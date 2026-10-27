@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+._*
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*~
+
+# Logs and temp files
+*.log
+tmp/
+
+# Local env
+.env
+.env.*
+
+# Dependencies
+node_modules/
+
+# Sahne gallery build output
+packages/sahne-gallery/dist/
+
+# Sahne kit: source recordings (local only; SOURCES.md says where each comes from)
+packages/sahne-kit/sounds/library/
+
+# Playwright output
+test-results/
+playwright-report/

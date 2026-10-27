@@ -1,0 +1,71 @@
+{
+  "avatar": {
+    "body": {
+      "build": "adult",
+      "height": 0.82,
+      "shape": "broad"
+    },
+    "face": {
+      "ears": "small",
+      "eyeColor": "eye_blue",
+      "eyes": "monolid",
+      "nose": "aquiline",
+      "shape": "diamond"
+    },
+    "hair": {
+      "color": "hair_10",
+      "style": "hair_wavy_long"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "colors": [
+          "fab_16"
+        ],
+        "id": "bottom_salvar"
+      },
+      "shoes": {
+        "colors": [
+          "fab_22"
+        ],
+        "id": "shoes_flats"
+      },
+      "top": {
+        "colors": [
+          "fab_09"
+        ],
+        "id": "top_sweater"
+      }
+    },
+    "skin": "skin_05",
+    "v": 1,
+    "wear": {
+      "head": {
+        "colors": [
+          "fab_12"
+        ],
+        "id": "headscarf_wrap"
+      },
+      "waist": {
+        "colors": [
+          "fab_18"
+        ],
+        "id": "apron_shop"
+      }
+    }
+  },
+  "bio": "Sells village eggs and greens, and weighs everything twice.",
+  "bioFa": "تخم‌مرغِ محلی و سبزی می‌فروشد و همه‌چیز را دو بار وزن می‌کند.",
+  "color": "#8A8580",
+  "id": "stallholder_2",
+  "kind": "extra",
+  "level": "A1",
+  "name": "Pazarcı",
+  "nameFa": "فروشنده‌ی بازار",
+  "order": 118,
+  "places": [
+    "pazar_ferikoy"
+  ],
+  "role": "A stallholder at the Feriköy Saturday market",
+  "roleFa": "فروشنده‌ای در بازارِ شنبه‌های فری‌کؤی"
+}

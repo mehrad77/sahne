@@ -1,0 +1,4 @@
+{
+ "about": "The set kit's plan : generators still to draw, and variants still to draw on built ones (`built: true`); each leaves this file when it is drawn. `needs.json` names these by `kit` and `variant`.",
+ "generators": {}
+}

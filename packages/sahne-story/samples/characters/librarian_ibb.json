@@ -1,0 +1,88 @@
+{
+  "avatar": {
+    "body": {
+      "build": "adult",
+      "height": 0.56,
+      "shape": "broad"
+    },
+    "face": {
+      "brows": "thin",
+      "eyes": "small",
+      "marks": [
+        "laugh_lines"
+      ],
+      "mouth": "full",
+      "nose": "upturned",
+      "shape": "square"
+    },
+    "hair": {
+      "color": "hair_02",
+      "style": "hair_bob"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "colors": [
+          "fab_24"
+        ],
+        "id": "bottom_skirt_long"
+      },
+      "outer": {
+        "colors": [
+          "fab_50",
+          "fab_13"
+        ],
+        "id": "outer_cardigan_short"
+      },
+      "shoes": {
+        "colors": [
+          "fab_22",
+          "fab_22"
+        ],
+        "id": "shoes_flats"
+      },
+      "top": {
+        "colors": [
+          "fab_02"
+        ],
+        "id": "top_tee_long"
+      }
+    },
+    "skin": "skin_02",
+    "v": 1,
+    "wear": {
+      "eyes": {
+        "colors": [
+          "met_gold"
+        ],
+        "id": "glasses_round"
+      },
+      "head": {
+        "colors": [
+          "fab_43"
+        ],
+        "id": "headscarf_pinned"
+      },
+      "neck": {
+        "colors": [
+          "fab_33"
+        ],
+        "id": "lanyard_badge"
+      }
+    }
+  },
+  "bio": "Sits at the desk and asks for quiet with one finger.",
+  "bioFa": "پشتِ میز می‌نشیند و با یک انگشت می‌گوید ساکت.",
+  "color": "#8A8580",
+  "id": "librarian_ibb",
+  "kind": "extra",
+  "level": "A1",
+  "name": "Kütüphaneci",
+  "nameFa": "کتابدار",
+  "order": 106,
+  "places": [
+    "library_ibb"
+  ],
+  "role": "The librarian at the İBB city library",
+  "roleFa": "کتابدارِ کتابخانه‌ی شهرداری"
+}

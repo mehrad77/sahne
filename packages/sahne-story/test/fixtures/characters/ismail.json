@@ -1,0 +1,82 @@
+{
+  "avatar": {
+    "body": {
+      "build": "adult",
+      "height": 0.38,
+      "shape": "round"
+    },
+    "face": {
+      "brows": "thick",
+      "eyes": "round",
+      "mouth": "wide",
+      "nose": "round",
+      "shape": "round"
+    },
+    "facialHair": {
+      "color": "#4A4440",
+      "style": "moustache_thick"
+    },
+    "hair": {
+      "color": "hair_08",
+      "style": "hair_classic"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "colors": [
+          "fab_24"
+        ],
+        "id": "bottom_trousers"
+      },
+      "shoes": {
+        "colors": [
+          "fab_20"
+        ],
+        "id": "shoes_leather"
+      },
+      "top": {
+        "colors": [
+          "fab_02"
+        ],
+        "id": "top_shirt_rolled"
+      }
+    },
+    "skin": "skin_05",
+    "v": 1,
+    "wear": {
+      "waist": {
+        "colors": [
+          "fab_04"
+        ],
+        "id": "apron_shop"
+      }
+    }
+  },
+  "bio": "Runs the corner shop; quick, warm, a little impatient.",
+  "bioFa": "بقالیِ سرِ کوچه را می‌گرداند؛ تند، گرم، کمی بی‌حوصله.",
+  "circle": "neighbourhood",
+  "color": "#B5582E",
+  "id": "ismail",
+  "kind": "cast",
+  "level": "A1",
+  "motion": {
+    "energy": "mid",
+    "signature": [
+      "welcome",
+      "explain"
+    ],
+    "tempo": 1.1
+  },
+  "name": "İsmail",
+  "nameFa": "اسماعیل",
+  "order": 3,
+  "places": [
+    "bakkal"
+  ],
+  "role": "The bakkal on the corner",
+  "roleFa": "بقالِ سرِ کوچه",
+  "voice": {
+    "pitch": 0.78,
+    "rate": 1.05
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "avatar": {
+    "body": {
+      "build": "adult",
+      "height": 0.45,
+      "shape": "average"
+    },
+    "face": {
+      "brows": "soft",
+      "eyes": "round",
+      "mouth": "wide",
+      "nose": "button",
+      "shape": "oval"
+    },
+    "hair": {
+      "color": "hair_02",
+      "style": "hair_short"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "colors": [
+          "fab_03"
+        ],
+        "id": "bottom_jeans"
+      },
+      "shoes": {
+        "colors": [
+          "fab_01",
+          "fab_01"
+        ],
+        "id": "shoes_sneakers"
+      },
+      "top": {
+        "colors": [
+          "fab_12"
+        ],
+        "id": "top_shirt"
+      }
+    },
+    "skin": "skin_04",
+    "v": 1
+  },
+  "bio": "New in Istanbul, learning Turkish.",
+  "bioFa": "تازه به استانبول آمده و ترکی یاد می‌گیرد.",
+  "color": "#2F8C88",
+  "id": "nima",
+  "kind": "standin",
+  "level": "A1",
+  "name": "Nima",
+  "nameFa": "نیما",
+  "order": 2,
+  "role": "The newcomer: the learner",
+  "roleFa": "تازه‌وارد: خودِ زبان‌آموز",
+  "voice": {
+    "pitch": 1.05,
+    "rate": 1
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "sahne-gallery",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd packages/sahne-gallery && PORT=${PORT:-5180} node serve.mjs"
+      ],
+      "port": 5180,
+      "autoPort": true
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "avatar": {
+    "body": {
+      "build": "adult",
+      "height": 0.35,
+      "shape": "broad"
+    },
+    "face": {
+      "brows": "bushy",
+      "ears": "small",
+      "eyes": "sleepy",
+      "mouth": "full",
+      "nose": "long",
+      "shape": "square"
+    },
+    "hair": {
+      "color": "hair_01",
+      "style": "hair_buzz"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "id": "bottom_trousers_suit"
+      },
+      "shoes": {
+        "colors": [
+          "fab_22"
+        ],
+        "id": "shoes_leather"
+      },
+      "top": {
+        "colors": [
+          "fab_05"
+        ],
+        "id": "top_shirt"
+      }
+    },
+    "skin": "skin_20",
+    "v": 1,
+    "wear": {
+      "eyes": {
+        "colors": [
+          "met_black"
+        ],
+        "id": "glasses_rectangle"
+      },
+      "neck": {
+        "id": "lanyard_badge"
+      }
+    }
+  },
+  "bio": "Checks the papers, taps the contract and shakes his head; tired, never a villain.",
+  "bioFa": "مدارک را بررسی می‌کند، روی قرارداد می‌زند و سر تکان می‌دهد؛ خسته است، اما آدمِ بدی نیست.",
+  "color": "#8A8580",
+  "id": "clerk_goc",
+  "kind": "extra",
+  "level": "A1",
+  "name": "Memur",
+  "nameFa": "مأمور",
+  "order": 101,
+  "places": [
+    "goc_inside"
+  ],
+  "role": "The clerk behind the glass at Göç İdaresi",
+  "roleFa": "کارمندِ پشتِ شیشه در اداره‌ی مهاجرت"
+}

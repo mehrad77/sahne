@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "character.json",
+  "title": "A character document (STORIES_SCHEMA.md §5)",
+  "type": "object",
+  "required": ["id", "order", "name", "nameFa", "kind", "role", "roleFa", "bio", "bioFa", "color", "level"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "order": { "type": "integer", "minimum": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "nameFa": { "type": "string", "minLength": 1 },
+    "kind": { "enum": ["narrator", "standin", "cast", "extra"] },
+    "role": { "type": "string", "minLength": 1 },
+    "roleFa": { "type": "string", "minLength": 1 },
+    "bio": { "type": "string", "minLength": 1 },
+    "bioFa": { "type": "string", "minLength": 1 },
+    "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+    "level": { "enum": ["A1", "A2", "B1"] },
+    "circle": { "enum": ["old_friends", "neighbourhood", "tomer", "guest"] },
+    "places": { "type": "array", "items": { "type": "string" } },
+    "catch": { "type": ["string", "object"] },
+    "friend": { "type": "boolean" },
+    "terms": { "type": "array", "items": { "type": "string" } },
+    "puppet": { "type": "string" },
+    "address": { "type": "object", "additionalProperties": { "enum": ["sen", "siz"] } },
+    "avatar": {
+      "type": "object",
+      "required": ["v", "kit", "body", "skin", "face", "hair", "outfit"],
+      "properties": {
+        "v": { "const": 1 },
+        "body": { "type": "object", "required": ["build"], "properties": { "build": { "enum": ["adult", "elder", "child", "toddler"] } } },
+        "custom": { "type": "array", "maxItems": 2 }
+      }
+    },
+    "outfits": { "type": "object", "propertyNames": { "not": { "const": "default" } }, "additionalProperties": { "type": "object" } },
+    "motion": {
+      "type": "object",
+      "properties": {
+        "tempo": { "type": "number", "minimum": 0.7, "maximum": 1.3 },
+        "energy": { "enum": ["low", "mid", "high"] },
+        "signature": { "type": "array", "minItems": 2, "maxItems": 3, "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "voice": {
+      "type": "object",
+      "required": ["rate", "pitch"],
+      "properties": { "rate": { "type": "number" }, "pitch": { "type": "number" }, "neural": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "album": { "type": "object" }
+  },
+  "allOf": [{ "anyOf": [{ "required": ["avatar"] }, { "required": ["puppet"] }] }],
+  "additionalProperties": false
+}

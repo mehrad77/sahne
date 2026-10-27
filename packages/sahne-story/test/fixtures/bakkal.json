@@ -1,0 +1,46 @@
+{
+  "arc": {"id": "s1w02", "tr": "Mahallede", "en": "In the neighbourhood", "fa": "در محله", "mechanics": ["say", "explore", "act", "aloud"]},
+  "cast": ["ismail", "nima"],
+  "draft": true,
+  "gl": {
+    "buyrun": ["بفرمایید", "here you are; go ahead"],
+    "başka": ["دیگر", "other; else"],
+    "taze": ["تازه", "fresh"]
+  },
+  "id": "s1e00",
+  "kind": "episode",
+  "lessons": ["g_a1_2_var_yok", "g_a1_1_bu_su_o", "g_a1_2_sayilar"],
+  "level": "A1",
+  "place": "bakkal",
+  "ref": "A1_2",
+  "releaseDate": "2026-09-14",
+  "season": 1,
+  "steps": [
+    {"at": {"ismail": "counter"}, "kerim": "ledge", "scene": "bakkal", "time": "day"},
+    {"en": "Nima is at the bakkal.", "fa": "نیما در بقالی است.", "narr": true, "tr": "Nima bakkalda.", "who": "kerim"},
+    {"do": "welcome", "emo": "happy", "en": "Welcome! Come in.", "fa": "خوش آمدید! بفرمایید.", "move": {"how": "enter", "to": "customer", "who": "nima"}, "sfx": {"id": "doorbell", "word": "çın çın"}, "to": "nima", "tr": "Hoş geldiniz! Buyrun.", "who": "ismail"},
+    {"at": "mark:shelf", "do": "look", "emo": "curious", "en": "Is there bread? Is there milk?", "fa": "نان هست؟ شیر هست؟", "link": {"ekmek": "obj:ekmek", "süt": "obj:sut"}, "tr": "Ekmek var mı? Süt var mı?", "who": "nima"},
+    {"at": "obj:ekmek", "do": "point", "en": "There is bread. That bread is very fresh.", "fa": "نان هست. آن نان خیلی تازه است.", "link": {"ekmek": "obj:ekmek"}, "react": {"nima": {"at": "obj:ekmek", "do": "look"}}, "tr": "Ekmek var. Şu ekmek çok taze.", "who": "ismail"},
+    {"act": {"expect": "obj:ekmek", "id": "which_bread", "kind": "tap", "prompt": {"en": "Which one is \"şu ekmek\"?", "fa": "«şu ekmek» کدام است؟", "tr": "Hangi ekmek?"}, "react": {"ok": {"ismail": {"do": "nod", "emo": "happy"}}, "other": {"ismail": "confused"}}, "targets": ["obj:ekmek", "obj:simit"], "to": "ismail"}},
+    {"do": "shrug", "emo": "sorry", "en": "But there is no milk.", "fa": "ولی شیر نیست.", "link": {"süt": "obj:sut"}, "obj": [{"id": "sut", "op": "hide"}], "on": "yok", "tr": "Ama süt yok.", "who": "ismail"},
+    {"spot": {"en": "var: there is. yok: there isn't. The milk is gone: only its outline is left.", "ex": "Ama süt yok.", "fa": "var یعنی هست، yok یعنی نیست. شیر تمام شده: فقط جایش مانده.", "lesson": "g_a1_2_var_yok", "show": "var_yok"}},
+    {"choice": {"id": "ask", "kind": "polite", "options": [
+      {"do": "count", "en": "Two loaves, please.", "fa": "دو تا نان، لطفاً.", "link": {"ekmek": "obj:ekmek"}, "n": 2, "ok": true, "react": {"ismail": {"do": "nod", "emo": "happy"}}, "reply": [
+        {"emo": "happy", "en": "Here you are!", "fa": "بفرمایید!", "obj": [{"id": "ekmek", "n": 2, "op": "give", "to": "nima"}], "tr": "Buyrun!", "who": "ismail"}
+      ], "tone": "polite", "tr": "İki ekmek, lütfen."},
+      {"do": "count", "en": "Give two loaves.", "fa": "دو تا نان بده.", "link": {"ekmek": "obj:ekmek"}, "n": 2, "react": {"ismail": {"emo": "confused"}}, "reply": [
+        {"beat": {"wait": 900}},
+        {"en": "…Here you are.", "fa": "…بفرمایید.", "obj": [{"id": "ekmek", "n": 2, "op": "give", "to": "nima"}], "tr": "…Buyrun.", "who": "ismail"}
+      ], "tone": "blunt", "tr": "İki ekmek ver."}
+    ], "to": "ismail"}},
+    {"do": "explain", "emo": "curious", "en": "Anything else?", "fa": "چیز دیگری؟", "tempo": 1.4, "tr": "Başka bir şey?", "who": "ismail"},
+    {"emo": "nervous", "en": "…", "fa": "…", "sfx": {"at": "mark:clock", "id": "clock_tick", "word": "tik tak"}, "tr": "…", "voice": "silent", "who": "nima"},
+    {"en": "Slowly, little by little…", "fa": "آهسته آهسته…", "narr": true, "tr": "Yavaş yavaş…", "who": "kerim"}
+  ],
+  "summary": "Nima buys bread at İsmail's corner shop. There is bread, but no milk.",
+  "summaryFa": "نیما از بقالیِ اسماعیل نان می‌خرد. نان هست، ولی شیر نیست.",
+  "title": "Ekmek var mı?",
+  "titleEn": "Is there bread?",
+  "titleFa": "نان هست؟",
+  "words": ["a1-w-ekmek", "a1-w-sut", "a1-w-simit", "a1-w-var", "a1-w-yok"]
+}

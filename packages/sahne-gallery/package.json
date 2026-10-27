@@ -1,0 +1,26 @@
+{
+  "name": "sahne-gallery",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dev gallery for Sahne: the look, parts, faces, lights and cameras",
+  "scripts": {
+    "dev": "node serve.mjs",
+    "size": "node size.mjs",
+    "golden": "node golden.mjs",
+    "golden:update": "node golden.mjs --update",
+    "thumbs": "node thumbs.mjs",
+    "check": "tsc -p ../tsconfig.json && node size.mjs && node determinism.mjs && node ../sahne-story/stories.ts --check --quiet && node ../sahne-story/cast/extras.ts --check && node --test ../sahne/test/*.test.ts ../sahne-kit/test/*.test.ts ../sahne-tr/test/*.test.ts ../sahne-story/test/*.test.ts test/*.test.ts && node golden.mjs"
+  },
+  "dependencies": {
+    "sahne": "workspace:*",
+    "sahne-kit": "workspace:*",
+    "sahne-story": "workspace:*",
+    "sahne-tr": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "esbuild": "0.28.2",
+    "typescript": "~6.0.3"
+  }
+}

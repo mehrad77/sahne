@@ -1,0 +1,54 @@
+Sahne kit art licence
+=====================
+
+Copyright (c) 2026 Mehrad Rousta
+
+The kits' art, sounds and music in this repository are licensed under the
+Creative Commons Attribution 4.0 International licence (CC BY 4.0):
+https://creativecommons.org/licenses/by/4.0/
+
+Attribute as: "Sahne kit art by Mehrad Rousta, CC BY 4.0", with a link to
+https://github.com/mehrad77/sahne where the medium allows.
+
+What this covers
+----------------
+
+The kit's art is code: the shapes, colours, poses and sounds it draws and plays.
+"The kits' art, sounds and music" means:
+
+- packages/sahne-kit/src/ (people's parts, faces, hair, clothes, hands,
+  gestures, palettes and patterns; the set pieces and props of src/set/; the
+  animal puppets of src/puppets/; the synthesized sounds of src/sounds.ts and
+  the music of src/music.ts), except what is reserved below;
+- the sound files cut from recordings, packages/sahne-kit/sounds/*.m4a. The
+  recordings they are cut from are CC0 (public domain), from the sources listed
+  in packages/sahne-kit/sounds/SOURCES.md, and stay CC0;
+- the pictures made from them in this repository: the golden frames
+  (packages/sahne-gallery/golden/), apart from what they show of the reserved
+  works.
+
+The build scripts and tests that sit beside the art (packages/sahne-kit/*/build.ts,
+packages/sahne-kit/test/) and the rest of the repository are code under the MIT
+License (LICENSE).
+
+Reserved: not licensed, all rights reserved
+-------------------------------------------
+
+These are not covered by CC BY 4.0 or by the MIT License. You may not use,
+copy, modify or redistribute them outside this repository and Kumru
+(https://github.com/mehrad77/kumru) without written permission:
+
+1. Kerim's art: everything in packages/sahne-kit/src/kerim/. That covers her
+   drawing (art.ts), her stage puppet's art generated from it (art.gen.ts), her
+   stylesheet (kerim.css, exported as sahne-kit/kerim.css), her gestures
+   (gestures.ts) and her puppet (index.ts). Kerim is the mascot of Kumru.
+
+2. The parts reserved for Kumru's cast: every part whose entry in
+   packages/sahne-kit/src/curation.ts has avail "cast". Today these are:
+     - top_shirt_uniform  (the extras' uniform shirt)
+     - apron_pockets      (Hatice's apron)
+   A part that gains avail "cast" in curation.ts later is reserved in the same
+   way.
+
+The rest of the kit's parts, whatever avail they have ("open", "unlock" or
+"hidden"), are CC BY 4.0.

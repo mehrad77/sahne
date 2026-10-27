@@ -1,0 +1,69 @@
+{
+  "avatar": {
+    "body": {
+      "build": "adult",
+      "height": 0.78,
+      "shape": "slim"
+    },
+    "carry": {
+      "id": "bag_shoulder"
+    },
+    "face": {
+      "brows": "thin",
+      "ears": "large",
+      "eyeColor": "eye_dark",
+      "eyes": "monolid",
+      "mouth": "small",
+      "shape": "square"
+    },
+    "hair": {
+      "color": "hair_10",
+      "style": "hair_curly_short"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "colors": [
+          "fab_09"
+        ],
+        "id": "bottom_chinos"
+      },
+      "outer": {
+        "colors": [
+          "fab_08"
+        ],
+        "id": "outer_jacket_bomber"
+      },
+      "shoes": {
+        "colors": [
+          "fab_20"
+        ],
+        "id": "shoes_boots_chelsea"
+      },
+      "top": {
+        "colors": [
+          "fab_18"
+        ],
+        "id": "top_sweater"
+      }
+    },
+    "skin": "skin_15",
+    "v": 1
+  },
+  "bio": "Walking somewhere; asked the way, he points.",
+  "bioFa": "دارد جایی می‌رود؛ وقتی راه را می‌پرسند، با دست نشان می‌دهد.",
+  "color": "#8A8580",
+  "id": "passerby_1",
+  "kind": "extra",
+  "level": "A1",
+  "name": "Yoldan geçen",
+  "nameFa": "رهگذر",
+  "order": 119,
+  "places": [
+    "istiklal_street",
+    "istiklal_taksim",
+    "ferikoy"
+  ],
+  "role": "A passer-by on İstiklal",
+  "roleFa": "رهگذری در استقلال"
+}

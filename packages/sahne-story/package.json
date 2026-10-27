@@ -1,0 +1,20 @@
+{
+  "name": "sahne-story",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The story format for Sahne: a story document becomes a script, its player, the story check and lints",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "sahne": "workspace:*",
+    "sahne-tr": "workspace:*"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0"
+  }
+}

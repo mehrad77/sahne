@@ -1,0 +1,107 @@
+# sahne-story
+
+A story format for the [Sahne](../sahne/README.md) stage: story documents (the format [Kumru](https://github.com/mehrad77/kumru) plays), the adapter that turns one into a Sahne script, the player, the lints and the story check. Story-specific, so it lives beside the engine, not in it. It depends on `sahne` and `sahne-tr`. The story format itself is described in the Kumru repo (`docs/stories/STORIES_SCHEMA.md`, `STORIES_STAGE.md`); the schemas are here, in `schema/`.
+
+| Export | What it does |
+|---|---|
+| `adaptStory(story, options)` | A story document (`STORIES_SCHEMA.md`) becomes a Sahne script with its reply cards: the turns, what `Stage.load` needs (cast, with Kerim as the kit's bird puppet when her document has `puppet`, the characters' `terms`, the wardrobe its `looks` need, each place with the story's props that stand there, kept from place to place, the other branches' cues), `perform(picks)` and the default picks (`STORIES_STAGE.md` §3). Translations stay off the stage, in the cue info for the log and the card |
+| `personalise` (an option of `adaptStory`) | The host's personalising (Kumru's `personalizeStr`): the name and hometown tokens become the learner's, in every text that reaches the stage (lines, link keys, sound words, prop labels, phone screens, an act's prompt, display names) |
+| `storyPlayer(stage, adapted, hooks)` | The player's logic without a screen: what the footer offers (`busy`, `devam`, a `turn` card, `end`), `devam`, `say`, `choose(index)` (re-plans from its own cue), `act()` (its answer re-plans what follows), `restart`, `tick` for a hidden tab, and `run` (the cue playing, an act's with its `result`, for the host's act card). Kumru's reader and the gallery draw on it (`src/player.ts`, `test/player.test.ts`) |
+| `flagsOf`, `warmthOf`, `albumBand`, `metIn`, `unlockedOf` | What the stories remember of a learner, derived from the picks the app keeps per story (`st[id].ch`) and never stored: flags (§4.7), warmth and Kerim's album (§4.8), the avatar unlock tokens (`src/memory.ts`) |
+| `storyProps(story, place)` | The story's own props that stand in `place` (`at` a point or mark in the opening place, or a map of places), with `at` resolved and `keep` set (`STORIES_SCHEMA.md` §3) |
+| `dressing(story, avatars, characters, ok)` | Who wears what, step by step (`src/looks.ts`, `STORIES_SCHEMA.md` §5.2): the cast's starting documents, the wardrobe, and the costume changes per step; the learner wears only a coat and a hat |
+| `lintStory(story, options)` | Staging that contradicts the Turkish it stages (`STORIES_STAGE.md` §4): deixis, *var*/*yok*, numbers, the staging budget, phone lines, silent lines, clock times, links and `obj:` targets on stage, stand-in turns, mechanics, where story props stand, changes of clothes (`look`), and that every scene's place, marks, Kerim's perch, moves and time exist (`place`). With the characters, Kerim on stage stands on her perch, so `ch:kerim` has a place. A problem may carry a `fix` |
+| `suggest(story, options)` | The fixes, plus the links a line could have |
+| `lintPlace(place, {kit, cards, needs})` | A place document against the place standard (`src/lint-place.ts`): `valid`, `needs`, `depth`, `density`, `explore`, `crowd`, `reach`, `light`, `sound`, `budget` (5 KB of JSON, and every flat fits a layer of the atlas). A `placeholder` document only warns |
+| The story check (`check/`, `stories.ts`; node only, not exported from `src/index.ts`) | Every story, character and place against the story docs: JSON schemas (`schema/*.json`, ajv), ids, calendar (`days.json`), `ref` and lesson units, cast, counts, flags, quiz, mistakes, unknown words, the known-word ratio and recycling (warnings for now), `lintStory` and `lintPlace`. See *The story check* below |
+| `isCard`, `isA1`, `cardProblem` | The app's card index (`src/cards.ts`): which ids a `terms` entry may name (any live card) and which count as A1. `load.ts` builds the index in node from the content root's `cards/` and `cards-extra/` (read only) |
+| `needsOf(needs, place)` | A place's entry in the content root's `needs.json`: what the stories' briefs ask of it, keyed by site (`src/needs.ts`) |
+
+## Where the data lives
+
+Every node reader (the story check, the place checker, the extras' generator, the tests, the kit's set build and tests, the gallery's server and scripts) finds the story data through `paths.ts`, never through a path of its own. The data is in a **content root**:
+
+- the folder named by the env var `SAHNE_CONTENT` (an absolute path), for example Kumru's `data/`: `SAHNE_CONTENT=$PWD/data pnpm sahne dev`;
+- without it, `samples/` in this package: one short sample story (`s1e00`), its characters (Kerim, Nima, İsmail) with the generated extras, and two places (`bakkal`, `metro_m11`).
+
+| In the content root | What | Needed |
+|---|---|---|
+| `stories/<id>.json` | the stories | yes |
+| `characters/<id>.json` | the cast roster and the generic extras together, told apart by `kind` | yes |
+| `places/<id>.json` | the place documents | yes |
+| `cards/`, `cards-extra/` | the word cards a story's `words` and a place's `terms` name; also the gallery's tap-to-translate | no: without them the card rules, unknown words and the known-word ratio do not run |
+| `grammar/` | the grammar lessons a story's `lessons` name | no: without it lesson ids are not checked |
+| `syllabus/a1.json` | what each unit teaches, for the known-word ratio | no |
+| `days.json` | the release calendar, `{ "<story id>": { "date", "week", "kind" } }` | no: without it the calendar rules do not run, and a flag's story is dated by its own `releaseDate` |
+| `needs.json` | what the stories' briefs ask of each place, keyed by site | no: without it the place lint's `needs` rule does not run |
+| `thumbs/` | the story pictures, written by `sahne-gallery/thumbs.mjs` | no |
+
+Story docs are separate from the data. The optional env var `SAHNE_STORY_DOCS` (an absolute folder) holds `STORIES_WORLD.md`: the stories' sites, as the tables of its §2. The gallery's places board (`/data/world.json`) and `test/needs.test.ts` read it. Without it, the board leaves the sites out and that test skips. Nothing in Sahne reads `STORIES_A1.md`; the calendar is `days.json`.
+
+### The contract, in short
+
+| What | Where | Shape | Absent |
+|---|---|---|---|
+| `SAHNE_CONTENT` | env, an absolute folder | the content root below | `packages/sahne-story/samples/` |
+| `SAHNE_STORY_DOCS` | env, an absolute folder | holds `STORIES_WORLD.md` | no sites on the board; the needs-vs-world test skips |
+| stories, characters, places | `<root>/{stories,characters,places}/<id>.json` | `schema/story.json`, `character.json`, `place.json` | required |
+| cards | `<root>/cards/`, `<root>/cards-extra/` | `<id>.json` with `tr`, `en`, `fa`, `level`, `ref`, `retired` | `loadCards()` returns `null` (not `{}`); every card rule skips |
+| grammar | `<root>/grammar/<id>.json` | with `ref`, `level` | lesson refs are not checked |
+| syllabus | `<root>/syllabus/a1.json` | `{ words, lessons, units }` | the known-word ratio uses the cards alone, or skips |
+| calendar | `<root>/days.json` | `{ "s1e01": { "date": "2026-09-07", "week": 1, "kind": "episode" } }` | the calendar rules skip; a flag's story is dated by its own `releaseDate` |
+| needs | `<root>/needs.json` | `src/needs.ts` `Needs`, keyed by site | `loadNeeds()` returns `undefined`; the place lint's `needs` rule and `test/needs.test.ts` skip |
+| extras | written to `<root>/characters/` by `cast/extras.ts` | `kind: "extra"` | `--check` fails: run the generator |
+| thumbs | written to `<root>/thumbs/` by `sahne-gallery/thumbs.mjs` | `<id>.webp` and `thumbs.json` | `--check` fails: run the script |
+
+A missing optional file is never an error: each rule that needs it skips. The samples have no cards, grammar, syllabus, calendar or needs, and pass `stories.ts --check` with 0 errors and 0 warnings.
+
+The JSON schemas stay in `schema/`. Each file is named by its `id`. The gallery's two bundled JSON imports (`sahne-gallery/src/bakkal.ts`, `src/systems/places.ts`) are the only literal paths, and they read the samples.
+
+## Places
+
+The place documents are read by the gallery, the stories and the tests from `places/` of the content root. The checker prints every place against the standard:
+
+```bash
+node packages/sahne-story/places.ts            # the table and the problems
+node packages/sahne-story/places.ts --check    # exits 1 on any error
+node packages/sahne-story/places.ts --file <path>.json        # a document elsewhere too
+```
+
+The story, character and place types are in `src/types.ts`.
+
+## The cast
+
+`characters/` of the content root is the one home of the characters' documents (`STORIES_SCHEMA.md` §5): `<id>.json`, one per character, the file named by its `id`. The roster is every document there whose `kind` is not `extra` (`loadCast` in `check/world.ts`), the extras the ones with `kind: "extra"` (`loadExtras`). A story has no copies: the story check and the gallery give each story Kerim, Nima and the characters its `cast` and `extras` name, read from there (`charactersOf` in `check/world.ts`). The gallery shows the roster at `#/cast` and the extras at `#/cast/extras`; the studio plays any of them (`#/kit/people?tab=studio&look=<id>` or `look=<id>.<outfit>`).
+
+**The extras.** The silent people of the places (`clerk_goc`, `cayci_ortakoy`, `cayci_vapur`, `baker_firin`, `usta`, `librarian_ibb`, `librarian_bu`, `teacher_kindergarten`, `child_1`…`child_8`, `stallholder_1`, `stallholder_2`, `passerby_1`, `passenger_1`…`passenger_7`) are character documents with `kind: "extra"` in `characters/<id>.json` of the content root, beside the roster, so a story's `extras` find them like any character. `cast/extras.ts` writes them and nobody edits them by hand: `node packages/sahne-story/cast/extras.ts` writes them into `$SAHNE_CONTENT/characters` (or the samples), `--check` (in `pnpm sahne check` and Kumru's `pnpm check`) fails on a missing, stale or unknown extra. It only ever creates, rewrites or deletes a file whose document is `kind: "extra"`, and refuses to write an extra over a character of another kind with the same file name. Each is the builder's `randomize(seed)` with a frozen `offer` (the build, the skin, every face value, the hair styles and colours, the garments and fabric colours it may draw are listed in the script; no patterns), then the role's fixed fields set on top (an apron, a lanyard, a headscarf, glasses), and women and girls get no facial hair. The freeze holds against parts the kit gains; a change to a listed part, the kit's odds or the randomiser makes `--check` fail on purpose: regenerate and look at `#/cast/extras` again. Name and role are the role in Turkish and Persian, `color` one neutral grey, `level` A1, `order` from 101.
+
+The check (`checkCast` in `check/rules.ts`) holds each roster document to its schema, its id to its file name and never a retired id (the old series' `ada can dede deniz ela marti mert selin simit zeynep`), its `order` unique; an avatar, and each outfit applied to it, within `AVATAR_MAX_BYTES` as written (before `normalize`, which trims to fit); composed with the kit, with no part refused, out of its slot, unfit for the build, replaced or dropped for size (hidden and clipped parts are normal); no value `normalize` would change or drop (a colour the palette lacks, a pattern the part does not take, an unknown face value); a `puppet` one the kit or Kerim's module provides. The extras get the same, and an `order` of 100 or more. `test/cast.test.ts` is the clipping check over the roster and the extras.
+
+## The story check
+
+```bash
+node packages/sahne-story/stories.ts            # the table of stories × rules, the problems, the season report
+node packages/sahne-story/stories.ts s1e00      # one story
+node packages/sahne-story/stories.ts --check    # exits 1 on any error (warnings and info pass)
+```
+
+Errors: the characters (above), schema, ids, calendar (with `days.json`: release date, kind and arc against it; always: no Sunday, no break week, specials on Saturdays), `ref` and lessons and target words against the week's unit (a card above the story's level, or with no ref, never counts), cast limits (`CAST_ALLOW` holds s1e45's six), counts (target words, choices, spots), flags (each read flag set by the earlier story it names, once that story is written), quiz, `mistake.fix`, words that resolve to no card, gloss or name, missing places and characters, and every `lintStory` error. Warnings and info: line counts, the 95% known-word ratio (known = cards and syllabus words up to the week's unit, names, numbers and particles; glosses do not count), recycling forwards (the target words reappear in two of the next stories within 14 days, once those stories exist) and backwards, albums, the season's choice kinds. The rules that need the cards, the grammar, the syllabus or the calendar run only when the content root has them (see the table above). `pnpm sahne check` and Kumru's `pnpm check` run the check, and `test/drafts.test.ts` finds every story in `stories/` of the content root on its own.
+
+## The sample story
+
+`samples/stories/s1e00.json` is a short original story written for this repo, "Portakal var mı?": Nima rides the M11 home in the evening, then buys oranges at İsmail's bakkal (a tap act, a polite-or-blunt choice, a grammar spot on *var*/*yok*). Its characters are `kerim`, `nima` and `ismail` from `samples/characters/`, its places `metro_m11` and `bakkal` from `samples/places/`. The gallery plays it at `#/stories/s1e00`, and the golden frames (`sahne-gallery/golden.mjs`) shoot five of its cues. A sample has no cards, grammar, syllabus or calendar, so those rules are off for it.
+
+## Tests
+
+```bash
+node --test test/*.test.ts   # here, or pnpm test
+pnpm sahne check             # from the repo root: types, sizes and every Sahne package's tests
+```
+
+- `test/places.test.ts`: a place built to the standard passes `lintPlace`, each rule catches its own break, a placeholder only warns, the story's `place` rule, and every place document has no errors.
+- `test/needs.test.ts`: the content root's `needs.json` (skipped without one) covers every story, uses live cards, and every prop names a kit generator and variant that is drawn or planned (`packages/sahne-kit/set/plan.json`).
+- `test/schema.test.ts`, `test/drafts.test.ts`: the schemas accept every document of the content root and refuse a seeded break; every story passes the check with no errors.
+- `test/extras.test.ts`: the extras' generator is deterministic, the extras' files are current, every extra passes the cast check, a broken one is caught, and the generator leaves the roster's files in the shared folder alone.
+- `test/cast.test.ts`: every roster avatar, each outfit applied, and every extra, composed at rest: the stage's lone-figure framing (`figureBox` from `figureDims`) holds every head piece inside its top and sides at head and bust and every piece at full; the still (`renderSvg`) holds the hair and headwear inside its picture at head and bust (a failure there is hair or a hat beyond the still's clamp, 1.5 head heights up and 0.8 head widths out); and each raw document is within the 2 KB cap.
+- `test/story.test.ts`, `test/places.test.ts`: the adapter and the lints on the bakkal test scene, written as a story (`test/fixtures/`, with a small card index of its own, `fixtures/cards.json`).
+- Tests of Kumru's own stories (s1e01, the seeded breaks of each story-check rule on it, the card index) live in the Kumru repo, which runs them on its data.

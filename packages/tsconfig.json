@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "noUnusedLocals": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": []
+  },
+  "include": ["sahne/src/**/*.ts", "sahne-kit/src/**/*.ts", "sahne-tr/src/**/*.ts", "sahne-story/src/**/*.ts", "sahne-gallery/src/**/*.ts"]
+}

@@ -1,0 +1,61 @@
+{
+  "avatar": {
+    "body": {
+      "build": "child",
+      "height": 0.73,
+      "shape": "round"
+    },
+    "face": {
+      "brows": "thin",
+      "ears": "large",
+      "marks": [
+        "dimples"
+      ],
+      "nose": "broad",
+      "shape": "long"
+    },
+    "hair": {
+      "color": "hair_01",
+      "style": "hair_curly_short"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "colors": [
+          "fab_58"
+        ],
+        "id": "bottom_trousers"
+      },
+      "shoes": {
+        "colors": [
+          "fab_10",
+          "fab_01",
+          "fab_58"
+        ],
+        "id": "shoes_canvas"
+      },
+      "top": {
+        "colors": [
+          "fab_42"
+        ],
+        "id": "top_tee_long"
+      }
+    },
+    "skin": "skin_08",
+    "v": 1
+  },
+  "bio": "One of the row of kindergarten children who sing on the park stage.",
+  "bioFa": "یکی از بچه‌های مهدکودک که در ردیفِ روی صحنه‌ی پارک آواز می‌خوانند.",
+  "color": "#8A8580",
+  "id": "child_6",
+  "kind": "extra",
+  "level": "A1",
+  "name": "Çocuk",
+  "nameFa": "بچه",
+  "order": 114,
+  "places": [
+    "park_ferikoy"
+  ],
+  "role": "A kindergarten child at the park show",
+  "roleFa": "بچه‌ی مهدکودک در جشنِ پارک"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "sahne-repo",
+  "private": true,
+  "packageManager": "pnpm@11.5.0",
+  "scripts": {
+    "sahne": "pnpm --filter sahne-gallery",
+    "check": "pnpm --filter sahne-gallery check",
+    "dev": "pnpm --filter sahne-gallery dev"
+  }
+}

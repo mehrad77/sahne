@@ -1,0 +1,79 @@
+{
+  "avatar": {
+    "body": {
+      "build": "elder",
+      "height": 0.95,
+      "shape": "average"
+    },
+    "face": {
+      "brows": "bushy",
+      "eyeColor": "eye_dark",
+      "eyes": "small",
+      "marks": [
+        "laugh_lines",
+        "forehead_lines"
+      ],
+      "mouth": "bowed",
+      "nose": "aquiline",
+      "shape": "long"
+    },
+    "hair": {
+      "color": "hair_08",
+      "style": "hair_bun_low"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "colors": [
+          "fab_27"
+        ],
+        "id": "bottom_skirt_midi"
+      },
+      "outer": {
+        "colors": [
+          "fab_09"
+        ],
+        "id": "outer_cardigan_short"
+      },
+      "shoes": {
+        "colors": [
+          "fab_29"
+        ],
+        "id": "shoes_loafer"
+      },
+      "top": {
+        "colors": [
+          "fab_02"
+        ],
+        "id": "top_blouse_collar"
+      }
+    },
+    "skin": "skin_17",
+    "v": 1,
+    "wear": {
+      "eyes": {
+        "colors": [
+          "fab_50"
+        ],
+        "id": "glasses_reading"
+      },
+      "neck": {
+        "id": "neck_glasses_chain"
+      }
+    }
+  },
+  "bio": "Knows every shelf, and whispers.",
+  "bioFa": "همه‌ی قفسه‌ها را می‌شناسد و آهسته حرف می‌زند.",
+  "color": "#8A8580",
+  "id": "librarian_bu",
+  "kind": "extra",
+  "level": "A1",
+  "name": "Kütüphaneci",
+  "nameFa": "کتابدار",
+  "order": 107,
+  "places": [
+    "library_bu"
+  ],
+  "role": "The librarian at the Beykent University library",
+  "roleFa": "کتابدارِ کتابخانه‌ی دانشگاهِ بیکنت"
+}

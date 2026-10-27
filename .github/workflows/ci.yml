@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    # nothing from the course books or Kumru's private data may be tracked here: no content/, no yk-s-* files,
+    # and no cards, cards-extra, grammar, path or syllabus data folder (whole path segments, so src/art/path.ts passes)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: no private data tracked
+        run: |
+          bad=$(git ls-files | grep -E '(^|/)(content|cards|cards-extra|grammar|path|syllabus)/|(^|/)yk-s-' || true)
+          if [ -n "$bad" ]; then echo "private data is tracked:"; echo "$bad"; exit 1; fi
+          echo "no private data tracked"
+
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: packages/sahne-gallery
+      # the stage's handwriting (--sahne-text-hand) is Comic Neue first: without it Linux falls back to whatever
+      # `cursive` maps to, and the signs in golden/linux/ would differ from machine to machine
+      - run: sudo apt-get install -y fonts-comic-neue
+      - run: pnpm sahne check
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: sahne-golden-failed
+          path: packages/sahne-gallery/golden/failed/
+          if-no-files-found: ignore

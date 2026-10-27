@@ -1,0 +1,128 @@
+{
+  "address": {
+    "nima": "siz",
+    "zafer": "siz"
+  },
+  "album": {
+    "s1": {
+      "close": {
+        "en": "Nima comes by every day.",
+        "fa": "نیما هر روز سر می‌زنه.",
+        "photo": {
+          "step": 18,
+          "story": "s1e05"
+        },
+        "tr": "Nima her gün geliyor."
+      },
+      "family": {
+        "en": "Nima is like my own niece or nephew.",
+        "fa": "نیما مثلِ خواهرزاده/برادرزاده‌ی خودمه.",
+        "photo": {
+          "step": 18,
+          "story": "s1e34"
+        },
+        "tr": "Nima benim yeğenim gibi."
+      },
+      "met": {
+        "en": "Nima… my tea customer.",
+        "fa": "نیما… مشتریِ چاییِ من.",
+        "photo": {
+          "step": 5,
+          "story": "s1e05"
+        },
+        "tr": "Nima… çay müşterim."
+      }
+    }
+  },
+  "avatar": {
+    "body": {
+      "build": "adult",
+      "height": 0.4,
+      "shape": "round"
+    },
+    "face": {
+      "brows": "thick",
+      "ears": "large",
+      "eyeColor": "eye_dark",
+      "eyes": "round",
+      "marks": [
+        "laugh_lines"
+      ],
+      "mouth": "wide",
+      "nose": "round",
+      "shape": "round"
+    },
+    "facialHair": {
+      "color": "hair_08",
+      "style": "moustache_thick"
+    },
+    "hair": {
+      "color": "hair_08",
+      "style": "hair_classic"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "colors": [
+          "fab_20"
+        ],
+        "id": "bottom_trousers"
+      },
+      "shoes": {
+        "colors": [
+          "fab_28"
+        ],
+        "id": "shoes_leather"
+      },
+      "top": {
+        "colors": [
+          "fab_01"
+        ],
+        "id": "top_shirt_rolled"
+      }
+    },
+    "skin": "skin_04",
+    "v": 1,
+    "wear": {
+      "waist": {
+        "colors": [
+          "fab_09"
+        ],
+        "id": "apron_shop"
+      }
+    }
+  },
+  "bio": "In his 50s, from Rize on the Black Sea; owns the bakkal round the corner from the TÖMER campus in Taksim. Generous, knows everyone's business, and gossips a little.",
+  "bioFa": "پنجاه و چند ساله، اهلِ ریزه در کرانهٔ دریای سیاه؛ صاحبِ بقالیِ سرِ کوچهٔ ساختمانِ تومر در تکسیم. دست‌ودل‌باز است، از کارِ همه خبر دارد و کمی هم غیبت می‌کند.",
+  "catch": {
+    "en": "Here you are! Fresh, fresh!",
+    "fa": "بفرمایید، بفرمایید! تازهٔ تازه!",
+    "tr": "Buyrun, buyrun! Taze taze!"
+  },
+  "circle": "neighbourhood",
+  "color": "#3F7D4E",
+  "id": "ismail",
+  "kind": "cast",
+  "level": "A1",
+  "motion": {
+    "energy": "high",
+    "signature": [
+      "welcome",
+      "hand_heart",
+      "give"
+    ],
+    "tempo": 0.9
+  },
+  "name": "İsmail",
+  "nameFa": "اسماعیل",
+  "order": 6,
+  "places": [
+    "bakkal"
+  ],
+  "role": "Owner of the bakkal by the TÖMER campus",
+  "roleFa": "صاحبِ بقالیِ کنارِ ساختمانِ تومر",
+  "voice": {
+    "pitch": 0.85,
+    "rate": 0.95
+  }
+}

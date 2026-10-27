@@ -1,0 +1,12 @@
+{
+  "name": "sahne",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "description": "Paper-theatre stage engine: puppets, places, camera, light, sound and interaction for illustrated dialogue scenes",
+  "exports": { ".": "./src/index.ts", "./listen": "./src/listen/index.ts" },
+  "scripts": {
+    "test": "node --test test/*.test.ts"
+  }
+}

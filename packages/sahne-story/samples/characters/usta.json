@@ -1,0 +1,58 @@
+{
+  "avatar": {
+    "body": {
+      "build": "adult",
+      "height": 0.48,
+      "shape": "slim"
+    },
+    "face": {
+      "brows": "thick",
+      "ears": "large",
+      "eyeColor": "eye_blue",
+      "eyes": "almond",
+      "nose": "long"
+    },
+    "facialHair": {
+      "style": "beard_short"
+    },
+    "hair": {
+      "color": "hair_06",
+      "style": "hair_short"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "colors": [
+          "fab_24"
+        ],
+        "id": "bottom_cargo"
+      },
+      "shoes": {
+        "colors": [
+          "fab_29"
+        ],
+        "id": "shoes_boots_work"
+      },
+      "top": {
+        "id": "top_shirt_rolled"
+      }
+    },
+    "skin": "skin_06",
+    "v": 1
+  },
+  "bio": "Fixes the heating and the leaks in the building, toolbox in hand.",
+  "bioFa": "با جعبه‌ابزارش شوفاژ و چکه‌های ساختمان را درست می‌کند.",
+  "color": "#8A8580",
+  "id": "usta",
+  "kind": "extra",
+  "level": "A1",
+  "name": "Usta",
+  "nameFa": "اوستا",
+  "order": 105,
+  "places": [
+    "flat_maria",
+    "flat_nima_room"
+  ],
+  "role": "The repairman",
+  "roleFa": "تعمیرکار"
+}

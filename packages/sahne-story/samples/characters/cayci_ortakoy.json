@@ -1,0 +1,76 @@
+{
+  "avatar": {
+    "body": {
+      "build": "elder",
+      "height": 0.8,
+      "shape": "slim"
+    },
+    "face": {
+      "brows": "straight",
+      "ears": "large",
+      "eyes": "almond",
+      "marks": [
+        "laugh_lines",
+        "crows_feet"
+      ],
+      "mouth": "small",
+      "nose": "small",
+      "shape": "heart"
+    },
+    "facialHair": {
+      "style": "moustache_thick"
+    },
+    "hair": {
+      "color": "hair_08",
+      "style": "hair_classic"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "id": "bottom_trousers"
+      },
+      "shoes": {
+        "colors": [
+          "fab_24"
+        ],
+        "id": "shoes_leather"
+      },
+      "top": {
+        "colors": [
+          "fab_01"
+        ],
+        "id": "top_shirt_rolled"
+      }
+    },
+    "skin": "skin_05",
+    "v": 1,
+    "wear": {
+      "hat": {
+        "colors": [
+          "fab_24"
+        ],
+        "id": "cap_flat"
+      },
+      "waist": {
+        "colors": [
+          "fab_22"
+        ],
+        "id": "apron_cafe"
+      }
+    }
+  },
+  "bio": "Carries tea on a tray along the shore and calls 'Çay, çay!'",
+  "bioFa": "چای را در سینی کنارِ ساحل می‌چرخاند و صدا می‌زند «چای، چای!»",
+  "color": "#8A8580",
+  "id": "cayci_ortakoy",
+  "kind": "extra",
+  "level": "A1",
+  "name": "Çaycı",
+  "nameFa": "چای‌فروش",
+  "order": 102,
+  "places": [
+    "ortakoy"
+  ],
+  "role": "The çaycı on the Ortaköy shore",
+  "roleFa": "چای‌فروشِ ساحلِ اورتاکوی"
+}
