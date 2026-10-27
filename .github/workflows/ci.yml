@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   scan:
-    # nothing from the course books or Kumru's private data may be tracked here: no content/, no yk-s-* files,
+    # none of Kumru's private data may be tracked here: no content/, no yk-s-* files,
     # and no cards, cards-extra, grammar, path or syllabus data folder (whole path segments, so src/art/path.ts passes)
     runs-on: ubuntu-latest
     steps:

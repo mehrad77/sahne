@@ -482,7 +482,7 @@ function coil(x: number, y0: number, len: number): Shape[] {
   for (let y = y0 + 0.5; y < y0 + len; y += 1) { holes.add(ellipse(x + 0.6, y, 0.22)); loops.moveTo(x + 0.6, y).cubicTo(x + 0.2, y - 0.6, x - 1, y - 0.55, x - 1, y + 0.1); }
   return [flatS(holes, "#3A3D45", 0.8), { path: loops, stroke: { color: "#8E979E", width: 0.22, cap: "round" }, flat: true }];
 }
-/** A city's silhouette over the foot y: low roofs, a dome with two minarets, a round tower: a course book's cover art. */
+/** A city's silhouette over the foot y: low roofs, a dome with two minarets, a round tower: a language workbook's cover art. */
 function skyline(w: number, y: number, c: string): Shape {
   const sil = rect(-w / 2, y - 1.6, w, 1.6).add(ellipse(-2, y - 1.6, 3, 2.4)).add(rect(-2.4, y - 5, 0.8, 1.2)).add(rect(4, y - 7, 1.8, 6)).add(poly([[3.8, y - 7], [6, y - 7], [4.9, y - 9.2]]));
   for (const mx of [-6, 2]) sil.add(rect(mx - 0.3, y - 7.2, 0.6, 6)).add(poly([[mx - 0.4, y - 7.2], [mx + 0.4, y - 7.2], [mx, y - 8.6]]));

@@ -59,7 +59,7 @@ assets/                        the README's poster and scene pictures (assets/RE
 - **Ids are permanent.** Never rename a part, set piece, prop, sound, gesture or place id that a document may use. Add the new id, and map the old one through the kit's `aliases`.
 - **Docs follow the code.** One fact lives in one place and is linked from elsewhere. Update the area's doc in the same commit as the change. Never renumber a section that code or other docs cite (`DESIGN.md §12`).
 - **The size budgets bind** (README, `size.mjs`). A bundle over budget fails the gate.
-- **No story data that is not ours.** The samples are original. Never add text from a course book, card or lesson data, or a real person's character, to this repo.
+- **No story data that is not ours.** The samples are original. Never add text we don't hold the rights to, card or lesson data, or another project's characters to this repo.
 - **Secrets** never go in the repo.
 - **Kerim is "she".** She is a kumru (a collared dove), Kumru's mascot and narrator. Her art (`sahne-kit/src/kerim/`) is all rights reserved ([LICENSE-ART](LICENSE-ART)).
 

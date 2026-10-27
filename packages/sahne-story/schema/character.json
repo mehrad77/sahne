@@ -19,7 +19,6 @@
     "circle": { "enum": ["old_friends", "neighbourhood", "tomer", "guest"] },
     "places": { "type": "array", "items": { "type": "string" } },
     "catch": { "type": ["string", "object"] },
-    "friend": { "type": "boolean" },
     "terms": { "type": "array", "items": { "type": "string" } },
     "puppet": { "type": "string" },
     "address": { "type": "object", "additionalProperties": { "enum": ["sen", "siz"] } },
