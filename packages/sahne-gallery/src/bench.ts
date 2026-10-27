@@ -258,11 +258,11 @@ export const BENCH_TAXI_BACK: PlaceDoc = {
     { kit: "cabin", variant: "taxi_back", x: 0, z: -1.2, w: 460 },
   ],
   // the marks needs.json asks of the taxi: the rear bench (three seats: a seat mark seats whoever is put or walks there, until
-  // they move), the driver (the car's left, so screen right from the windscreen) and the front passenger with their backs to
-  // us, and Kerim flying along outside the side window
+  // they move), the driver (the car's left, so screen right from the windscreen) and the front passenger, facing the way the
+  // car goes, so towards us, as the camera sits at the windscreen; and Kerim flying along outside the side window
   marks: {
     back_l: { x: -0.55, z: -0.9, seat: 0.55 }, back_m: { x: 0, z: -0.9, seat: 0.55 }, back_r: { x: 0.55, z: -0.9, seat: 0.55 },
-    driver: { x: 1.0, z: 0.45, seat: 0.55, facing: "back" }, front: { x: -1.0, z: 0.45, seat: 0.55, facing: "back" },
+    driver: { x: 1.0, z: 0.45, seat: 0.55 }, front: { x: -1.0, z: 0.45, seat: 0.55 },
     outside: { x: -1.85, y: 1.35, z: -0.6, air: true, pace: true },
   },
   times: ["day", "dusk", "night"],

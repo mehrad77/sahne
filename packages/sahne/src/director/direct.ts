@@ -103,7 +103,7 @@ class Direction {
   side(id: string, dx: number, eps = 0.15) { return Math.abs(dx) < eps ? this.w.actors[id].yaw : dx < 0 ? Math.PI : 0; }
   /** The yaw to face `q` from `p`: a person three-quarters, an animal side-on. */
   faceTo(id: string, p: Vec3, q: Vec3) { return this.sideOn(id) ? this.side(id, q[0] - p[0]) : this.yawTo(id, p, q); }
-  /** A person facing someone: a turn of TALK_YAW towards them; seated with the back to the camera (a car's front seats), over the shoulder, still from behind. */
+  /** A person facing someone: a turn of TALK_YAW towards them; seated with the back to the camera (a car's front seats seen from the back seat), over the shoulder, still from behind. */
   yawTo(id: string, p: Vec3, q: Vec3) {
     const a = this.w.actors[id], f = faceYaw(p, q);
     return a && a.seat !== undefined && Math.abs(a.yaw) > Math.PI / 2 ? Math.PI - f : f;
