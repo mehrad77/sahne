@@ -7,6 +7,7 @@
 import { AudioEngine, type Bus, type Rendered, type SoundDef } from "sahne";
 import { $, bar, button, chip, choice, css, head, link, select, slider, toggle } from "../shell/dom.ts";
 import type { Ctx } from "../shell/ctx.ts";
+import { SOUNDS_URL } from "../shell/data.ts";
 
 const PX_PER_S = 220, H = 120, WAVE = 28, FMIN = 40;
 /** What a footstep sounds on (DESIGN.md §8.2): the `surface` param of a sound that takes it. */
@@ -114,7 +115,7 @@ export async function render(host: HTMLElement, ctx: Ctx) {
   const [needs, places] = await Promise.all([ctx.data("needs").catch(() => ({})), ctx.data("places").catch(() => [])]);
 
   // the view's own engines: one with the recordings, one with the patches alone (a recording's fallback)
-  const audio = new AudioEngine(kit, { sounds: "/dist/sounds/" }), synth = new AudioEngine(kit);
+  const audio = new AudioEngine(kit, { sounds: SOUNDS_URL }), synth = new AudioEngine(kit);
   ctx.cleanup(() => { for (const e of [audio, synth]) { e.ambience([]); e.stopAll(); e.destroy(); } });
   const on = () => { audio.setEnabled(true); synth.setEnabled(true); };
   const stop = () => { for (const e of [audio, synth]) { e.ambience([]); e.stopAll(); } };

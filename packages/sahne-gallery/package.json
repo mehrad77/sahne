@@ -6,6 +6,7 @@
   "description": "Dev gallery for Sahne: the look, parts, faces, lights and cameras",
   "scripts": {
     "dev": "node serve.mjs",
+    "build": "node build.mjs",
     "size": "node size.mjs",
     "golden": "node golden.mjs",
     "golden:update": "node golden.mjs --update",
@@ -19,8 +20,10 @@
     "sahne-tr": "workspace:*"
   },
   "devDependencies": {
+    "@fontsource/comic-neue": "5.3.0",
     "@playwright/test": "1.63.0",
     "esbuild": "0.28.2",
+    "marked": "18.1.2",
     "typescript": "~6.0.3"
   }
 }

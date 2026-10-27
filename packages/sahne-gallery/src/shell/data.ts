@@ -34,12 +34,15 @@ export interface DataMap {
 /** sahne-kit/catalogue/plan.json, as the catalogue reads it. */
 export interface CataloguePlan { parts: unknown[]; features: unknown[]; patterns: unknown[]; palettes: Record<string, unknown>; deferred: unknown[] }
 
+/** The kit's recordings, beside the page (the dev server and the static site both serve dist/sounds/). */
+export const SOUNDS_URL = typeof document === "undefined" ? "dist/sounds/" : new URL("dist/sounds/", document.baseURI).href;
+
 const cache = new Map<string, Promise<unknown>>();
 /** One of the gallery's data files; a failure rejects with the server's message. */
 export function data<K extends keyof DataMap>(name: K): Promise<DataMap[K]> {
   let p = cache.get(name);
   if (!p) {
-    p = fetch(`/data/${name}.json`).then(async r => { if (!r.ok) throw new Error(`/data/${name}.json: ${await r.text()}`); return r.json(); });
+    p = fetch(new URL(`data/${name}.json`, document.baseURI)).then(async r => { if (!r.ok) throw new Error(`/data/${name}.json: ${await r.text()}`); return r.json(); });
     p.catch(() => cache.delete(name));
     cache.set(name, p);
   }

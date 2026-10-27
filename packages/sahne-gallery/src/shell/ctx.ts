@@ -4,7 +4,7 @@
 
 import { mountStage, type Motion, type Stage, type StageOptions } from "sahne";
 import { KIT, LANG } from "./kit.ts";
-import { data } from "./data.ts";
+import { data, SOUNDS_URL } from "./data.ts";
 
 /** Where the gallery is: `#/<section>/<path…>?<query>`. */
 export interface Route { section: string; path: string[]; query: URLSearchParams }
@@ -76,7 +76,7 @@ export class Ctx {
 
   /** A stage in `el` with the gallery's kit and settings, destroyed when the route changes. */
   mount(el: HTMLElement, opts: Partial<StageOptions> = {}): Stage {
-    const st = mountStage(el, { kit: KIT, lang: LANG, motion: this.settings.motion, captions: this.settings.captions, sounds: "/dist/sounds/", ...opts });
+    const st = mountStage(el, { kit: KIT, lang: LANG, motion: this.settings.motion, captions: this.settings.captions, sounds: SOUNDS_URL, ...opts });
     if (this.settings.sound) st.setSound(true);
     this.stages.push(st);
     if (this.stages.length > this.maxStages) console.warn(`gallery: ${this.stages.length} live stages on ${location.hash} (browsers keep about 16 WebGL contexts)`);
