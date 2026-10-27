@@ -1,5 +1,5 @@
-// The gallery as a static site, in dist/site/ (deployed to https://sahne.shab.boo by
-// .github/workflows/pages.yml): the page and its head (the social cards, the structured data), the bundle
+// The gallery as a static site, in dist/site/ (deployed to https://sahne.shab.boo on
+// Cloudflare: wrangler.jsonc): the page and its head (the social cards, the structured data), the bundle
 // minified, every /data/<name>.json and each doc (/data/docs/<slug>.json) written once (data.mjs), the
 // sounds, the font, the favicon, robots.txt and the sitemap, the repo's assets/ (the docs' pictures) and
 // the social card (assets/social-preview.jpg, as og.jpg). Every URL in the page is relative to it, so the

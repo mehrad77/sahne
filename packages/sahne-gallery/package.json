@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "node serve.mjs",
     "build": "node build.mjs",
+    "deploy": "node build.mjs && pnpm dlx wrangler@4 deploy",
     "size": "node size.mjs",
     "golden": "node golden.mjs",
     "golden:update": "node golden.mjs --update",

@@ -1,0 +1,44 @@
+name: deploy
+
+# The gallery as the live demo, https://sahne.shab.boo, on Cloudflare: once `ci` passes on main, the gallery is
+# built as a static site from the samples and deployed as a Worker's static assets (packages/sahne-gallery:
+# build.mjs, wrangler.jsonc; `pnpm sahne deploy` does the same by hand). Off until a maintainer sets the
+# repository variable DEPLOY_ENABLED = true and the secrets CLOUDFLARE_API_TOKEN (a token that can edit Workers)
+# and CLOUDFLARE_ACCOUNT_ID.
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: vars.DEPLOY_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm sahne build
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: packages/sahne-gallery
+          command: deploy
