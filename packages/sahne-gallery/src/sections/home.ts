@@ -1,22 +1,12 @@
-// #/: what Sahne is, for someone who has never seen it: a scene playing, what the engine does (each with
+// #/: what Sahne is, for someone who has never seen it: a short film playing (src/film.ts), what the engine does (each with
 // a link to its live demo), the few lines that mount a stage, and what the gallery holds (counted from
 // the kit, the engine and the data, so it is always current). The owner's review page is #/dev.
 
-import { CUE_KINDS, STAGING_FIELDS, TIMES, WEATHER, type PieceDef, type Script } from "sahne";
+import { CUE_KINDS, STAGING_FIELDS, TIMES, WEATHER, type PieceDef } from "sahne";
 import { $, link } from "../shell/dom.ts";
 import type { Ctx } from "../shell/ctx.ts";
 import { live } from "../shell/live.ts";
-
-/** The hero: two friends on the waterfront as golden hour turns to night; it loops. */
-const HERO: Script = { v: 1, cues: [
-  { scene: { place: "bench_shore", time: "golden", at: { nima: "left", ismail: "right" }, cam: "wide" } },
-  { line: { who: "nima", text: "Merhaba İsmail Bey!", to: "ismail", do: "wave", emo: "happy" } },
-  { line: { who: "ismail", text: "Merhaba! Ne güzel bir akşam.", do: "welcome", emo: "happy", react: { nima: { do: "nod" } } } },
-  { beat: { sfx: { id: "ferry_horn", word: "düüüt" }, env: ["time:dusk:3000"], wait: 1600 } },
-  { line: { who: "nima", text: "Vapur geliyor! Çay içelim mi?", emo: "curious", do: "point", cam: "two" } },
-  { line: { who: "ismail", text: "Tabii, hadi!", do: "nod", emo: "happy" } },
-  { beat: { env: ["time:night:3000"], wait: 2400, cam: "wide" } },
-] };
+import { FILM, FILM_EXTRAS, FILM_PLACES, FILM_TITLES } from "../film.ts";
 
 const FEATURES: [string, string, string][] = [
   ["Cut-paper puppets", "People built from a kit of parts: faces that talk and blink, 39 gestures and 14 emotions, walks, carries and idle life, all posed by one rig.", "#/systems/actors"],
@@ -54,8 +44,28 @@ export async function render(host: HTMLElement, ctx: Ctx) {
   host.append(hero);
   const stageSlot = $("div", "hero-stage");
   host.append(stageSlot);
-  await live(stageSlot, ctx, HERO, { loop: true, controls: false });
-  host.append($("p", "note", "Live, not a video: the scene above is a 7-cue script, directed and drawn in your browser. Turn on sound in the top bar."));
+  // the film, with a title card at its start and each chapter's caption, as a film's subtitles
+  const title = $("div", "film-title"), cap = $("div", "film-cap");
+  title.append($("small", "", "Sahne presents"), $("b", "", "Son Vapur"), $("span", "", "The Last Ferry · a film in one script"));
+  let capTimer = 0;
+  // the samples' extras it casts (an actor whose extra is missing stands in as the kit's default person)
+  const extras = new Map((await ctx.data("extras").catch(() => [])).map(x => [x.file.replace(/\.json$/, ""), x]));
+  const cast = Object.fromEntries(Object.entries(FILM_EXTRAS).map(([actor, id]) => [actor, extras.get(id)?.avatar ?? ctx.kit.defaultDoc]));
+  const names = Object.fromEntries(Object.entries(FILM_EXTRAS).map(([actor, id]) => [actor, String(extras.get(id)?.name ?? actor)]));
+  // ?chapter=<n> starts the film at its nth chapter (for checking one)
+  const chapter = Number(ctx.route.query.get("chapter") ?? 0), starts = [...FILM_TITLES.keys()];
+  const film = await live(stageSlot, ctx, FILM, { loop: true, controls: false, preroll: 2600, places: FILM_PLACES, cast, names, start: starts[chapter] ?? 0, onCue: i => {
+    if (i === 0 && !chapter) { title.classList.add("on"); setTimeout(() => title.classList.remove("on"), 2800); }
+    const t = FILM_TITLES.get(i);
+    if (!t) return;
+    cap.textContent = t;
+    cap.classList.add("on");
+    clearTimeout(capTimer);
+    capTimer = setTimeout(() => cap.classList.remove("on"), 3200);
+  } });
+  ctx.cleanup(() => clearTimeout(capTimer));
+  film.box.append(title, cap);
+  host.append($("p", "note", `Live, not a video: a ${FILM.cues.length}-cue script in ${FILM_TITLES.size} places, directed and drawn in your browser as it plays. Turn on sound in the top bar.`));
 
   // ---- what it is ----
   host.append($("h2", "", "What it is"));

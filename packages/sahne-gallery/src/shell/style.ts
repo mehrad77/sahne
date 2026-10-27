@@ -108,6 +108,13 @@ table.t th { color: var(--mute); font-weight: 600; }
 .cta:hover { border-color: var(--accent); }
 .cta.main { background: var(--accent); border-color: var(--accent); color: #fff; }
 .hero-stage .frame { border-radius: 16px; box-shadow: 0 10px 30px #0002; }
+.film-title, .film-cap { position: absolute; pointer-events: none; opacity: 0; transition: opacity .8s; color: #fff; text-shadow: 0 1px 8px #000a; z-index: 3; }
+.film-title { inset: 0; display: grid; place-content: center; text-align: center; background: radial-gradient(#0008, #000c); }
+.film-title b { font: 700 clamp(30px, 7vw, 64px)/1.05 Georgia, serif; }
+.film-title small { font: 600 clamp(10px, 1.4vw, 13px)/1.6 system-ui, sans-serif; letter-spacing: .3em; text-transform: uppercase; opacity: .8; }
+.film-title span { font: italic 400 clamp(12px, 2vw, 17px)/1.6 Georgia, serif; opacity: .85; }
+.film-cap { left: 14px; bottom: 12px; font: 600 clamp(11px, 1.6vw, 14px)/1.2 system-ui, sans-serif; letter-spacing: .04em; text-transform: uppercase; background: #0006; padding: 5px 10px; border-radius: 6px; }
+.film-title.on, .film-cap.on { opacity: 1; }
 .prose-p { max-width: 72ch; font-size: 15px; line-height: 1.6; margin: 0 0 10px; }
 pre.code, .prose pre { font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--chip); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; overflow: auto; max-width: 100%; }
 /* the docs */
