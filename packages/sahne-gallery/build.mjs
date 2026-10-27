@@ -1,9 +1,10 @@
 // The gallery as a static site, in dist/site/ (deployed to https://sahne.shab.boo by
-// .github/workflows/pages.yml): the page and its head, the bundle minified, every /data/<name>.json and
-// each doc (/data/docs/<slug>.json) written once (data.mjs), the sounds, the font, the favicon, the
-// repo's assets/ (the docs' pictures) and the social card (assets/social-preview.jpg, as og.jpg). Every
-// URL in the page is relative to it, so the site also works under a sub-path. It builds from the samples
-// only: with SAHNE_CONTENT or SAHNE_STORY_DOCS set it refuses, so a public site never carries other content.
+// .github/workflows/pages.yml): the page and its head (the social cards, the structured data), the bundle
+// minified, every /data/<name>.json and each doc (/data/docs/<slug>.json) written once (data.mjs), the
+// sounds, the font, the favicon, robots.txt and the sitemap, the repo's assets/ (the docs' pictures) and
+// the social card (assets/social-preview.jpg, as og.jpg). Every URL in the page is relative to it, so the
+// site also works under a sub-path. It builds from the samples only: with SAHNE_CONTENT or
+// SAHNE_STORY_DOCS set it refuses, so a public site never carries other content.
 import * as esbuild from "esbuild";
 import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -23,7 +24,7 @@ await esbuild.build({ ...BUNDLE, minify: true, outdir: out + "dist/app", logLeve
 copyStatic(out + "dist/");
 for (const [name, make] of Object.entries(DATA)) writeFileSync(`${out}data/${name}.json`, JSON.stringify(await make()));
 for (const { slug } of DOCS) writeFileSync(`${out}data/docs/${slug}.json`, JSON.stringify(doc(slug)));
-for (const f of ["index.html", "favicon.svg"]) cpSync(dir + f, out + f);
+for (const f of ["index.html", "favicon.svg", "robots.txt", "sitemap.xml"]) cpSync(dir + f, out + f);
 cpSync(dir + "../../assets/social-preview.jpg", out + "og.jpg");
 cpSync(dir + "../../assets", out + "assets", { recursive: true });
 writeFileSync(out + ".nojekyll", "");
