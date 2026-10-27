@@ -3,12 +3,15 @@
 <p align="center"><img src="assets/poster.jpg" alt="Sahne: a paper-theatre stage engine. Scene cards of a waterfront at golden hour, a night sky over the city, a story playing in a corner shop and a taxi ride, above a row of cut-paper characters." width="100%"></p>
 
 <p align="center">
+  <a href="https://sahne.shab.boo"><img alt="live demo: sahne.shab.boo" src="https://img.shields.io/badge/live%20demo-sahne.shab.boo-2F8C88"></a>
   <a href="https://github.com/mehrad77/sahne/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/mehrad77/sahne/actions/workflows/ci.yml/badge.svg"></a>
   <a href="LICENSE"><img alt="code: MIT" src="https://img.shields.io/badge/code-MIT-blue"></a>
   <a href="LICENSE-ART"><img alt="art: CC BY 4.0" src="https://img.shields.io/badge/art-CC%20BY%204.0-orange"></a>
 </p>
 
 *Sahne* is Turkish for "stage". It is a paper-theatre stage engine for illustrated, interactive dialogue scenes on the web. Its characters are made of cut paper. They act in lit places with depth: a camera, the time of day and weather, sound and music, speech bubbles with lip-sync, and things the user can tap, drag or say aloud. Everything is drawn in code, with no image assets, and WebGL2 renders it as paper, with an SVG fallback.
+
+**See it live at [sahne.shab.boo](https://sahne.shab.boo)**: every system with a demo, the kit, the places, a story playing, and these docs.
 
 [Kumru](https://github.com/mehrad77/kumru) is the first app to use it: a Turkish practice app whose stories Kerim, a kumru (collared dove), narrates. Sahne knows no language and no app. The Turkish plugin and the story format are packages of their own.
 
@@ -27,7 +30,7 @@ Every picture here is drawn live by the engine from code and a few hundred bytes
 | ![A street of shopfronts crowded with people, pigeons and a cat](assets/scenes/crowd.jpg) | ![A neighbourhood street at dusk: an old building, a bakery, a lamp post and a tree](assets/scenes/ferikoy.jpg) |
 | **A crowded street.** Walking lanes, a queue, a group, people on a bench, birds and a cat. | **A neighbourhood street at dusk.** Façades, shopfronts, a lamp post and a tree, all parametric set pieces. |
 
-Run `pnpm dev` to see every one of them move, with the controls for the time of day, the weather and the camera.
+See every one of them move at [sahne.shab.boo](https://sahne.shab.boo) (or run `pnpm dev`), with the controls for the time of day, the weather and the camera.
 
 ## Packages
 
