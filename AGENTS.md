@@ -11,7 +11,9 @@ packages/
   sahne-tr/       the Turkish plugin                            → packages/sahne-tr/README.md
   sahne-story/    the story format, its checks, paths.ts, samples/ → packages/sahne-story/README.md
   sahne-gallery/  the dev gallery and the checks (:5180)        → packages/sahne-gallery/README.md
-.github/workflows/ci.yml   pnpm sahne check on every push and pull request, and the scan
+.github/workflows/ci.yml       pnpm sahne check on every push and pull request, and the scan
+.github/workflows/release.yml  a GitHub release and npm publishing on a v* tag; off until RELEASE_ENABLED / PUBLISH_ENABLED are set
+assets/                        the README's poster and scene pictures (assets/README.md says how they were made)
 ```
 
 ## Before you work on X, read Y

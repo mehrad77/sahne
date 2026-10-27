@@ -1,0 +1,16 @@
+name: Kit idea
+description: A part, set piece, prop, sound or gesture the kit should have
+labels: [kit]
+body:
+  - type: input
+    id: what
+    attributes:
+      label: What it is
+      description: For example "a simit cart", "a hearing aid", "a ferry horn"
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Where it would be used, and how it should look
+      description: Reference photos help. Kit art follows packages/sahne-kit/STYLE.md

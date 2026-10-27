@@ -1,8 +1,33 @@
 # Sahne
 
+<p align="center"><img src="assets/poster.jpg" alt="Sahne: a paper-theatre stage engine. Scene cards of a waterfront at golden hour, a night sky over the city, a story playing in a corner shop and a taxi ride, above a row of cut-paper characters." width="100%"></p>
+
+<p align="center">
+  <a href="https://github.com/mehrad77/sahne/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/mehrad77/sahne/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="LICENSE"><img alt="code: MIT" src="https://img.shields.io/badge/code-MIT-blue"></a>
+  <a href="LICENSE-ART"><img alt="art: CC BY 4.0" src="https://img.shields.io/badge/art-CC%20BY%204.0-orange"></a>
+</p>
+
 *Sahne* is Turkish for "stage". It is a paper-theatre stage engine for illustrated, interactive dialogue scenes on the web. Its characters are made of cut paper. They act in lit places with depth: a camera, the time of day and weather, sound and music, speech bubbles with lip-sync, and things the user can tap, drag or say aloud. Everything is drawn in code, with no image assets, and WebGL2 renders it as paper, with an SVG fallback.
 
 [Kumru](https://github.com/mehrad77/kumru) is the first app to use it: a Turkish practice app whose stories Kerim, a kumru (collared dove), narrates. Sahne knows no language and no app. The Turkish plugin and the story format are packages of their own.
+
+## Scenes
+
+Every picture here is drawn live by the engine from code and a few hundred bytes of JSON. Each is a frame of the dev gallery: a story playing, or one of the gallery's test places at a time of day.
+
+| | |
+|---|---|
+| ![Nima and İsmail at the corner shop, a speech bubble over İsmail](assets/scenes/story.jpg) | ![A metro car on the M11, passengers seated, Kerim flying alongside the window](assets/scenes/metro.jpg) |
+| **A story playing.** Bubbles aimed at the mouth, lip-sync from the Turkish spelling, faces and gestures, the camera cutting in. | **On the metro.** The car runs a timetable; the next-station display, the passengers and the view outside all move with it. |
+| ![A waterfront with a mosque, the bridge and a holiday crowd walking by the railing at golden hour](assets/scenes/shore.jpg) | ![The same waterfront at night under a sky of stars](assets/scenes/shore-night.jpg) |
+| **The waterfront, golden hour.** Depth bands from the far shore to the railing, a crowd of faceless paper walkers. | **The same place at night.** One place document; the light preset, the sky and the lit windows do the rest. |
+| ![A rooftop at night above a city of lit windows, stars and the moon](assets/scenes/roof.jpg) | ![The inside of a taxi at dusk, the road ahead seen through the windscreen](assets/scenes/taxi.jpg) |
+| **A roof at night.** The city at three depths, stars, the moon and its glow. | **A taxi ride.** A cabin built in depth; the road and the street scroll past outside. |
+| ![A street of shopfronts crowded with people, pigeons and a cat](assets/scenes/crowd.jpg) | ![A neighbourhood street at dusk: an old building, a bakery, a lamp post and a tree](assets/scenes/ferikoy.jpg) |
+| **A crowded street.** Walking lanes, a queue, a group, people on a bench, birds and a cat. | **A neighbourhood street at dusk.** Façades, shopfronts, a lamp post and a tree, all parametric set pieces. |
+
+Run `pnpm dev` to see every one of them move, with the controls for the time of day, the weather and the camera.
 
 ## Packages
 
@@ -47,14 +72,9 @@ Kit art is TypeScript that draws paper shapes. Read [STYLE.md](packages/sahne-ki
 
 Then run `pnpm check`. The kit's tests hold every part to its slot, its views and its budget. The gallery's coverage test fails while an engine feature has no demo.
 
-## Sending a pull request
+## Contributing
 
-1. Fork, branch, and keep one change per PR. Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat(kit): …`, `fix(sahne): …`, `docs: …`).
-2. `pnpm check` must pass. CI runs the same check on Linux.
-3. If your change alters how things look, say so and add the gallery links (a view's address holds its state) with screenshots. Golden frames are per platform: update `golden/darwin/` on a Mac with `pnpm sahne golden:update`. For `golden/linux/`, take the `sahne-golden-failed` artifact of the CI run, or shoot the frames in an x86_64 `node:24` container with `fonts-comic-neue`.
-4. A new generator gets a `--check`, and the docs change in the same PR as the code.
-
-[AGENTS.md](AGENTS.md) holds the rules every change follows. It is written for coding agents and is just as useful to people.
+Pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the setup, the checks and what a PR needs, and [AGENTS.md](AGENTS.md) holds the rules every change follows (it is written for coding agents and is just as useful to people). Bugs and kit ideas go in [issues](https://github.com/mehrad77/sahne/issues/new/choose).
 
 ## Size budgets
 
