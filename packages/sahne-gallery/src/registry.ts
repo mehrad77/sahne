@@ -11,7 +11,12 @@ export interface View { render(host: HTMLElement, ctx: Ctx): void | Promise<void
 export interface Section { id: string; title: string; about: string; nav?: () => NavItem[] | Promise<NavItem[]>; load: () => Promise<View> }
 
 export const SECTIONS: Section[] = [
-  { id: "", title: "Home", about: "What Sahne is, its numbers, what changed", load: () => import("./sections/home.ts") },
+  { id: "", title: "Home", about: "What Sahne is, a scene playing, what it does", load: () => import("./sections/home.ts") },
+  {
+    id: "docs", title: "Docs", about: "The guide, the engine's design, the kit, the story format",
+    nav: async () => (await data("docs")).map(d => ({ label: d.title, hash: `#/docs/${d.slug}`, group: d.group })),
+    load: () => import("./sections/docs.ts"),
+  },
   {
     id: "systems", title: "Systems", about: "The engine, one live demo per system",
     nav: () => SYSTEMS.map(s => ({ label: s.title, hash: `#/systems/${s.id}`, group: s.group })),
@@ -41,6 +46,7 @@ export const SECTIONS: Section[] = [
     nav: () => [{ label: "Roster", hash: "#/cast" }, { label: "Extras", hash: "#/cast/extras" }],
     load: () => import("./sections/cast.ts"),
   },
+  { id: "dev", title: "For maintainers", about: "Engine coverage and the changes to review", load: () => import("./sections/dev.ts") },
 ];
 
 export const KIT_NAV: NavItem[] = [

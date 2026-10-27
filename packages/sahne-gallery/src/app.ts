@@ -15,8 +15,8 @@ document.head.append(Object.assign(document.createElement("style"), { textConten
 ctx.applyPage();
 
 const app = $("div", "app"), side = $("aside", "side"), main = $("div", "main"), top = $("div", "topbar"), view = $("main", "view");
-const brand = Object.assign($("a", "brand", "Sahne gallery"), { href: "#/" });
-brand.append($("small", "", "the paper-theatre stage, live"));
+const brand = Object.assign($("a", "brand", "Sahne"), { href: "#/" });
+brand.append($("small", "", "a paper-theatre stage engine: demos and docs"));
 const nav = $("nav");
 nav.setAttribute("aria-label", "Gallery");
 side.append(brand, nav);
@@ -82,7 +82,7 @@ async function show() {
   markCurrent();
   const section = SECTIONS.find(s => s.id === route.section) ?? SECTIONS[0];
   crumbs.textContent = [section.title, ...route.path].join(" · ");
-  document.title = `${[...route.path].reverse().join(" · ") || section.title} · Sahne gallery`;
+  document.title = route.section || route.path.length ? `${[...route.path].reverse().join(" · ") || section.title} · Sahne` : "Sahne: a paper-theatre stage engine";
   view.replaceChildren($("p", "note", "Loading…"));
   try {
     const v = await section.load();

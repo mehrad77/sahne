@@ -54,7 +54,7 @@ type-checks the five packages, measures the bundles against their budgets (`size
 
 ## Status
 
-The engine build (B0–B5, DESIGN.md §15) is done. `pnpm sahne check` runs 571 tests: 563 pass on the samples, and 8 that need data the samples lack (a `needs.json`, Kumru's airport) are skipped.
+The engine build (B0–B5, DESIGN.md §15) is done. `pnpm sahne check` runs 574 tests: 566 pass on the samples, and 8 that need data the samples lack (a `needs.json`, Kumru's airport) are skipped.
 
 - **The look (B1):** the paper renderer, five light presets (`day`, `golden`, `dusk`, `night`, `overcast`), the framings, the paper flip, the bakkal.
 - **Rig and acting (B2):** the script and the director, the timeline, the rig (gestures, IK, walk, carry, idle life), 12 hand shapes, 39 gestures and 14 emotions, lip-sync through `sahne-tr`, faces with gaze and blinks, props that hide, change hands, are placed on a mark and are kept from place to place, costume changes from a wardrobe, text on props (a sign's label, a phone's screen) as HTML on their paper plane, kit puppets (a bird that perches, hops, flies and hovers, `rig/bird.ts`; a cat that sits, loafs, sleeps, strides, looks and miaows, `rig/cat.ts`; Pisi and the gulls in `sahne-kit/puppets`), the `follow` cam, a door that swings, the bubbles and Kerim's narrator window (`bubbles: "log"` and `setBubbles` leave the lines to the app in log mode), tap-to-translate behind a flag.

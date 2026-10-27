@@ -4,7 +4,7 @@
 // (systems/registry.ts). The kit's views, the places and the stories enumerate their own content
 // (every gesture, part, generator, sound, place and draft), so they are covered by construction; they
 // and the demos together must name every DESIGN.md section from §5 to §10. test/coverage.test.ts holds
-// the gallery to this; Home shows it.
+// the gallery to this; #/dev shows it.
 
 import { ACT_KINDS, CAM_KINDS, CUE_KINDS, EMIT_KINDS, ENV_VERBS, MOTION_KINDS, MOVE_HOWS, OBJ_OPS, STAGING_FIELDS, TIMES, VOICES, WEATHER } from "sahne";
 import { SYSTEMS } from "./systems/registry.ts";

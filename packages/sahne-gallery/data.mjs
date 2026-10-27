@@ -2,7 +2,9 @@
 // them on every request (adding a place or a draft needs only a reload); build.mjs writes them once into
 // the static site. Where the files live is sahne-story/paths.ts.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Marked } from "marked";
 import { execFileSync } from "node:child_process";
 import { CARDS, PLACES, STORIES_WORLD } from "../sahne-story/paths.ts";
 import { loadNeeds } from "../sahne-story/load.ts";
@@ -106,7 +108,78 @@ export const DATA = {
   extras,
   sizes: measure,
   kerim: kerimPage,
+  // the docs' index (doc() renders one, as /data/docs/<slug>.json)
+  docs: () => DOCS.map(({ slug, title, group }) => ({ slug, title, group })),
 };
+
+// ---- The docs: the repo's own markdown, rendered for #/docs -------------------------------------------
+
+/** The docs the gallery shows, in its sidebar's order: slug, title, group, and the file from the repo root. A
+ * link between two of them stays in the gallery; a link to any other repo file goes to GitHub. */
+export const DOCS = [
+  ["start", "Your first scene", "Guide", "packages/sahne-gallery/guide/start.md"],
+  ["overview", "Overview", "Guide", "README.md"],
+  ["engine", "The engine", "Engine", "packages/sahne/README.md"],
+  ["design", "Design", "Engine", "packages/sahne/DESIGN.md"],
+  ["turkish", "The Turkish plugin", "Engine", "packages/sahne-tr/README.md"],
+  ["style", "Style guide", "Kit", "packages/sahne-kit/STYLE.md"],
+  ["catalogue", "Catalogue", "Kit", "packages/sahne-kit/CATALOGUE.md"],
+  ["set", "Set pieces", "Kit", "packages/sahne-kit/SET.md"],
+  ["sounds", "Sound sources", "Kit", "packages/sahne-kit/sounds/SOURCES.md"],
+  ["stories", "Stories and places", "Stories", "packages/sahne-story/README.md"],
+  ["gallery", "The gallery", "Project", "packages/sahne-gallery/README.md"],
+  ["packages", "Package conventions", "Project", "packages/README.md"],
+  ["contributing", "Contributing", "Project", "CONTRIBUTING.md"],
+  ["agents", "Rules for changes", "Project", "AGENTS.md"],
+].map(([slug, title, group, file]) => ({ slug, title, group, file }));
+
+const REPO_URL = "https://github.com/mehrad77/sahne";
+/** The gallery's own address: a link to it from a doc stays in the page (`#/…`). */
+const SITE = "https://sahne.shab.boo/";
+const BY_FILE = new Map(DOCS.map(d => [d.file, d]));
+/** A heading's anchor, as GitHub makes it. */
+const anchor = text => text.toLowerCase().replace(/<[^>]+>/g, "").replace(/[^\p{L}\p{N}\s_-]/gu, "").trim().replace(/\s/g, "-");
+const escape = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** One doc as HTML. Links: to another doc → `#/docs/<slug>?at=<anchor>`; to a heading of its own → `?at=`; to
+ * any other repo file → GitHub (images → raw; the repo's assets/ is served beside the page). Headings carry GitHub's anchors, and a numbered one (`## 12.`,
+ * `### 4.1`) also `data-sec`, so `?at=s12` finds DESIGN.md §12. A fenced block in the language `sahne` (a
+ * script, `{ v, cues }`) becomes a live stage in the gallery and stays plain JSON on GitHub. */
+export function doc(slug) {
+  const d = DOCS.find(d => d.slug === slug);
+  if (!d) return null;
+  const here = posix.dirname(d.file);
+  const href = (url, image) => {
+    if (url.startsWith(SITE)) return url.slice(SITE.length) || "#/";
+    if (/^[a-z]+:|^\/\//i.test(url)) return url;
+    if (url.startsWith("#")) return `#/docs/${slug}?at=${url.slice(1)}`;
+    const [path, hash] = url.split("#");
+    const file = posix.normalize(posix.join(here, path)).replace(/\/$/, "");
+    const to = BY_FILE.get(file);
+    if (to && !image) return `#/docs/${to.slug}${hash ? `?at=${hash}` : ""}`;
+    if (image && file.startsWith("assets/")) return file;
+    return image ? `https://raw.githubusercontent.com/mehrad77/sahne/main/${file}` : `${REPO_URL}/${file.includes(".") ? "blob" : "tree"}/main/${file}${hash ? `#${hash}` : ""}`;
+  };
+  const toc = [];
+  const md = new Marked({ gfm: true, renderer: {
+    heading({ tokens, depth }) {
+      const html = this.parser.parseInline(tokens), id = anchor(html);
+      const sec = html.match(/^(\d+(?:\.\d+)?)\.?\s/)?.[1];
+      if (depth >= 2 && depth <= 3) toc.push({ id, depth, text: html.replace(/<[^>]+>/g, "") });
+      return `<h${depth} id="${id}"${sec ? ` data-sec="${sec}"` : ""}>${html}</h${depth}>\n`;
+    },
+    link({ href: url, title, tokens }) { return `<a href="${escape(href(url))}"${title ? ` title="${escape(title)}"` : ""}>${this.parser.parseInline(tokens)}</a>`; },
+    image({ href: url, title, text }) { return `<img src="${escape(href(url, true))}" alt="${escape(text)}"${title ? ` title="${escape(title)}"` : ""} loading="lazy">`; },
+    code({ text, lang }) {
+      if (lang === "sahne") return `<div class="sahne-live" data-script="${escape(text)}"></div><details class="src"><summary>The script</summary><pre><code>${escape(text)}</code></pre></details>\n`;
+      return `<pre><code${lang ? ` class="language-${escape(lang)}"` : ""}>${escape(text)}</code></pre>\n`;
+    },
+  } });
+  // inline HTML in the docs (the README's centred poster) has repo-relative src/href too
+  const html = md.parse(readFileSync(at(`../../${d.file}`), "utf8"))
+    .replace(/(<(?:img|a)\b[^>]*?\s(?:src|href)=")([^"#][^"]*)"/g, (m, pre, url) => /^[a-z]+:|^\/\/|^#/i.test(url) ? m : `${pre}${escape(href(url, pre.startsWith("<img")))}"`);
+  return { ...d, html, toc, source: `${REPO_URL}/blob/main/${d.file}` };
+}
 
 // ---- What the page loads beside the bundle --------------------------------------------------------
 
