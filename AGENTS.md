@@ -15,6 +15,7 @@ packages/
 .github/workflows/deploy.yml   the gallery as the live demo, https://sahne.shab.boo (Cloudflare), deployed after ci passes on main; off until DEPLOY_ENABLED is set
 .github/workflows/release.yml  a GitHub release and npm publishing on a v* tag; off until RELEASE_ENABLED / PUBLISH_ENABLED are set
 assets/                        the README's poster and scene pictures (assets/README.md says how they were made)
+.claude/skills/                visual-check, new-kit-part, new-place: the repo's own workflows for agents
 ```
 
 ## Before you work on X, read Y
