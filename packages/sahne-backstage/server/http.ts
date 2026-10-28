@@ -8,7 +8,7 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { CONTENT, IS_SAMPLES } from "../../sahne-story/paths.ts";
-import { allProblems, check, exists, forget, isKind, listing, readDoc, save, type Edit } from "./content.ts";
+import { allProblems, check, exists, forget, isKind, lessons, listing, readDoc, save, searchCards, type Edit } from "./content.ts";
 import { headOf } from "./git.ts";
 import { readReview, writeReview } from "./review.ts";
 
@@ -75,6 +75,8 @@ export async function serve(o: Options): Promise<Running> {
       if (!isKind(a) || !exists(a, b)) throw new Fail(404, `no ${a} ${b}`);
       return json(res, 200, { doc: await headOf(a, b) });
     }
+    if (route === "cards" && m === "GET") return json(res, 200, { cards: searchCards(new URL(req.url ?? "", "http://localhost").searchParams.get("q") ?? "") });
+    if (route === "lessons" && m === "GET") return json(res, 200, { lessons: lessons() });
     if (route === "problems" && m === "GET") return json(res, 200, { problems: allProblems() });
     if (route === "review" && m === "GET") return json(res, 200, readReview());
     if (route === "review" && m === "POST") {

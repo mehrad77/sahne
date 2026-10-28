@@ -205,6 +205,20 @@ export function allProblems(): Problem[] {
   return every;
 }
 
+/** Word cards matching a search (Turkish or English), for the word picker: read live, never written anywhere. */
+export function searchCards(q: string, limit = 40): { id: string; tr: string; en: string; level?: string }[] {
+  const cards = options().cards;
+  if (!cards) return [];
+  const s = q.trim().toLocaleLowerCase("tr");
+  return Object.entries(cards).filter(([id, c]) => !c.retired && (!s || id.includes(s) || c.tr.toLocaleLowerCase("tr").includes(s) || c.en.toLowerCase().includes(s)))
+    .slice(0, limit).map(([id, c]) => ({ id, tr: c.tr, en: c.en, ...(c.level ? { level: c.level } : {}) }));
+}
+
+/** The grammar lessons' ids with their unit, for the lesson picker (none on a root without grammar/). */
+export function lessons(): { id: string; ref?: string }[] {
+  return Object.entries(world().lessons ?? {}).map(([id, l]) => ({ id, ref: l.ref }));
+}
+
 /** Everything the browser lists: the series, the seasons with their episodes, the cast, the places. */
 export function listing() {
   const w = world();

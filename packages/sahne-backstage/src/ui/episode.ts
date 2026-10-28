@@ -5,7 +5,7 @@
 
 import { html } from "htm/preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { lintStory, suggest, type StoryDoc } from "sahne-story";
+import { lintStory, seasonOf, suggest, type StoryDoc } from "sahne-story";
 import type { Run } from "sahne";
 import { checkDocs, checked, change, draftOf, history, keyOf, openDoc, saveDocs, world } from "../store.ts";
 import { cueOf, cuePath, equal, get, same, within, type Path } from "../model/path.ts";
@@ -114,7 +114,7 @@ function Editor(p: { id: string }) {
       <button onClick=${() => history("story", p.id, "undo")} disabled=${!d.past.length} title="Undo">↶ Undo</button>
       <button onClick=${() => history("story", p.id, "redo")} disabled=${!d.future.length} title="Redo">↷ Redo</button>
       <button onClick=${() => history("story", p.id, "revert")} disabled=${!dirty(d)}>Revert</button>
-      <button class="primary" onClick=${() => void saveDocs([key])} disabled=${!dirty(d) || !w.writable} title=${w.writable ? "" : "read-only"}>Save</button>
+      <button class="primary" onClick=${() => void saveDocs([key, keyOf("season", `s${seasonOf(p.id)}`)])} disabled=${!dirty(d) || !w.writable} title=${w.writable ? "" : "read-only"}>Save</button>
     </div>
     <div class="episode">
       <div>

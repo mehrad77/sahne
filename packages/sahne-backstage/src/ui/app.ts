@@ -5,6 +5,7 @@
 //   #/review                where every episode stands
 //   #/cast, #/character/<id> the cast, a character's look and words
 //   #/places, #/place/<id>   the places, a place's marks, props and set pieces
+//   #/new/<season>          a new episode from its brief
 
 import { html } from "htm/preact";
 import "@preact/signals";
@@ -15,6 +16,7 @@ import { Episode } from "./episode.ts";
 import { ReviewPage } from "./review.ts";
 import { CastPage, CharacterPage } from "./cast.ts";
 import { PlacePage, PlacesPage } from "./places.ts";
+import { NewEpisode } from "./new.ts";
 
 export function App() {
   const w = world.value, r = route.value;
@@ -50,6 +52,7 @@ function pageFor(page: string | undefined, id: string | undefined) {
     case "character": return html`<${CharacterPage} key=${id} id=${id} />`;
     case "places": return html`<${PlacesPage} />`;
     case "place": return html`<${PlacePage} key=${id} id=${id} />`;
+    case "new": return html`<${NewEpisode} key=${id} season=${id} />`;
     default: return html`<p>No page ${page}. <a href="#/">The series</a></p>`;
   }
 }

@@ -35,8 +35,9 @@ console.log(b.url);
 
 | Route | What |
 |---|---|
-| `#/` | The series: its titles and summary, its narrator and stand-in, its seasons |
-| `#/season/<id>` | A season: its episodes in order, each with its title, kind, release date, week, place, and draft or not |
+| `#/` | The series: its titles and summary, its narrator and stand-in, its seasons. *Edit the series* edits them, and on a root without `series.json`, *Start the series* writes one. *+ Season n* adds the next season |
+| `#/season/<id>` | A season: its episodes in order, each with its title, kind, release date, week, place, and draft or not. *Edit the season* is described below. *+ New episode* opens the wizard |
+| `#/new/<season>` | A new episode from its brief, described below |
 | `#/episode/<id>` | An episode, described below |
 | `#/cast` | Everyone of the series as a portrait, the extras apart. *New character* starts one with a new id: ids are permanent, and a retired one is refused |
 | `#/character/<id>` | A character, described below |
@@ -113,6 +114,28 @@ console.log(b.url);
   - The 5 KB budget (`MAX_BYTES`), and each of `PLACE_RULES` as ✓, ! or ✗, with `lintPlace`'s problems.
   - Saving runs the place check. The gallery's camera check (`#/places/<id>`) stays in the gallery.
 
+**Editing a season** (`src/ui/seasons.ts`).
+- Its titles, summary and launch day.
+- **Its weeks' arcs.** An arc is written in the season and in every story of its week, so editing one edits them all, and they are saved together. *+ a week* adds the next.
+- **Its calendar.**
+  - Each episode's date, kind and week. A change goes to the season's `calendar` and to the story's own `releaseDate` and `kind` together.
+  - A season without a calendar can start one from what its episodes say: their dates and kinds, and the week from their arc id.
+- *Save the season* writes the season and every episode it changed in one save, checked together.
+
+**A new episode** (`src/ui/new.ts`, `src/model/skeleton.ts`).
+- **The brief:**
+  - the id (the season's next free one), the release date and kind;
+  - the week (its arc), the place and the cast;
+  - the target words. The cards are searched live through `GET /api/cards?q=`, and their text is never stored. On a root without cards, the ids are typed in;
+  - the lessons (`GET /api/lessons`);
+  - the titles and the premise.
+- **The skeleton.** The editor writes a first draft the story check can read, marked `draft: true`:
+  - a scene with the cast on floor marks;
+  - Kerim's opening and a few lines;
+  - one choice, one spot, and three quiz items, every text to fill in.
+- **Saving it.** The skeleton opens in the episode editor, with its row in the season's calendar. It is created (saved for the first time) once the check finds no error. Its Save writes the episode and its season together.
+- **The thumbnail** is missing until it is shot: `GET /api/thumbs` names it, with the command.
+
 **Live preview.**
 - An edit that changes only words (`src/model/steps.ts` `wordsOnly`) re-directs the cues: `storyPlayer.replace`, with no reload.
 - Any other edit adapts the story again and loads the stage.
@@ -177,6 +200,8 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
 | `POST /api/save` `{ edits }` | 200 `{ saved: { "<kind>:<id>": mtime }, problems }`, or 400, 403, 409 or 422 `{ message, problems? }` |
 | `GET /api/head/<kind>/<id>` | `{ doc }`: the document at git's HEAD, or null |
 | `GET /api/thumbs` | `{ stale, command }` |
+| `GET /api/cards?q=` | `{ cards: [{ id, tr, en, level? }] }`: up to 40 word cards matching the search, read live (the word picker) |
+| `GET /api/lessons` | `{ lessons: [{ id, ref? }] }`: the grammar lessons, when the root has them |
 | `GET /api/problems` | `{ problems }`: every problem of the content root, as `stories.ts --check` finds them (the review page) |
 | `GET /api/review`, `POST /api/review` `{ id, review }` | The review notes; a POST replaces one episode's (cleaned: unknown keys dropped) and answers all of them |
 | `POST /api/reload` | The server forgets the world it has read (after a change made elsewhere) |
@@ -196,8 +221,8 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `store.ts` (signals: the world, the route, each open document's draft, the server's problems);
   - `api.ts`;
   - `stage.ts` (`Preview`: the stage and a story player that follow the document);
-  - `model/` (paths into a document, undo and redo, the step list; pure and tested in Node);
-  - `ui/` (the pages: `app`, `home`, `season`, `episode`, `inspector`, `staging`, `pick`, `review`, `changes`, `cast`, `places`, `fields`).
+  - `model/` (paths into a document, undo and redo, the step list, what changed, a new episode's skeleton; pure and tested in Node);
+  - `ui/` (the pages: `app`, `home`, `season`, `episode`, `inspector`, `staging`, `pick`, `review`, `changes`, `cast`, `places`, `seasons`, `new`, `fields`).
 - **`index.html`** is the page.
 - **`test/`**: `node --test` covers the save round trip, the model, and the server on a temp copy of the samples. `pnpm check` runs it.
 

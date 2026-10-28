@@ -122,6 +122,21 @@ test("review notes go to the sidecar, cleaned, never into a story", async () => 
   assert.ok(Array.isArray(all.body.problems));
 });
 
+test("a new episode's skeleton, with its calendar row, passes the story check and is created", async () => {
+  const { skeleton } = await import("../src/model/skeleton.ts");
+  const w = (await call(rw.url, "GET", "world")).body;
+  const se = w.seasons.s1;
+  const arcId = Object.keys(se.arcs)[0];
+  const doc = skeleton({ id: "s1e01", season: 1, releaseDate: "2026-09-15", kind: "episode", week: 0, arc: { ...se.arcs[arcId], id: arcId }, place: "bakkal", cast: ["ismail"],
+    words: ["a1-w-ekmek", "a1-w-su", "a1-w-cay", "a1-w-peynir", "a1-w-zeytin"], lessons: ["g_a1_2_var_yok"], title: "Ekmek var mı?", level: "A1" }, { narrator: "kerim", standin: "nima", places: w.places });
+  const c = await call(rw.url, "POST", "check", { edits: [{ kind: "story", id: "s1e01", doc, create: true }] });
+  assert.deepEqual(c.body.problems.filter((p: { level: string }) => p.level === "error"), []);
+  const r = await call(rw.url, "POST", "save", { edits: [{ kind: "story", id: "s1e01", doc, create: true }] });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok(readFileSync(join(root, "stories", "s1e01.json"), "utf8").endsWith("}\n"));
+  assert.equal((await call(rw.url, "POST", "save", { edits: [{ kind: "story", id: "s1e01", doc, create: true }] })).status, 400, "an id is created once");
+});
+
 test("the page and its bundle are served", async () => {
   const page = await fetch(rw.url);
   assert.match(await page.text(), /dist\/app\/index\.js/);
