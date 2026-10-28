@@ -61,6 +61,8 @@ export interface CueInfo {
   turn?: Turn;
   /** The choice option a `say` or `reply` cue belongs to. */
   option?: number;
+  /** A `reply` cue's index in its option's `reply` list (gated replies that were skipped still count). */
+  reply?: number;
 }
 
 export interface Performance { script: Script; info: CueInfo[] }
@@ -145,11 +147,11 @@ export function adaptStory(story: StoryDoc, o: AdaptOptions): StoryStage {
         const c = s.choice, k = Math.min(Math.max(0, Number(picks[c.id] ?? 0) | 0), c.options.length - 1), op = c.options[k];
         const turn: Turn = { kind: "choice", step, id: c.id, ...(c.to ? { to: c.to } : {}), options: c.options.map(card) };
         line({ ...op, who: STANDIN }, step, "say", { turn, option: k });
-        for (const r of op.reply ?? []) {
-          if (!passes(r, flags)) continue;
-          if (isBeat(r)) beat(r, step, "reply", { option: k });
-          else line(r, step, "reply", { option: k });
-        }
+        (op.reply ?? []).forEach((r, j) => {
+          if (!passes(r, flags)) return;
+          if (isBeat(r)) beat(r, step, "reply", { option: k, reply: j });
+          else line(r, step, "reply", { option: k, reply: j });
+        });
       } else if (isAct(s)) {
         const a = s.act;
         const cue = { kind: a.kind, targets: [...a.targets], ...(a.expect ? { expect: a.expect } : {}), ...(a.prompt ? { prompt: p(a.prompt.tr) } : {}),

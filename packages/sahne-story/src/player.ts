@@ -51,11 +51,18 @@ export interface StoryPlayer {
   act(): Promise<string | undefined>;
   /** Back to the opening scene, picks reset. */
   restart(): void;
+  /** Go to cue `i` with the picks so far (an editor's scrubber): cue 0 shows the opening scene; a cue with a card waits
+   * for its card (the footer offers it), any other cue plays from the world after the cue before it. */
+  jump(i: number): void;
+  /** Swap in a new adaptation of the same story (an editor changed its text or staging), keeping the picks and the
+   * art already loaded: the cues are re-directed, not reloaded. Call `jump` after to see the change on stage. */
+  replace(adapted: StoryStage): void;
   /** Call on a timer: the footer follows the performance where animation frames are paused (a hidden tab). */
   tick(): void;
 }
 
-export function storyPlayer(stage: PlayerStage, adapted: StoryStage, hooks: PlayerHooks = {}): StoryPlayer {
+export function storyPlayer(stage: PlayerStage, story: StoryStage, hooks: PlayerHooks = {}): StoryPlayer {
+  let adapted = story;
   let picks: Picks = { ...adapted.defaults }, info: CueInfo[] = [], next = 1, run: PlayerRun | null = null, last = "";
   const changed = () => hooks.onChange?.();
   const playing = () => !!run && stage.now() < run.dur;
@@ -127,6 +134,21 @@ export function storyPlayer(stage: PlayerStage, adapted: StoryStage, hooks: Play
       return target;
     },
     restart() { load(); changed(); },
+    jump(i) {
+      i = Math.max(0, Math.min(i | 0, info.length - 1));
+      run = null;
+      if (i === 0) { stage.show(0); next = 1; changed(); return; }
+      stage.show(i - 1);
+      next = i;
+      if (turnAt(i)) changed(); else playCue(i);
+    },
+    replace(a) {
+      adapted = a;
+      picks = { ...a.defaults, ...picks };
+      replan(0);
+      if (next > info.length) next = info.length;
+      changed();
+    },
     tick() {
       const key = (playing() ? "p" : "s") + next;
       if (key !== last) { last = key; changed(); }
