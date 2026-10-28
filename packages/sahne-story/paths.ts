@@ -1,8 +1,9 @@
 // Where the story data lives: the content root. It is the folder named by the env var SAHNE_CONTENT (an
 // absolute path), or, without it, this package's samples/ (one short sample story, its characters and two
 // places). The root holds stories/, characters/ and places/ (<id>.json each; the extras flat among the
-// characters, told apart by `kind: "extra"`). Everything else in it is optional, and the checks that need
-// it run only when it is there: cards/ and cards-extra/ (the word cards the stories teach), grammar/ (the
+// characters, told apart by `kind: "extra"`), and its series: series.json and seasons/ (s<n>.json each; the
+// stories are the episodes). Everything else in it is optional, and the checks that need it run only when
+// it is there: cards/ and cards-extra/ (the word cards the stories teach), grammar/ (the
 // lessons a story names), syllabus/ (a1.json, what each unit teaches), thumbs/ (the story pictures,
 // written by the gallery's thumbs.mjs), needs.json (what each place is asked for) and days.json (the
 // release calendar). The schemas stay in this package. A second, optional env var, SAHNE_STORY_DOCS (an
@@ -63,8 +64,19 @@ export const SYLLABUS = new URL("syllabus/", CONTENT);
 export const THUMBS = new URL("thumbs/", CONTENT);
 /** Optional: what the stories' briefs ask of each place (src/needs.ts). */
 export const NEEDS = new URL("needs.json", CONTENT);
-/** Optional: the release calendar, { <story id>: { date, week, kind } } (check/world.ts `Day`). */
+/** Optional: the release calendar, { <story id>: { date, week, kind } } (check/world.ts `Day`); a season's `calendar` takes its place. */
 export const DAYS = new URL("days.json", CONTENT);
+
+/** The series: the root's one story world (schema/series.json). */
+export const SERIES = new URL("series.json", CONTENT);
+/** The seasons: `s<n>.json` (schema/season.json). */
+export const SEASONS = new URL("seasons/", CONTENT);
+/** One season's file. */
+export const seasonFile = (id: string): URL => new URL(`${id}.json`, SEASONS);
+/** Every season id with a file, in season order. */
+export const seasonIds = (): string[] => existsSync(SEASONS) ? readdirSync(SEASONS).filter(f => /^s[1-9][0-9]?\.json$/.test(f)).map(f => f.slice(0, -5)).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))) : [];
+/** Editors' notes beside the content, never read by the app or the checks: sahne-backstage's review state. */
+export const REVIEW = new URL(".backstage/review.json", CONTENT);
 
 /** The JSON schemas of stories, characters and places (stay in the package). */
 export const SCHEMA = new URL("schema/", HERE);

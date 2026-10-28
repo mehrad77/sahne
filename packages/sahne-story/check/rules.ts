@@ -7,13 +7,13 @@ import { lowerTr } from "sahne-tr";
 import { applyLook, AVATAR_MAX_BYTES, compose, GARMENT_FIELDS, normalize, serialize, type AvatarDoc, type AvatarNote, type Kit, type KitManifest, type Solid } from "sahne";
 import { puppets as KERIM_PUPPETS } from "../../sahne-kit/src/kerim/index.ts";
 import { puppets as ANIMAL_PUPPETS } from "../../sahne-kit/src/puppets/index.ts";
-import { isAct, isChoice, isLine, isSpot, isScene, lintPlace, lintStory, NARRATOR, STANDIN, type CharacterDoc, type LineStep, type Needs, type StoryDoc, type Step } from "../src/index.ts";
+import { isAct, isChoice, isLine, isSpot, isScene, lintPlace, lintStory, NARRATOR, seasonOf, STANDIN, type CharacterDoc, type LineStep, type Needs, type StoryDoc, type Step } from "../src/index.ts";
 import type { CardIndex } from "../src/index.ts";
-import { validateDoc } from "./schema.ts";
+import { validateDoc, type SchemaKind } from "./schema.ts";
 import { resolver, words, type Resolver } from "./words.ts";
 import type { Draft, World } from "./world.ts";
 
-export type CheckRule = "schema" | "id" | "calendar" | "ref" | "cast" | "counts" | "flags" | "quiz" | "mistake" | "text" | "words" | "recycle" | "character" | "lint" | "place";
+export type CheckRule = "schema" | "id" | "series" | "calendar" | "ref" | "cast" | "counts" | "flags" | "quiz" | "mistake" | "text" | "words" | "recycle" | "character" | "lint" | "place";
 export interface CheckProblem { rule: CheckRule | string; level: "error" | "warning" | "info"; story: string; step?: number; message: string }
 /**
  * `kit` is a whole `Kit` (sahne-kit's full.ts) when the cast's avatars are to be composed; a bare manifest
@@ -29,6 +29,9 @@ const BREAKS: [string, string][] = [["2026-11-02", "2026-11-07"], ["2027-01-04",
 const LEVELS = ["A1", "A2", "B1"];
 /** Lines per story (Kumru's STORIES_DESIGN.md §1, proposed): [min, max] by level and kind. */
 const LINES: Record<string, Record<string, [number, number]>> = { A1: { episode: [10, 14], special: [20, 28] }, A2: { episode: [14, 18], special: [26, 34] }, B1: { episode: [16, 22], special: [30, 40] } };
+
+/** A week's arc id: season 1, week 3 → `s1w03`. */
+export const arcId = (season: number, week: number) => `s${season}w${String(week).padStart(2, "0")}`;
 
 /** The unit a week teaches: weeks 1-6 their own, weeks 7-8 all of A1 (Kumru's STORIES_A1.md *Weeks*). */
 export const unitOfWeek = (week: number) => Math.min(week, 6);
@@ -94,17 +97,17 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   else if (day) {
     if (s.releaseDate !== day.date) add("calendar", "error", `releaseDate ${s.releaseDate} but Days has ${day.date}`);
     if (s.kind !== day.kind) add("calendar", "error", `kind ${s.kind} but Days has ${day.kind}`);
-    if (s.arc && s.arc.id !== `s1w0${day.week}`) add("calendar", "error", `arc ${s.arc.id} but the story is in week ${day.week}`);
+    if (s.arc && s.arc.id !== arcId(seasonOf(d.id), day.week)) add("calendar", "error", `arc ${s.arc.id} but the story is in week ${day.week}`);
   }
   if (s.releaseDate && dayOfWeek(s.releaseDate) === 0) add("calendar", "error", `${s.releaseDate} is a Sunday`);
   if (s.releaseDate && BREAKS.some(([a, b]) => s.releaseDate! >= a && s.releaseDate! <= b)) add("calendar", "error", `${s.releaseDate} falls in a break week`);
   if (s.releaseDate && s.kind === "special" && dayOfWeek(s.releaseDate) !== 6) add("calendar", "error", "a special comes out on a Saturday");
   if (s.releaseDate && s.kind === "episode" && dayOfWeek(s.releaseDate) === 6) add("calendar", "error", "an episode comes out Monday to Friday");
-  if (s.level && s.season && LEVELS.indexOf(s.level) !== s.season - 1) add("id", "error", `level ${s.level} does not match season ${s.season}`);
-  if (s.id && s.season && s.id[1] !== String(s.season)) add("id", "error", `season ${s.season} does not match the id ${s.id}`);
+  if (s.id && s.season && seasonOf(s.id) !== s.season) add("id", "error", `season ${s.season} does not match the id ${s.id}`);
 
   // ref is a constraint (DESIGN §2): the week's unit
-  if (day && s.ref !== `A1_${unit}`) add("ref", "error", `ref ${s.ref} but week ${day.week} teaches A1_${unit}`);
+  const level = s.level ?? "A1";
+  if (day && s.ref !== `${level}_${unit}`) add("ref", "error", `ref ${s.ref} but week ${day.week} teaches ${level}_${unit}`);
   if (world.lessons) for (const l of s.lessons ?? []) {
     const g = world.lessons[l];
     if (!g) add("ref", "error", `lesson ${l} is not in grammar/`);
@@ -286,6 +289,61 @@ export function checkSeason(world: World, drafts: Draft[] = world.drafts, o: Che
   const kinds: Record<string, number> = {};
   for (const d of drafts) for (const st of d.story.steps) if (isChoice(st)) kinds[st.choice.kind ?? "polite"] = (kinds[st.choice.kind ?? "polite"] ?? 0) + 1;
   if (Object.keys(kinds).length) add("counts", "info", "season", `choice kinds: ${Object.entries(kinds).map(([k, n]) => `${k} ${n}`).join(", ")} (a third each wanted over the season)`);
+  return out;
+}
+
+/**
+ * The series and its seasons: each document against its schema and its file name, the narrator and the
+ * stand-in, every story's season, the calendar both ways (a row for every story of a season that has one, a
+ * story for every row) and against days.json when the root still has one, and each story's arc against its
+ * season's. Without series.json, one warning (the root predates series).
+ */
+export function checkSeries(world: World): CheckProblem[] {
+  const out: CheckProblem[] = [];
+  const add = (level: CheckProblem["level"], story: string, message: string, rule: CheckRule = "series") => out.push({ rule, level, story, message });
+  const schema = (kind: SchemaKind, doc: unknown, at: string) => { for (const p of validateDoc(kind, doc)) add("error", at, `${p.path}: ${p.message}`, "schema"); };
+  const sr = world.series;
+  if (!sr) add("warning", "series", "the content root has no series.json: add one, with a seasons/s<n>.json per season");
+  else {
+    schema("series", sr, "series");
+    for (const [role, id, kind, stage] of [["narrator", sr.narrator, "narrator", NARRATOR], ["stand-in", sr.standin, "standin", STANDIN]] as const) {
+      const c = world.cast[id];
+      if (!c) add("error", "series", `the ${role} ${id} has no character document`);
+      else if (c.kind !== kind) add("error", "series", `the ${role} ${id} is a ${c.kind}, not a ${kind}`);
+      if (id !== stage) add("error", "series", `the stage casts ${stage} as the ${role}; another ${role} is not supported yet`);
+    }
+  }
+  for (const [file, se] of Object.entries(world.seasons)) {
+    const at = `season:${file}`;
+    schema("season", se, at);
+    if (se.id !== file) add("error", at, `the file is ${file} but the season's id is ${se.id}`);
+    if (se.n !== Number(file.slice(1))) add("error", at, `n is ${se.n} but the file is ${file}`);
+    for (const id of Object.keys(se.calendar ?? {})) if (seasonOf(id) !== se.n) add("error", at, `the calendar names ${id}, a story of another season`);
+    for (const id of Object.keys(se.arcs ?? {})) if (!id.startsWith(`s${se.n}w`)) add("error", at, `arc ${id} belongs to another season`);
+    const episodes = world.drafts.filter(d => seasonOf(d.id) === se.n);
+    if (!episodes.length) add("warning", at, "the season has no episodes yet");
+    if (se.calendar) {
+      for (const d of episodes) if (!se.calendar[d.id]) add("error", d.id, `${d.id} has no row in season ${file}'s calendar`, "calendar");
+      for (const id of Object.keys(se.calendar)) if (!world.drafts.some(d => d.id === id)) add("warning", at, `the calendar has ${id}, which is not written yet`, "calendar");
+    }
+    for (const d of episodes) {
+      const a = d.story.arc;
+      if (!a || !se.arcs) continue;
+      const want = se.arcs[a.id];
+      if (!want) add("error", d.id, `arc ${a.id} is not one of season ${file}'s arcs`, "calendar");
+      else if (JSON.stringify({ tr: a.tr, en: a.en, fa: a.fa, mechanics: a.mechanics }) !== JSON.stringify({ tr: want.tr, en: want.en, fa: want.fa, mechanics: want.mechanics })) add("error", d.id, `arc ${a.id} differs from season ${file}'s`, "calendar");
+    }
+  }
+  if (world.series) for (const d of world.drafts) { const n = seasonOf(d.id); if (n && !world.seasons[`s${n}`]) add("error", d.id, `season s${n} has no document in seasons/`); }
+  // while days.json is still written beside the seasons' calendars, the two agree
+  if (world.daysFile && Object.values(world.seasons).some(se => se.calendar)) {
+    for (const [id, d] of Object.entries(world.days ?? {})) {
+      const f = world.daysFile[id];
+      if (!f) add("error", id, `${id} is in its season's calendar but not in days.json`, "calendar");
+      else if (f.date !== d.date || f.kind !== d.kind || f.week !== d.week) add("error", id, `days.json has ${f.date} ${f.kind} week ${f.week}, the season ${d.date} ${d.kind} week ${d.week}`, "calendar");
+    }
+    for (const id of Object.keys(world.daysFile)) if (!world.days?.[id]) add("error", id, `${id} is in days.json but in no season's calendar`, "calendar");
+  }
   return out;
 }
 

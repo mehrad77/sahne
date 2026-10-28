@@ -27,7 +27,7 @@
   "properties": {
     "id": {
       "type": "string",
-      "pattern": "^s[1-3]e[0-9]{2}$"
+      "pattern": "^s[1-9][0-9]?e[0-9]{2}$"
     },
     "releaseDate": {
       "type": "string",
@@ -47,11 +47,9 @@
       ]
     },
     "season": {
-      "enum": [
-        1,
-        2,
-        3
-      ]
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 99
     },
     "arc": {
       "type": "object",
@@ -65,7 +63,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^s[1-3]w[0-9]{2}$"
+          "pattern": "^s[1-9][0-9]?w[0-9]{2}$"
         },
         "tr": {
           "type": "string",
@@ -406,7 +404,7 @@
         },
         "sets": {
           "type": "string",
-          "pattern": "^s[1-3]e[0-9]{2}_[a-z0-9_]+$"
+          "pattern": "^s[1-9][0-9]?e[0-9]{2}_[a-z0-9_]+$"
         },
         "warm": {
           "type": "object",

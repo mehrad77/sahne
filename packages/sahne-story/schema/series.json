@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sahne-story/series.json",
+  "title": "A series: the one story world of a content root (series.json)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "id", "title", "titleEn", "titleFa", "narrator", "standin"],
+  "properties": {
+    "v": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "title": { "type": "string", "minLength": 1 },
+    "titleEn": { "type": "string", "minLength": 1 },
+    "titleFa": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string" },
+    "summaryFa": { "type": "string" },
+    "narrator": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "standin": { "type": "string", "pattern": "^[a-z0-9_]+$" }
+  }
+}

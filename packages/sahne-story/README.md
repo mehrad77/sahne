@@ -22,21 +22,22 @@ A story format for the [Sahne](../sahne/README.md) stage: story documents (the f
 Every node reader (the story check, the place checker, the extras' generator, the tests, the kit's set build and tests, the gallery's server and scripts) finds the story data through `paths.ts`, never through a path of its own. The data is in a **content root**:
 
 - the folder named by the env var `SAHNE_CONTENT` (an absolute path), for example Kumru's `data/`: `SAHNE_CONTENT=$PWD/data pnpm sahne dev`;
-- without it, `samples/` in this package: one short sample story (`s1e00`), its characters (Kerim, Nima, İsmail) with the generated extras, and two places (`bakkal`, `metro_m11`).
+- without it, `samples/` in this package: the sample series, one short sample story (`s1e00`), its characters (Kerim, Nima, İsmail) with the generated extras, and two places (`bakkal`, `metro_m11`).
 
 | In the content root | What | Needed |
 |---|---|---|
 | `stories/<id>.json` | the stories | yes |
 | `characters/<id>.json` | the cast roster and the generic extras together, told apart by `kind` | yes |
 | `places/<id>.json` | the place documents | yes |
+| `series.json`, `seasons/s<n>.json` | the series and its seasons ([Series, seasons, episodes](#series-seasons-episodes)) | yes: without `series.json` the check gives one warning |
 | `cards/`, `cards-extra/` | the word cards a story's `words` and a place's `terms` name; also the gallery's tap-to-translate | no: without them the card rules, unknown words and the known-word ratio do not run |
 | `grammar/` | the grammar lessons a story's `lessons` name | no: without it lesson ids are not checked |
 | `syllabus/a1.json` | what each unit teaches, for the known-word ratio | no |
-| `days.json` | the release calendar, `{ "<story id>": { "date", "week", "kind" } }` | no: without it the calendar rules do not run, and a flag's story is dated by its own `releaseDate` |
+| `days.json` | the release calendar, `{ "<story id>": { "date", "week", "kind" } }`, until the seasons carry it (`calendar`); while both exist they must agree | no: without either the calendar rules do not run, and a flag's story is dated by its own `releaseDate` |
 | `needs.json` | what the stories' briefs ask of each place, keyed by site | no: without it the place lint's `needs` rule does not run |
 | `thumbs/` | the story pictures, written by `sahne-gallery/thumbs.mjs` | no |
 
-Story docs are separate from the data. The optional env var `SAHNE_STORY_DOCS` (an absolute folder) holds `STORIES_WORLD.md`: the stories' sites, as the tables of its §2. The gallery's places board (`/data/world.json`) and `test/needs.test.ts` read it. Without it, the board leaves the sites out and that test skips. Nothing in Sahne reads `STORIES_A1.md`; the calendar is `days.json`.
+Story docs are separate from the data. The optional env var `SAHNE_STORY_DOCS` (an absolute folder) holds `STORIES_WORLD.md`: the stories' sites, as the tables of its §2. The gallery's places board (`/data/world.json`) and `test/needs.test.ts` read it. Without it, the board leaves the sites out and that test skips. Nothing in Sahne reads `STORIES_A1.md`; the calendar is the seasons' `calendar`, or `days.json`.
 
 ### The contract, in short
 
@@ -45,17 +46,24 @@ Story docs are separate from the data. The optional env var `SAHNE_STORY_DOCS` (
 | `SAHNE_CONTENT` | env, an absolute folder | the content root below | `packages/sahne-story/samples/` |
 | `SAHNE_STORY_DOCS` | env, an absolute folder | holds `STORIES_WORLD.md` | no sites on the board; the needs-vs-world test skips |
 | stories, characters, places | `<root>/{stories,characters,places}/<id>.json` | `schema/story.json`, `character.json`, `place.json` | required |
+| series, seasons | `<root>/series.json`, `<root>/seasons/s<n>.json` | `schema/series.json`, `season.json` | one warning; the series rules skip |
 | cards | `<root>/cards/`, `<root>/cards-extra/` | `<id>.json` with `tr`, `en`, `fa`, `level`, `ref`, `retired` | `loadCards()` returns `null` (not `{}`); every card rule skips |
 | grammar | `<root>/grammar/<id>.json` | with `ref`, `level` | lesson refs are not checked |
 | syllabus | `<root>/syllabus/a1.json` | `{ words, lessons, units }` | the known-word ratio uses the cards alone, or skips |
-| calendar | `<root>/days.json` | `{ "s1e01": { "date": "2026-09-07", "week": 1, "kind": "episode" } }` | the calendar rules skip; a flag's story is dated by its own `releaseDate` |
+| calendar | each season's `calendar`, else `<root>/days.json` | `{ "s1e01": { "date": "2026-09-07", "week": 1, "kind": "episode" } }` | the calendar rules skip; a flag's story is dated by its own `releaseDate` |
 | needs | `<root>/needs.json` | `src/needs.ts` `Needs`, keyed by site | `loadNeeds()` returns `undefined`; the place lint's `needs` rule and `test/needs.test.ts` skip |
 | extras | written to `<root>/characters/` by `cast/extras.ts` | `kind: "extra"` | `--check` fails: run the generator |
 | thumbs | written to `<root>/thumbs/` by `sahne-gallery/thumbs.mjs` | `<id>.webp` and `thumbs.json` | `--check` fails: run the script |
 
-A missing optional file is never an error: each rule that needs it skips. The samples have no cards, grammar, syllabus, calendar or needs, and pass `stories.ts --check` with 0 errors and 0 warnings.
+A missing optional file is never an error: each rule that needs it skips. The samples have no cards, grammar, syllabus, calendar or needs (their season has arcs but no calendar), and pass `stories.ts --check` with 0 errors and 0 warnings.
 
 The JSON schemas stay in `schema/`. Each file is named by its `id`. The gallery's two bundled JSON imports (`sahne-gallery/src/bakkal.ts`, `src/systems/places.ts`) are the only literal paths, and they read the samples.
+
+## Series, seasons, episodes
+
+A content root holds one **series**: its story world. `series.json` names it (`title`, `titleEn`, `titleFa`, an optional `summary` and `summaryFa`) and its `narrator` and `standin` (the stage casts `NARRATOR` and `STANDIN`, `src/types.ts`; another id is an error for now). A series has **seasons**, one `seasons/s<n>.json` each: `id` (`s<n>`, the file name), `n`, the titles and summaries, an optional `launch` date, the weeks' `arcs` by arc id (`s<n>wNN`) and the release `calendar` by story id (`{ date, kind, week }`, the shape of `days.json`). The **episodes** are the story documents: `s<n>eNN` is episode NN of season n (`seasonOf`), ordered by id; a story's `kind` says whether it is a weekday episode or a Saturday special. A series and its seasons have no level: a story's own `level` and `ref` are its own.
+
+`checkSeries` (in `stories.ts --check`): each document against its schema and its file name; the narrator and stand-in have character documents of that kind; every story's season has a document; where a season has a calendar, a row for each of its stories and a story for each row (one not written yet is a warning); each story's `arc` equals its season's `arcs` entry; while `days.json` is still written beside the calendars, the two agree. A story's own calendar rules read the season's row: its `releaseDate` and `kind`, and its arc id from the week (`arcId`). Types: `SeriesDoc`, `SeasonDoc`, `CalendarRow` (`src/types.ts`); paths: `SERIES`, `SEASONS`, `seasonFile`, `seasonIds` (`paths.ts`).
 
 ## Places
 

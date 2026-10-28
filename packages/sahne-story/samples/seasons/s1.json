@@ -1,0 +1,18 @@
+{
+  "v": 1,
+  "id": "s1",
+  "n": 1,
+  "title": "Birinci sezon",
+  "titleEn": "Season one",
+  "titleFa": "فصل اول",
+  "summary": "Nima's first evening home: the metro, then oranges at İsmail's shop.",
+  "summaryFa": "اولین عصر نیما در راه خانه: مترو، بعد پرتقال از مغازهٔ اسماعیل.",
+  "arcs": {
+    "s1w00": {
+      "en": "A sample",
+      "fa": "یک نمونه",
+      "mechanics": ["say", "explore", "act"],
+      "tr": "Bir örnek"
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sahne-story/season.json",
+  "title": "A season of the series (seasons/s<n>.json): its titles, its weeks' arcs and its release calendar",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "id", "n", "title", "titleEn", "titleFa"],
+  "properties": {
+    "v": { "const": 1 },
+    "id": { "type": "string", "pattern": "^s[1-9][0-9]?$" },
+    "n": { "type": "integer", "minimum": 1, "maximum": 99 },
+    "title": { "type": "string", "minLength": 1 },
+    "titleEn": { "type": "string", "minLength": 1 },
+    "titleFa": { "type": "string", "minLength": 1 },
+    "summary": { "type": "string" },
+    "summaryFa": { "type": "string" },
+    "launch": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "arcs": {
+      "type": "object",
+      "propertyNames": { "pattern": "^s[1-9][0-9]?w[0-9]{2}$" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tr", "en", "fa", "mechanics"],
+        "properties": {
+          "tr": { "type": "string", "minLength": 1 },
+          "en": { "type": "string", "minLength": 1 },
+          "fa": { "type": "string", "minLength": 1 },
+          "mechanics": { "type": "array", "uniqueItems": true, "items": { "enum": ["say", "explore", "act", "aloud", "unlocks"] } }
+        }
+      }
+    },
+    "calendar": {
+      "type": "object",
+      "propertyNames": { "pattern": "^s[1-9][0-9]?e[0-9]{2}$" },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["date", "kind", "week"],
+        "properties": {
+          "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+          "kind": { "enum": ["episode", "special"] },
+          "week": { "type": "integer", "minimum": 0, "maximum": 99 }
+        }
+      }
+    }
+  }
+}

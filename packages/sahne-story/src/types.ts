@@ -120,6 +120,44 @@ export interface StoryDoc {
   [k: string]: unknown;
 }
 
+/** The series: the one story world of a content root (`series.json`, schema/series.json). Its episodes are the story documents. */
+export interface SeriesDoc {
+  v: 1;
+  id: string;
+  title: string;
+  titleEn: string;
+  titleFa: string;
+  summary?: string;
+  summaryFa?: string;
+  /** The narrator's and the stand-in's character ids (the stage casts `NARRATOR` and `STANDIN`). */
+  narrator: string;
+  standin: string;
+}
+
+/** One release of an episode: its date, whether it is a weekday episode or a Saturday special, and its week. */
+export interface CalendarRow { date: string; kind: "episode" | "special"; week: number }
+
+/** A season of the series (`seasons/s<n>.json`, schema/season.json): its episodes are the stories `s<n>eNN`. No level. */
+export interface SeasonDoc {
+  v: 1;
+  id: string;
+  n: number;
+  title: string;
+  titleEn: string;
+  titleFa: string;
+  summary?: string;
+  summaryFa?: string;
+  /** The first release day of the season. */
+  launch?: string;
+  /** Each week's arc, by arc id (`s<n>wNN`): every story of the week carries the same `arc`. */
+  arcs?: Record<string, Omit<Arc, "id">>;
+  /** The release calendar, by story id: the source of truth for each story's `releaseDate` and `kind`. */
+  calendar?: Record<string, CalendarRow>;
+}
+
+/** The season a story id belongs to (`s12e03` → 12), or 0 for an id that is not one. */
+export const seasonOf = (id: string): number => Number(/^s([1-9][0-9]?)e[0-9]{2}$/.exec(id)?.[1] ?? 0);
+
 /** The character document (§5): what the stage reads of it. */
 export interface CharacterDoc {
   id: string;
