@@ -7,6 +7,7 @@ import type { StoryDoc } from "sahne-story";
 import { get, set, type Path } from "../model/path.ts";
 import { kindOf } from "../model/steps.ts";
 import { Check, Select, Text, Tri } from "./fields.ts";
+import { Json, SceneFields, Staging, StepTools } from "./staging.ts";
 
 export interface InspectorProps {
   story: StoryDoc;
@@ -15,6 +16,8 @@ export interface InspectorProps {
   cast: string[];
   /** Edit the story: `fn` gets the document; `field` names a typed field (one undo step). */
   edit(fn: (s: StoryDoc) => StoryDoc, field?: string): void;
+  /** Select another step (after a move, an insert, a delete). */
+  select(path: Path | null): void;
 }
 
 const TONES = ["polite", "warm", "formal", "casual", "blunt", "rude"];
@@ -36,12 +39,18 @@ export function Inspector(p: InspectorProps) {
   const kind = isOption ? "option" : kindOf(v);
   return html`<div class="fields">
     <div class="note">${kind} · ${where}</div>
+    <${StepTools} story=${p.story} path=${p.path} cast=${p.cast} edit=${(fn: (s: StoryDoc) => StoryDoc) => p.edit(fn)} select=${p.select} />
     ${kind === "line" && html`<${LineWords} ...${p} path=${p.path} reply=${isReply} />`}
     ${kind === "option" && html`<${OptionWords} ...${p} path=${p.path} />`}
     ${kind === "spot" && html`<${SpotWords} ...${p} path=${[...p.path, "spot"]} />`}
     ${kind === "choice" && html`<${ChoiceFields} ...${p} path=${[...p.path, "choice"]} />`}
     ${kind === "act" && html`<${Tri} label="Prompt" doc=${v.act?.prompt} saved=${get(p.saved, [...p.path, "act", "prompt"])} onInput=${(k: string, x: string | undefined) => p.edit(s => set(s, [...p.path!, "act", "prompt", k], x), `${where}.prompt.${k}`)} />`}
-    ${(kind === "beat" || kind === "scene") && html`<p class="note">A ${kind} has no words: its staging is below.</p>`}
+    ${(kind === "line" || kind === "option") && html`<${Staging} ...${p} path=${p.path} />`}
+    ${kind === "beat" && html`<${Staging} ...${p} path=${[...p.path, "beat"]} />`}
+    ${kind === "scene" && html`<${SceneFields} ...${p} path=${p.path} />`}
+    <details><summary>The step as JSON (for what the forms do not cover)</summary>
+      <${Json} label=${where} rows=${12} value=${v} onInput=${(x: unknown) => x && typeof x === "object" && p.edit(s => set(s, p.path!, x))} />
+    </details>
   </div>`;
 }
 
