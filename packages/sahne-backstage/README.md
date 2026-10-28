@@ -53,6 +53,26 @@ console.log(b.url);
   - For a spot: its lesson, example and words.
   - For a choice: its id, kind and whom it is said to.
   - With nothing selected: the episode's titles, summary, quiz and glosses.
+- **Staging** (`src/ui/staging.ts`), under the words of a line, an option, a reply or a beat.
+  - The fields come in the order the stories use them most: feeling (`emo`), gesture (`do`), said to (`to`), looking or pointing at (`at`), then camera, voice, tempo and count.
+  - Then the props (`obj`), moves (`move`), others' reactions (`react`), words that point at things (`link`) and sounds (`sfx`).
+  - The rest sits under *More*: `env`, `via`, `on`, `wait`, `frame` and `looks`.
+  - Each field picks from what is valid there:
+    - the kit's emotions, gestures and sounds;
+    - the engine's cameras, moves, prop ops and voices (`CAM_KINDS`, `MOVE_HOWS`, `OBJ_OPS`, `VOICES`);
+    - the marks and props of the place the step plays in;
+    - the cast.
+  - A scene has its own form: the place, time, weather, the place's states, who stands on which mark, and Kerim's perch.
+  - Every step also has a raw JSON drawer for what the forms do not cover. The story check judges it like any other edit.
+- **Step tools.**
+  - Move a step up or down, duplicate it or delete it.
+  - Add a line, a stand-in line, Kerim's narration, a beat, a scene, a spot or a choice after the selected step.
+  - On an option: add an option (at most 3) or a reply.
+- **On the stage** (`src/ui/pick.ts`).
+  - *Show the marks* pins the place's marks over the stage, placed through its camera every frame.
+  - *A click sets* turns a click into staging for the selected step: a person or prop it looks or points at (`at`), the person it is said to (`to`), or the mark its speaker moves to (`move`).
+  - People and props come from the interaction layer's `inspect`; marks come from the pins.
+  - Shot buttons set the step's `cam`.
 - **Problems.**
   - The stage lints (`lintStory`, `suggest`) run in the browser as you type.
   - The full story check runs on the server a moment later. A problem the edit brought is marked **new**.
@@ -150,7 +170,7 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `api.ts`;
   - `stage.ts` (`Preview`: the stage and a story player that follow the document);
   - `model/` (paths into a document, undo and redo, the step list; pure and tested in Node);
-  - `ui/` (the pages).
+  - `ui/` (the pages: `app`, `home`, `season`, `episode`, `inspector`, `staging`, `pick`, `review`, `changes`, `fields`).
 - **`index.html`** is the page.
 - **`test/`**: `node --test` covers the save round trip, the model, and the server on a temp copy of the samples. `pnpm check` runs it.
 

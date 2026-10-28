@@ -16,6 +16,7 @@ import { Check, Problems } from "./fields.ts";
 import { Inspector } from "./inspector.ts";
 import { ReviewPanel } from "./review.ts";
 import { ChangesPanel } from "./changes.ts";
+import { StagePick } from "./pick.ts";
 import type { Problem } from "../api.ts";
 
 declare global { interface Window { backstage?: { preview: Preview; select(path: Path | null): void } } }
@@ -119,6 +120,7 @@ function Editor(p: { id: string }) {
       <div>
         <div class="stagebox"><div ref=${box}></div></div>
         ${player && html`<${Transport} preview=${pv!} redraw=${redraw} />`}
+        ${pv && html`<${StagePick} preview=${pv} story=${story} path=${path} host=${box.current?.parentElement ?? null} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} />`}
         ${allFlags.length > 0 && html`<div class="panel" style="margin-top:8px"><b>Flags set by earlier stories</b>
           <div class="row">${allFlags.map(f => html`<${Check} label=${f} value=${flags.includes(f)} onInput=${(on: boolean) => {
             const next = on ? [...flags, f] : flags.filter(x => x !== f);
@@ -128,7 +130,7 @@ function Editor(p: { id: string }) {
           ${(["edit", "review", "changes"] as const).map(t => html`<button role="tab" aria-selected=${tab === t} class=${tab === t ? "primary" : ""} onClick=${() => setTab(t)}>${t === "edit" ? "Edit" : t === "review" ? "Review" : "Changes since the last commit"}</button>`)}
         </div>
         <div class="panel" style="margin-top:6px">
-          ${tab === "edit" && html`<${Inspector} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} />`}
+          ${tab === "edit" && html`<${Inspector} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} select=${select} />`}
           ${tab === "review" && html`<${ReviewPanel} id=${p.id} story=${story} path=${path} />`}
           ${tab === "changes" && html`<${ChangesPanel} id=${p.id} story=${story} savedAt=${d.mtime} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} select=${select} />`}
         </div>
