@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { lookAt, mat4Mul, perspective, project, type Vec3 } from "../src/core/math.ts";
-import { AlphaMasks, MASK_SCALE, isTarget, maskHit, parseTarget, partOf, pickTop, poolAlpha, rayAt, rayQuad, rayTri, rayZ, type Pick } from "../src/interact/hit.ts";
+import { AlphaMasks, MASK_SCALE, isTarget, maskHit, parseTarget, partOf, pickTop, poolAlpha, rayAt, rayFloor, rayQuad, rayTri, rayZ, type Pick } from "../src/interact/hit.ts";
 import { HINT_AT, SHOW_AT, dragged, inspectOf, nameOf, resolvedCue, skipAct, startAct, targetOf, tryAct, type SceneInfo } from "../src/interact/act.ts";
 import { speechFallback, matchFallback } from "../src/core/lang.ts";
 import { direct, directAll, fold, glance, type DirectCtx } from "../src/director/direct.ts";
@@ -31,6 +31,18 @@ test("the ray through a projected point passes through the point, for any camera
       assert.ok(Math.hypot(c[0] - p[0], c[1] - p[1], c[2] - p[2]) < 1e-4, `ray misses ${p}`);
     }
   }
+});
+
+test("the floor point under a projected floor point is that point; above the horizon there is none", () => {
+  const cam = { eye: [0, 1.4, 6] as Vec3, target: [0, 1.1, 0] as Vec3, fov: 0.52 }, aspect = 1.6;
+  const vp = mat4Mul(perspective(cam.fov, aspect, 0.1, 200), lookAt(cam.eye, cam.target));
+  for (const p of [[0.3, 0, -0.4], [-2.4, 0, -2], [1.5, 0, 1.5]] as Vec3[]) {
+    const q = project(vp, p), f = rayFloor(rayAt(cam, aspect, q[0], q[1]))!;
+    assert.ok(f && Math.hypot(f[0] - p[0], f[1], f[2] - p[2]) < 1e-4, `floor point misses ${p}`);
+  }
+  const shelf = rayFloor(rayAt(cam, aspect, 0, -0.2), 0.9)!;
+  near(shelf[1], 0.9);
+  assert.equal(rayFloor(rayAt(cam, aspect, 0, 0.9)), null, "a ray going up never meets the floor");
 });
 
 // a 1 m square standing at z = −2, art's top left at (−0.5, 2), as the stage builds flats (y down the art)

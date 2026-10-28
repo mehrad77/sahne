@@ -58,6 +58,13 @@ export function rayQuad(ray: Ray, c: readonly Vec3[]): { t: number; s: number; v
   return s >= 0 && s <= 1 && v >= 0 && v <= 1 ? { t, s, v } : null;
 }
 
+/** Where a ray meets the level plane at height `y` (the floor at 0), ahead of its origin, or null (parallel, or behind). */
+export function rayFloor(ray: Ray, y = 0): Vec3 | null {
+  if (Math.abs(ray.d[1]) < 1e-12) return null;
+  const t = (y - ray.o[1]) / ray.d[1];
+  return t > 0 ? [ray.o[0] + ray.d[0] * t, y, ray.o[2] + ray.d[2] * t] : null;
+}
+
 /** Where a ray meets a triangle (Möller–Trumbore): the distance, or null. */
 export function rayTri(ray: Ray, a: Vec3, b: Vec3, c: Vec3): number | null {
   const e1 = sub(b, a), e2 = sub(c, a), p = cross(ray.d, e2), det = dot(e1, p);

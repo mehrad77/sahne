@@ -30,7 +30,7 @@ import { moveAt } from "./anim/move.ts";
 import { cloneWorld, inState, propKey, whenWeight, type PropState, type Shot, type World } from "./script/world.ts";
 import { CAM_MS, emptyTrack, evaluate, type ActorFrame, type Frame, type Perf, type VoiceLine } from "./anim/timeline.ts";
 import { direct, directAll, glance, type DirectCtx } from "./director/direct.ts";
-import type { Pick } from "./interact/hit.ts";
+import { rayAt, rayFloor, type Pick } from "./interact/hit.ts";
 import { Overlay, type Bubble, type InsetOptions } from "./ui/overlay.ts";
 import type { GlossOptions } from "./ui/gloss.ts";
 import { AudioEngine, type AudioSessionType } from "./audio/engine.ts";
@@ -1890,6 +1890,15 @@ export class Stage {
       }
     }
     return x0 <= x1 ? [x0, y0, x1, y1] : null;
+  }
+
+  /**
+   * The point of the floor (or of the level plane at `height`) under CSS pixel (x, y) inside the stage element,
+   * in the last frame's camera: where an editor drops a mark. Null off the floor (above the horizon).
+   */
+  floorAt(x: number, y: number, height = 0): Vec3 | null {
+    if (!this.cssW || !this.cssH) return null;
+    return rayFloor(rayAt(this.cam, this.aspect, x / this.cssW * 2 - 1, 1 - y / this.cssH * 2), height);
   }
 
   /** A world point in CSS pixels inside the stage element. */

@@ -495,6 +495,7 @@ A flat may **react** to people (`FlatSpec.react`, `FlatReact`), and remember it.
 - **An act never blocks.** After two misses, the target is hinted with a gaze or a glow. After three, it is shown and the story goes on.
 - **Every act has an accessible alternative:** a list of buttons for keyboards and screen readers.
 - **Hit tests** cast a ray against piece quads and check a low-resolution alpha mask taken from the atlas, so taps on transparent corners pass through.
+- **Floor points.** `Stage.floorAt(x, y, height?)` casts the same ray against the level plane (`rayFloor`): the floor point under a CSS pixel, where an editor drops a mark (sahne-backstage). Marks themselves are not pickable.
 - **Each story week chooses its mechanics.** The engine never assumes one is on.
 
 **How it is built (B5).** The interaction layer is attached to a stage, not part of it, so the builder and the lists never load it: `interact(stage, { explore, list, focus, words })`, before `load`.
