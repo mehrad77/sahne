@@ -38,6 +38,10 @@ console.log(b.url);
 | `#/` | The series: its titles and summary, its narrator and stand-in, its seasons |
 | `#/season/<id>` | A season: its episodes in order, each with its title, kind, release date, week, place, and draft or not |
 | `#/episode/<id>` | An episode, described below |
+| `#/cast` | Everyone of the series as a portrait, the extras apart. *New character* starts one with a new id: ids are permanent, and a retired one is refused |
+| `#/character/<id>` | A character, described below |
+| `#/places` | Every place, with how many episodes it opens; *New place* starts one |
+| `#/place/<id>` | A place, described below |
 | `#/review` | Where every episode stands: status, steps reviewed, Persian checked, errors, warnings, the known-word ratio (when the root has cards), open comments; *Export the notes* downloads them as markdown |
 
 **The episode page:**
@@ -86,6 +90,29 @@ console.log(b.url);
   - *Put back as committed* restores one step. A person commits; backstage never does.
 - **Undo, redo, revert and save.** Typing into one field is one undo step. Save is refused when the edit brings an error. Problems the file already had do not block it.
 
+**A character's page** (`src/ui/cast.ts`).
+- Their look, in Sahne's builder in `author` mode: every part, the cast's own included. The size of the look is shown against `AVATAR_MAX_BYTES`.
+- Their outfits, each previewed on them (`applyLook`) and edited as a look (clothes only).
+- Names, role and bio in Turkish and Persian, colour, order, level, voice.
+- How they address each of the others (`sen` or `siz`), and the places they belong to.
+- The whole document as JSON, for the album and the rest.
+- Saving runs the cast check.
+- An extra is shown, never edited. Extras are written by `sahne-story/cast/extras.ts`.
+
+**A place's page** (`src/ui/places.ts`).
+- The place on a stage, at each of its times and states.
+- **Marks.**
+  - Each mark is a pin you drag on the floor (`Stage.floorAt`); *+ a mark* adds one where you click.
+  - The marks' table edits x, y, z, facing and seat.
+- **Props.** Each is edited as JSON. *+ a prop* adds one, picking from the kit.
+- **Set pieces.**
+  - A list. For the selected piece, its id and place, its variant, and a control for each param its generator declares (`PieceDef.meta`).
+  - A piece's art comes from its seed: its `seed`, else the site with its `id`, else the site with its kit and position (`pieceSeed`). Naming an unnamed piece, or moving one, would change its art, so the editor pins the seed it had first.
+- **Settings.** Name, size, Kerim's perch, the floor's sound, its times, ambience and camera.
+- **Checks.**
+  - The 5 KB budget (`MAX_BYTES`), and each of `PLACE_RULES` as ✓, ! or ✗, with `lintPlace`'s problems.
+  - Saving runs the place check. The gallery's camera check (`#/places/<id>`) stays in the gallery.
+
 **Live preview.**
 - An edit that changes only words (`src/model/steps.ts` `wordsOnly`) re-directs the cues: `storyPlayer.replace`, with no reload.
 - Any other edit adapts the story again and loads the stage.
@@ -98,7 +125,7 @@ console.log(b.url);
 
 **What a save keeps from the file:**
 - Each number as it was written: `1.0` stays `1.0`, because the file is parsed with a `JSON.rawJSON` reviver.
-- Each file's own key order.
+- Each file's own key order. A file whose keys are all sorted stays sorted. Otherwise each object keeps its keys' order and a new key goes last, so the builder or a form writing an object in its own order changes only what changed.
 - Whether the file ends in a newline.
 - UTF-8 text as it is, with no `\u` escapes.
 
@@ -170,7 +197,7 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `api.ts`;
   - `stage.ts` (`Preview`: the stage and a story player that follow the document);
   - `model/` (paths into a document, undo and redo, the step list; pure and tested in Node);
-  - `ui/` (the pages: `app`, `home`, `season`, `episode`, `inspector`, `staging`, `pick`, `review`, `changes`, `fields`).
+  - `ui/` (the pages: `app`, `home`, `season`, `episode`, `inspector`, `staging`, `pick`, `review`, `changes`, `cast`, `places`, `fields`).
 - **`index.html`** is the page.
 - **`test/`**: `node --test` covers the save round trip, the model, and the server on a temp copy of the samples. `pnpm check` runs it.
 
