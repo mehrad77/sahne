@@ -172,6 +172,25 @@ console.log(b.url);
 
 **Thumbnails.** A thumbnail goes stale only when the opening picture changes: the opening scene, place, props, cast or looks (`sahne-gallery/thumbs.mjs`). A fix to a line's words leaves it as it was. `GET /api/thumbs` lists the stale ones, with the command that shoots them.
 
+## AI help (`server/ai.ts`, `src/ui/ai.ts`)
+
+AI help is optional, and is on only when the server's environment has `ANTHROPIC_API_KEY`. The key never goes in the repo. Without it, every AI button is hidden.
+
+The server calls the Messages API with plain `fetch`. Each ask answers JSON to a schema (`output_config.format`; these models take no forced tool call). It sends `fallbacks: "default"` (beta `server-side-fallback-2026-07-01`), so a declined request is re-run on another model. A refusal that stands is shown as an error.
+
+The three asks:
+- **Rewrite** (`claude-sonnet-5-5`): rewrites the selected line, option or reply with an instruction ("simpler", "warmer"). It comes back as a word diff to accept or discard.
+- **Second reader** (`claude-opus-5-5`, a tab beside *Review*): reviews the whole episode against its brief, as a reader who did not write it.
+  - Each finding links to its step.
+  - For a line, a finding can carry a fix to accept.
+- **Draft** (`claude-opus-5-5`, on a `draft: true` episode): writes its steps and quiz from the brief and the skeleton, to accept as a whole.
+
+What leaves the machine:
+- The story document (its texts and staging, with card ids, never a card's text).
+- The cast's names and roles.
+
+Every answer is a suggestion. Accepting it is an edit like any other: Undo reverts it, and the story check judges it before it can be saved. The model ids live in one place (`MODELS`).
+
 ## Review notes (`server/review.ts`)
 
 Review state is editors' notes, so it is not part of a story: a story's root takes no extra keys. It lives in a sidecar beside the content, `<root>/.backstage/review.json`, at sahne-story's `paths.ts` `REVIEW`.
@@ -202,6 +221,7 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
 | `GET /api/thumbs` | `{ stale, command }` |
 | `GET /api/cards?q=` | `{ cards: [{ id, tr, en, level? }] }`: up to 40 word cards matching the search, read live (the word picker) |
 | `GET /api/lessons` | `{ lessons: [{ id, ref? }] }`: the grammar lessons, when the root has them |
+| `POST /api/ai/rewrite` `{ story, path, instruction?, cast }`, `/api/ai/review` `{ story, brief?, cast }`, `/api/ai/draft` `{ story, brief, cast }` | `{ suggestion }`, `{ summary, findings }`, `{ steps, quiz, notes }`; 503 without a key, 422 when Claude declines |
 | `GET /api/problems` | `{ problems }`: every problem of the content root, as `stories.ts --check` finds them (the review page) |
 | `GET /api/review`, `POST /api/review` `{ id, review }` | The review notes; a POST replaces one episode's (cleaned: unknown keys dropped) and answers all of them |
 | `POST /api/reload` | The server forgets the world it has read (after a change made elsewhere) |
@@ -214,7 +234,8 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `content.ts` (kinds, files, checks, saves);
   - `save.ts`;
   - `git.ts`;
-  - `review.ts`.
+  - `review.ts`;
+  - `ai.ts`.
 - The server reads sahne-story's Node-only files (`paths.ts`, `check/`, `load.ts`) by path. The package exports only `"."`.
 - **`src/`** is the browser side, built with Preact and htm tagged templates (no JSX, so the source stays erasable TypeScript). It contains:
   - `index.ts`;
@@ -222,8 +243,8 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `api.ts`;
   - `stage.ts` (`Preview`: the stage and a story player that follow the document);
   - `model/` (paths into a document, undo and redo, the step list, what changed, a new episode's skeleton; pure and tested in Node);
-  - `ui/` (the pages: `app`, `home`, `season`, `episode`, `inspector`, `staging`, `pick`, `review`, `changes`, `cast`, `places`, `seasons`, `new`, `fields`).
+  - `ui/` (the pages: `app`, `home`, `season`, `episode`, `inspector`, `staging`, `pick`, `review`, `changes`, `cast`, `places`, `seasons`, `new`, `ai`, `fields`).
 - **`index.html`** is the page.
-- **`test/`**: `node --test` covers the save round trip, the model, and the server on a temp copy of the samples. `pnpm check` runs it.
+- **`test/`**: `node --test` covers the save round trip, the model, the server on a temp copy of the samples, and AI help with the network stubbed. `pnpm check` runs it.
 
 The package exports `"."` → `src/index.ts`, like every package, and also `"./server"` → `server/index.ts`. The server is the one Node-only entry. Backstage never ships to learners, so it has no `size.mjs` budget and no `determinism.mjs` entry.

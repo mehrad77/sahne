@@ -11,6 +11,7 @@ import { CONTENT, IS_SAMPLES } from "../../sahne-story/paths.ts";
 import { allProblems, check, exists, forget, isKind, lessons, listing, readDoc, save, searchCards, type Edit } from "./content.ts";
 import { headOf } from "./git.ts";
 import { readReview, writeReview } from "./review.ts";
+import { ai, aiReady } from "./ai.ts";
 
 const HERE = new URL("../", import.meta.url);
 const SOUNDS = new URL("../../sahne-kit/sounds/", import.meta.url);
@@ -57,7 +58,7 @@ export async function serve(o: Options): Promise<Running> {
   async function api(req: http.IncomingMessage, res: http.ServerResponse, path: string[]) {
     const [route, a, b] = path;
     const m = req.method ?? "GET";
-    if (route === "world" && m === "GET") return json(res, 200, { ...listing(), samples: IS_SAMPLES, writable: o.write });
+    if (route === "world" && m === "GET") return json(res, 200, { ...listing(), samples: IS_SAMPLES, writable: o.write, ai: aiReady() });
     if (route === "reload" && m === "POST") { forget(); return json(res, 200, { ok: true }); }
     if (route === "doc" && m === "GET" && a && b) {
       if (!isKind(a) || !exists(a, b)) throw new Fail(404, `no ${a} ${b}`);
@@ -83,6 +84,7 @@ export async function serve(o: Options): Promise<Running> {
       if (!o.write) throw new Fail(403, "read-only: start backstage with --write");
       return json(res, 200, writeReview(await body(req)));
     }
+    if (route === "ai" && m === "POST" && a) return json(res, 200, await ai(a, await body(req)));
     if (route === "thumbs" && m === "GET") return json(res, 200, { stale: await staleThumbs(), command: "node packages/sahne-gallery/thumbs.mjs (in the Sahne repo, with SAHNE_CONTENT set)" });
     throw new Fail(404, `no route ${m} /api/${path.join("/")}`);
   }

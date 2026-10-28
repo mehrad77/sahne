@@ -8,6 +8,7 @@ import { get, set, type Path } from "../model/path.ts";
 import { kindOf } from "../model/steps.ts";
 import { Check, Select, Text, Tri } from "./fields.ts";
 import { Json, SceneFields, Staging, StepTools } from "./staging.ts";
+import { AiRewrite } from "./ai.ts";
 
 export interface InspectorProps {
   story: StoryDoc;
@@ -45,6 +46,7 @@ export function Inspector(p: InspectorProps) {
     ${kind === "spot" && html`<${SpotWords} ...${p} path=${[...p.path, "spot"]} />`}
     ${kind === "choice" && html`<${ChoiceFields} ...${p} path=${[...p.path, "choice"]} />`}
     ${kind === "act" && html`<${Tri} label="Prompt" doc=${v.act?.prompt} saved=${get(p.saved, [...p.path, "act", "prompt"])} onInput=${(k: string, x: string | undefined) => p.edit(s => set(s, [...p.path!, "act", "prompt", k], x), `${where}.prompt.${k}`)} />`}
+    ${(kind === "line" || kind === "option") && html`<${AiRewrite} story=${p.story} path=${p.path} edit=${(fn: (s: StoryDoc) => StoryDoc) => p.edit(fn)} />`}
     ${(kind === "line" || kind === "option") && html`<${Staging} ...${p} path=${p.path} />`}
     ${kind === "beat" && html`<${Staging} ...${p} path=${[...p.path, "beat"]} />`}
     ${kind === "scene" && html`<${SceneFields} ...${p} path=${p.path} />`}
