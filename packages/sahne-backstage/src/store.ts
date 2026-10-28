@@ -93,6 +93,43 @@ export async function saveDocs(keys: string[]): Promise<boolean> {
     drafts.value = next;
   });
   say(`saved ${list.map(k => k.replace(":", " ")).join(", ")}`);
+  allProblems.value = null;
   await loadWorld();
   return true;
+}
+
+// ---- review notes (server/review.ts) -------------------------------------------------------------------------------
+
+export type Status = "draft" | "reviewed" | "approved";
+export interface Comment { id: string; at?: string; by: string; text: string; date: string; done?: boolean }
+export interface EpisodeReview { status?: Status; ai?: boolean; reviewer?: string; steps?: Record<string, { reviewed?: boolean; persian?: boolean }>; comments?: Comment[] }
+
+export const review = signal<Record<string, EpisodeReview>>({});
+export const allProblems = signal<Problem[] | null>(null);
+
+export async function loadReview() {
+  const r = await api.get<{ episodes: Record<string, EpisodeReview> }>("review");
+  if (r.status === 200) review.value = r.episodes;
+}
+
+/** Change one episode's notes and write them (the notes are saved at once, apart from the story). */
+export async function setReview(id: string, fn: (r: EpisodeReview) => EpisodeReview) {
+  const next = fn(review.value[id] ?? {});
+  review.value = { ...review.value, [id]: next };
+  if (!world.value?.writable) { say("read-only: the notes are not written (start backstage with --write)", true); return; }
+  const r = await api.post<{ episodes: Record<string, EpisodeReview> }>("review", { id, review: next });
+  if (r.status === 200) review.value = r.episodes; else say(`notes not saved: ${(r as { message?: string }).message ?? r.status}`, true);
+}
+
+/** Every problem of the content root (the review dashboard), from the server. */
+export async function loadAllProblems() {
+  const r = await api.get<{ problems: Problem[] }>("problems");
+  if (r.status === 200) allProblems.value = r.problems;
+}
+
+/** The reviewer's name, kept in this browser only. */
+export const reviewer = signal<string>((() => { try { return localStorage.getItem("backstage:reviewer") ?? ""; } catch { return ""; } })());
+export function setReviewer(name: string) {
+  reviewer.value = name;
+  try { localStorage.setItem("backstage:reviewer", name); } catch { /* no storage */ }
 }

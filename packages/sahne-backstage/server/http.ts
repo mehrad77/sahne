@@ -1,5 +1,5 @@
 // Backstage's HTTP server (Node only): the JSON API over the content root (content.ts), the page and its bundle (esbuild,
-// served from memory), the bubbles' font and the kit's sounds. It answers only this machine: a request whose Host or Origin
+// built into dist/app, git-ignored, and rebuilt when a source changes), the bubbles' font and the kit's sounds. It answers only this machine: a request whose Host or Origin
 // is not localhost is refused, so a web page open in the same browser cannot reach it, and a write must be JSON.
 
 import * as esbuild from "esbuild";
@@ -8,8 +8,9 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { CONTENT, IS_SAMPLES } from "../../sahne-story/paths.ts";
-import { check, exists, forget, isKind, listing, readDoc, save, type Edit } from "./content.ts";
+import { allProblems, check, exists, forget, isKind, listing, readDoc, save, type Edit } from "./content.ts";
 import { headOf } from "./git.ts";
+import { readReview, writeReview } from "./review.ts";
 
 const HERE = new URL("../", import.meta.url);
 const SOUNDS = new URL("../../sahne-kit/sounds/", import.meta.url);
@@ -74,6 +75,12 @@ export async function serve(o: Options): Promise<Running> {
       if (!isKind(a) || !exists(a, b)) throw new Fail(404, `no ${a} ${b}`);
       return json(res, 200, { doc: await headOf(a, b) });
     }
+    if (route === "problems" && m === "GET") return json(res, 200, { problems: allProblems() });
+    if (route === "review" && m === "GET") return json(res, 200, readReview());
+    if (route === "review" && m === "POST") {
+      if (!o.write) throw new Fail(403, "read-only: start backstage with --write");
+      return json(res, 200, writeReview(await body(req)));
+    }
     if (route === "thumbs" && m === "GET") return json(res, 200, { stale: await staleThumbs(), command: "node packages/sahne-gallery/thumbs.mjs (in the Sahne repo, with SAHNE_CONTENT set)" });
     throw new Fail(404, `no route ${m} /api/${path.join("/")}`);
   }
@@ -115,7 +122,8 @@ export async function serve(o: Options): Promise<Running> {
       up.on("error", e => res.writeHead(502).end(e.message));
       up.end();
     } catch (e) {
-      const f = e instanceof Fail ? e : new Fail(500, (e as Error).message);
+      const st = (e as { status?: unknown }).status;
+      const f = e instanceof Fail ? e : new Fail(typeof st === "number" ? st : 500, (e as Error).message);
       if (f.status === 500) console.error(e);
       if (!res.headersSent) json(res, f.status, { message: f.message, ...(f.body ?? {}) });
     }

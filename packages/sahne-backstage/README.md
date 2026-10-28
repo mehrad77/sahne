@@ -38,6 +38,7 @@ console.log(b.url);
 | `#/` | The series: its titles and summary, its narrator and stand-in, its seasons |
 | `#/season/<id>` | A season: its episodes in order, each with its title, kind, release date, week, place, and draft or not |
 | `#/episode/<id>` | An episode, described below |
+| `#/review` | Where every episode stands: status, steps reviewed, Persian checked, errors, warnings, the known-word ratio (when the root has cards), open comments; *Export the notes* downloads them as markdown |
 
 **The episode page:**
 - **The stage.** The whole kit, Kerim, the animals, the sounds, and Kerim's round window for the narrator.
@@ -55,6 +56,14 @@ console.log(b.url);
 - **Problems.**
   - The stage lints (`lintStory`, `suggest`) run in the browser as you type.
   - The full story check runs on the server a moment later. A problem the edit brought is marked **new**.
+- **Review** (a tab beside *Edit*).
+  - Where the episode stands: an AI draft, reviewed or approved, and whether AI wrote it.
+  - For the selected step: reviewed, and its Persian checked.
+  - Comments on the episode or on a step, each marked done when it is dealt with.
+  - The reviewer's name is kept in this browser only.
+- **Changes since the last commit** (a tab).
+  - The episode's fields and each changed step against git's HEAD, with the words diffed word by word.
+  - *Put back as committed* restores one step. A person commits; backstage never does.
 - **Undo, redo, revert and save.** Typing into one field is one undo step. Save is refused when the edit brings an error. Problems the file already had do not block it.
 
 **Live preview.**
@@ -93,6 +102,22 @@ console.log(b.url);
 
 **Thumbnails.** A thumbnail goes stale only when the opening picture changes: the opening scene, place, props, cast or looks (`sahne-gallery/thumbs.mjs`). A fix to a line's words leaves it as it was. `GET /api/thumbs` lists the stale ones, with the command that shoots them.
 
+## Review notes (`server/review.ts`)
+
+Review state is editors' notes, so it is not part of a story: a story's root takes no extra keys. It lives in a sidecar beside the content, `<root>/.backstage/review.json`, at sahne-story's `paths.ts` `REVIEW`.
+
+```json
+{ "v": 1, "episodes": { "s1e01": { "status": "reviewed", "ai": true, "reviewer": "…",
+  "steps": { "4": { "reviewed": true, "persian": true }, "12.0.1": { "reviewed": true } },
+  "comments": [{ "id": "…", "at": "4", "by": "…", "text": "…", "date": "2026-10-29 10:00", "done": true }] } } }
+```
+
+- **Status** is `draft`, `reviewed` or `approved`.
+- **A step key** is the step's number, then the option's, then the reply's (`12.0.1`).
+- **The notes are saved at once.** They are written apart from the story's Save, and only when backstage runs with `--write`.
+- **What is never in them:** card or lesson text. No app and no check reads the sidecar.
+- **Commit it or not.** An app may commit the sidecar, so the review is shared, or git-ignore it.
+
 ## The API (`server/http.ts`)
 
 Every request must come from this machine: `Host` and `Origin` must be localhost, and a write must be `application/json`.
@@ -105,16 +130,19 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
 | `POST /api/save` `{ edits }` | 200 `{ saved: { "<kind>:<id>": mtime }, problems }`, or 400, 403, 409 or 422 `{ message, problems? }` |
 | `GET /api/head/<kind>/<id>` | `{ doc }`: the document at git's HEAD, or null |
 | `GET /api/thumbs` | `{ stale, command }` |
+| `GET /api/problems` | `{ problems }`: every problem of the content root, as `stories.ts --check` finds them (the review page) |
+| `GET /api/review`, `POST /api/review` `{ id, review }` | The review notes; a POST replaces one episode's (cleaned: unknown keys dropped) and answers all of them |
 | `POST /api/reload` | The server forgets the world it has read (after a change made elsewhere) |
 
 ## Layout
 
 - **`server/`** is Node only, so `packages/tsconfig.json`, which has `"types": []`, does not type-check it. It contains:
   - `index.ts` (`startBackstage`) and `cli.ts`;
-  - `http.ts` (routes, guards, the esbuild bundle served from memory, the font and the sounds);
+  - `http.ts` (routes, guards, the esbuild bundle in `dist/app/` (git-ignored, rebuilt on change), the font and the sounds);
   - `content.ts` (kinds, files, checks, saves);
   - `save.ts`;
-  - `git.ts`.
+  - `git.ts`;
+  - `review.ts`.
 - The server reads sahne-story's Node-only files (`paths.ts`, `check/`, `load.ts`) by path. The package exports only `"."`.
 - **`src/`** is the browser side, built with Preact and htm tagged templates (no JSX, so the source stays erasable TypeScript). It contains:
   - `index.ts`;

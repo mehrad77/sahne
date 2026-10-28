@@ -2,7 +2,7 @@
 
 import { h, render } from "preact";
 import { App } from "./ui/app.ts";
-import { loadWorld } from "./store.ts";
+import { loadReview, loadWorld } from "./store.ts";
 
-await loadWorld();
+await Promise.all([loadWorld(), loadReview()]);
 render(h(App, {}), document.getElementById("app")!);

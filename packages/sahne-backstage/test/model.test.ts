@@ -93,3 +93,14 @@ test("the flags a story's callbacks read", () => {
   assert.deepEqual(flagsIn(s), ["s1e00_a", "s1e00_b"]);
   assert.deepEqual(flagsIn({ steps: [] }), []);
 });
+
+test("what changed since a version: the rows, the fields, a word diff", async () => {
+  const { changes, diffWords } = await import("../src/model/diff.ts");
+  assert.deepEqual(diffWords("Bir portakal lütfen", "İki portakal lütfen"), [{ op: "-", text: "Bir" }, { op: "+", text: "İki" }, { op: "=", text: " portakal lütfen" }]);
+  assert.deepEqual(diffWords("a", "a"), [{ op: "=", text: "a" }]);
+  const now = set(set(STORY, ["steps", 1, "tr"], "Yeni."), ["titleEn", ], "New");
+  const c = changes(STORY, now);
+  assert.deepEqual(c.fields, ["titleEn"]);
+  assert.deepEqual(c.rows.map(r => r.row.path), [["steps", 1]]);
+  assert.equal(changes(null, STORY).added, STORY.steps.length);
+});

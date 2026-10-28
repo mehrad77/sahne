@@ -1,7 +1,8 @@
 // The editor's shell: the side bar (the series, its seasons, the cast, the places, review) and the page the hash names.
 //   #/                      the series and its seasons
 //   #/season/<id>           a season's episodes
-//   #/episode/<id>          one episode: play it, fix its words, stage it
+//   #/episode/<id>          one episode: play it, fix its words, stage it, review it
+//   #/review                where every episode stands
 
 import { html } from "htm/preact";
 import "@preact/signals";
@@ -9,6 +10,7 @@ import { dirtyKeys, notice, route, world } from "../store.ts";
 import { Home } from "./home.ts";
 import { Season } from "./season.ts";
 import { Episode } from "./episode.ts";
+import { ReviewPage } from "./review.ts";
 
 export function App() {
   const w = world.value, r = route.value;
@@ -21,6 +23,7 @@ export function App() {
       <h1>Backstage</h1>
       <div class="sub">${w.series?.titleEn ?? "No series yet"}${w.samples ? " · samples" : ""}${w.writable ? "" : " · read-only"}</div>
       <a href="#/" aria-current=${here()}>The series</a>
+      <a href="#/review" aria-current=${here("review")}>Review</a>
       <div class="group">Seasons</div>
       ${seasons.map(s => html`<a href=${`#/season/${s.id}`} aria-current=${here("season", s.id)}>${s.titleEn}</a>`)}
       ${!seasons.length && html`<p class="note">No seasons yet.</p>`}
@@ -36,6 +39,7 @@ function pageFor(page: string | undefined, id: string | undefined) {
     case undefined: return html`<${Home} />`;
     case "season": return html`<${Season} id=${id} />`;
     case "episode": return html`<${Episode} key=${id} id=${id} />`;
+    case "review": return html`<${ReviewPage} />`;
     default: return html`<p>No page ${page}. <a href="#/">The series</a></p>`;
   }
 }

@@ -69,7 +69,7 @@ export interface Problem extends CheckProblem { doc: string; new?: boolean }
 let cached: World | null = null;
 const world = (): World => (cached ??= loadWorld());
 /** Forget the world read from disk (after a save, or a change made elsewhere). */
-export const forget = () => { cached = null; };
+export const forget = () => { cached = null; every = null; };
 
 const solids = new Map<string, Solid[]>();
 const solidsOf = (places: Record<string, StoryPlace>): Record<string, Solid[]> =>
@@ -187,6 +187,22 @@ export function save(edits: Edit[], o: { write: boolean }): SaveResult {
   for (const e of edits) { const u = fileOf(e.kind, e.id); saved[`${e.kind}:${e.id}`] = writeAtomic(u, textFor(u, e.doc)); }
   forget();
   return { status: 200, saved, problems };
+}
+
+let every: Problem[] | null = null;
+/** Every problem of the content root, as `stories.ts --check` finds them (cached until the next save or reload). */
+export function allProblems(): Problem[] {
+  if (every) return every;
+  const w = world();
+  const edits: Edit[] = [
+    ...(w.series ? [{ kind: "series" as const, id: "series", doc: w.series }] : []),
+    ...w.drafts.map(d => ({ kind: "story" as const, id: d.id, doc: d.story })),
+    ...Object.keys(w.cast).map(id => ({ kind: "character" as const, id, doc: w.cast[id] })),
+    ...Object.keys(w.places).map(id => ({ kind: "place" as const, id, doc: w.places[id] })),
+  ];
+  every = problemsIn(w, edits);
+  if (!w.series) every.push(...checkSeries(w).map(p => ({ ...p, doc: "series:series" })));
+  return every;
 }
 
 /** Everything the browser lists: the series, the seasons with their episodes, the cast, the places. */

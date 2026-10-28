@@ -14,6 +14,8 @@ import { dirty } from "../model/history.ts";
 import { KIT, Preview, solidsOf } from "../stage.ts";
 import { Check, Problems } from "./fields.ts";
 import { Inspector } from "./inspector.ts";
+import { ReviewPanel } from "./review.ts";
+import { ChangesPanel } from "./changes.ts";
 import type { Problem } from "../api.ts";
 
 declare global { interface Window { backstage?: { preview: Preview; select(path: Path | null): void } } }
@@ -39,6 +41,7 @@ function Editor(p: { id: string }) {
   const redraw = () => tick(n => n + 1);
   const [path, setPath] = useState<Path | null>(null);
   const [flags, setFlags] = useState<string[]>([]);
+  const [tab, setTab] = useState<"edit" | "review" | "changes">("edit");
   const cast = useMemo(() => [...new Set([w.series?.narrator ?? "kerim", w.series?.standin ?? "nima", ...(story.cast ?? []), ...(story.extras ?? [])])], [story.cast, story.extras]);
 
   // the stage, once
@@ -121,7 +124,14 @@ function Editor(p: { id: string }) {
             const next = on ? [...flags, f] : flags.filter(x => x !== f);
             setFlags(next); pv!.setFlags(next, Math.max(0, player!.next - 1)); redraw();
           }} />`)}</div></div>`}
-        <div class="panel" style="margin-top:10px"><${Inspector} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} /></div>
+        <div class="row" role="tablist" style="margin-top:10px">
+          ${(["edit", "review", "changes"] as const).map(t => html`<button role="tab" aria-selected=${tab === t} class=${tab === t ? "primary" : ""} onClick=${() => setTab(t)}>${t === "edit" ? "Edit" : t === "review" ? "Review" : "Changes since the last commit"}</button>`)}
+        </div>
+        <div class="panel" style="margin-top:6px">
+          ${tab === "edit" && html`<${Inspector} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} />`}
+          ${tab === "review" && html`<${ReviewPanel} id=${p.id} story=${story} path=${path} />`}
+          ${tab === "changes" && html`<${ChangesPanel} id=${p.id} story=${story} savedAt=${d.mtime} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} select=${select} />`}
+        </div>
       </div>
       <div>
         <div class="row" style="margin-bottom:6px"><b class="grow">Steps</b><button class="small" onClick=${() => setPath(null)} aria-pressed=${!path}>The episode</button></div>
