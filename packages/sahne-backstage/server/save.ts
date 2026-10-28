@@ -1,7 +1,9 @@
 // Reading and writing content files without changing what an edit did not touch. A file is parsed with each number kept as
 // it was written (`1.0` stays `1.0`: JSON.rawJSON, Node 24), its own key order and whether it ends in a newline; an edited
 // document that comes back from the browser (where `1.0` became `1`) takes the old spelling back wherever the value is the
-// same. A write goes to a temp file beside the target (not named *.json, so no reader lists it) and is renamed over it.
+// same, and the old key order (a file whose keys are all sorted stays sorted; otherwise each object keeps its keys' order
+// and a new key goes last: a builder or a form that writes an object in its own order changes only what changed). A write
+// goes to a temp file beside the target (not named *.json, so no reader lists it) and is renamed over it.
 
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
@@ -38,6 +40,25 @@ export function keepNumbers(next: Json, prev: Json): Json {
   return next;
 }
 
+const isObject = (v: unknown): v is Record<string, Json> => !!v && typeof v === "object" && !Array.isArray(v) && !J.isRawJSON(v);
+
+/** Whether every object in a document has its keys in sorted order. */
+export function sortedKeys(v: Json): boolean {
+  if (Array.isArray(v)) return v.every(sortedKeys);
+  if (!isObject(v)) return true;
+  const k = Object.keys(v);
+  return k.every((x, i) => i === 0 || k[i - 1] <= x) && Object.values(v).every(sortedKeys);
+}
+
+/** `next` with its keys in `prev`'s order (new keys after), or sorted throughout when `sorted`. */
+export function keepOrder(next: Json, prev: Json, sorted: boolean): Json {
+  if (Array.isArray(next)) return next.map((v, i) => keepOrder(v, Array.isArray(prev) ? prev[i] : undefined, sorted));
+  if (!isObject(next)) return next;
+  const p = isObject(prev) ? prev : {};
+  const keys = sorted ? Object.keys(next).sort() : [...Object.keys(p).filter(k => k in next), ...Object.keys(next).filter(k => !(k in p))];
+  return Object.fromEntries(keys.map(k => [k, keepOrder(next[k], p[k], sorted)]));
+}
+
 /** The text of a document, as the content files are written: 2-space indent, raw UTF-8, and a final newline when asked. */
 export const format = (doc: Json, newline: boolean): string => JSON.stringify(doc, null, 2) + (newline ? "\n" : "");
 
@@ -51,9 +72,9 @@ export function writeAtomic(u: URL, text: string): number {
   return statSync(u).mtimeMs;
 }
 
-/** The text an edit of a file writes: the old numbers' spelling and the file's newline kept; a new file ends in a newline. */
+/** The text an edit of a file writes: the old numbers' spelling, key order and newline kept; a new file ends in a newline. */
 export function textFor(u: URL, doc: Json): string {
   if (!existsSync(u)) return format(doc, true);
   const old = readFile(u);
-  return format(keepNumbers(doc, old.doc), old.newline);
+  return format(keepOrder(keepNumbers(doc, old.doc), old.doc, sortedKeys(old.doc)), old.newline);
 }

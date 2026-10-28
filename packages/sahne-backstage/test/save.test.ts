@@ -7,7 +7,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, readdirSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { format, keepNumbers, parseKeep, plain, readFile, textFor, writeAtomic } from "../server/save.ts";
+import { format, keepNumbers, keepOrder, parseKeep, plain, readFile, sortedKeys, textFor, writeAtomic } from "../server/save.ts";
 
 const TEXT = `{
   "v": 1,
@@ -55,4 +55,13 @@ test("textFor keeps the file's newline; a new file gets one; writes are atomic",
     const fresh = pathToFileURL(join(dir, "yeni.json"));
     assert.ok(textFor(fresh, { id: "yeni" }).endsWith("}\n"));
   } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("an object written in another order keeps the file's order; a sorted file stays sorted", () => {
+  const prev = { b: 1, a: { y: 1, x: 2 }, c: [{ q: 1, p: 2 }] };
+  const next = { a: { x: 3, y: 1, z: 0 }, c: [{ p: 2, q: 1 }], b: 1, d: 4 };
+  assert.deepEqual(JSON.stringify(keepOrder(next, prev, false)), JSON.stringify({ b: 1, a: { y: 1, x: 3, z: 0 }, c: [{ q: 1, p: 2 }], d: 4 }));
+  assert.ok(!sortedKeys(prev));
+  assert.ok(sortedKeys({ a: 1, b: { c: 1, d: [{ e: 1, f: 2 }] } }));
+  assert.deepEqual(Object.keys(keepOrder({ z: 1, a: 2 }, { a: 1 }, true) as object), ["a", "z"]);
 });
