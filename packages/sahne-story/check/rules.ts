@@ -339,14 +339,16 @@ export function checkSeries(world: World): CheckProblem[] {
     }
   }
   if (world.series) for (const d of world.drafts) { const n = seasonOf(d.id); if (n && !world.seasons[`s${n}`]) add("error", d.id, `season s${n} has no document in seasons/`); }
-  // while days.json is still written beside the seasons' calendars, the two agree
+  // days.json, where an app still writes it beside the seasons' calendars, follows them: the seasons are the source, so a
+  // difference is days.json to regenerate (a warning; the app's own generator check is its gate)
   if (world.daysFile && Object.values(world.seasons).some(se => se.calendar)) {
+    const stale = (id: string, why: string) => add("warning", id, `days.json is behind the season's calendar (${why}): regenerate it from the seasons`, "calendar");
     for (const [id, d] of Object.entries(world.days ?? {})) {
       const f = world.daysFile[id];
-      if (!f) add("error", id, `${id} is in its season's calendar but not in days.json`, "calendar");
-      else if (f.date !== d.date || f.kind !== d.kind || f.week !== d.week) add("error", id, `days.json has ${f.date} ${f.kind} week ${f.week}, the season ${d.date} ${d.kind} week ${d.week}`, "calendar");
+      if (!f) stale(id, `no ${id}`);
+      else if (f.date !== d.date || f.kind !== d.kind || f.week !== d.week) stale(id, `${f.date} ${f.kind} week ${f.week}, the season ${d.date} ${d.kind} week ${d.week}`);
     }
-    for (const id of Object.keys(world.daysFile)) if (!world.days?.[id]) add("error", id, `${id} is in days.json but in no season's calendar`, "calendar");
+    for (const id of Object.keys(world.daysFile)) if (!world.days?.[id]) stale(id, `${id} is in no season's calendar`);
   }
   return out;
 }

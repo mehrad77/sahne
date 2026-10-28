@@ -67,9 +67,10 @@ test("the seasons' calendars are the release calendar, kept in step with days.js
   const w = fresh();
   w.seasons = seasons; w.days = calendarOf(seasons, null);
   w.daysFile = { s1e01: { ...file.s1e01, date: "2026-10-29" }, s1e02: { id: "s1e02", date: "2026-10-30", kind: "episode", week: 1 } };
-  const es = errors(w);
-  assert.ok(es.some(m => /days.json has 2026-10-29 episode week 1, the season 2026-10-28/.test(m)));
-  assert.ok(es.some(m => /s1e02 is in days.json but in no season's calendar/.test(m)));
+  const ws = checkSeries(w).filter(p => p.level === "warning").map(p => p.message);
+  assert.ok(ws.some(m => /days.json is behind the season's calendar \(2026-10-29 episode week 1, the season 2026-10-28/.test(m)), "the seasons are the source: days.json is regenerated");
+  assert.ok(ws.some(m => /s1e02 is in no season's calendar/.test(m)));
+  assert.ok(!errors(w).some(m => /days.json/.test(m)));
 });
 
 test("a story's arc is its season's, and its week's", () => {
