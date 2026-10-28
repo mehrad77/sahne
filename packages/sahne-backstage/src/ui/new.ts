@@ -91,7 +91,7 @@ export function NewEpisode(p: { season?: string }) {
         <div class="panel fields">
           <b>Lessons (1–3)</b>
           ${lessons.length ? html`<div style="max-height:160px;overflow:auto">${lessons.map(l => html`<label class="row"><input type="checkbox" style="width:auto" checked=${ls.includes(l.id)} onChange=${(e: Event) => put("lessons", (e.target as HTMLInputElement).checked ? [...ls, l.id].slice(0, 3) : ls.filter(x => x !== l.id))} /> ${l.id}${l.ref ? ` · ${l.ref}` : ""}</label>`)}</div>`
-          : html`<${Text} label="Lesson ids (this root has no grammar: g_a1_<n>_<slug>, comma between)" value=${ls.join(", ")} onInput=${(v: string | undefined) => put("lessons", (v ?? "").split(",").map(s => s.trim()).filter(Boolean).slice(0, 3))} />`}
+          : html`<${Text} label=${"Lesson ids (this root has no grammar: g_a1_<n>_<slug>, comma between)"} value=${ls.join(", ")} onInput=${(v: string | undefined) => put("lessons", (v ?? "").split(",").map(s => s.trim()).filter(Boolean).slice(0, 3))} />`}
         </div>
         ${problems.length ? html`<p class="note">Still needed: ${problems.join(" · ")}</p>` : ""}
         <div class="row"><span class="grow"></span><button class="primary" disabled=${problems.length > 0 || !!draftOf("story", f.id)} onClick=${() => void create()}>Write the skeleton and open it</button></div>

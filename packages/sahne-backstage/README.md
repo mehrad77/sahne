@@ -35,7 +35,7 @@ console.log(b.url);
 
 | Route | What |
 |---|---|
-| `#/` | The series: its titles and summary, its narrator and stand-in, its seasons. *Edit the series* edits them, and on a root without `series.json`, *Start the series* writes one. *+ Season n* adds the next season |
+| `#/` | The series: its titles and summary, its narrator and stand-in, its seasons, and any episode whose season has no document yet. *Edit the series* edits them, and on a root without `series.json`, *Start the series* writes one. *+ Season n* adds the next season |
 | `#/season/<id>` | A season: its episodes in order, each with its title, kind, release date, week, place, and draft or not. *Edit the season* is described below. *+ New episode* opens the wizard |
 | `#/new/<season>` | A new episode from its brief, described below |
 | `#/episode/<id>` | An episode, described below |
