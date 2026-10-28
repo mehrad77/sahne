@@ -10,7 +10,7 @@ import type { CharacterDoc } from "sahne-story";
 import { $, chip, choice, css, head, link } from "../shell/dom.ts";
 import type { Ctx } from "../shell/ctx.ts";
 import type { Extra } from "../shell/data.ts";
-import { kerimPortrait } from "../kerim.ts";
+import { kerimPortrait } from "sahne-kit/kerim/portrait";
 
 const FRAMINGS: Framing[] = ["head", "bust", "full"];
 const bytes = (doc: AvatarDoc) => new TextEncoder().encode(serialize(doc)).length;

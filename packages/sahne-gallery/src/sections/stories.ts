@@ -14,7 +14,7 @@ import { $, bar, button, css, frame, link, toggle } from "../shell/dom.ts";
 import type { Ctx } from "../shell/ctx.ts";
 import type { Draft } from "../shell/data.ts";
 import { glossLookup, speak, type SceneGloss } from "../gloss.ts";
-import { kerimPortrait, kerimOnTalk } from "../kerim.ts";
+import { kerimPortrait, kerimOnTalk } from "sahne-kit/kerim/portrait";
 import { replyCard, type Aloud } from "../card.ts";
 
 declare global { interface Window { storyDemo?: { stage: Stage; adapted: StoryStage; picks: Picks; next: number; heard: { cue: number; best: number; heard: string }[] } } }

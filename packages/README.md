@@ -53,6 +53,7 @@ A new package's tests also join `pnpm sahne check` (the gallery's `check` script
 
 Kerim, the kumru (a collared dove) who narrates Kumru's stories, lives in the kit:
 - her art, `packages/sahne-kit/src/kerim/art.ts` (exported as `sahne-kit/kerim/art`), which Kumru's page and `sahne-gallery/serve.mjs` import and Kumru's icon tool reads by regex for the brand files;
+- her portrait for the narrator's round window, `packages/sahne-kit/src/kerim/portrait.ts` (exported as `sahne-kit/kerim/portrait`), which the gallery and sahne-backstage use;
 - her CSS, `packages/sahne-kit/src/kerim/kerim.css` (exported as `sahne-kit/kerim.css`), which poses and animates her in an app; an app sets her drop shadow, `--k-shadow`, on `:root`;
 - her stage puppet, `src/kerim/art.gen.ts`, converted from both by `node packages/sahne-kit/kerim/build.ts` (`--check` in the kit's tests).
 
