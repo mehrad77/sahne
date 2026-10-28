@@ -40,6 +40,7 @@ See every one of them move at [sahne.shab.boo](https://sahne.shab.boo) (or run `
 | [`sahne-kit`](packages/sahne-kit/) | The first kit: bodies, faces, hair, clothes, set pieces, props, animals, sounds and music, all drawn in code. Style guide: [STYLE.md](packages/sahne-kit/STYLE.md). Every part: [CATALOGUE.md](packages/sahne-kit/CATALOGUE.md), [SET.md](packages/sahne-kit/SET.md) |
 | [`sahne-tr`](packages/sahne-tr/) | The Turkish plugin: mouth timing from spelling, word ↔ token matching, say-it-aloud matching, numbers and clock times |
 | [`sahne-story`](packages/sahne-story/) | The story format: the adapter (a story document becomes a script), the player, the story check and lints, the schemas, and a sample story |
+| [`sahne-backstage`](packages/sahne-backstage/) | The editor: an app runs it on its content root to play, fix and save the series, its seasons and episodes, the cast and the places, in the browser, checked as `pnpm check` checks them |
 | [`sahne-gallery`](packages/sahne-gallery/) | The dev gallery: a live demo of every engine system, the whole kit, every place and every story. It also runs the checks (sizes, determinism, golden frames) |
 
 The packages follow the conventions in [packages/README.md](packages/README.md). They ship TypeScript source with erasable syntax only, so Node 24 runs it directly and esbuild bundles it. There is no build step, and nothing is published to npm. An app takes this repo as a git submodule and adds `packages/*` to its pnpm workspace.

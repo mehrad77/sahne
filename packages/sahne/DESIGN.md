@@ -74,9 +74,10 @@ app (Kumru)                            sahne (engine)                           
 | `packages/sahne-kit` | The art: the body kit, parts, palettes, faces, poses and gestures, props, set pieces, sound patches, motifs, CC0 samples. A different app can ship a different kit in another style | `sahne` (types only) |
 | `packages/sahne-tr` | The Turkish plugin: mouth timing from spelling, token matching for word ↔ object links, normalising and matching speech for *say it aloud* (`normalise`, `matchLine`), and what the teaching lints read (*bu/şu/o*, numbers, clock times) | `sahne` (types only) |
 | `packages/sahne-story` | The story format's adapter (`adaptStory`: a story document becomes a script and its reply cards, the Kumru repo's `docs/stories/STORIES_STAGE.md` §3) and the story lints (`lintStory`, `suggest`, §4). Story-specific, so it lives beside the engine, not in it | `sahne` (types), `sahne-tr` |
+| `packages/sahne-backstage` | The editor an app runs on its content root: series, seasons and episodes played, fixed and staged in the browser, saved with the story check; a Node server beside a Preact page. Never ships | all but the gallery |
 | `packages/sahne-gallery` | The dev site: every part, view, emotion, gesture, set, light and sound; the builder; a script player; a story played through the adapter; a performance readout | all of them |
 
-All five are TypeScript with erasable syntax only, so Node 24 runs the tests directly (as the reader's tests do) and esbuild bundles them. The root pnpm workspace includes `packages/*` ([packages/README.md](../README.md)).
+All six are TypeScript with erasable syntax only, so Node 24 runs the tests directly (as the reader's tests do) and esbuild bundles them. The root pnpm workspace includes `packages/*` ([packages/README.md](../README.md)).
 
 ### 4.2 Modules of the engine
 

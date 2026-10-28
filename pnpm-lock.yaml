@@ -10,6 +10,36 @@ importers:
 
   packages/sahne: {}
 
+  packages/sahne-backstage:
+    dependencies:
+      '@fontsource/comic-neue':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@preact/signals':
+        specifier: ^2.11.3
+        version: 2.11.4(preact@11.1.0)
+      esbuild:
+        specifier: 0.28.2
+        version: 0.28.2
+      htm:
+        specifier: ^3.1.1
+        version: 3.1.1
+      preact:
+        specifier: ^11.0.1
+        version: 11.1.0
+      sahne:
+        specifier: workspace:*
+        version: link:../sahne
+      sahne-kit:
+        specifier: workspace:*
+        version: link:../sahne-kit
+      sahne-story:
+        specifier: workspace:*
+        version: link:../sahne-story
+      sahne-tr:
+        specifier: workspace:*
+        version: link:../sahne-tr
+
   packages/sahne-gallery:
     dependencies:
       sahne:
@@ -232,6 +262,14 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
+  '@preact/signals-core@1.14.5':
+    resolution: {integrity: sha512-vcRv7Ityz5JVmeiVqIluLFzT/PDS/AlhHUpw3/aUWqcVUs6bDGIPXE/6RSC4evBNWYvnniozg5Syfj33al3gkg==}
+
+  '@preact/signals@2.11.4':
+    resolution: {integrity: sha512-Rb+5RPo9gWSaHtzJeauhHxiC8KP/IF2DEPkHPEOGOnuy2wnJzRqyeLRankUCYd6ADqtxS6GnWGv6Ie343d8aYw==}
+    peerDependencies:
+      preact: '>= 10.25.0 || >=11.0.0-0'
+
   ajv@8.20.0:
     resolution: {integrity: sha512-Thbli+OlOj+iMPYFBVBfJ3OmCAnaSyNn4M1vz9T6Gka5Jt9ba/HIR56joy65tY6kx/FCF5VXNB819Y7/GUrBGA==}
 
@@ -245,6 +283,9 @@ packages:
 
   fast-uri@3.1.9:
     resolution: {integrity: sha512-hS/0Wt3Ya043oKXs0sIxrMpKQITXhMLIrVAKKXi4gozGC9v7YRWVnXIZzjNPTO02M9BdxLCWqK1yRXgNziVyJQ==}
+
+  htm@3.1.1:
+    resolution: {integrity: sha512-983Vyg8NwUE7JkZ6NmOqpCZ+sh1bKv2iYTlUkzlWmA5JD2acKoxd4KVxbMmxX/85mtfdnDmTFoNKcg5DGAvxNQ==}
 
   json-schema-traverse@1.0.0:
     resolution: {integrity: sha512-NM8/P9n3XjXhIZn1lLhkFaACTOURQXjWhV4BA/RnOv8xvgqtqpAX9IO4mRQxSx1Rlo4tqzeqb0sOlruaOy3dug==}
@@ -263,6 +304,14 @@ packages:
     resolution: {integrity: sha512-+7ziBLidS4NaNCdt57SUDT+wYmmd5fmiQejUic/kb+YsYSCPyOOE9sebzMjNmQrsnNpDJqd4WHvV/8lfKfUDUg==}
     engines: {node: '>=20'}
     hasBin: true
+
+  preact@11.1.0:
+    resolution: {integrity: sha512-hz1VsjWx5pSYPDVEzb9w+XyOmQpP1qW/ZEaMiYm+C8ykJr8KP+TKGZIbCW0QmZ/Yr/jg3XkZoziEWn9iWHZ9Mw==}
+    peerDependencies:
+      preact-render-to-string: '>=6.7.0'
+    peerDependenciesMeta:
+      preact-render-to-string:
+        optional: true
 
   require-from-string@2.0.2:
     resolution: {integrity: sha512-Xf0nWe6RseziFMu+Ap9biiUbmplq6S9/p+7w7YXP/JBHhrUDDUhwa+vANyubuqfZWTveU//DYVGsDG7RKL/vEw==}
@@ -359,6 +408,13 @@ snapshots:
     dependencies:
       playwright: 1.63.0
 
+  '@preact/signals-core@1.14.5': {}
+
+  '@preact/signals@2.11.4(preact@11.1.0)':
+    dependencies:
+      '@preact/signals-core': 1.14.5
+      preact: 11.1.0
+
   ajv@8.20.0:
     dependencies:
       fast-deep-equal: 3.1.3
@@ -399,6 +455,8 @@ snapshots:
 
   fast-uri@3.1.9: {}
 
+  htm@3.1.1: {}
+
   json-schema-traverse@1.0.0: {}
 
   marked@18.1.2: {}
@@ -408,6 +466,8 @@ snapshots:
   playwright@1.63.0:
     dependencies:
       playwright-core: 1.63.0
+
+  preact@11.1.0: {}
 
   require-from-string@2.0.2: {}
 

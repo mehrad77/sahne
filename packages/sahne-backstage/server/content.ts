@@ -1,0 +1,197 @@
+// The content root as backstage edits it (Node only; imported after SAHNE_CONTENT is set, server/index.ts). Five kinds of
+// document, each a file named by its id: the series, the seasons, the stories (the episodes), the characters and the places.
+// Where each lives is sahne-story's paths.ts, never a path built here. A save is a set of documents checked together (a
+// season's calendar and its stories' dates change in one save): the edited documents are swapped into the world the story
+// check reads (check/world.ts) and checked with the gate's own options (stories.ts: the full kit, the places' solids, the
+// cards, the needs). A problem the files already had does not block a save; one the edit brings does.
+
+import { existsSync, readdirSync } from "node:fs";
+import { placeSolids, type Solid } from "sahne";
+import kit from "../../sahne-kit/src/full.ts";
+import { CHARACTERS, IS_SAMPLES, PLACES, SERIES, seasonFile, seasonIds, storyFile, storyIds } from "../../sahne-story/paths.ts";
+import { loadCards, loadNeeds } from "../../sahne-story/load.ts";
+import { checkCast, checkPlaces, checkSeason, checkSeries, checkStory, RETIRED_CHARACTERS, type CheckOptions, type CheckProblem } from "../../sahne-story/check/rules.ts";
+import { calendarOf, charactersOf, loadWorld, type World } from "../../sahne-story/check/world.ts";
+import { lintPlace, type CharacterDoc, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
+import { plain, readFile, textFor, writeAtomic } from "./save.ts";
+
+export type Kind = "series" | "season" | "story" | "character" | "place";
+export const KINDS: Kind[] = ["series", "season", "story", "character", "place"];
+
+/** What each kind's ids look like. The series has one document, id `series`. */
+const ID: Record<Kind, RegExp> = {
+  series: /^series$/,
+  season: /^s[1-9][0-9]?$/,
+  story: /^s[1-9][0-9]?e[0-9]{2}$/,
+  character: /^[a-z0-9_]+$/,
+  place: /^[a-z0-9_]+$/,
+};
+
+const jsonIds = (dir: URL) => (existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith(".json") && f !== "needs.json").map(f => f.slice(0, -5)).sort() : []);
+
+/** A document's file. Only for ids of the kind's pattern. */
+export function fileOf(kind: Kind, id: string): URL {
+  if (!ID[kind].test(id)) throw new Error(`not a ${kind} id: ${id}`);
+  switch (kind) {
+    case "series": return SERIES;
+    case "season": return seasonFile(id);
+    case "story": return storyFile(id);
+    case "character": return new URL(`${id}.json`, CHARACTERS);
+    case "place": return new URL(`${id}.json`, PLACES);
+  }
+}
+
+/** Every id of a kind with a file. */
+export function idsOf(kind: Kind): string[] {
+  switch (kind) {
+    case "series": return existsSync(SERIES) ? ["series"] : [];
+    case "season": return seasonIds();
+    case "story": return storyIds();
+    case "character": return jsonIds(CHARACTERS);
+    case "place": return jsonIds(PLACES);
+  }
+}
+
+export const isKind = (k: string): k is Kind => (KINDS as string[]).includes(k);
+export const exists = (kind: Kind, id: string) => ID[kind].test(id) && idsOf(kind).includes(id);
+
+/** A document as the browser gets it: plain JSON and the file's mtime (a save names it, so a change on disk is not overwritten). */
+export function readDoc(kind: Kind, id: string): { doc: unknown; mtime: number } {
+  const r = readFile(fileOf(kind, id));
+  return { doc: plain(r.doc), mtime: r.mtime };
+}
+
+// ---- checks ----------------------------------------------------------------------------------------------------------------
+
+export interface Edit { kind: Kind; id: string; doc: unknown; mtime?: number; create?: boolean }
+export interface Problem extends CheckProblem { doc: string; new?: boolean }
+
+let cached: World | null = null;
+const world = (): World => (cached ??= loadWorld());
+/** Forget the world read from disk (after a save, or a change made elsewhere). */
+export const forget = () => { cached = null; };
+
+const solids = new Map<string, Solid[]>();
+const solidsOf = (places: Record<string, StoryPlace>): Record<string, Solid[]> =>
+  Object.fromEntries(Object.entries(places).map(([id, p]) => {
+    const key = `${id}:${JSON.stringify(p.pieces ?? [])}`;
+    let s = solids.get(key);
+    if (!s) { s = placeSolids(p, kit); solids.set(key, s); }
+    return [id, s];
+  }));
+
+let gate: Omit<CheckOptions, "solids"> | null = null;
+const options = () => (gate ??= { kit, cards: loadCards(), needs: loadNeeds() });
+
+/** The world with the edits in it: a story's characters read again from the edited cast, the calendar from the edited seasons. */
+function withEdits(w0: World, edits: Edit[]): World {
+  const w: World = { ...w0, drafts: [...w0.drafts], places: { ...w0.places }, cast: { ...w0.cast }, extras: { ...w0.extras }, seasons: { ...w0.seasons } };
+  for (const e of edits) {
+    if (e.kind === "series") w.series = e.doc as SeriesDoc;
+    else if (e.kind === "season") w.seasons[e.id] = e.doc as SeasonDoc;
+    else if (e.kind === "place") w.places[e.id] = e.doc as StoryPlace;
+    else if (e.kind === "character") {
+      const c = e.doc as CharacterDoc;
+      if (c?.kind === "extra") { w.extras[e.id] = c; delete w.cast[e.id]; } else { w.cast[e.id] = c; delete w.extras[e.id]; }
+    }
+  }
+  if (edits.some(e => e.kind === "season")) w.days = calendarOf(w.seasons, w.daysFile ?? null);
+  const stories = new Map(edits.filter(e => e.kind === "story").map(e => [e.id, e.doc as StoryDoc]));
+  w.drafts = w.drafts.map(d => (stories.has(d.id) ? { ...d, story: stories.get(d.id)! } : d));
+  for (const [id, story] of stories) if (!w.drafts.some(d => d.id === id)) w.drafts.push({ id, story, characters: {}, file: `stories/${id}.json` });
+  w.drafts.sort((a, b) => a.id.localeCompare(b.id));
+  w.drafts = w.drafts.map(d => ({ ...d, characters: charactersOf(d.story, w.cast, w.extras) }));
+  return w;
+}
+
+/** The problems of the edited documents in a world: each story's own and season rules, each character's, each place's, the series'. */
+function problemsIn(w: World, edits: Edit[]): Problem[] {
+  const out: Problem[] = [];
+  const o = options();
+  const tag = (doc: string) => (p: CheckProblem): Problem => ({ ...p, doc });
+  const stories = edits.filter(e => e.kind === "story").map(e => e.id);
+  if (stories.length) {
+    const sol = solidsOf(w.places);
+    const opts: CheckOptions = { ...o, solids: Object.fromEntries(stories.map(id => [id, sol])) };
+    for (const id of stories) {
+      const d = w.drafts.find(x => x.id === id);
+      if (d) out.push(...checkStory(d, w, opts).map(tag(`story:${id}`)));
+    }
+    out.push(...checkSeason(w, w.drafts, opts).filter(p => stories.includes(p.story)).map(p => tag(`story:${p.story}`)(p)));
+  }
+  const characters = edits.filter(e => e.kind === "character").map(e => e.id);
+  if (characters.length) out.push(...checkCast(w, o).filter(p => characters.some(id => p.story === `cast:${id}` || p.story === `extra:${id}`)).map(p => tag(`character:${p.story.split(":")[1]}`)(p)));
+  for (const e of edits.filter(e => e.kind === "place")) {
+    const doc = w.places[e.id];
+    out.push(...checkPlaces({ ...w, places: { [e.id]: doc } }).map(tag(`place:${e.id}`)));
+    for (const p of lintPlace(doc, { kit, cards: o.cards, needs: o.needs })) out.push({ rule: p.rule, level: p.level, story: `place:${e.id}`, message: p.message, doc: `place:${e.id}` });
+  }
+  if (edits.some(e => e.kind === "series" || e.kind === "season")) {
+    for (const p of checkSeries(w)) {
+      const doc = p.story === "series" ? "series:series" : p.story.startsWith("season:") ? `season:${p.story.slice(7)}` : `story:${p.story}`;
+      out.push({ ...p, doc });
+    }
+  }
+  return out;
+}
+
+const key = (p: CheckProblem) => `${p.rule}|${p.level}|${p.story}|${p.step ?? ""}|${p.message}`;
+
+/** Check edited documents: every problem of theirs, the ones the edit brought marked `new`. */
+export function check(edits: Edit[]): Problem[] {
+  const w0 = world();
+  const before = new Set(problemsIn(w0, edits.filter(e => !e.create && exists(e.kind, e.id)).map(e => ({ ...e, doc: currentDoc(w0, e) }))).map(key));
+  const after = problemsIn(withEdits(w0, edits), edits);
+  return after.map(p => (before.has(key(p)) ? p : { ...p, new: true }));
+}
+
+/** The document a kind and id have in the world now (what an edit replaces). */
+function currentDoc(w: World, e: Edit): unknown {
+  switch (e.kind) {
+    case "series": return w.series;
+    case "season": return w.seasons[e.id];
+    case "story": return w.drafts.find(d => d.id === e.id)?.story;
+    case "place": return w.places[e.id];
+    case "character": return w.cast[e.id] ?? w.extras[e.id];
+  }
+}
+
+// ---- saving ------------------------------------------------------------------------------------------------------------------
+
+export interface SaveResult { status: 200 | 400 | 403 | 409 | 422; saved?: Record<string, number>; problems?: Problem[]; message?: string }
+
+/** Why an edit may not be made at all: an id of the wrong pattern, a new id that is taken or retired, an old one that is gone. */
+function refuse(e: Edit): string | null {
+  if (!ID[e.kind].test(e.id)) return `${e.id} is not a ${e.kind} id`;
+  if (!e.doc || typeof e.doc !== "object" || Array.isArray(e.doc)) return `${e.kind} ${e.id}: not a document`;
+  const has = exists(e.kind, e.id);
+  if (e.create) {
+    if (has) return `${e.kind} ${e.id} exists already: ids are permanent, pick a new one`;
+    if (e.kind === "character" && RETIRED_CHARACTERS.has(e.id)) return `${e.id} is a retired character id`;
+  } else if (!has) return `${e.kind} ${e.id} has no file`;
+  const docId = (e.doc as { id?: unknown }).id;
+  if (e.kind !== "series" && docId !== e.id) return `${e.kind} ${e.id}: its id is ${String(docId)}; ids never change`;
+  if (e.kind === "character" && !e.create && (e.doc as CharacterDoc).kind === "extra") return `${e.id} is an extra: extras are written by sahne-story/cast/extras.ts`;
+  return null;
+}
+
+/** Save a set of documents: refused whole when one is refused, changed on disk since it was read (409), or brings an error (422). */
+export function save(edits: Edit[], o: { write: boolean }): SaveResult {
+  if (!o.write) return { status: 403, message: IS_SAMPLES ? "the samples are read-only: start backstage with --write to edit them" : "this backstage is read-only (no --write)" };
+  if (!edits.length) return { status: 400, message: "nothing to save" };
+  for (const e of edits) { const why = refuse(e); if (why) return { status: 400, message: why }; }
+  for (const e of edits) if (!e.create && e.mtime !== undefined && readFile(fileOf(e.kind, e.id)).mtime !== e.mtime) return { status: 409, message: `${e.kind} ${e.id} changed on disk since it was opened: reload it` };
+  const problems = check(edits);
+  if (problems.some(p => p.new && p.level === "error")) return { status: 422, problems, message: "the edit brings errors" };
+  const saved: Record<string, number> = {};
+  for (const e of edits) { const u = fileOf(e.kind, e.id); saved[`${e.kind}:${e.id}`] = writeAtomic(u, textFor(u, e.doc)); }
+  forget();
+  return { status: 200, saved, problems };
+}
+
+/** Everything the browser lists: the series, the seasons with their episodes, the cast, the places. */
+export function listing() {
+  const w = world();
+  const episodes = w.drafts.map(d => ({ id: d.id, season: d.story.season, title: d.story.title, titleEn: d.story.titleEn, kind: d.story.kind, releaseDate: d.story.releaseDate, draft: !!d.story.draft, place: d.story.place, cast: d.story.cast }));
+  return { series: w.series, seasons: w.seasons, episodes, characters: { ...w.cast, ...w.extras } as Record<string, CharacterDoc>, places: w.places, days: w.days, cards: !!w.cards };
+}

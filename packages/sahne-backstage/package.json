@@ -1,0 +1,29 @@
+{
+  "name": "sahne-backstage",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A local, in-browser editor for a Sahne content root: its series, seasons and episodes, the cast and the places",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./server/index.ts"
+  },
+  "bin": {
+    "sahne-backstage": "./server/cli.ts"
+  },
+  "scripts": {
+    "dev": "node server/cli.ts",
+    "test": "node --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@fontsource/comic-neue": "5.3.0",
+    "@preact/signals": "^2.11.3",
+    "esbuild": "0.28.2",
+    "htm": "^3.1.1",
+    "preact": "^11.0.1",
+    "sahne": "workspace:*",
+    "sahne-kit": "workspace:*",
+    "sahne-story": "workspace:*",
+    "sahne-tr": "workspace:*"
+  }
+}

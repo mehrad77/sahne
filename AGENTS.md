@@ -10,6 +10,7 @@ packages/
   sahne-kit/      the first kit: people, set pieces, props, sounds, music, Kerim → STYLE.md, CATALOGUE.md, SET.md
   sahne-tr/       the Turkish plugin                            → packages/sahne-tr/README.md
   sahne-story/    the story format, its checks, paths.ts, samples/ → packages/sahne-story/README.md
+  sahne-backstage/ the editor an app runs on its content root (:5181) → packages/sahne-backstage/README.md
   sahne-gallery/  the dev gallery and the checks (:5180)        → packages/sahne-gallery/README.md
 .github/workflows/ci.yml       pnpm sahne check on every push and pull request, and the scan
 .github/workflows/deploy.yml   the gallery as the live demo, https://sahne.shab.boo (Cloudflare), deployed after ci passes on main; off until DEPLOY_ENABLED is set
@@ -25,6 +26,7 @@ assets/                        the README's poster and scene pictures (assets/RE
 | The engine | [packages/sahne/README.md](packages/sahne/README.md) and [DESIGN.md](packages/sahne/DESIGN.md) |
 | Kit art (people, set, props) | [STYLE.md](packages/sahne-kit/STYLE.md), [CATALOGUE.md](packages/sahne-kit/CATALOGUE.md), [SET.md](packages/sahne-kit/SET.md), `src/curation.ts` |
 | Stories, places, the content root | [packages/sahne-story/README.md](packages/sahne-story/README.md) |
+| The editor (backstage) | [packages/sahne-backstage/README.md](packages/sahne-backstage/README.md), then the story README's series section |
 | The gallery, screenshots, golden frames | [packages/sahne-gallery/README.md](packages/sahne-gallery/README.md) |
 | Package conventions, Kerim | [packages/README.md](packages/README.md) |
 
@@ -34,6 +36,7 @@ assets/                        the README's poster and scene pictures (assets/RE
 - `pnpm check` (the same as `pnpm sahne check`, the gallery's `check` script) is the gate: types, sizes, bundle determinism, the story and extras checks, every package's Node tests and the golden frames. Run it after every change.
 - `pnpm sahne <script>` runs a gallery script (`pnpm sahne dev`, `pnpm sahne golden:update`).
 - Start the gallery with `preview_start sahne-gallery` (`.claude/launch.json`), or `pnpm dev`.
+- Start the editor with `preview_start sahne-backstage` (the samples, read-only), or `node packages/sahne-backstage/server/cli.ts --content <root> --write`.
 - **The content root.** Every story, character and place is read through `packages/sahne-story/paths.ts`: from `$SAHNE_CONTENT` (an absolute folder) or, without it, from `packages/sahne-story/samples/`. Never build such a path yourself. Never point a path outside the repo: `packages/sahne-gallery/test/boundary.test.ts` fails on one.
 - The tests in `packages/sahne-story/test/kumru/` check Kumru's own content. They run only with `SAHNE_CONTENT` set to Kumru's `data/`. On the samples they are skipped, which is expected.
 

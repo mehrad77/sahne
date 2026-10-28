@@ -24,7 +24,8 @@ export interface CheckOptions { kit?: KitManifest | Kit; puppets?: string[]; sol
 
 /** s1e45 has six speakers in an episode, the owner's choice (Kumru's STORIES_A1.md). */
 export const CAST_ALLOW = new Set(["s1e45"]);
-const RETIRED_CHARACTERS = new Set("ada can dede deniz ela marti mert selin simit zeynep".split(" "));
+/** Character ids of the series Kumru replaced: never used again (ids are permanent). */
+export const RETIRED_CHARACTERS = new Set("ada can dede deniz ela marti mert selin simit zeynep".split(" "));
 const BREAKS: [string, string][] = [["2026-11-02", "2026-11-07"], ["2027-01-04", "2027-01-09"]];
 const LEVELS = ["A1", "A2", "B1"];
 /** Lines per story (Kumru's STORIES_DESIGN.md §1, proposed): [min, max] by level and kind. */

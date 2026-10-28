@@ -21,6 +21,7 @@ node_modules/
 
 # Sahne gallery build output
 packages/sahne-gallery/dist/
+packages/sahne-backstage/dist/
 
 # Sahne kit: source recordings (local only; SOURCES.md says where each comes from)
 packages/sahne-kit/sounds/library/

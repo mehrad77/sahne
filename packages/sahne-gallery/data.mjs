@@ -127,6 +127,7 @@ export const DOCS = [
   ["set", "Set pieces", "Kit", "packages/sahne-kit/SET.md"],
   ["sounds", "Sound sources", "Kit", "packages/sahne-kit/sounds/SOURCES.md"],
   ["stories", "Stories and places", "Stories", "packages/sahne-story/README.md"],
+  ["backstage", "Backstage, the editor", "Stories", "packages/sahne-backstage/README.md"],
   ["gallery", "The gallery", "Project", "packages/sahne-gallery/README.md"],
   ["packages", "Package conventions", "Project", "packages/README.md"],
   ["contributing", "Contributing", "Project", "CONTRIBUTING.md"],
