@@ -22,7 +22,7 @@ pnpm check                          # the same as pnpm sahne check: types of all
 node packages/sahne-gallery/size.mjs  # the size check alone (--json for an app's build)
 ```
 
-`tsconfig.json` has `"types": []` and includes only each package's `src/`, so Node-only files (tests, `sahne-kit/sounds/build.ts`) are not type-checked by it; never `npx tsc`. `pnpm sahne check` runs 614 tests today: 606 pass on the samples, and 8 that need data the samples lack (a `needs.json`, Kumru's airport) are skipped. `size.mjs` bundles and minifies each package on its own, gzips it and fails over budget (`sahne/DESIGN.md` §12):
+`tsconfig.json` has `"types": []` and includes only each package's `src/`, so Node-only files (tests, `sahne-kit/sounds/build.ts`) are not type-checked by it; never `npx tsc`. `pnpm sahne check` runs 616 tests today: 608 pass on the samples, and 8 that need data the samples lack (a `needs.json`, Kumru's airport) are skipped. `size.mjs` bundles and minifies each package on its own, gzips it and fails over budget (`sahne/DESIGN.md` §12):
 
 | Bundle | Budget (gzip) |
 |---|---|

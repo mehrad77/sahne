@@ -75,6 +75,18 @@ test("an edit that brings an error is refused and writes nothing; one the file h
   assert.ok(c.body.problems.some((p: { new?: boolean }) => p.new));
 });
 
+test("an edit that breaks another document is refused: two stories on one date", async () => {
+  const { skeleton } = await import("../src/model/skeleton.ts");
+  const w = (await call(rw.url, "GET", "world")).body;
+  const se = w.seasons.s1, arcId = Object.keys(se.arcs)[0];
+  const s0 = (await call(rw.url, "GET", "doc/story/s1e00")).body.doc;
+  const doc = skeleton({ id: "s1e02", season: 1, releaseDate: s0.releaseDate, kind: "episode", week: 0, arc: { ...se.arcs[arcId], id: arcId }, place: "bakkal", cast: ["ismail"],
+    words: ["a1-w-a", "a1-w-b", "a1-w-c", "a1-w-d", "a1-w-e"], lessons: ["g_a1_2_var_yok"], title: "İkinci", level: "A1" }, { narrator: "kerim", standin: "nima", places: w.places });
+  const r = await call(rw.url, "POST", "save", { edits: [{ kind: "story", id: "s1e02", doc, create: true }] });
+  assert.equal(r.status, 422);
+  assert.ok(r.body.problems.some((p: { new?: boolean; message: string }) => p.new && /is also .*release date/.test(p.message)));
+});
+
 test("a file changed on disk since it was opened is not overwritten", async () => {
   const { body: { doc, mtime } } = await call(rw.url, "GET", "doc/story/s1e00");
   const t = new Date(Date.now() + 5000);
@@ -135,6 +147,25 @@ test("a new episode's skeleton, with its calendar row, passes the story check an
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.ok(readFileSync(join(root, "stories", "s1e01.json"), "utf8").endsWith("}\n"));
   assert.equal((await call(rw.url, "POST", "save", { edits: [{ kind: "story", id: "s1e01", doc, create: true }] })).status, 400, "an id is created once");
+});
+
+test("a series started on a root with stories writes its seasons with it", async () => {
+  const { startSeries } = await import("../src/model/series.ts");
+  const bare = mkdtempSync(join(tmpdir(), "backstage-bare-"));
+  cpSync(SAMPLES, bare, { recursive: true });
+  rmSync(join(bare, "series.json")); rmSync(join(bare, "seasons"), { recursive: true });
+  const b = await start(["--content", bare, "--write"]);
+  try {
+    const story = (await call(b.url, "GET", "doc/story/s1e00")).body.doc;
+    const { series, seasons } = startSeries("demo", [story], { narrator: "kerim", standin: "nima" });
+    assert.equal(seasons.length, 1);
+    assert.deepEqual(Object.keys(seasons[0].arcs ?? {}), [story.arc.id]);
+    const alone = await call(b.url, "POST", "save", { edits: [{ kind: "series", id: "series", doc: series, create: true }] });
+    assert.equal(alone.status, 422, "a series alone leaves the stories without a season");
+    const r = await call(b.url, "POST", "save", { edits: [{ kind: "series", id: "series", doc: series, create: true }, ...seasons.map(se => ({ kind: "season", id: se.id, doc: se, create: true }))] });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(JSON.parse(readFileSync(join(bare, "seasons", "s1.json"), "utf8")).id, "s1");
+  } finally { b.p.kill(); rmSync(bare, { recursive: true, force: true }); }
 });
 
 test("the page and its bundle are served", async () => {

@@ -3,7 +3,8 @@
 // Where each lives is sahne-story's paths.ts, never a path built here. A save is a set of documents checked together (a
 // season's calendar and its stories' dates change in one save): the edited documents are swapped into the world the story
 // check reads (check/world.ts) and checked with the gate's own options (stories.ts: the full kit, the places' solids, the
-// cards, the needs). A problem the files already had does not block a save; one the edit brings does.
+// cards, the needs). The rules across documents (the season's dates and arcs, the cast's order) run over all of them, so an
+// edit that breaks another document is caught. A problem the files already had does not block a save; one the edit brings does.
 
 import { existsSync, readdirSync } from "node:fs";
 import { placeSolids, type Solid } from "sahne";
@@ -12,7 +13,7 @@ import { CHARACTERS, IS_SAMPLES, PLACES, SERIES, seasonFile, seasonIds, storyFil
 import { loadCards, loadNeeds } from "../../sahne-story/load.ts";
 import { checkCast, checkPlaces, checkSeason, checkSeries, checkStory, RETIRED_CHARACTERS, type CheckOptions, type CheckProblem } from "../../sahne-story/check/rules.ts";
 import { calendarOf, charactersOf, loadWorld, type World } from "../../sahne-story/check/world.ts";
-import { lintPlace, type CharacterDoc, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
+import { lintPlace, seasonOf, type CharacterDoc, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
 import { plain, readFile, textFor, writeAtomic } from "./save.ts";
 
 export type Kind = "series" | "season" | "story" | "character" | "place";
@@ -117,10 +118,12 @@ function problemsIn(w: World, edits: Edit[]): Problem[] {
       const d = w.drafts.find(x => x.id === id);
       if (d) out.push(...checkStory(d, w, opts).map(tag(`story:${id}`)));
     }
-    out.push(...checkSeason(w, w.drafts, opts).filter(p => stories.includes(p.story)).map(p => tag(`story:${p.story}`)(p)));
+    // the rules across stories, for every story: an edit of one can break another (two on one date)
+    out.push(...checkSeason(w, w.drafts, opts).map(p => tag(p.story === "season" ? `season:s${seasonOf(stories[0])}` : `story:${p.story}`)(p)));
   }
   const characters = edits.filter(e => e.kind === "character").map(e => e.id);
-  if (characters.length) out.push(...checkCast(w, o).filter(p => characters.some(id => p.story === `cast:${id}` || p.story === `extra:${id}`)).map(p => tag(`character:${p.story.split(":")[1]}`)(p)));
+  // the cast check over everyone: an edit of one can clash with another (two with one order)
+  if (characters.length) out.push(...checkCast(w, o).map(p => tag(`character:${p.story.split(":")[1]}`)(p)));
   for (const e of edits.filter(e => e.kind === "place")) {
     const doc = w.places[e.id];
     out.push(...checkPlaces({ ...w, places: { [e.id]: doc } }).map(tag(`place:${e.id}`)));

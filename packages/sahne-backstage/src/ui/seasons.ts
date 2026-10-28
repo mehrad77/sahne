@@ -10,6 +10,7 @@ import { set } from "../model/path.ts";
 import { dirty } from "../model/history.ts";
 import { change, createDoc, draftOf, go, keyOf, openDoc, saveDocs, world } from "../store.ts";
 import { Problems, Select, Text, Tri } from "./fields.ts";
+import { startSeries } from "../model/series.ts";
 import { checked } from "../store.ts";
 
 const MECHANICS = ["say", "explore", "act", "aloud", "unlocks"] as const;
@@ -44,14 +45,22 @@ function NewSeries() {
   const w = world.value!;
   const [id, setId] = useState("");
   const ok = /^[a-z0-9_]+$/.test(id);
+  const [busy, setBusy] = useState(false);
+  /** The series and a season document for every season the stories use, saved together (the check needs both). */
   const start = async () => {
-    createDoc("series", "series", { v: 1, id, title: id, titleEn: id, titleFa: id, narrator: "kerim", standin: "nima" });
-    if (await saveDocs([keyOf("series", "series")])) go();
+    setBusy(true);
+    const stories = (await Promise.all(w.episodes.map(e => openDoc("story", e.id)))).filter(Boolean).map(d => d!.doc as StoryDoc);
+    const { series, seasons } = startSeries(id, stories, { narrator: "kerim", standin: "nima" });
+    createDoc("series", "series", series);
+    for (const se of seasons) if (!w.seasons[se.id]) createDoc("season", se.id, se);
+    const ok = await saveDocs([keyOf("series", "series"), ...seasons.map(se => keyOf("season", se.id))]);
+    setBusy(false);
+    if (ok) go();
   };
   return html`<div class="panel row">
     <input placeholder="the series' id (a-z, 0-9, _)" value=${id} style="max-width:240px" aria-label="The series' id" onInput=${(e: Event) => setId((e.target as HTMLInputElement).value.trim().toLowerCase())} />
-    <button class="primary" disabled=${!ok || !w.writable} onClick=${() => void start()}>Start the series</button>
-    <span class="note">Its titles, narrator and stand-in can be edited after.</span></div>`;
+    <button class="primary" disabled=${!ok || !w.writable || busy} onClick=${() => void start()}>${busy ? "Starting…" : "Start the series"}</button>
+    <span class="note">It also writes a season document for each season the episodes use, with their arcs. The titles, narrator and stand-in can be edited after.</span></div>`;
 }
 
 /** A season's editing: its fields, the arcs planner and the calendar. Saves the season and the stories it changed together. */

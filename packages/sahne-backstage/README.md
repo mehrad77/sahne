@@ -35,7 +35,7 @@ console.log(b.url);
 
 | Route | What |
 |---|---|
-| `#/` | The series: its titles and summary, its narrator and stand-in, its seasons, and any episode whose season has no document yet. *Edit the series* edits them, and on a root without `series.json`, *Start the series* writes one. *+ Season n* adds the next season |
+| `#/` | The series: its titles and summary, its narrator and stand-in, its seasons, and any episode whose season has no document yet. *Edit the series* edits them, and on a root without `series.json`, *Start the series* writes one, with a season document for each season the episodes use (their arcs, no calendar) in the same save, since the check needs both. *+ Season n* adds the next season |
 | `#/season/<id>` | A season: its episodes in order, each with its title, kind, release date, week, place, and draft or not. *Edit the season* is described below. *+ New episode* opens the wizard |
 | `#/new/<season>` | A new episode from its brief, described below |
 | `#/episode/<id>` | An episode, described below |
@@ -166,6 +166,7 @@ console.log(b.url);
 - The edited documents are swapped into the world the story check reads (`check/world.ts`).
 - They are checked with the gate's own options: the full kit, each place's solids, the cards and the needs.
 - Stories get `checkStory` and `checkSeason`, characters `checkCast`, and places `checkPlaces` and `lintPlace`. A series or season edit gets `checkSeries`.
+- The rules across documents run over every document, not only the edited ones: the season's dates and arcs, and the cast's order. An edit that breaks another document is caught (two episodes on one date).
 - The same checks run on the files as they are, and a problem in both is not new.
 
 **Refused with 403 when read-only.** That is the default, and on the samples a save needs `--write`.
