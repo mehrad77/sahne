@@ -90,3 +90,12 @@ test("the narrator and the stand-in are the stage's", () => {
   assert.ok(es.some(m => /the narrator ismail is a cast, not a narrator/.test(m)));
   assert.ok(es.some(m => /another narrator is not supported yet/.test(m)));
 });
+
+test("two stories' arcs are the same arc whatever order their keys were written in", async () => {
+  const { checkSeason } = await import("../check/rules.ts");
+  const w = fresh(), d = w.drafts[0], arc = d.story.arc!;
+  const twin = { ...d, id: "s1e98", story: { ...d.story, id: "s1e98", releaseDate: "2026-12-31", arc: Object.fromEntries(Object.entries(arc).reverse()) as typeof arc } };
+  assert.ok(!checkSeason(w, [d, twin]).some(p => /differs/.test(p.message)));
+  const other = { ...twin, story: { ...twin.story, arc: { ...arc, tr: "başka" } } };
+  assert.ok(checkSeason(w, [d, other]).some(p => /differs/.test(p.message)));
+});

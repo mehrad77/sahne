@@ -11,7 +11,11 @@
     "s1w00": {
       "en": "A sample",
       "fa": "یک نمونه",
-      "mechanics": ["say", "explore", "act"],
+      "mechanics": [
+        "say",
+        "explore",
+        "act"
+      ],
       "tr": "Bir örnek"
     }
   }

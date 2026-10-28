@@ -78,6 +78,9 @@ const flagOptions = (s: StoryDoc) => [
   ...((s.followUp ?? []) as Step[]).flatMap(st => (isChoice(st) ? st.choice.options.filter(op => op.sets).map(op => ({ ...op, step: undefined })) : [])),
 ];
 
+/** A value's JSON with every object's keys sorted: equal documents compare equal whatever order their keys were written in. */
+const canonical = (v: unknown): string => JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : x));
+
 const dayOfWeek = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay();
 const addDays = (date: string, n: number) => new Date(Date.parse(`${date}T12:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
 
@@ -233,7 +236,7 @@ export function checkSeason(world: World, drafts: Draft[] = world.drafts, o: Che
   for (const d of drafts) {
     const s = d.story;
     if (s.releaseDate) { const prev = byDate.get(s.releaseDate); if (prev) add("calendar", "error", s.id, `${s.releaseDate} is also ${prev}'s release date`); else byDate.set(s.releaseDate, s.id); }
-    if (s.arc) { const k = JSON.stringify(s.arc), prev = arcs.get(s.arc.id); if (prev && prev.arc !== k) add("calendar", "error", s.id, `arc ${s.arc.id} differs from ${prev.id}'s`); else if (!prev) arcs.set(s.arc.id, { id: s.id, arc: k }); }
+    if (s.arc) { const k = canonical(s.arc), prev = arcs.get(s.arc.id); if (prev && prev.arc !== k) add("calendar", "error", s.id, `arc ${s.arc.id} differs from ${prev.id}'s`); else if (!prev) arcs.set(s.arc.id, { id: s.id, arc: k }); }
     for (const op of flagOptions(s)) setBy.set(op.sets!, d);
   }
   // callbacks name a flag an earlier story set; a story's date is the calendar's, or without one its own releaseDate
@@ -332,7 +335,7 @@ export function checkSeries(world: World): CheckProblem[] {
       if (!a || !se.arcs) continue;
       const want = se.arcs[a.id];
       if (!want) add("error", d.id, `arc ${a.id} is not one of season ${file}'s arcs`, "calendar");
-      else if (JSON.stringify({ tr: a.tr, en: a.en, fa: a.fa, mechanics: a.mechanics }) !== JSON.stringify({ tr: want.tr, en: want.en, fa: want.fa, mechanics: want.mechanics })) add("error", d.id, `arc ${a.id} differs from season ${file}'s`, "calendar");
+      else if (canonical({ tr: a.tr, en: a.en, fa: a.fa, mechanics: a.mechanics }) !== canonical({ tr: want.tr, en: want.en, fa: want.fa, mechanics: want.mechanics })) add("error", d.id, `arc ${a.id} differs from season ${file}'s`, "calendar");
     }
   }
   if (world.series) for (const d of world.drafts) { const n = seasonOf(d.id); if (n && !world.seasons[`s${n}`]) add("error", d.id, `season s${n} has no document in seasons/`); }
