@@ -176,3 +176,17 @@ test("parenthetical: gestures, feelings, who it is said to, where it points, wal
   assert.deepEqual(parseParenthetical("angry, juggles", v), { staging: { emo: "annoyed" }, rest: ["juggles"] });
   assert.deepEqual(chipsOf({ do: "wave", to: "ismail", at: "obj:apple" }, id => (id === "ismail" ? "İsmail" : id)).map(c => c.label), ["wave", "→ İsmail", "at apple"]);
 });
+
+test("autostage: the director's choices as ghosts, the rules' as suggestions", async () => {
+  const { ghostsOf, suggestionsOf, taken } = await import("../src/model/autostage.ts");
+  const { trLang } = await import("../../sahne-story/src/index.ts");
+  const info = [{ step: 0, kind: "scene" }, { step: 1, kind: "line", who: "ismail" }] as never;
+  const perfs = [{ after: { shot: { kind: "wide", ids: [] } } }, { after: { last: { who: "ismail", to: "nima" }, shot: { kind: "two", ids: ["ismail", "nima"] } } }];
+  assert.deepEqual(ghostsOf(info, perfs), { "steps/1": { to: "nima", cam: "two", camIds: ["ismail", "nima"] } });
+  const story = { ...STORY, steps: [{ scene: "bakkal", at: {} }, { who: "ismail", tr: "Merhaba!" }, { who: "nima", tr: "Ekmek var mı?" }, { who: "nima", tr: "Evet.", do: "nod" }] } as unknown as StoryDoc;
+  const s = suggestionsOf(story, { lang: trLang, lints: [], gestures: ["wave", "nod"], emotions: ["curious", "surprised"], narrator: "kerim", standin: "nima" });
+  assert.deepEqual(s["steps/1"].map(x => x.fix), [{ do: "wave" }, { emo: "surprised" }], "merhaba motivates a wave; ! a surprise");
+  assert.deepEqual(s["steps/2"].map(x => x.fix), [{ emo: "curious" }], "a question");
+  assert.equal(s["steps/3"], undefined, "a gesture already written is not suggested again");
+  assert.deepEqual(taken({ link: { a: "obj:a" }, do: "nod" }, { link: { b: "obj:b" }, do: "wave" }), { link: { a: "obj:a", b: "obj:b" }, do: "wave" });
+});

@@ -102,8 +102,12 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
   - Focusing a block selects it and the stage plays that moment; an option not picked is picked. The block playing is marked, and so are a changed block and one with problems.
 - **After the script:** the quiz (each question in every language, three options in the main language, the right one, the line its answer quotes) and the glosses (a word the cards do not have, its meaning in each translation).
 - **The stage:** the whole kit, the narrator's round window, the transport (the opening, back, *Next*, a scrubber over every cue and one through the cue playing: held props and gestures go wrong mid-cue, so look there), the learner's card (say, a choice's options, an act), and one switch for each flag the episode's callbacks read.
+- **Staging fills itself in, and can be overridden** (`src/model/autostage.ts`). A block's chips are of three kinds:
+  - **set** (solid): written in the story; × clears it back to the director's choice.
+  - **ghost** (dotted): what the director does by itself and never writes: whom a line is said to and the shot it gets, read from the stage's own performance of each cue, so it is exactly what plays.
+  - **suggested** (dashed): what the rules would add: the lints' fixes (a deixis gesture at the thing named, a prop shown or hidden, a count, a link from a word to a prop on stage), a gesture the words motivate (the story language's `motive` words: *merhaba* suggests a wave), a feeling the punctuation does (a question, an exclamation). A click takes one, ⌥ Enter every one of the block, *Take n suggestions* in the toolbar every one of the episode; undo takes them back.
+- **Directing on the stage** (`direct.ts`). With *Direct* on, a click on a person opens a menu of gestures (each a picture of it), feelings (each a face), what they look at, where they walk, and *says it to them*; on a prop: point at it, hold it up, touch it, show it, hide it, give it. What the speaker does goes on the block; what someone else does goes on it as their reaction (`react`). A click on a mark's pin walks the speaker there, and dragging a person onto a pin walks them. The shot bar sets the block's camera (*auto* leaves it to the director).
 - **Details** opens the selected block's full staging in a drawer (`details.ts`, the forms in `src/ui/staging.ts`): every field with a picker of what is valid there (the kit's emotions, gestures and sounds; the engine's cameras, moves, prop ops and voices; the place's marks and props; the cast), a scene's time, weather and states, a line's note for the learner, the flags that gate it, and the step as JSON.
-- **On the stage** (`src/ui/pick.ts`): the place's marks as pins, a click that sets the selected block's `at`, `to` or `move`, and shot buttons for its `cam`.
 - **Problems, review and changes** are tabs under the stage. The stage lints (`lintStory`, `suggest`, in the series' story language) run as you type, the full story check a moment later on the server; a problem the edit brought is marked **new**. Review: the episode's status, each step reviewed and its translations checked, comments. Changes: each changed step against git's HEAD, with *Put back as committed*. A person commits; backstage never does.
 - **Undo, redo, revert and save.** Typing into one field is one undo step. Save is refused when the edit brings an error; problems the file already had do not block it.
 
@@ -243,8 +247,8 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `api.ts`;
   - `stage.ts` (`Preview`: the stage and a story player that follow the document);
   - `thumbs.ts` (pictures the stage draws once and keeps);
-  - `model/` (paths into a document, undo and redo, the step list, what changed, the board's weeks, the script's blocks and keys, parentheticals, a new episode's skeleton, the palette's search; pure and tested in Node);
-  - `ui/` (the pages: `app` (the shell), `board`, `new`, `studio/` (the episode: `episode`, `script`, `sections`, `details`), `cast`, `places`, `kitpage`, `review`, `seasons` (settings); and their parts: `galleries`, `lang`, `staging`, `pick`, `changes`, `ai`, `fields`, `theme`, `kit/`).
+  - `model/` (paths into a document, undo and redo, the step list, what changed, the board's weeks, the script's blocks and keys, parentheticals, ghosts and suggestions, a new episode's skeleton, the palette's search; pure and tested in Node);
+  - `ui/` (the pages: `app` (the shell), `board`, `new`, `studio/` (the episode: `episode`, `script`, `sections`, `details`, `direct`), `cast`, `places`, `kitpage`, `review`, `seasons` (settings); and their parts: `galleries`, `lang`, `staging`, `changes`, `ai`, `fields`, `theme`, `kit/`).
 - **`index.html`** is the page.
 - **`test/`**: `node --test` covers the save round trip, the model, the server on a temp copy of the samples, and AI help with the network stubbed. `pnpm check` runs it.
 

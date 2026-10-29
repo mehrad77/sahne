@@ -15,6 +15,7 @@ import { allLanguages, textOf, type StoryDoc } from "sahne-story";
 import { get, set, type Path } from "../../model/path.ts";
 import { addAfter, blocks, convert, duplicateAt, emptyLine, INSERTS, moveBy, nextSpeaker, remove, stagingIn, template, type Block, type Insert } from "../../model/script.ts";
 import { chipsOf, parseParenthetical } from "../../model/parenthetical.ts";
+import { taken, type Ghost, type Suggest } from "../../model/autostage.ts";
 import { KIT } from "../../stage.ts";
 import { history, say, world } from "../../store.ts";
 import { Icon, Popover } from "../kit/index.ts";
@@ -36,6 +37,9 @@ export interface ScriptProps {
   marks?: Record<number, { errors: number; warnings: number }>;
   /** What shows in a block's gutter beside its number (review marks, notes). */
   gutter?(b: Block): unknown;
+  /** What the director does by itself on each block (never written), and what the rules suggest, by block path. */
+  ghosts?: Record<string, Ghost>;
+  suggestions?: Record<string, Suggest[]>;
 }
 
 const key = (p: Path) => p.join("/");
@@ -74,12 +78,21 @@ export function Script(p: ScriptProps) {
       p.select(b.path, true);
     } else if (e.key === "@" && empty && b.kind === "line") { e.preventDefault(); setMenu({ kind: "speaker", path: b.path, ...rect() }); }
     else if (e.key === "/" && empty && b.depth === 0) { e.preventDefault(); setMenu({ kind: "insert", path: b.path, ...rect() }); }
+    else if (e.key === "Enter" && e.altKey) { e.preventDefault(); takeAll(b.path); }
     else if (e.key === "(" && !e.altKey && (b.kind === "line" || b.kind === "option" || b.kind === "action")) { e.preventDefault(); setParen(key(b.path)); }
     else if (isMod(e) && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); apply(moveBy(p.story, b.path, e.key === "ArrowUp" ? -1 : 1)); }
     else if (isMod(e) && e.key.toLowerCase() === "d") { e.preventDefault(); apply(duplicateAt(p.story, b.path)); }
     else if (isMod(e) && e.key.toLowerCase() === "z") { e.preventDefault(); history("story", p.id, e.shiftKey ? "redo" : "undo"); }
     else if (e.key === "ArrowUp" && !e.shiftKey && (target as HTMLTextAreaElement).selectionStart === 0) { const i = list.findIndex(x => key(x.path) === key(b.path)); if (i > 0) { e.preventDefault(); p.select(list[i - 1].path, true); } }
     else if (e.key === "ArrowDown" && !e.shiftKey && (target as HTMLTextAreaElement).selectionEnd === text.length) { const i = list.findIndex(x => key(x.path) === key(b.path)); if (i < list.length - 1) { e.preventDefault(); p.select(list[i + 1].path, true); } }
+  };
+
+  /** Every suggestion of a block, taken. */
+  const takeAll = (path: Path) => {
+    const ss = p.suggestions?.[key(path)] ?? [];
+    if (!ss.length) return;
+    const base = "beat" in ((get(p.story, path) ?? {}) as object) ? [...path, "beat"] : path;
+    p.edit(s => set(s, base, ss.reduce((x, sg) => taken(x, sg.fix), (get(s, base) ?? {}) as Record<string, unknown>)), `${key(path)}.take`);
   };
 
   const insert = (kind: Insert, after: Path) => {
@@ -167,8 +180,11 @@ function Staged(p: Common & { at: Path; who?: string }) {
   const open = p.paren === key(p.at), setOpen = (on: boolean) => p.setParen(on ? key(p.at) : null);
   const setParen = setText;
   const step = get(p.story, p.at);
-  const chips = chipsOf(stagingIn(step) as Record<string, unknown>, p.name);
+  const st = stagingIn(step) as Record<string, unknown>;
+  const chips = chipsOf(st, p.name);
   const base = "beat" in ((step ?? {}) as object) ? [...p.at, "beat"] : p.at;
+  const ghost = p.ghosts?.[key(p.at)], sugg = p.suggestions?.[key(p.at)] ?? [];
+  const take = (sg: Suggest) => p.edit(s => set(s, base, taken((get(s, base) ?? {}) as Record<string, unknown>, sg.fix)), `${key(p.at)}.take`);
   const commit = () => {
     if (!paren.trim()) { setOpen(false); return; }
     const pl = w.places[placeAt(p.story, Number(p.at[1]))];
@@ -187,6 +203,9 @@ function Staged(p: Common & { at: Path; who?: string }) {
   const clear = (k: string) => p.edit(s => set(s, [...base, k], undefined));
   return html`<span class="staged">
     ${chips.map(c => html`<span class="schip set">${c.label}<button aria-label=${`Clear ${c.key}`} onClick=${() => clear(c.key)}>×</button></span>`)}
+    ${ghost?.to && !st.to && html`<span class="schip ghost" title="The director's choice: who it is said to. Set it to change it.">→ ${ghost.to === "viewer" ? "us" : p.name(ghost.to)}</span>`}
+    ${ghost?.cam && !st.cam && html`<span class="schip ghost" title="The director's shot. The shot bar on the stage changes it.">${ghost.cam} shot</span>`}
+    ${sugg.map(sg => html`<button class="schip suggest" title=${`${sg.why}: click (or ⌥ Enter for all) to take it`} onClick=${() => take(sg)}>+ ${chipsOf(sg.fix as Record<string, unknown>, p.name).map(c => c.label).join(", ")}</button>`)}
     ${open ? html`<input class="paren" autofocus value=${paren} placeholder="(waves, happy, to …)" aria-label="How it is said" lang=${main === "tr" ? "en" : undefined}
       onInput=${(e: Event) => setParen((e.target as HTMLInputElement).value)} onBlur=${commit}
       onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); commit(); } else if (e.key === "Escape") { setParen(""); setOpen(false); } }} />`

@@ -17,7 +17,6 @@ import { KIT, Preview, solidsOf } from "../../stage.ts";
 import { Problems } from "../fields.ts";
 import { ReviewPanel } from "../review.ts";
 import { ChangesPanel } from "../changes.ts";
-import { StagePick } from "../pick.ts";
 import { AiDraft, AiReview } from "../ai.ts";
 import { Drawer, Icon, MOD } from "../kit/index.ts";
 import { inLang, useLangs } from "../lang.ts";
@@ -25,6 +24,9 @@ import type { Problem } from "../../api.ts";
 import { Script } from "./script.ts";
 import { EpisodeHead, Glosses, Quiz } from "./sections.ts";
 import { Details } from "./details.ts";
+import { Direct } from "./direct.ts";
+import { ghostsOf, suggestionsOf, taken } from "../../model/autostage.ts";
+import { get, set } from "../../model/path.ts";
 
 declare global { interface Window { backstage?: { preview: Preview; select(path: Path | null): void } } }
 
@@ -82,16 +84,25 @@ function Studio(p: { id: string }) {
     return () => clearTimeout(t);
   }, [story]);
 
-  const lints = useMemo(() => {
+  const { lints, suggestions } = useMemo(() => {
     const o = { places: w.places, characters: w.characters, kit: KIT, lang };
     try {
       const ps = lintStory(story, { ...o, solids: solidsOf(w.places) }).map(x => ({ ...x, doc: key, story: p.id } as Problem));
-      const ss = suggest(story, o).map(x => ({ rule: "suggest", level: "info", story: p.id, step: x.step, option: x.option, message: x.message, doc: key } as Problem));
-      return [...ps, ...ss];
-    } catch (e) { return [{ rule: "lint", level: "error", story: p.id, message: String(e), doc: key } as Problem]; }
+      const raw = suggest(story, o);
+      const sugg = suggestionsOf(story, { lang, lints: raw, gestures: Object.keys(KIT.gestures), emotions: Object.keys(KIT.face.emotions), narrator: w.series?.narrator ?? "kerim", standin: w.series?.standin ?? "nima" });
+      return { lints: ps, suggestions: sugg };
+    } catch (e) { return { lints: [{ rule: "lint", level: "error", story: p.id, message: String(e), doc: key } as Problem], suggestions: {} }; }
   }, [story]);
+  const nSuggest = Object.values(suggestions).reduce((n, x) => n + x.length, 0);
+  /** Every suggestion of the episode, taken (one edit). */
+  const takeAll = () => edit(s => Object.entries(suggestions).reduce((x, [k, ss]) => {
+    const path = k.split("/").map(v => (/^\d+$/.test(v) ? Number(v) : v));
+    const base = "beat" in ((get(x, path) ?? {}) as object) ? [...path, "beat"] : path;
+    return set(x, base, ss.reduce((st, sg) => taken(st, sg.fix), (get(x, base) ?? {}) as Record<string, unknown>));
+  }, s), "take-all");
 
   const pv = preview.current, player = pv?.player, info = player?.info ?? [];
+  const ghosts = pv ? ghostsOf(info, pv.stage.perfs) : {};
   const playing = player && player.next > 0 ? cuePath(info[Math.max(0, player.next - 1)] ?? { step: 0, kind: "scene" }) : null;
 
   /** Select a block (and put the cursor in it with `focus`): the stage plays that moment. */
@@ -129,20 +140,21 @@ function Studio(p: { id: string }) {
       <button class="iconbtn" onClick=${() => history("story", p.id, "undo")} disabled=${!d.past.length} title=${`Undo (${MOD} Z)`} aria-label="Undo"><${Icon} name="undo" /></button>
       <button class="iconbtn" onClick=${() => history("story", p.id, "redo")} disabled=${!d.future.length} title=${`Redo (⇧${MOD} Z)`} aria-label="Redo"><${Icon} name="redo" /></button>
       <button onClick=${() => history("story", p.id, "revert")} disabled=${!dirty(d)}>Revert</button>
+      ${nSuggest > 0 && html`<button onClick=${takeAll} title="Take every staging the rules suggest (the dashed chips); undo takes them back">Take ${nSuggest} suggestion${nSuggest > 1 ? "s" : ""}</button>`}
       <button aria-pressed=${details} onClick=${() => setDetails(!details)} title="All the staging of the selected block">Details</button>
       <button class="primary" onClick=${save} disabled=${!dirty(d) || !w.writable} title=${w.writable ? `Save (${MOD} S)` : "read-only"}><${Icon} name="save" size=${16} /> Save</button>
     </div>
     <div class="studio-split">
       <div class="script-col">
         <${EpisodeHead} story=${story} saved=${saved} edit=${edit} />
-        <${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} />
+        <${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} ghosts=${ghosts} suggestions=${suggestions} />
         <${Quiz} story=${story} saved=${saved} edit=${edit} />
         <${Glosses} story=${story} saved=${saved} edit=${edit} />
       </div>
       <div class="stage-col">
         <div class="stagebox"><div ref=${box}></div></div>
         ${player && html`<${Transport} preview=${pv!} redraw=${redraw} />`}
-        ${pv && html`<${StagePick} preview=${pv} story=${story} path=${path} host=${box.current?.parentElement ?? null} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} />`}
+        ${pv && html`<${Direct} preview=${pv} story=${story} path=${path} host=${box.current?.parentElement ?? null} edit=${edit} cast=${cast} />`}
         ${allFlags.length > 0 && html`<div class="flags"><span class="note">Flags from earlier stories:</span>${allFlags.map(f => html`<button class=${`chip${flags.includes(f) ? " on" : ""}`} aria-pressed=${flags.includes(f)} onClick=${() => {
           const next = flags.includes(f) ? flags.filter(x => x !== f) : [...flags, f];
           setFlags(next); pv!.setFlags(next, Math.max(0, player!.next - 1)); redraw();
