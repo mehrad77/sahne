@@ -3,7 +3,7 @@
 // turn, draws its frame and keeps it as an image in IndexedDB under a key that changes with what it shows, so it is drawn
 // again only when that changes. A browser without IndexedDB (or one that refuses it) still draws, every time.
 
-import { hashString, mountStage, type AvatarDoc, type Cue, type PlaceDoc, type PuppetRef, type Run, type Stage } from "sahne";
+import { hashString, mountStage, type AvatarDoc, type Cue, type LoadOptions, type PlaceDoc, type PuppetRef, type Run, type Stage } from "sahne";
 import { KIT, LANG } from "./stage.ts";
 
 const W = 360, H = 225, DB = "sahne-backstage-thumbs", STORE = "thumbs";
@@ -29,7 +29,7 @@ async function put(key: string, url: string) {
 }
 
 /** What a picture shows: a place, its cues (the last shown, or `at` of the way through `play`), the cast. */
-export interface Scene { place: PlaceDoc; places?: Record<string, PlaceDoc>; cues: Cue[]; cast: Record<string, AvatarDoc | PuppetRef>; names?: Record<string, string>; play?: { cue: number; at: number } }
+export interface Scene { place?: PlaceDoc; places?: Record<string, PlaceDoc>; cues: Cue[]; cast: Record<string, AvatarDoc | PuppetRef>; names?: Record<string, string>; play?: { cue: number; at: number }; /** The rest of what `load` takes (an episode's wardrobe, props, narrator). */ load?: Partial<LoadOptions> }
 interface Job { key: string; scene: () => Scene; done: (url: string | null) => void }
 const queue: Job[] = [];
 let stage: Stage | null = null, host: HTMLElement | null = null, busy = false;
@@ -66,7 +66,7 @@ async function pump() {
 }
 
 function bake(st: Stage, s: Scene): Promise<string | null> {
-  st.load({ v: 1, cues: s.cues }, { cast: s.cast, places: s.places ?? { [s.place.id]: s.place }, ...(s.names ? { names: s.names } : {}) });
+  st.load({ v: 1, cues: s.cues }, { ...s.load, cast: s.cast, places: s.places ?? (s.place ? { [s.place.id]: s.place } : s.load?.places ?? {}), ...(s.names ? { names: s.names } : {}) });
   if (s.play) {
     st.show(Math.max(0, s.play.cue - 1));
     const run = st.play(s.play.cue) as Run;
@@ -87,6 +87,12 @@ function bake(st: Stage, s: Scene): Promise<string | null> {
 /** A place's wide shot at its first time. */
 export const placeThumb = (doc: PlaceDoc & { times?: string[] }) =>
   snapshot(`place|${hashString(JSON.stringify(doc))}`, () => ({ place: doc, cues: [{ scene: { place: doc.id, time: doc.times?.[0] ?? "day", at: {}, cam: "wide" } }], cast: {} }));
+
+/** The end of cue `i` of an episode's performance (the storyboard): kept by everything up to it, so an edit later on keeps it. */
+export const cueThumb = (cues: Cue[], i: number, load: Partial<LoadOptions>) => {
+  const upTo = cues.slice(0, i + 1);
+  return snapshot(`cue|${hashString(JSON.stringify(upTo))}|${hashString(JSON.stringify([load.cast, load.wardrobe, load.places]))}`, () => ({ cues: upTo, cast: (load.cast ?? {}) as Record<string, AvatarDoc | PuppetRef>, load }));
+};
 
 /** An empty room a gesture is shown in. */
 const ROOM: PlaceDoc = { v: 1, id: "backstage_room", size: { w: 5, d: 3 }, pieces: [], marks: { a: { x: 0, z: 0 } } } as unknown as PlaceDoc;

@@ -25,6 +25,7 @@ import { Script } from "./script.ts";
 import { EpisodeHead, Glosses, Quiz } from "./sections.ts";
 import { Details } from "./details.ts";
 import { Direct } from "./direct.ts";
+import { Strip } from "./strip.ts";
 import { ghostsOf, suggestionsOf, taken } from "../../model/autostage.ts";
 import { get, set } from "../../model/path.ts";
 
@@ -152,6 +153,7 @@ function Studio(p: { id: string }) {
         <${Glosses} story=${story} saved=${saved} edit=${edit} />
       </div>
       <div class="stage-col">
+        ${pv && player && html`<${Strip} preview=${pv} story=${shown.current} at=${Math.max(0, player.next - 1)} select=${select} jump=${(i: number) => { player.jump(i); redraw(); }} />`}
         <div class="stagebox"><div ref=${box}></div></div>
         ${player && html`<${Transport} preview=${pv!} redraw=${redraw} />`}
         ${pv && html`<${Direct} preview=${pv} story=${story} path=${path} host=${box.current?.parentElement ?? null} edit=${edit} cast=${cast} />`}

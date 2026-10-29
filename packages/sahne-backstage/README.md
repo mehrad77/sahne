@@ -101,6 +101,7 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
   - **A parenthetical** (`src/model/parenthetical.ts`) is read phrase by phrase: a gesture of the kit (`waves`, `points at the apple`), a feeling (`happy`, `angry`), whom it is said to (`to İsmail`), where it points (`at the door`), a walk (`walks to counter`), a voice (`whispers`) or a shot (`close`). What it does not understand is named, never written.
   - Focusing a block selects it and the stage plays that moment; an option not picked is picked. The block playing is marked, and so are a changed block and one with problems.
 - **After the script:** the quiz (each question in every language, three options in the main language, the right one, the line its answer quotes) and the glosses (a word the cards do not have, its meaning in each translation).
+- **The storyboard strip** over the stage (`strip.ts`): a picture of each beat of the episode as it plays now (each scene, line, reply, action and act, at its end), drawn once and kept, keyed by everything up to it so an edit late in the episode keeps the pictures before it. A click goes there in the script and on the stage; the one playing is marked, and a choice shows as a fork.
 - **The stage:** the whole kit, the narrator's round window, the transport (the opening, back, *Next*, a scrubber over every cue and one through the cue playing: held props and gestures go wrong mid-cue, so look there), the learner's card (say, a choice's options, an act), and one switch for each flag the episode's callbacks read.
 - **Staging fills itself in, and can be overridden** (`src/model/autostage.ts`). A block's chips are of three kinds:
   - **set** (solid): written in the story; × clears it back to the director's choice.
@@ -248,7 +249,7 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `stage.ts` (`Preview`: the stage and a story player that follow the document);
   - `thumbs.ts` (pictures the stage draws once and keeps);
   - `model/` (paths into a document, undo and redo, the step list, what changed, the board's weeks, the script's blocks and keys, parentheticals, ghosts and suggestions, a new episode's skeleton, the palette's search; pure and tested in Node);
-  - `ui/` (the pages: `app` (the shell), `board`, `new`, `studio/` (the episode: `episode`, `script`, `sections`, `details`, `direct`), `cast`, `places`, `kitpage`, `review`, `seasons` (settings); and their parts: `galleries`, `lang`, `staging`, `changes`, `ai`, `fields`, `theme`, `kit/`).
+  - `ui/` (the pages: `app` (the shell), `board`, `new`, `studio/` (the episode: `episode`, `script`, `sections`, `details`, `direct`, `strip`), `cast`, `places`, `kitpage`, `review`, `seasons` (settings); and their parts: `galleries`, `lang`, `staging`, `changes`, `ai`, `fields`, `theme`, `kit/`).
 - **`index.html`** is the page.
 - **`test/`**: `node --test` covers the save round trip, the model, the server on a temp copy of the samples, and AI help with the network stubbed. `pnpm check` runs it.
 
