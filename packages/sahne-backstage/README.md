@@ -144,19 +144,11 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
   - The 5 KB budget (`MAX_BYTES`), and each of `PLACE_RULES` as ✓, ! or ✗, with `lintPlace`'s problems.
   - Saving runs the place check. The gallery's camera check (`#/places/<id>`) stays in the gallery.
 
-**A new episode** (`src/ui/new.ts`, `src/model/skeleton.ts`).
-- **The brief:**
-  - the id (the season's next free one), the release date and kind;
-  - the week (its arc), the place and the cast;
-  - the target words. The cards are searched live through `GET /api/cards?q=`, and their text is never stored. On a root without cards, the ids are typed in;
-  - the lessons (`GET /api/lessons`);
-  - the titles and the premise.
-- **The skeleton.** The editor writes a first draft the story check can read, marked `draft: true`:
-  - a scene with the cast on floor marks;
-  - Kerim's opening and a few lines;
-  - one choice, one spot, and three quiz items, every text to fill in.
-- **Saving it.** The skeleton opens in the episode editor, with its row in the season's calendar. It is created (saved for the first time) once the check finds no error. Its Save writes the episode and its season together.
-- **The thumbnail** is missing until it is shot: `GET /api/thumbs` names it, with the command.
+**A new episode** (`src/ui/new.ts`, `src/model/skeleton.ts`), from an empty day on the board or *New episode*:
+- **Three picks:** where (a place from its picture, and the time of day), who (the cast from their portraits; the stand-in is always in, the narrator narrates), and what it teaches (the target words, searched live through `GET /api/cards?q=`, their text never stored; on a root without cards, ids typed in; and one to three lessons, `GET /api/lessons`). Then a title (the main language's at least) and a line of premise in the translations, which the narrator opens with.
+- **The rest comes from the day:** the id (the season's next free one), the kind (a Saturday is a special), the week and its theme (a week with none gets one to write). The day can be changed at the top.
+- **Or from an episode:** another episode's place, cast, structure and staging, with every text cleared to `…` (`duplicate`), and the flags it sets renamed for the new story.
+- `skeleton` writes a draft the check can read (a scene with the cast on floor marks, the narrator's opening, a few lines, a choice, a spot, three quiz items), every text a placeholder in each of the series' languages (a Turkish series gets a few real words to start from), marked `draft: true`. It opens in the script, and is saved with its calendar row (and a new week's theme) once the check finds no error: it will want the target words by then.
 
 **Live preview.**
 - An edit that changes only words (`src/model/steps.ts` `wordsOnly`) re-directs the cues: `storyPlayer.replace`, with no reload.

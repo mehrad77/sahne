@@ -128,3 +128,18 @@ test("board: weeks from the launch, Monday to Saturday, a Saturday a special, a 
   assert.deepEqual(rowOn(weeks, "2026-11-14"), { date: "2026-11-14", kind: "special", week: 2 });
   assert.deepEqual(rowOn(weeks, "2026-11-10"), { date: "2026-11-10", kind: "episode", week: 2 });
 });
+
+test("a new episode: a skeleton in the series' languages, or a copy of another with its texts cleared", async () => {
+  const { skeleton, duplicate } = await import("../src/model/skeleton.ts");
+  const brief = { id: "s1e05", season: 1, releaseDate: "2026-09-16", kind: "episode" as const, week: 1, arc: { id: "s1w01", tr: "a", en: "b", fa: "c", mechanics: ["say" as const] }, place: "bakkal", cast: ["ismail"], words: [], lessons: ["g_a1_1_x"], title: { tr: "Yeni" } };
+  const de = skeleton({ ...brief, title: { de: "Yeni" } }, { narrator: "kerim", standin: "nima", places, languages: { main: "de", translations: ["en"] } });
+  assert.deepEqual(de.title, { de: "Yeni", en: "Yeni" }, "the main title stands in for a missing translation");
+  assert.deepEqual(de.steps[2], { who: "ismail", de: "…", en: "…" }, "a placeholder in each language");
+  const copy = duplicate(STORY, brief);
+  assert.equal(copy.id, "s1e05");
+  assert.equal(copy.steps.length, STORY.steps.length, "the structure is kept");
+  const line = copy.steps.find(s => "who" in s) as unknown as Record<string, unknown>;
+  assert.equal(line.tr, "…");
+  assert.ok(!JSON.stringify(copy.steps).includes("Portakal"), "no text of the old episode is left");
+  assert.equal(copy.draft, true);
+});
