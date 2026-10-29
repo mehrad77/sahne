@@ -211,14 +211,19 @@ Review state is editors' notes, so it is not part of a story: a story's root tak
 Backstage is also an MCP server, so an agent (Claude Code, the editor's own assistant, any MCP client) can read and edit the content root. Every tool goes through `server/content.ts`, so an agent's edit passes the same check as a person's save.
 
 **Where it is served.**
-- **Streamable HTTP** at `http://localhost:5181/mcp`, inside the normal server, behind the same localhost `Host` and `Origin` guard. Each client gets a session (`mcp-session-id`), opened by its `initialize` request.
-- **stdio**, for an agent that starts the server itself. It prints nothing to stdout but MCP frames, and reads the content root again before each call, since a backstage in another process may write the same files:
+- **Streamable HTTP** at `http://localhost:5181/mcp`, inside the normal server, behind the same localhost `Host` and `Origin` guard. Each client gets a session (`mcp-session-id`), opened by its `initialize` request. This is the way to work beside the editor: proposals land in the editor that is open.
 
 ```bash
-claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mcp --content <root> --write
+claude mcp add --transport http sahne-backstage http://localhost:5181/mcp
 ```
 
-  The flags are those of the server (below), plus `--backstage http://localhost:5181/`: proposals then go to that running backstage's queue, and `show` and direct writes reach its open editors. Without it, a stdio server's proposals stay in its own queue, where no editor sees them.
+- **stdio**, for an agent that starts the server itself. It prints nothing to stdout but MCP frames, and reads the content root again before each call, since a backstage in another process may write the same files. With `--backstage`, its proposals go to the running backstage's queue, and `show` and direct writes reach its open editors; without it, proposals stay in the stdio server's own queue, where no editor sees them:
+
+```bash
+claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mcp --content <root> --write --backstage http://localhost:5181/
+```
+
+  The flags are those of the server (below), plus `--backstage`.
 - **In memory**, to the editor's assistant (`server/assistant.ts`).
 
 **The flags** (of `cli.ts` and `cli.ts mcp`; `startBackstage()` takes them as `agentEdits` and `shareCards`; `GET /api/world` answers both):
