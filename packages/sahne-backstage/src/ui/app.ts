@@ -1,12 +1,11 @@
 // The studio: a top bar (the series, its seasons, search and commands, whether everything is saved, the theme), a rail
 // of the places to work (the board, the cast, the places, review, settings), and the page the hash names.
-//   #/                      the series and its seasons
-//   #/season/<id>           a season's episodes
+//   #/, #/season/<id>       the board: a season's weeks and days, each episode on its release day
 //   #/episode/<id>          one episode: play it, fix its words, stage it, review it
 //   #/review                where every episode stands
 //   #/cast, #/character/<id> the cast, a character's look and words
 //   #/places, #/place/<id>   the places, a place's marks, props and set pieces
-//   #/new/<season>          a new episode from its brief
+//   #/new/<season>[/<date>] a new episode (on that day)
 //   #/kit                   the kit: props, set pieces, gestures, emotions, sounds
 
 import { html } from "htm/preact";
@@ -19,8 +18,7 @@ import { Icon, MOD } from "./kit/index.ts";
 import { Palette } from "./kit/palette.ts";
 import { cycleTheme, theme } from "./theme.ts";
 import { tx } from "./fields.ts";
-import { Home } from "./home.ts";
-import { Season } from "./season.ts";
+import { BoardPage } from "./board.ts";
 import { Episode } from "./episode.ts";
 import { ReviewPage } from "./review.ts";
 import { CastPage, CharacterPage } from "./cast.ts";
@@ -88,15 +86,14 @@ function commandsOf(): Command[] {
 
 function pageFor(page: string | undefined, id: string | undefined) {
   switch (page) {
-    case undefined: return html`<${Home} />`;
-    case "season": return html`<${Season} id=${id} />`;
+    case undefined: case "season": return html`<${BoardPage} />`;
     case "episode": return html`<${Episode} key=${id} id=${id} />`;
     case "review": return html`<${ReviewPage} />`;
     case "cast": return html`<${CastPage} />`;
     case "character": return html`<${CharacterPage} key=${id} id=${id} />`;
     case "places": return html`<${PlacesPage} />`;
     case "place": return html`<${PlacePage} key=${id} id=${id} />`;
-    case "new": return html`<${NewEpisode} key=${id} season=${id} />`;
+    case "new": return html`<${NewEpisode} key=${route.value.join("/")} season=${id} date=${route.value[2]} />`;
     case "kit": return html`<${KitPage} />`;
     default: return html`<p>No page ${page}. <a href="#/">The board</a></p>`;
   }

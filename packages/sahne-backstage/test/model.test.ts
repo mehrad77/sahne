@@ -113,3 +113,18 @@ test("search: every word of the query in a label or its keywords, accents ignore
   assert.equal(search(items, "").length, 3);
   assert.deepEqual(search(items, "zzz"), []);
 });
+
+test("board: weeks from the launch, Monday to Saturday, a Saturday a special, a row's week its episodes'", async () => {
+  const { boardOf, rowOn, mondayOf, datesOf } = await import("../src/model/board.ts");
+  const season = { v: 1 as const, id: "s1", n: 1, title: { tr: "t" }, launch: "2026-10-28", calendar: { s1e01: { date: "2026-10-28", kind: "episode" as const, week: 1 }, s1e02: { date: "2026-11-09", kind: "episode" as const, week: 2 } } };
+  assert.equal(mondayOf("2026-10-28"), "2026-10-26");
+  const dates = datesOf(season, [{ id: "s1e01" }, { id: "s1e02" }, { id: "s1e03", releaseDate: "2026-11-14" }]);
+  assert.deepEqual(dates, { s1e01: "2026-10-28", s1e02: "2026-11-09", s1e03: "2026-11-14" });
+  const weeks = boardOf(season, dates);
+  assert.equal(weeks.length, 4, "three weeks, then one to plan into");
+  assert.deepEqual(weeks.map(w => w.week), [1, null, 2, 3], "an empty week between week 1 and week 2 is a break; the one after the last is the next");
+  assert.equal(weeks[0].days.find(d => d.date === "2026-10-28")?.episode, "s1e01");
+  assert.equal(weeks[0].days[5].kind, "special");
+  assert.deepEqual(rowOn(weeks, "2026-11-14"), { date: "2026-11-14", kind: "special", week: 2 });
+  assert.deepEqual(rowOn(weeks, "2026-11-10"), { date: "2026-11-10", kind: "episode", week: 2 });
+});

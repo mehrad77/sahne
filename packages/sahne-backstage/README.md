@@ -55,9 +55,8 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 
 | Route | What |
 |---|---|
-| `#/` | The series: its titles and summary, its narrator and stand-in, its seasons, and any episode whose season has no document yet. *Edit the series* edits them, and on a root without `series.json`, *Start the series* writes one, with a season document for each season the episodes use (their arcs, no calendar) in the same save, since the check needs both. *+ Season n* adds the next season |
-| `#/season/<id>` | A season: its episodes in order, each with its title, kind, release date, week, place, and draft or not. *Edit the season* is described below. *+ New episode* opens the wizard |
-| `#/new/<season>` | A new episode from its brief, described below |
+| `#/`, `#/season/<id>` | The board of a season (the first, or the one named), described below |
+| `#/new/<season>[/<date>]` | A new episode (on that day), described below |
 | `#/episode/<id>` | An episode, described below |
 | `#/kit` | The kit as galleries: props, set pieces, gestures, emotions, sounds |
 | `#/cast` | Everyone of the series as a portrait, the extras on their own tab. *New character* starts one with a new id: ids are permanent, and a retired one is refused |
@@ -65,6 +64,15 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 | `#/places` | Every place as its wide shot, with how many episodes it opens; *New place* starts one |
 | `#/place/<id>` | A place, described below |
 | `#/review` | Where every episode stands: status, steps reviewed, Persian checked, errors, warnings, the known-word ratio (when the root has cards), open comments; *Export the notes* downloads them as markdown |
+
+**The board** (`src/ui/board.ts`, its dates in `src/model/board.ts`):
+- A season's weeks are rows and Monday to Saturday the columns: an episode on a weekday, a special on Saturday, no Sunday. The rows run from the season's launch week (or its first episode's) to its last episode's, and one more to plan into. A row's week is the one its episodes' calendar rows (or arcs) name; an empty row between two weeks is a break.
+- **Each episode is a card on its release day:** its place's picture, its title in the main language, a special or not, a draft or not, its review status (an edge: to review, reviewed, approved) and its errors and warnings. A click opens it.
+- **Dragging a card to another day moves its release:** the season's calendar row and the story's own date and kind change together (a season with no calendar starts one from every episode's date), and to another week the episode takes that week's theme (a week with none takes the episode's). The changes wait in a save bar; a save the check refuses lists the new errors there (a story's `ref` belongs to its week's unit, for one).
+- **An empty day** starts a new episode on it (`#/new/<season>/<date>`).
+- **Each row starts with its week's theme** (its arc), edited in place in the main language; its menu edits it in every language and what the learner does that week (`mechanics`). A theme is written in the season and in every story of the week, saved together.
+- Episodes with no date wait under the board, to be dragged onto a day.
+- *Season* and *Series* open their settings in a drawer: titles and summaries in every language, the series' languages, narrator and stand-in, the season's launch day. On a root with no `series.json`, the board starts one.
 
 **The episode page:**
 - **The toolbar.** *Review* shows where the episode stands (its status, how many comments) and opens the Review tab under the stage. Then Undo, Redo, Revert and Save.
@@ -135,14 +143,6 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 - **Checks.**
   - The 5 KB budget (`MAX_BYTES`), and each of `PLACE_RULES` as ✓, ! or ✗, with `lintPlace`'s problems.
   - Saving runs the place check. The gallery's camera check (`#/places/<id>`) stays in the gallery.
-
-**Editing a season** (`src/ui/seasons.ts`).
-- Its titles, summary and launch day.
-- **Its weeks' arcs.** An arc is written in the season and in every story of its week, so editing one edits them all, and they are saved together. *+ a week* adds the next.
-- **Its calendar.**
-  - Each episode's date, kind and week. A change goes to the season's `calendar` and to the story's own `releaseDate` and `kind` together.
-  - A season without a calendar can start one from what its episodes say: their dates and kinds, and the week from their arc id.
-- *Save the season* writes the season and every episode it changed in one save, checked together.
 
 **A new episode** (`src/ui/new.ts`, `src/model/skeleton.ts`).
 - **The brief:**
