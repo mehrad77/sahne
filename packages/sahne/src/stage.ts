@@ -440,7 +440,7 @@ export class Stage {
     // `false` no overlay at all (a builder's preview, thumbnails); `"log"` the narrator's window and the sound words but no line
     // bubbles (the host shows the lines; setBubbles switches); `true` everything (theatre mode)
     this.lines = o.bubbles !== false && o.bubbles !== "log";
-    this.overlay = o.bubbles === false || !r ? null : new Overlay(el, { project: p => this.project(p), still: this.motion === "still" });
+    this.overlay = o.bubbles === false || !r ? null : new Overlay(el, { project: p => this.project(p), still: this.motion === "still", ...(this.lang.id !== "und" ? { lang: this.lang.id } : {}), ...(this.lang.dir ? { dir: this.lang.dir } : {}) });
     this.gloss = o.gloss ?? null;
     if (o.glosses && this.gloss) this.overlay?.setGloss(this.gloss);
     this.audio = new AudioEngine(this.kit, { volumes: o.volumes, sounds: o.sounds, session: o.audioSession });
