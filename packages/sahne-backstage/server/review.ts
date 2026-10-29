@@ -6,7 +6,7 @@
 
 import { existsSync } from "node:fs";
 import { REVIEW } from "../../sahne-story/paths.ts";
-import { plain, readFile, textFor, writeAtomic } from "./save.ts";
+import { plain, readFile, textFor, writeAtomic } from "../../sahne-story/json.ts";
 
 export type Status = "draft" | "reviewed" | "approved";
 export const STATUSES: Status[] = ["draft", "reviewed", "approved"];

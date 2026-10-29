@@ -145,7 +145,7 @@ The side bar links the series, review, the cast and the places, and lists the se
 - Either way, the stage returns to the cue that was showing.
 - A sign's or a phone's text is drawn into the art, so editing it needs a load. A load happens anyway, because that text is not one of the word keys.
 
-## How saving works (`server/save.ts`, `server/content.ts`)
+## How saving works (`server/content.ts`, with `sahne-story/json.ts`)
 
 **A save sends a set of documents, checked and written together.** A season's calendar and its stories' dates, for example, go in one save.
 
@@ -236,7 +236,6 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `index.ts` (`startBackstage`) and `cli.ts`;
   - `http.ts` (routes, guards, the esbuild bundle in `dist/app/` (git-ignored, rebuilt on change), the font and the sounds);
   - `content.ts` (kinds, files, checks, saves);
-  - `save.ts`;
   - `git.ts`;
   - `review.ts`;
   - `ai.ts`.

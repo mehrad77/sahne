@@ -1,4 +1,4 @@
-// Saving keeps what an edit did not touch (server/save.ts): a number's spelling (1.0), the key order, whether the file ends
+// Saving keeps what an edit did not touch (sahne-story/json.ts): a number's spelling (1.0), the key order, whether the file ends
 // in a newline, Turkish and Persian as written; an edit of one line changes only that line of the file.
 
 import { test } from "node:test";
@@ -7,7 +7,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, readdirSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { format, keepNumbers, keepOrder, parseKeep, plain, readFile, sortedKeys, textFor, writeAtomic } from "../server/save.ts";
+import { format, keepNumbers, keepOrder, parseKeep, plain, readFile, sortedKeys, textFor, writeAtomic } from "../json.ts";
 
 const TEXT = `{
   "v": 1,

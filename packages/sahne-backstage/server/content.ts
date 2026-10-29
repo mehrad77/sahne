@@ -14,7 +14,7 @@ import { loadCards, loadNeeds } from "../../sahne-story/load.ts";
 import { checkCast, checkPlaces, checkSeason, checkSeries, checkStory, RETIRED_CHARACTERS, type CheckOptions, type CheckProblem } from "../../sahne-story/check/rules.ts";
 import { calendarOf, charactersOf, loadWorld, type World } from "../../sahne-story/check/world.ts";
 import { lintPlace, seasonOf, type CharacterDoc, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
-import { plain, readFile, textFor, writeAtomic } from "./save.ts";
+import { plain, readFile, textFor, writeAtomic } from "../../sahne-story/json.ts";
 
 export type Kind = "series" | "season" | "story" | "character" | "place";
 export const KINDS: Kind[] = ["series", "season", "story", "character", "place"];
