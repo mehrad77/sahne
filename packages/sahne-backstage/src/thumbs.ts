@@ -56,6 +56,8 @@ async function pump() {
       document.body.append(host);
       stage = mountStage(host, { kit: KIT, lang: LANG, bubbles: false, motion: "full", maxDpr: 1 });
     }
+    // one picture at a time, when the page is idle: a long episode's strip never holds up typing
+    await new Promise<void>(r => ("requestIdleCallback" in window ? requestIdleCallback(() => r(), { timeout: 1500 }) : setTimeout(r, 30)));
     let url: string | null = null;
     try { url = await bake(stage, job.scene()); } catch (e) { console.warn(`backstage thumb: ${(e as Error).message}`); }
     if (url) void put(job.key, url);

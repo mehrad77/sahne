@@ -1,6 +1,6 @@
 // A season as a board (ui/board.ts), pure: its weeks as rows, Monday to Saturday as columns (an episode on a weekday, a
 // special on Saturday; no Sunday), each day with the episode released then. The rows run from the season's launch week
-// (or its first episode's) to its last episode's week, plus one more to plan into. Moving an episode to a day gives its
+// or its first episode's, whichever comes first, to its last episode's week, plus one more to plan into. Moving an episode to a day gives its
 // calendar row: the date, the kind the day takes and the week it falls in. A row's week is the one its episodes' calendar
 // rows name (a series may skip a break week, so the n-th row need not be week n), else counted from the first row.
 
@@ -31,7 +31,9 @@ export function datesOf(season: SeasonDoc, episodes: { id: string; releaseDate?:
 export function boardOf(season: SeasonDoc, dates: Record<string, string>, extra = 1, weeks: Record<string, number> = {}): Week[] {
   const named = (ids: string[]) => ids.map(id => season.calendar?.[id]?.week ?? weeks[id]).find((w): w is number => typeof w === "number");
   const all = Object.values(dates).filter(Boolean).sort();
-  const start = mondayOf(season.launch ?? all[0] ?? iso(new Date()));
+  // the launch week, or the first episode's when one comes before it (a season released before the app launched)
+  const first = [season.launch, all[0]].filter((x): x is string => !!x).sort()[0];
+  const start = mondayOf(first ?? iso(new Date()));
   const last = all.length ? mondayOf(all[all.length - 1]) : start;
   const n = Math.max(1, Math.round((toDate(last).getTime() - toDate(start).getTime()) / (7 * DAY)) + 1) + extra;
   const by = new Map<string, string>(Object.entries(dates).map(([id, d]) => [d, id]));

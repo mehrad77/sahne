@@ -127,6 +127,8 @@ test("board: weeks from the launch, Monday to Saturday, a Saturday a special, a 
   assert.equal(weeks[0].days[5].kind, "special");
   assert.deepEqual(rowOn(weeks, "2026-11-14"), { date: "2026-11-14", kind: "special", week: 2 });
   assert.deepEqual(rowOn(weeks, "2026-11-10"), { date: "2026-11-10", kind: "episode", week: 2 });
+  // episodes released before the launch: the board starts with the first of them
+  assert.equal(boardOf({ ...season, launch: "2026-12-01" }, dates)[0].monday, "2026-10-26");
 });
 
 test("a new episode: a skeleton in the series' languages, or a copy of another with its texts cleared", async () => {
