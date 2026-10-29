@@ -181,24 +181,13 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 
 **Thumbnails.** A thumbnail goes stale only when the opening picture changes: the opening scene, place, props, cast or looks (`sahne-gallery/thumbs.mjs`). A fix to a line's words leaves it as it was. `GET /api/thumbs` lists the stale ones, with the command that shoots them.
 
-## AI help (`server/ai.ts`, `src/ui/ai.ts`)
+## The assistant in the editor (`src/ui/assistant.ts`, `src/ui/settings.ts`)
 
-AI help is optional, and is on only when the server's environment has `ANTHROPIC_API_KEY`. The key never goes in the repo. Without it, every AI button is hidden.
-
-The server calls the Messages API with plain `fetch`. Each ask answers JSON to a schema (`output_config.format`; these models take no forced tool call). It sends `fallbacks: "default"` (beta `server-side-fallback-2026-07-01`), so a declined request is re-run on another model. A refusal that stands is shown as an error.
-
-The three asks:
-- **Rewrite** (`claude-sonnet-5-5`): rewrites the selected line, option or reply with an instruction ("simpler", "warmer"). It comes back as a word diff to accept or discard.
-- **Second reader** (`claude-opus-5-5`, a tab beside *Review*): reviews the whole episode against its brief, as a reader who did not write it.
-  - Each finding links to its step.
-  - For a line, a finding can carry a fix to accept.
-- **Draft** (`claude-opus-5-5`, on a `draft: true` episode): writes its steps and quiz from the brief and the skeleton, to accept as a whole.
-
-What leaves the machine:
-- The story document (its texts and staging, with card ids, never a card's text).
-- The cast's names and roles.
-
-Every answer is a suggestion. Accepting it is an edit like any other: Undo reverts it, and the story check judges it before it can be saved. The model ids live in one place (`MODELS`).
+- **A drawer beside any page** (✦ in the top bar, or *Open the assistant* in the palette): a conversation whose context is what is open (the page, the episode, the selected block, from `POST /api/selection`). Its answer streams in, with each tool it uses and what came of it. Its edits arrive as proposals above the script (or are written, in direct mode), never as hidden changes. *New conversation* starts again.
+- **Asks where you work** (*Ask* in the episode's toolbar): fill the missing translations, simplify this line, suggest staging for this line, propose choice options, check this scene, draft this episode from its brief, and *Second reader*, which reviews in a fresh conversation that never saw the drafting.
+- **A big ask waits for a yes:** the server says what it would cost (`confirm`), and *Go ahead* sends it again.
+- **The meter** in the top bar is today's spending against the day's cap (its title: the month's, and the tokens); it follows the `usage` events.
+- **Settings** (`#/settings`): Claude (its key from the environment) or a local model by its base URL (LM Studio, Ollama), the model, the caps per day and month in dollars and in tokens, the cost above which an ask waits for a yes, how agents' edits land, and whether the rules' staging suggestions are taken as you leave each line. They are kept in the person's config folder, never in the content root.
 
 ## Review notes (`server/review.ts`)
 
@@ -299,6 +288,57 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 | `POST /api/events` `{ event: "show" \| "doc", data }` | Another process tells the open editors what it did. A `doc` event also makes this server read the root again |
 | `/mcp` | The MCP server (Streamable HTTP) |
 
+## The assistant, providers and the budget (`server/assistant.ts`, `server/ai/`, `server/settings.ts`)
+
+**The assistant** is an agent loop on the server. It reaches backstage only as an MCP client of its own MCP server (`createMcp`, over an in-memory transport), so it uses the same tools and checks as any agent.
+- Its edits are made `by: "assistant"` and follow the agent-edits mode. That is the settings' `agentEdits`, else the server's `--agent-edits`, so proposals by default.
+- Its system prompt is built from the series: the title, the main language and the translations (and which run right to left), the narrator and the stand-in, a summary of the format, and how edits are made. Nothing in it belongs to one language.
+- **The second reader** is `fresh: true`: a new conversation of the person's last message alone. It never sees the drafting history, and it is told to comment rather than change.
+- **A big ask** (drafting or reviewing a whole season, or every episode) is estimated first. If it would cost more than `confirmOverUsd`, or use more tokens than are left today, nothing runs: the answer is a `confirm` event, and the editor sends the request again with `confirm: true`.
+- When the browser closes the request, the model's request is aborted, so a closed tab stops spending.
+
+**The providers** (`server/ai/provider.ts`). Both use plain `fetch`, streamed, with tools.
+- **Anthropic** (`ai/providers/anthropic.ts`). The Messages API with the key from `ANTHROPIC_API_KEY`, `anthropic-version: 2023-06-01` and adaptive thinking.
+  - The models live in one place (`MODELS`): `claude-opus-5-5` for an ordinary ask, and `claude-sonnet-5-5` for a quick one (`quick: true`). The settings' `model` replaces the first.
+  - A tool loop sends each turn back as it came, thinking blocks and their signatures included.
+  - A refusal, an API error or an answer cut off is an `error` event, and no tool of that turn runs.
+- **OpenAI-compatible** (`ai/providers/openai.ts`). Any `/v1/chat/completions` server with `tools` and `tool_calls`: LM Studio (`http://localhost:1234/v1`, the default), Ollama (`http://localhost:11434/v1`), or llama.cpp's server (`http://localhost:8080/v1`).
+  - `OPENAI_API_KEY` is sent as a bearer token when the environment has one.
+  - Without a `model`, the request names none, and the server uses the model it has loaded. Ollama needs one.
+  - A server that reports no usage is counted at about four characters a token, so the token caps still bind.
+
+**Settings** (`server/settings.ts`).
+- They live in the person's config folder: `$SAHNE_BACKSTAGE_CONFIG`, or `~/.config/sahne-backstage/`. The file is `settings.json`:
+
+```json
+{ "provider": "anthropic", "model": "claude-opus-5-5", "baseUrl": "http://localhost:1234/v1",
+  "caps": { "dayUsd": 5, "monthUsd": 50, "dayTokens": 2000000, "monthTokens": 20000000 },
+  "confirmOverUsd": 0.5, "agentEdits": "proposals", "applySuggestions": false }
+```
+
+- The values above for `provider`, `caps` and `confirmOverUsd` are the defaults. Choosing `openai` without a `baseUrl` saves LM Studio's.
+- **The environment overrides the file**: `SAHNE_AI_PROVIDER`, `SAHNE_AI_BASE_URL`, `SAHNE_AI_MODEL`. The CLI's `--ai-provider`, `--ai-base-url` and `--ai-model` set them.
+- **Keys are never stored.** They are read from the environment only. A save keeps only the known fields, so a key sent with it is dropped.
+- `applySuggestions` is the editor's own preference. The server keeps it and does nothing with it.
+
+**The budget** (`server/ai/budget.ts`).
+- **The prices** are in one table (`PRICES`, USD per million tokens, from the Claude API's model docs): Opus 5.5 is $4 in and $20 out, Sonnet 5.5 is $2 in and $10 out, and cache reads are $0.20. A local model costs nothing.
+- **The caps** are per day and per month (local time), in USD and in tokens. The token caps bind local models too. They are checked before every model request of a tool loop, and a request at a cap is refused with a message that says which cap.
+- **Every call is logged** to `<config>/usage.jsonl`, one JSON line each: `{ at, provider, model, input, output, cacheRead, cacheWrite, tokens, usd }`. After each call the editors get a `usage` event.
+- **Why the config folder.** The log and the settings are in the person's config folder, not in the content root's sidecar (`.backstage/`). An app such as Kumru commits its sidecar, and what one person spends is theirs.
+
+**What leaves the machine** is what the tools return: the story documents (texts and staging, with card ids), the cast's names and roles, the places' marks and the kit's names. With `--share-cards`, it also includes a card's main-language word. A card's translations and notes never leave.
+
+**The routes:**
+
+| Request | Answer |
+|---|---|
+| `POST /api/assistant` `{ messages: [{ role, content }], context?: { page, kind?, id?, path? }, fresh?, confirm?, quick? }` | `text/event-stream`. Each event's `data` is JSON with its `type`: `text { text }`, `tool { name, input }`, `tool_result { name, ok, summary }`, `proposal { id }`, `confirm { estimateUsd, why }`, `done { usage: { input, output, usd } }`, `error { message }`. 400 for a malformed request |
+| `GET /api/settings`, `POST /api/settings` `{ … }` | `{ settings, file, overrides, keys: { anthropic, openai }, ai }`. `keys` says whether each key is set, never the key. A POST merges over the file |
+| `GET /api/usage` | `{ today: { usd, tokens }, month: { usd, tokens }, caps }` |
+| `GET /api/world` | Also `ai`: `false` when the assistant cannot run, else `{ ready: true, provider, model }`. It is ready with Anthropic when `ANTHROPIC_API_KEY` is set, and with OpenAI-compatible when a base URL is set. The network is never probed for it |
+
+
 ## The API (`server/http.ts`)
 
 Every request must come from this machine: `Host` and `Origin` must be localhost, and a write must be `application/json`.
@@ -313,7 +353,6 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
 | `GET /api/thumbs` | `{ stale, command }` |
 | `GET /api/cards?q=` | `{ cards: [{ id, tr, en, level? }] }`: up to 40 word cards matching the search, read live (the word picker) |
 | `GET /api/lessons` | `{ lessons: [{ id, ref? }] }`: the grammar lessons, when the root has them |
-| `POST /api/ai/rewrite` `{ story, path, instruction?, cast }`, `/api/ai/review` `{ story, brief?, cast }`, `/api/ai/draft` `{ story, brief, cast }` | `{ suggestion }`, `{ summary, findings }`, `{ steps, quiz, notes }`; 503 without a key, 422 when Claude declines |
 | `GET /api/problems` | `{ problems }`: every problem of the content root, as `stories.ts --check` finds them (the review page) |
 | `GET /api/review`, `POST /api/review` `{ id, review }` | The review notes; a POST replaces one episode's (cleaned: unknown keys dropped) and answers all of them |
 | `POST /api/reload` | The server forgets the world it has read (after a change made elsewhere) |
@@ -326,18 +365,19 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `content.ts` (kinds, files, checks, saves);
   - `git.ts`;
   - `review.ts`;
-  - `ai.ts`;
-  - `mcp.ts` (the MCP server: its tools and resources), `proposals.ts` (agents' edits waiting for a person) and `events.ts` (the editors' event stream and selection).
+  - `mcp.ts` (the MCP server: its tools and resources), `proposals.ts` (agents' edits waiting for a person) and `events.ts` (the editors' event stream and selection);
+  - `assistant.ts` (the assistant's loop and its system prompt), `settings.ts` (the person's AI settings), and `ai/`: `provider.ts` (what a provider does, and the stream reader), `providers/anthropic.ts`, `providers/openai.ts` and `budget.ts` (the prices, the caps and the usage log).
 - The server reads sahne-story's Node-only files (`paths.ts`, `check/`, `load.ts`) by path. The package exports only `"."`.
 - **`src/`** is the browser side (the studio's shared parts in `src/ui/kit/`: icons, chips, drawers, popovers, the palette; the theme in `src/ui/theme.ts`), built with Preact and htm tagged templates (no JSX, so the source stays erasable TypeScript). It contains:
   - `index.ts`;
   - `store.ts` (signals: the world, the route, each open document's draft, the server's problems);
   - `api.ts`;
   - `stage.ts` (`Preview`: the stage and a story player that follow the document);
+  - `events.ts` (the server's events: proposals, direct writes, `show`, usage; the selection);
   - `thumbs.ts` (pictures the stage draws once and keeps);
   - `model/` (paths into a document, undo and redo, the step list, what changed, the board's weeks, the script's blocks and keys, parentheticals, ghosts and suggestions, notes, a new episode's skeleton, the palette's search; pure and tested in Node);
-  - `ui/` (the pages: `app` (the shell), `board`, `new`, `studio/` (the episode: `episode`, `script`, `sections`, `details`, `direct`, `strip`, `notes`), `cast`, `places`, `kitpage`, `review`, `seasons` (settings); and their parts: `galleries`, `lang`, `staging`, `changes`, `ai`, `fields`, `theme`, `kit/`).
+  - `ui/` (the pages: `app` (the shell), `board`, `new`, `studio/` (the episode: `episode`, `script`, `sections`, `details`, `direct`, `strip`, `notes`), `cast`, `places`, `kitpage`, `review`, `seasons` (settings), `settings` (the assistant and the budget); and their parts: `assistant`, `galleries`, `lang`, `staging`, `changes`, `fields`, `theme`, `kit/`).
 - **`index.html`** is the page.
-- **`test/`**: `node --test` covers the save round trip, the model, the server on a temp copy of the samples, and AI help with the network stubbed. `mcp.test.ts` covers the MCP server in memory, over HTTP and over stdio. `pnpm check` runs it.
+- **`test/`**: `node --test` covers the save round trip, the model, the server on a temp copy of the samples, and the rest of the API. `mcp.test.ts` covers the MCP server in memory, over HTTP and over stdio. `assistant.test.ts` covers the assistant's loops, the budget and the settings with the network stubbed, in a temp config folder. `pnpm check` runs it.
 
 The package exports `"."` → `src/index.ts`, like every package, and also `"./server"` → `server/index.ts`. The server is the one Node-only entry. Backstage never ships to learners, so it has no `size.mjs` budget and no `determinism.mjs` entry.

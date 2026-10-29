@@ -17,7 +17,9 @@ import { CONTENT, IS_SAMPLES } from "../../sahne-story/paths.ts";
 import { allProblems, check, exists, forget, isKind, lessons, listing, oldShape, readDoc, save, searchCards, type Edit } from "./content.ts";
 import { headOf } from "./git.ts";
 import { readReview, writeReview } from "./review.ts";
-import { ai, aiReady } from "./ai.ts";
+import { requestOf, runAssistant, usageSummary } from "./assistant.ts";
+import { MODELS } from "./ai/providers/anthropic.ts";
+import { overrides, readiness, readSettings, settingsFile, writeSettings } from "./settings.ts";
 import { Events, selectionOf } from "./events.ts";
 import { createMcp, type AgentEdits } from "./mcp.ts";
 import { proposalsOf, type NewProposal, type ProposalEdit } from "./proposals.ts";
@@ -67,6 +69,13 @@ export async function serve(o: Options): Promise<Running> {
   const agentEdits: AgentEdits = o.agentEdits ?? "proposals", shareCards = o.shareCards === true;
   const events = new Events(), proposals = proposalsOf(events);
   const writable = () => o.write && !oldShape().length;
+  /** The assistant, as `GET /api/world` gives it: false when it cannot run, so a plain truthiness check still works. */
+  const aiOf = () => {
+    const r = readiness();
+    return r.ready ? { ready: true, provider: r.provider, model: r.model ?? (r.provider === "anthropic" ? MODELS.full : "local") } : false;
+  };
+  /** The settings for the editor: what is in effect, where the file is, what the environment overrides, and whether keys are set (never the keys). */
+  const settingsView = () => ({ settings: readSettings(), file: settingsFile(), overrides: overrides(), keys: { anthropic: !!process.env.ANTHROPIC_API_KEY, openai: !!process.env.OPENAI_API_KEY }, ai: readiness() });
 
   // ---- MCP over Streamable HTTP: a session per client, made by its initialize request ----
   const sessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();
@@ -109,7 +118,7 @@ export async function serve(o: Options): Promise<Running> {
   async function api(req: http.IncomingMessage, res: http.ServerResponse, path: string[]) {
     const [route, a, b] = path;
     const m = req.method ?? "GET";
-    if (route === "world" && m === "GET") return json(res, 200, { ...listing(), samples: IS_SAMPLES, writable: writable(), oldShape: oldShape().length, ai: aiReady(), agentEdits, shareCards });
+    if (route === "world" && m === "GET") return json(res, 200, { ...listing(), samples: IS_SAMPLES, writable: writable(), oldShape: oldShape().length, ai: aiOf(), agentEdits, shareCards });
     if (route === "events" && m === "GET") return events.stream(req, res);
     if (route === "events" && m === "POST") {
       // another backstage process on this root (cli.ts mcp --backstage) tells the editors what it did
@@ -163,7 +172,20 @@ export async function serve(o: Options): Promise<Running> {
       if (!o.write) throw new Fail(403, "read-only: start backstage with --write");
       return json(res, 200, writeReview(await body(req)));
     }
-    if (route === "ai" && m === "POST" && a) return json(res, 200, await ai(a, await body(req)));
+    if (route === "assistant" && m === "POST") {
+      const ask = requestOf(await body(req));
+      if (typeof ask === "string") throw new Fail(400, ask);
+      res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", connection: "keep-alive", "x-accel-buffering": "no" });
+      // a closed tab stops the spending: the provider's request is aborted
+      const stop = new AbortController();
+      res.on("close", () => { if (!res.writableEnded) stop.abort(); });
+      await runAssistant(ask, e => { if (!res.writableEnded) res.write(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`); }, { write: o.write, agentEdits, shareCards, events, signal: stop.signal });
+      res.end();
+      return;
+    }
+    if (route === "settings" && m === "GET") return json(res, 200, settingsView());
+    if (route === "settings" && m === "POST") { writeSettings(await body(req)); return json(res, 200, settingsView()); }
+    if (route === "usage" && m === "GET") return json(res, 200, usageSummary(readSettings().caps));
     if (route === "thumbs" && m === "GET") return json(res, 200, { stale: await staleThumbs(), command: "node packages/sahne-gallery/thumbs.mjs (in the Sahne repo, with SAHNE_CONTENT set)" });
     throw new Fail(404, `no route ${m} /api/${path.join("/")}`);
   }

@@ -75,9 +75,12 @@ export async function reject(p: Proposal) {
   await refresh();
 }
 
-/** The editor's selection, for the agents (`sahne://selection`), sent a moment after it settles. */
+/** What the editor has selected: the assistant's context, and the agents' (`sahne://selection`). */
+export const selection = signal<{ page: string; kind?: Kind; id?: string; path?: Path | null } | null>(null);
 let selTimer = 0;
+/** The editor's selection, kept and sent to the server a moment after it settles. */
 export function postSelection(sel: { page: string; kind?: Kind; id?: string; path?: Path | null }) {
+  selection.value = sel;
   clearTimeout(selTimer);
   selTimer = setTimeout(() => void api.post("selection", { ...sel, path: sel.path ?? undefined }), 400) as unknown as number;
 }

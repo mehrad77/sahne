@@ -7,6 +7,7 @@
 //   #/places, #/place/<id>   the places, a place's marks, props and set pieces
 //   #/new/<season>[/<date>] a new episode (on that day)
 //   #/kit                   the kit: props, set pieces, gestures, emotions, sounds
+//   #/settings              the assistant's model, the budget, how agents' edits land
 
 import { html } from "htm/preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
@@ -17,6 +18,8 @@ import type { Command } from "../model/search.ts";
 import { Icon, MOD } from "./kit/index.ts";
 import { Palette } from "./kit/palette.ts";
 import { proposals } from "../events.ts";
+import { assistantOpen, AssistantDrawer, Meter } from "./assistant.ts";
+import { SettingsPage } from "./settings.ts";
 import { cycleTheme, theme } from "./theme.ts";
 import { tx } from "./fields.ts";
 import { BoardPage } from "./board.ts";
@@ -28,7 +31,7 @@ import { NewEpisode } from "./new.ts";
 import { KitPage } from "./kitpage.ts";
 
 /** The places to work, in the rail. */
-const RAIL: [string, string, string][] = [["", "board", "Board"], ["cast", "cast", "Cast"], ["places", "places", "Places"], ["kit", "hand", "Kit"], ["review", "review", "Review"]];
+const RAIL: [string, string, string][] = [["", "board", "Board"], ["cast", "cast", "Cast"], ["places", "places", "Places"], ["kit", "hand", "Kit"], ["review", "review", "Review"], ["settings", "settings", "Settings"]];
 
 export function App() {
   const w = world.value, r = route.value;
@@ -45,7 +48,7 @@ export function App() {
   // the season on screen: its page, an episode of it, or a new episode in it
   const current = page === "season" || page === "new" ? id : page === "episode" && id ? `s${seasonOf(id)}` : undefined;
   const dirty = dirtyKeys.value.length;
-  const area = page === "character" ? "cast" : page === "place" ? "places" : page === "review" ? "review" : page === "cast" || page === "places" || page === "kit" ? page : "";
+  const area = page === "character" ? "cast" : page === "place" ? "places" : page === "review" ? "review" : page === "cast" || page === "places" || page === "kit" || page === "settings" ? page : "";
   return html`<div class="studio">
     <header class="topbar">
       <a class="brand" href="#/" style="text-decoration:none;color:inherit"><${Icon} name="stage" size=${22} /> Backstage</a>
@@ -55,6 +58,8 @@ export function App() {
       <span class=${`state${dirty ? " dirty" : ""}${w.writable ? "" : " ro"}`} title=${dirty ? dirtyKeys.value.map(k => k.replace(":", " ")).join(", ") : ""}>
         ${!w.writable ? (w.oldShape ? "Read-only: convert the root" : w.samples ? "Samples · read-only" : "Read-only") : dirty ? `${dirty} unsaved` : "All saved"}</span>
       ${proposals.value.length > 0 && html`<a class="chip warn" href=${`#/episode/${proposals.value[0].doc}`} title=${proposals.value.map(x => `${x.doc}: ${x.summary}`).join("\n")}>${proposals.value.length} proposed edit${proposals.value.length > 1 ? "s" : ""}</a>`}
+      <${Meter} />
+      <button class="iconbtn" aria-pressed=${assistantOpen.value} onClick=${() => { assistantOpen.value = !assistantOpen.value; }} title="The assistant" aria-label="The assistant"><${Icon} name="spark" /></button>
       <button class="iconbtn" onClick=${cycleTheme} title=${`Theme: ${theme.value}`} aria-label=${`Theme: ${theme.value}`}><${Icon} name=${theme.value === "dark" ? "moon" : theme.value === "light" ? "sun" : "auto"} /></button>
     </header>
     <nav class="rail" aria-label="Areas">
@@ -62,6 +67,7 @@ export function App() {
     </nav>
     <div class="page">${w.oldShape ? html`<div class="banner">This content root is in the old language shape (${w.oldShape} files), so nothing is saved until it is converted: <code>node packages/sahne-story/convert/languages.ts</code> with <code>SAHNE_CONTENT</code> set to it.</div>` : ""}
       <main>${pageFor(page, id)}</main></div>
+    <${AssistantDrawer} />
     ${palette && html`<${Palette} commands=${commands} onClose=${() => setPalette(false)} />`}
     ${notice.value && html`<div class=${`notice${notice.value.bad ? " bad" : ""}`} role="status">${notice.value.text}</div>`}
   </div>`;
@@ -83,6 +89,8 @@ function commandsOf(): Command[] {
     { id: "go-places", what: "Go", label: "The places", run: () => go("places") },
     { id: "go-kit", what: "Go", label: "The kit: props, gestures, emotions, sounds", run: () => go("kit") },
     { id: "theme", what: "Do", label: "Switch the theme (system, light, dark)", run: cycleTheme },
+    { id: "assistant", what: "Do", label: "Open the assistant", run: () => { assistantOpen.value = true; } },
+    { id: "settings", what: "Go", label: "Settings: the assistant, the budget", run: () => go("settings") },
   ];
 }
 
@@ -97,6 +105,7 @@ function pageFor(page: string | undefined, id: string | undefined) {
     case "place": return html`<${PlacePage} key=${id} id=${id} />`;
     case "new": return html`<${NewEpisode} key=${route.value.join("/")} season=${id} date=${route.value[2]} />`;
     case "kit": return html`<${KitPage} />`;
+    case "settings": return html`<${SettingsPage} />`;
     default: return html`<p>No page ${page}. <a href="#/">The board</a></p>`;
   }
 }

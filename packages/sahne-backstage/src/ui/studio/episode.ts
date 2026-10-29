@@ -17,7 +17,9 @@ import { KIT, Preview, solidsOf } from "../../stage.ts";
 import { ReviewGutter, ReviewPanel } from "../review.ts";
 import { NotesPanel } from "./notes.ts";
 import { ChangesPanel } from "../changes.ts";
-import { AiDraft, AiReview } from "../ai.ts";
+import { AskMenu, assistantOpen } from "../assistant.ts";
+import { settingsNow } from "../settings.ts";
+import { Popover } from "../kit/index.ts";
 import { Drawer, Icon, MOD } from "../kit/index.ts";
 import { inLang, useLangs } from "../lang.ts";
 import type { Problem } from "../../api.ts";
@@ -54,7 +56,8 @@ function Studio(p: { id: string }) {
   const redraw = () => tick(n => n + 1);
   const [path, setPath] = useState<Path | null>(null), [focusTick, setFocusTick] = useState(0);
   const [flags, setFlags] = useState<string[]>([]);
-  const [tab, setTab] = useState<"problems" | "review" | "changes" | "ai">("problems");
+  const [tab, setTab] = useState<"problems" | "review" | "changes">("problems");
+  const [asks, setAsks] = useState<{ x: number; y: number } | null>(null);
   const [here, setHere] = useState(false);
   const [details, setDetails] = useState(false);
   const cast = useMemo(() => [...new Set([w.series?.narrator ?? "kerim", w.series?.standin ?? "nima", ...(story.cast ?? []), ...(story.extras ?? [])])], [story.cast, story.extras]);
@@ -98,6 +101,12 @@ function Studio(p: { id: string }) {
     } catch (e) { return { lints: [{ rule: "lint", level: "error", story: p.id, message: String(e), doc: key } as Problem], suggestions: {} }; }
   }, [story]);
   const nSuggest = Object.values(suggestions).reduce((n, x) => n + x.length, 0);
+  /** One block's suggestions, taken. */
+  const takeAt = (at: Path) => {
+    const ss = suggestions[at.join("/")];
+    if (!ss?.length) return;
+    edit(s => { const base = "beat" in ((get(s, at) ?? {}) as object) ? [...at, "beat"] : at; return set(s, base, ss.reduce((st, sg) => taken(st, sg.fix), (get(s, base) ?? {}) as Record<string, unknown>)); }, "take-auto");
+  };
   /** Every suggestion of the episode, taken (one edit). */
   const takeAll = () => edit(s => Object.entries(suggestions).reduce((x, [k, ss]) => {
     const path = k.split("/").map(v => (/^\d+$/.test(v) ? Number(v) : v));
@@ -111,6 +120,8 @@ function Studio(p: { id: string }) {
 
   /** Select a block (and put the cursor in it with `focus`): the stage plays that moment. */
   function select(next: Path | null, focus = false) {
+    // leaving a line: its staging suggestions taken, when the settings say so
+    if (path && settingsNow()?.applySuggestions && (!next || next.join("/") !== path.join("/"))) takeAt(path);
     setPath(next);
     postSelection({ page: "episode", kind: "story", id: p.id, path: next });
     if (focus) setFocusTick(n => n + 1);
@@ -150,6 +161,7 @@ function Studio(p: { id: string }) {
       <button class="iconbtn" onClick=${() => history("story", p.id, "redo")} disabled=${!d.future.length} title=${`Redo (⇧${MOD} Z)`} aria-label="Redo"><${Icon} name="redo" /></button>
       <button onClick=${() => history("story", p.id, "revert")} disabled=${!dirty(d)}>Revert</button>
       ${nSuggest > 0 && html`<button onClick=${takeAll} title="Take every staging the rules suggest (the dashed chips); undo takes them back">Take ${nSuggest} suggestion${nSuggest > 1 ? "s" : ""}</button>`}
+      ${w.ai && html`<button onClick=${(e: MouseEvent) => setAsks({ x: e.clientX, y: e.clientY + 12 })} title="Ask the assistant about this episode or the selected block"><${Icon} name="spark" size=${16} /> Ask</button>`}
       <button aria-pressed=${details} onClick=${() => setDetails(!details)} title="All the staging of the selected block">Details</button>
       <button class="primary" onClick=${save} disabled=${!dirty(d) || !w.writable} title=${w.writable ? `Save (${MOD} S)` : "read-only"}><${Icon} name="save" size=${16} /> Save</button>
     </div>
@@ -173,15 +185,15 @@ function Studio(p: { id: string }) {
           setFlags(next); pv!.setFlags(next, Math.max(0, player!.next - 1)); redraw();
         }}>${f}</button>`)}</div>`}
         <div class="tabs" role="tablist">
-          ${(["problems", "review", "changes", ...(w.ai ? ["ai"] as const : [])] as const).map(t => html`<button role="tab" aria-selected=${tab === t} onClick=${() => setTab(t)}>${t === "problems" ? `Notes${errors ? ` (${errors})` : ""}` : t === "review" ? "Review" : t === "ai" ? "Second reader" : "Changes"}</button>`)}
+          ${(["problems", "review", "changes"] as const).map(t => html`<button role="tab" aria-selected=${tab === t} onClick=${() => setTab(t)}>${t === "problems" ? `Notes${errors ? ` (${errors})` : ""}` : t === "review" ? "Review" : "Changes"}</button>`)}
         </div>
         ${tab === "problems" && html`<label class="row note"><input type="checkbox" style="width:auto" checked=${here} onChange=${(e: Event) => setHere((e.target as HTMLInputElement).checked)} /> only the selected block</label>
           <${NotesPanel} problems=${problems} path=${path} select=${select} edit=${edit} onlyHere=${here} />`}
         ${tab === "review" && html`<${ReviewPanel} id=${p.id} story=${story} path=${path} />`}
-        ${tab === "ai" && html`<${AiDraft} story=${story} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} /><${AiReview} story=${story} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} select=${(x: Path) => select(x, true)} />`}
         ${tab === "changes" && html`<${ChangesPanel} id=${p.id} story=${story} savedAt=${d.mtime} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} select=${(x: Path) => select(x, true)} />`}
       </div>
     </div>
+    ${asks && html`<${Popover} x=${asks.x} y=${asks.y} onClose=${() => setAsks(null)} label="Ask the assistant"><${AskMenu} onDone=${() => { setAsks(null); assistantOpen.value = true; }} /></${Popover}>`}
     ${details && html`<${Drawer} title="Details" onClose=${() => setDetails(false)}><${Details} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} /></${Drawer}>`}
   </section>`;
 }
