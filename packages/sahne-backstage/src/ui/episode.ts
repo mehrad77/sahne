@@ -7,7 +7,7 @@ import { html } from "htm/preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { lintStory, seasonOf, suggest, type StoryDoc } from "sahne-story";
 import type { Run } from "sahne";
-import { checkDocs, checked, change, draftOf, history, keyOf, openDoc, saveDocs, world } from "../store.ts";
+import { checkDocs, checked, change, draftOf, history, keyOf, openDoc, review, saveDocs, world } from "../store.ts";
 import { cueOf, cuePath, equal, get, same, within, type Path } from "../model/path.ts";
 import { flagsIn, rows, wordsOnly } from "../model/steps.ts";
 import { dirty } from "../model/history.ts";
@@ -44,6 +44,10 @@ function Editor(p: { id: string }) {
   const [path, setPath] = useState<Path | null>(null);
   const [flags, setFlags] = useState<string[]>([]);
   const [tab, setTab] = useState<"edit" | "review" | "changes" | "ai">("edit");
+  const tabs = useRef<HTMLDivElement>(null);
+  /** A tab opened from the toolbar, scrolled into view (the tabs sit under the stage). */
+  const openTab = (t: typeof tab) => { setTab(t); requestAnimationFrame(() => tabs.current?.scrollIntoView({ behavior: "smooth", block: "start" })); };
+  const status = review.value[p.id]?.status ?? "draft", comments = review.value[p.id]?.comments?.length ?? 0;
   const cast = useMemo(() => [...new Set([w.series?.narrator ?? "kerim", w.series?.standin ?? "nima", ...(story.cast ?? []), ...(story.extras ?? [])])], [story.cast, story.extras]);
 
   // the stage, once
@@ -112,6 +116,7 @@ function Editor(p: { id: string }) {
     <div class="toolbar row">
       <div class="grow"><h2 style="margin:0">${p.id} · <span lang="tr">${story.title}</span></h2>
         <span class="note">${story.titleEn ?? ""}${story.kind ? ` · ${story.kind}` : ""}${story.releaseDate ? ` · ${story.releaseDate}` : ""}${story.draft ? " · draft" : ""}</span></div>
+      <button onClick=${() => openTab("review")} title="Its status, each step reviewed, comments">Review · ${status === "draft" ? "AI draft" : status}${comments ? ` · ${comments} comment${comments > 1 ? "s" : ""}` : ""}</button>
       <button onClick=${() => history("story", p.id, "undo")} disabled=${!d.past.length} title="Undo">↶ Undo</button>
       <button onClick=${() => history("story", p.id, "redo")} disabled=${!d.future.length} title="Redo">↷ Redo</button>
       <button onClick=${() => history("story", p.id, "revert")} disabled=${!dirty(d)}>Revert</button>
@@ -128,7 +133,7 @@ function Editor(p: { id: string }) {
             setFlags(next); pv!.setFlags(next, Math.max(0, player!.next - 1)); redraw();
           }} />`)}</div></div>`}
         <${AiDraft} story=${story} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} />
-        <div class="row" role="tablist" style="margin-top:10px">
+        <div class="row" role="tablist" ref=${tabs} style="margin-top:10px;scroll-margin-top:70px">
           ${(["edit", "review", "changes", ...(w.ai ? ["ai"] as const : [])] as const).map(t => html`<button role="tab" aria-selected=${tab === t} class=${tab === t ? "primary" : ""} onClick=${() => setTab(t)}>${t === "edit" ? "Edit" : t === "review" ? "Review" : t === "ai" ? "Second reader (AI)" : "Changes since the last commit"}</button>`)}
         </div>
         <div class="panel" style="margin-top:6px">

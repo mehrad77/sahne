@@ -33,6 +33,8 @@ console.log(b.url);
 
 ## The pages
 
+The side bar links the series, review, the cast and the places, and lists the seasons. A season opens in place to its episodes (open by itself while the season or one of its episodes is on screen; its caret opens and closes it), with a link to a new episode.
+
 | Route | What |
 |---|---|
 | `#/` | The series: its titles and summary, its narrator and stand-in, its seasons, and any episode whose season has no document yet. *Edit the series* edits them, and on a root without `series.json`, *Start the series* writes one, with a season document for each season the episodes use (their arcs, no calendar) in the same save, since the check needs both. *+ Season n* adds the next season |
@@ -46,6 +48,7 @@ console.log(b.url);
 | `#/review` | Where every episode stands: status, steps reviewed, Persian checked, errors, warnings, the known-word ratio (when the root has cards), open comments; *Export the notes* downloads them as markdown |
 
 **The episode page:**
+- **The toolbar.** *Review* shows where the episode stands (its status, how many comments) and opens the Review tab under the stage. Then Undo, Redo, Revert and Save.
 - **The stage.** The whole kit, Kerim, the animals, the sounds, and Kerim's round window for the narrator.
 - **Transport.**
   - The opening scene, the cue before, and *Devam*.
@@ -57,7 +60,7 @@ console.log(b.url);
   - For a line, a choice option or a reply: who speaks, the words in Turkish, English and Persian (Persian edits right to left), Kerim's narration, and a note for the learner.
   - For a spot: its lesson, example and words.
   - For a choice: its id, kind and whom it is said to.
-  - With nothing selected: the episode's titles, summary, quiz and glosses.
+  - With nothing selected: the episode's titles, summary, cast, quiz and glosses. The cast picker sets the story's `cast` (the roster, 2 to 6, the stand-in among them) and `extras` (the silent people), and shows how many lines each one speaks; the story check refuses a speaker who is not in the cast.
 - **Staging** (`src/ui/staging.ts`), under the words of a line, an option, a reply or a beat.
   - The fields come in the order the stories use them most: feeling (`emo`), gesture (`do`), said to (`to`), looking or pointing at (`at`), then camera, voice, tempo and count.
   - Then the props (`obj`), moves (`move`), others' reactions (`react`), words that point at things (`link`) and sounds (`sfx`).

@@ -9,6 +9,7 @@ import { kindOf } from "../model/steps.ts";
 import { Check, Select, Text, Tri } from "./fields.ts";
 import { Json, SceneFields, Staging, StepTools } from "./staging.ts";
 import { AiRewrite } from "./ai.ts";
+import { world } from "../store.ts";
 
 export interface InspectorProps {
   story: StoryDoc;
@@ -102,6 +103,7 @@ function EpisodeFields(p: InspectorProps) {
     <${Tri} label="Title" keys=${["title", "titleEn", "titleFa"]} doc=${p.story as Record<string, unknown>} saved=${p.saved as Record<string, unknown>} onInput=${(k: string, x: string | undefined) => top(k).put(x ?? "")} />
     <${Text} label="Summary · English" multi value=${top("summary").value} onInput=${(x: string | undefined) => top("summary").put(x ?? "")} />
     <${Text} label="Summary · Persian" lang="fa" multi value=${top("summaryFa").value} onInput=${(x: string | undefined) => top("summaryFa").put(x ?? "")} />
+    <${CastPicker} ...${p} />
     <h3>Quiz</h3>
     ${quiz.map((q, i) => html`<div class="panel fields">
       <${Text} label=${`Question ${i + 1} · Turkish`} lang="tr" value=${q.q} onInput=${(x: string | undefined) => p.edit(s => set(s, ["quiz", i, "q"], x ?? ""), `quiz.${i}.q`)} />
@@ -121,6 +123,27 @@ function EpisodeFields(p: InspectorProps) {
     </tbody></table>
     <${AddGloss} onAdd=${(w: string) => p.edit(s => set(s, ["gl", w.toLocaleLowerCase("tr")], ["", ""]))} />
   </div>`;
+}
+
+/** Who is in the episode: its `cast` (the roster, 2 to 6, the stand-in among them) and its `extras` (the silent people). */
+function CastPicker(p: InspectorProps) {
+  const w = world.value!;
+  const narrator = w.series?.narrator ?? "kerim";
+  const cast = p.story.cast ?? [], extras = p.story.extras ?? [];
+  const lines = new Map<string, number>();
+  JSON.stringify(p.story.steps, (k, v) => { if (k === "who" && typeof v === "string") lines.set(v, (lines.get(v) ?? 0) + 1); return v; });
+  const people = Object.values(w.characters).filter(c => c.id !== narrator).sort((a, b) => Number(a.order ?? 0) - Number(b.order ?? 0) || a.id.localeCompare(b.id));
+  const toggle = (key: "cast" | "extras", list: string[], id: string, on: boolean) => p.edit(s => set(s, [key], on ? [...list, id] : list.filter(x => x !== id)));
+  const box = (key: "cast" | "extras", list: string[], c: (typeof people)[number]) => {
+    const n = lines.get(c.id) ?? 0;
+    return html`<label class="row" title=${n ? `${n} lines in this episode` : ""}><input type="checkbox" style="width:auto" checked=${list.includes(c.id)}
+      onChange=${(e: Event) => toggle(key, list, c.id, (e.target as HTMLInputElement).checked)} /> ${c.name ?? c.id}${n ? html` <small class="note">${n} lines</small>` : ""}${key === "extras" ? html` <small class="note">${c.id}</small>` : ""}</label>`;
+  };
+  const changed = (key: "cast" | "extras") => JSON.stringify(p.story[key] ?? []) !== JSON.stringify(p.saved[key] ?? []);
+  return html`<div class="field"><label>Cast (${cast.length}; 2 to 6, the stand-in among them; ${w.characters[narrator]?.name ?? narrator} narrates in every episode)${changed("cast") ? " · changed" : ""}</label>
+      <div class="row">${people.filter(c => c.kind !== "extra").map(c => box("cast", cast, c))}</div></div>
+    <details open=${extras.length > 0}><summary>Extras (${extras.length}): the silent people of the place${changed("extras") ? " · changed" : ""}</summary>
+      <div class="row">${people.filter(c => c.kind === "extra").map(c => box("extras", extras, c))}</div></details>`;
 }
 
 function AddGloss(p: { onAdd(w: string): void }) {
