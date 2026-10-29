@@ -1,23 +1,32 @@
 // Backstage's HTTP server (Node only): the JSON API over the content root (content.ts), the page and its bundle (esbuild,
 // built into dist/app, git-ignored, and rebuilt when a source changes), the bubbles' font and the kit's sounds. It answers only this machine: a request whose Host or Origin
-// is not localhost is refused, so a web page open in the same browser cannot reach it, and a write must be JSON.
+// is not localhost is refused, so a web page open in the same browser cannot reach it, and a write must be JSON. The same
+// guard covers the MCP server at /mcp (mcp.ts, Streamable HTTP, one session per client), the editors' event stream
+// (events.ts) and the agents' proposals (proposals.ts).
 
 import * as esbuild from "esbuild";
 import http from "node:http";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CONTENT, IS_SAMPLES } from "../../sahne-story/paths.ts";
 import { allProblems, check, exists, forget, isKind, lessons, listing, oldShape, readDoc, save, searchCards, type Edit } from "./content.ts";
 import { headOf } from "./git.ts";
 import { readReview, writeReview } from "./review.ts";
 import { ai, aiReady } from "./ai.ts";
+import { Events, selectionOf } from "./events.ts";
+import { createMcp, type AgentEdits } from "./mcp.ts";
+import { proposalsOf, type NewProposal, type ProposalEdit } from "./proposals.ts";
 
 const HERE = new URL("../", import.meta.url);
 const SOUNDS = new URL("../../sahne-kit/sounds/", import.meta.url);
 const FONTS = new URL("node_modules/@fontsource/comic-neue/files/", HERE);
 
-export interface Options { port: number; write: boolean; host?: string; log?: boolean }
+export interface Options { port: number; write: boolean; host?: string; log?: boolean; agentEdits?: AgentEdits; shareCards?: boolean }
 export interface Running { url: string; port: number; close(): Promise<void> }
 
 const LOCAL = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
@@ -55,10 +64,80 @@ export async function serve(o: Options): Promise<Running> {
 
   const json = (res: http.ServerResponse, status: number, v: unknown) => res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }).end(JSON.stringify(v));
 
+  const agentEdits: AgentEdits = o.agentEdits ?? "proposals", shareCards = o.shareCards === true;
+  const events = new Events(), proposals = proposalsOf(events);
+  const writable = () => o.write && !oldShape().length;
+
+  // ---- MCP over Streamable HTTP: a session per client, made by its initialize request ----
+  const sessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();
+  async function mcp(req: http.IncomingMessage, res: http.ServerResponse) {
+    const sid = req.headers["mcp-session-id"];
+    if (typeof sid === "string") {
+      const s = sessions.get(sid);
+      if (!s) return json(res, 404, { jsonrpc: "2.0", error: { code: -32001, message: "no such MCP session: initialize again" }, id: null });
+      return s.transport.handleRequest(req, res);
+    }
+    if (req.method !== "POST") return json(res, 400, { jsonrpc: "2.0", error: { code: -32000, message: "no MCP session: send an initialize request first" }, id: null });
+    const first = await body(req);
+    if (!isInitializeRequest(first)) return json(res, 400, { jsonrpc: "2.0", error: { code: -32000, message: "no MCP session: send an initialize request first" }, id: null });
+    const server = createMcp({ write: o.write, agentEdits, shareCards, events });
+    const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: randomUUID,
+      onsessioninitialized: id => { sessions.set(id, { server, transport }); },
+      onsessionclosed: id => { sessions.delete(id); },
+    });
+    transport.onclose = () => { if (transport.sessionId) sessions.delete(transport.sessionId); };
+    await server.connect(transport);
+    await transport.handleRequest(req, res, first);
+  }
+
+  /** A proposal another backstage process sends (`cli.ts mcp --backstage`), checked here, against this root. */
+  function proposalOf(v: unknown): NewProposal {
+    const b = v as Partial<NewProposal>;
+    const edit = (e: Partial<ProposalEdit>, what: string): ProposalEdit => {
+      if (!e || !isKind(String(e.kind)) || typeof e.doc !== "string" || !e.next || typeof e.next !== "object" || Array.isArray(e.next)) throw new Fail(400, `${what} is { kind, doc, next, base?, create? }`);
+      if (!e.create && !exists(e.kind!, e.doc)) throw new Fail(400, `${what}: there is no ${e.kind} ${e.doc}`);
+      return { kind: e.kind!, doc: e.doc, next: e.next, ...(typeof e.base === "number" ? { base: e.base } : {}), ...(e.create === true ? { create: true } : {}) };
+    };
+    const main = edit(b as Partial<ProposalEdit>, "a proposal");
+    const also = Array.isArray(b.also) ? b.also.map((e, i) => edit(e, `also[${i}]`)) : [];
+    const paths = Array.isArray(b.paths) ? b.paths.filter(p => Array.isArray(p) && p.every(k => typeof k === "string" || typeof k === "number")) : [];
+    const problems = check([main, ...also].map(e => ({ kind: e.kind, id: e.doc, doc: e.next, mtime: e.base, create: e.create })));
+    return { ...main, ...(also.length ? { also } : {}), paths, summary: String(b.summary ?? "").slice(0, 500), by: String(b.by ?? "agent").slice(0, 80) || "agent", problems, ...(typeof b.after === "string" && proposals.get(b.after) ? { after: b.after } : {}) };
+  }
+
   async function api(req: http.IncomingMessage, res: http.ServerResponse, path: string[]) {
     const [route, a, b] = path;
     const m = req.method ?? "GET";
-    if (route === "world" && m === "GET") return json(res, 200, { ...listing(), samples: IS_SAMPLES, writable: o.write && !oldShape().length, oldShape: oldShape().length, ai: aiReady() });
+    if (route === "world" && m === "GET") return json(res, 200, { ...listing(), samples: IS_SAMPLES, writable: writable(), oldShape: oldShape().length, ai: aiReady(), agentEdits, shareCards });
+    if (route === "events" && m === "GET") return events.stream(req, res);
+    if (route === "events" && m === "POST") {
+      // another backstage process on this root (cli.ts mcp --backstage) tells the editors what it did
+      const e = await body(req) as { event?: unknown; data?: unknown };
+      const d = (e?.data ?? {}) as Record<string, unknown>;
+      if (e?.event === "show" && typeof d.id === "string") { events.emit("show", { id: d.id, step: Array.isArray(d.step) ? d.step : null }); return json(res, 200, { ok: true }); }
+      if (e?.event === "doc" && typeof d.kind === "string" && typeof d.id === "string") { forget(); events.emit("doc", { kind: d.kind, id: d.id, mtime: d.mtime, ...(typeof d.by === "string" ? { by: d.by } : {}) }); return json(res, 200, { ok: true }); }
+      throw new Fail(400, "expected { event: \"show\" | \"doc\", data }");
+    }
+    if (route === "selection" && m === "GET") return json(res, 200, { selection: events.selection });
+    if (route === "selection" && m === "POST") {
+      const s = selectionOf(await body(req));
+      if (!s) throw new Fail(400, "expected { page, kind?, id?, path? }");
+      events.selection = s;
+      return json(res, 200, { ok: true });
+    }
+    if (route === "proposals" && m === "GET" && !a) return json(res, 200, { proposals: proposals.all() });
+    if (route === "proposals" && m === "POST" && !a) {
+      if (!writable()) throw new Fail(403, "this backstage is read-only: it takes no proposals");
+      return json(res, 200, { proposal: await proposals.add(proposalOf(await body(req))) });
+    }
+    if (route === "proposals" && m === "POST" && a) {
+      const v = await body(req) as { accepted?: unknown };
+      if (typeof v?.accepted !== "boolean") throw new Fail(400, "expected { accepted: true | false }");
+      const gone = proposals.resolve(a, v.accepted);
+      if (!gone) throw new Fail(404, `no proposal ${a}`);
+      return json(res, 200, { resolved: gone.map(p => p.id) });
+    }
     if (route === "reload" && m === "POST") { forget(); return json(res, 200, { ok: true }); }
     if (route === "doc" && m === "GET" && a && b) {
       if (!isKind(a) || !exists(a, b)) throw new Fail(404, `no ${a} ${b}`);
@@ -111,6 +190,7 @@ export async function serve(o: Options): Promise<Running> {
       if (!LOCAL.test(host)) throw new Fail(403, "backstage answers localhost only");
       if (origin && !(/^http:\/\//.test(origin) && LOCAL.test(origin.slice(7)))) throw new Fail(403, "not from this machine");
       const url = new URL(req.url ?? "/", "http://localhost");
+      if (url.pathname === "/mcp") return await mcp(req, res);
       if (url.pathname.startsWith("/api/")) return await api(req, res, url.pathname.slice(5).split("/").map(decodeURIComponent));
       const f = files[url.pathname];
       if (f) { res.writeHead(200, { "content-type": f[1], "cache-control": "no-store" }).end(readFileSync(f[0])); return; }
@@ -136,6 +216,12 @@ export async function serve(o: Options): Promise<Running> {
   const port = (server.address() as { port: number }).port;
   return {
     url: `http://localhost:${port}/`, port,
-    close: async () => { await new Promise<void>(r => server.close(() => r())); await ctx.dispose(); },
+    close: async () => {
+      await Promise.all([...sessions.values()].map(s => s.transport.close().catch(() => {})));
+      const closed = new Promise<void>(r => server.close(() => r()));
+      server.closeAllConnections(); // the event streams and MCP streams stay open otherwise
+      await closed;
+      await ctx.dispose();
+    },
   };
 }

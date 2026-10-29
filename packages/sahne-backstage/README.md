@@ -217,6 +217,88 @@ Review state is editors' notes, so it is not part of a story: a story's root tak
 - **What is never in them:** card or lesson text. No app and no check reads the sidecar.
 - **Commit it or not.** An app may commit the sidecar, so the review is shared, or git-ignore it.
 
+## MCP server and agent edits (`server/mcp.ts`, `server/proposals.ts`, `server/events.ts`)
+
+Backstage is also an MCP server, so an agent (Claude Code, the editor's own assistant, any MCP client) can read and edit the content root. Every tool goes through `server/content.ts`, so an agent's edit passes the same check as a person's save.
+
+**Where it is served.**
+- **Streamable HTTP** at `http://localhost:5181/mcp`, inside the normal server, behind the same localhost `Host` and `Origin` guard. Each client gets a session (`mcp-session-id`), opened by its `initialize` request.
+- **stdio**, for an agent that starts the server itself. It prints nothing to stdout but MCP frames, and reads the content root again before each call, since a backstage in another process may write the same files:
+
+```bash
+claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mcp --content <root> --write
+```
+
+  The flags are those of the server (below), plus `--backstage http://localhost:5181/`: proposals then go to that running backstage's queue, and `show` and direct writes reach its open editors. Without it, a stdio server's proposals stay in its own queue, where no editor sees them.
+- **In memory**, to the editor's assistant (`server/assistant.ts`).
+
+**The flags** (of `cli.ts` and `cli.ts mcp`; `startBackstage()` takes them as `agentEdits` and `shareCards`; `GET /api/world` answers both):
+- `--write`: without it every write tool refuses, and so it does on a root in the old language shape. The refusal says why.
+- `--agent-edits proposals|direct` (default `proposals`):
+  - **proposals.** A write tool computes the whole new document, checks it, and queues it. A person accepts or rejects it in the editor. Nothing is written.
+  - **direct.** A write tool saves (`save()`: 403, 400, 409 and 422 are the agent's answer) and sends a `doc` event to the open editors.
+  - In both modes, an edit that brings a new error is refused, with the problems, so the agent can fix it. A write tool takes the `mtime` that `read_episode` gave: an edit of a file changed since is refused.
+- `--share-cards`: `search_words` also gives a card's main-language word.
+
+**The card rule.** Agents get a card's id and level, and with `--share-cards` its main-language word. Never its translations, notes or lesson text.
+
+**The tools.** A path names a place in a document: `steps/3`, `steps/12/choice/options/0/reply/1`, `quiz/0`, `title`. A bare number is a step.
+
+| Tool | What |
+|---|---|
+| `series_overview` | The series: titles, languages, narrator, stand-in, seasons with their episodes, and whether and how it can be edited |
+| `list_episodes` `{ season? }` | The episodes, with title, kind, date, place, cast and draft |
+| `read_episode` `{ id, raw? }` | The episode as a script: one line per step, option and reply, each with its path, speaker, main text, translations and staging; the quiz; the `mtime`. `raw` adds the JSON |
+| `read_step` `{ id, path }` | The JSON at a path |
+| `kit_search` `{ kind, query?, limit? }` | Characters, places (with marks and props), the kit's props, gestures, emotions and sounds (`sahne-kit` `full`) |
+| `search_words` `{ query, limit? }` | Card ids and levels, and the word with `--share-cards` |
+| `check_episode` `{ id }` | The story check's problems for the episode |
+| `read_notes` `{ id }` | The episode's review notes |
+| `edit_step` `{ id, path, patch, mtime? }` | A merge patch (RFC 7386) on the object at the path; the path `""` is the episode itself (its id never changes) |
+| `insert_step` `{ id, at, step, mtime? }`, `delete_step` `{ id, path, mtime? }`, `move_step` `{ id, from, to, mtime? }` | Steps, options and replies in their lists |
+| `set_staging` `{ id, path, staging, mtime? }` | Staging keys; refuses a language code (texts go through `set_texts`) |
+| `set_texts` `{ id, path, texts, mtime? }` | Texts by language; only the series' languages |
+| `create_episode` `{ season, id?, releaseDate, kind, week, place, cast, words, lessons, title, summary?, level? }` | A new episode from `src/model/skeleton.ts`, with its calendar row when the season has a calendar |
+| `set_calendar` `{ season, story, row: { date, kind, week }, mtime? }` | The season's calendar row and the episode's `releaseDate`, `kind` and arc, together |
+| `comment` `{ id, step?, text }` | A review comment. It is a note, not content, so it is written at once (with `--write`) in both modes |
+| `set_review` `{ id, status }` | Direct mode only. In proposals mode a person decides where an episode stands |
+| `show` `{ id, step? }` | The open editors go to the episode and step (`show` event) |
+
+**The resources.**
+- `sahne://format`: sahne-story's README.
+- `sahne://languages`: the series' `languages`.
+- `sahne://selection`: what the open editor last posted to `POST /api/selection`.
+
+**Proposals** (`server/proposals.ts`, in memory, one queue per backstage process, never on disk).
+- A proposal is `{ id, kind, doc, next, base?, create?, also?, paths, summary, by, at, problems, after? }`:
+  - `next` is the whole proposed document, `base` the mtime it was computed from, and `create` marks a new document;
+  - `also` lists the documents that change with it, each `{ kind, doc, next, base?, create? }` (a season's calendar with its episode). They are saved in the same save;
+  - `paths` are the changed places, and `by` is `assistant` or the MCP client's name;
+  - `problems` is the check of `next` and `also`.
+- **They compose simply.** An agent's proposal is computed from the file plus that agent's own latest pending proposal on the document. `after` names that proposal. So each proposal holds the ones before it:
+  - accepting one also resolves those it was built on;
+  - rejecting one also drops those built on it.
+  Different agents' proposals are independent, each against the file.
+- **The browser applies an accepted proposal itself**, as an edit (Undo, the check, Save). Backstage never saves a proposal. An editor with unsaved edits of the same document applies only the proposal's `paths`, so nothing typed is lost.
+
+**In the editor** (`src/events.ts`, `src/ui/studio/proposals.ts`). The page listens to `/api/events`:
+- **A proposal** shows above its episode's script: who proposed it and what, each changed place with its words before and after (word by word), the errors it would bring, and *Accept* or *Reject*. The top bar counts the proposals waiting and links to the first.
+- **A direct write** reloads a document that has no unsaved edits here; one that has them gets a banner instead, to take theirs or keep yours.
+- **`show`** opens the episode at the step.
+- **The selection** is posted to `/api/selection` a moment after it settles, for the agents' `sahne://selection`.
+
+**The routes** (localhost only, as the rest of the API):
+
+| Request | Answer |
+|---|---|
+| `GET /api/events` | `text/event-stream`, a keep-alive comment every 20 s. Events: `proposal` `{ action: "added" \| "resolved", proposal, accepted?, with? }`, `doc` `{ kind, id, mtime, by? }`, `show` `{ id, step }` (a path, or null), `usage` |
+| `GET /api/proposals` | `{ proposals }` |
+| `POST /api/proposals` `{ kind, doc, next, base?, create?, also?, paths, summary, by, after? }` | `{ proposal }`: one queued from another process (`cli.ts mcp --backstage`), checked here; 403 when read-only |
+| `POST /api/proposals/<id>` `{ accepted }` | `{ resolved: [ids] }`: the person's answer (the browser applies an accepted one itself); 404 for an unknown id |
+| `POST /api/selection` `{ page, kind?, id?, path? }`, `GET /api/selection` | The editor's selection, for the `selection` resource |
+| `POST /api/events` `{ event: "show" \| "doc", data }` | Another process tells the open editors what it did. A `doc` event also makes this server read the root again |
+| `/mcp` | The MCP server (Streamable HTTP) |
+
 ## The API (`server/http.ts`)
 
 Every request must come from this machine: `Host` and `Origin` must be localhost, and a write must be `application/json`.
@@ -244,7 +326,8 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `content.ts` (kinds, files, checks, saves);
   - `git.ts`;
   - `review.ts`;
-  - `ai.ts`.
+  - `ai.ts`;
+  - `mcp.ts` (the MCP server: its tools and resources), `proposals.ts` (agents' edits waiting for a person) and `events.ts` (the editors' event stream and selection).
 - The server reads sahne-story's Node-only files (`paths.ts`, `check/`, `load.ts`) by path. The package exports only `"."`.
 - **`src/`** is the browser side (the studio's shared parts in `src/ui/kit/`: icons, chips, drawers, popovers, the palette; the theme in `src/ui/theme.ts`), built with Preact and htm tagged templates (no JSX, so the source stays erasable TypeScript). It contains:
   - `index.ts`;
@@ -255,6 +338,6 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `model/` (paths into a document, undo and redo, the step list, what changed, the board's weeks, the script's blocks and keys, parentheticals, ghosts and suggestions, notes, a new episode's skeleton, the palette's search; pure and tested in Node);
   - `ui/` (the pages: `app` (the shell), `board`, `new`, `studio/` (the episode: `episode`, `script`, `sections`, `details`, `direct`, `strip`, `notes`), `cast`, `places`, `kitpage`, `review`, `seasons` (settings); and their parts: `galleries`, `lang`, `staging`, `changes`, `ai`, `fields`, `theme`, `kit/`).
 - **`index.html`** is the page.
-- **`test/`**: `node --test` covers the save round trip, the model, the server on a temp copy of the samples, and AI help with the network stubbed. `pnpm check` runs it.
+- **`test/`**: `node --test` covers the save round trip, the model, the server on a temp copy of the samples, and AI help with the network stubbed. `mcp.test.ts` covers the MCP server in memory, over HTTP and over stdio. `pnpm check` runs it.
 
 The package exports `"."` → `src/index.ts`, like every package, and also `"./server"` → `server/index.ts`. The server is the one Node-only entry. Backstage never ships to learners, so it has no `size.mjs` budget and no `determinism.mjs` entry.

@@ -16,6 +16,7 @@ import { dirtyKeys, go, notice, route, world } from "../store.ts";
 import type { Command } from "../model/search.ts";
 import { Icon, MOD } from "./kit/index.ts";
 import { Palette } from "./kit/palette.ts";
+import { proposals } from "../events.ts";
 import { cycleTheme, theme } from "./theme.ts";
 import { tx } from "./fields.ts";
 import { BoardPage } from "./board.ts";
@@ -53,6 +54,7 @@ export function App() {
       <button class="search" onClick=${() => setPalette(true)} aria-label="Search and commands"><${Icon} name="search" size=${16} /> Search or run a command <kbd>${MOD} K</kbd></button>
       <span class=${`state${dirty ? " dirty" : ""}${w.writable ? "" : " ro"}`} title=${dirty ? dirtyKeys.value.map(k => k.replace(":", " ")).join(", ") : ""}>
         ${!w.writable ? (w.oldShape ? "Read-only: convert the root" : w.samples ? "Samples · read-only" : "Read-only") : dirty ? `${dirty} unsaved` : "All saved"}</span>
+      ${proposals.value.length > 0 && html`<a class="chip warn" href=${`#/episode/${proposals.value[0].doc}`} title=${proposals.value.map(x => `${x.doc}: ${x.summary}`).join("\n")}>${proposals.value.length} proposed edit${proposals.value.length > 1 ? "s" : ""}</a>`}
       <button class="iconbtn" onClick=${cycleTheme} title=${`Theme: ${theme.value}`} aria-label=${`Theme: ${theme.value}`}><${Icon} name=${theme.value === "dark" ? "moon" : theme.value === "light" ? "sun" : "auto"} /></button>
     </header>
     <nav class="rail" aria-label="Areas">

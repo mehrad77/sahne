@@ -26,6 +26,8 @@ import { EpisodeHead, Glosses, Quiz } from "./sections.ts";
 import { Details } from "./details.ts";
 import { Direct } from "./direct.ts";
 import { Strip } from "./strip.ts";
+import { ProposalsBar } from "./proposals.ts";
+import { conflicts, postSelection, proposals, shown as agentShown } from "../../events.ts";
 import { ghostsOf, suggestionsOf, taken } from "../../model/autostage.ts";
 import { get, set } from "../../model/path.ts";
 
@@ -110,6 +112,7 @@ function Studio(p: { id: string }) {
   /** Select a block (and put the cursor in it with `focus`): the stage plays that moment. */
   function select(next: Path | null, focus = false) {
     setPath(next);
+    postSelection({ page: "episode", kind: "story", id: p.id, path: next });
     if (focus) setFocusTick(n => n + 1);
     const pv = preview.current;
     if (!next || !pv) return;
@@ -126,6 +129,10 @@ function Studio(p: { id: string }) {
   }
 
   const edit = (fn: (s: StoryDoc) => StoryDoc, field?: string) => change<StoryDoc>("story", p.id, fn, field);
+  // an agent pointed here
+  useEffect(() => { const s = agentShown.value; if (s && s.id === p.id && s.step) select(s.step, true); }, [agentShown.value?.n]);
+  const mine = proposals.value.filter(x => (x.kind === "story" && x.doc === p.id) || x.also?.some(a => a.kind === "story" && a.doc === p.id));
+  const conflict = conflicts.value.has(key);
   const problems = [...(checked.value[key] ?? []), ...lints];
   const marks: Record<number, { errors: number; warnings: number }> = {};
   for (const x of problems) if (x.step !== undefined && (x.level === "error" || x.level === "warning")) { const m = (marks[x.step] ??= { errors: 0, warnings: 0 }); if (x.level === "error") m.errors++; else m.warnings++; }
@@ -146,6 +153,8 @@ function Studio(p: { id: string }) {
       <button aria-pressed=${details} onClick=${() => setDetails(!details)} title="All the staging of the selected block">Details</button>
       <button class="primary" onClick=${save} disabled=${!dirty(d) || !w.writable} title=${w.writable ? `Save (${MOD} S)` : "read-only"}><${Icon} name="save" size=${16} /> Save</button>
     </div>
+    ${conflict && html`<div class="banner">An agent wrote this episode while you had unsaved edits: <button class="small" onClick=${() => { void openDoc("story", p.id, true); conflicts.value = new Set([...conflicts.value].filter(k => k !== key)); }}>Take theirs</button> or save yours over it (the server will say it changed on disk; reload first to merge by hand).</div>`}
+    <${ProposalsBar} list=${mine} story=${story} select=${select} />
     <div class="studio-split">
       <div class="script-col">
         <${EpisodeHead} story=${story} saved=${saved} edit=${edit} />

@@ -19,7 +19,11 @@ export interface World {
   /** How many content files are still in the old language shape (then nothing is saved: convert the root first). */
   oldShape?: number;
   /** Whether AI help is on (the server has ANTHROPIC_API_KEY). */
-  ai?: boolean;
+  ai?: boolean | { ready: boolean; provider: string; model?: string };
+  /** How agents' edits land: as proposals to accept, or written directly. */
+  agentEdits?: "proposals" | "direct";
+  /** Whether agents may see a card's main-language word. */
+  shareCards?: boolean;
 }
 export interface Problem { rule: string; level: "error" | "warning" | "info"; story: string; step?: number; option?: number; message: string; doc: string; new?: boolean }
 export interface Edit { kind: Kind; id: string; doc: unknown; mtime?: number; create?: boolean }
