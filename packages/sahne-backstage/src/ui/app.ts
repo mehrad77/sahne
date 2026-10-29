@@ -19,7 +19,7 @@ import { Palette } from "./kit/palette.ts";
 import { cycleTheme, theme } from "./theme.ts";
 import { tx } from "./fields.ts";
 import { BoardPage } from "./board.ts";
-import { Episode } from "./episode.ts";
+import { Episode } from "./studio/episode.ts";
 import { ReviewPage } from "./review.ts";
 import { CastPage, CharacterPage } from "./cast.ts";
 import { PlacePage, PlacesPage } from "./places.ts";

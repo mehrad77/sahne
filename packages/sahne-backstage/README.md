@@ -74,57 +74,43 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 - Episodes with no date wait under the board, to be dragged onto a day.
 - *Season* and *Series* open their settings in a drawer: titles and summaries in every language, the series' languages, narrator and stand-in, the season's launch day. On a root with no `series.json`, the board starts one.
 
-**The episode page:**
-- **The toolbar.** *Review* shows where the episode stands (its status, how many comments) and opens the Review tab under the stage. Then Undo, Redo, Revert and Save.
-- **The stage.** The whole kit, Kerim, the animals, the sounds, and Kerim's round window for the narrator.
-- **Transport.**
-  - The opening scene, the cue before, and *Devam*.
-  - A slider over every cue (`storyPlayer.jump`), and a slider through the cue that is playing (`Run.seek`). Held props and gestures go wrong mid-cue, so look there.
-  - The learner's card: *Söyle*, a choice's options (each picks its branch), or an act on stage.
-- **Flags.** One switch for each flag the episode's callbacks read (`if`, `unless`). A switch adapts the story again and reloads the stage.
-- **Steps.** Every step, with a choice's options and their replies indented under it. Clicking a row selects it and plays it. A row whose option is not picked picks that option. A changed row is marked, and so is a row with problems.
-- **The inspector.**
-  - For a line, a choice option or a reply: who speaks, the words in the series' languages (Persian edits right to left), Kerim's narration, and a note for the learner.
-  - For a spot: its lesson, example and words.
-  - For a choice: its id, kind and whom it is said to.
-  - With nothing selected: the episode's titles, summary, cast, quiz and glosses. The cast picker sets the story's `cast` (the roster, 2 to 6, the stand-in among them) and `extras` (the silent people), and shows how many lines each one speaks; the story check refuses a speaker who is not in the cast.
-- **Staging** (`src/ui/staging.ts`), under the words of a line, an option, a reply or a beat.
-  - The fields come in the order the stories use them most: feeling (`emo`), gesture (`do`), said to (`to`), looking or pointing at (`at`), then camera, voice, tempo and count.
-  - Then the props (`obj`), moves (`move`), others' reactions (`react`), words that point at things (`link`) and sounds (`sfx`).
-  - The rest sits under *More*: `env`, `via`, `on`, `wait`, `frame` and `looks`.
-  - Each field picks from what is valid there:
-    - the kit's emotions, gestures and sounds;
-    - the engine's cameras, moves, prop ops and voices (`CAM_KINDS`, `MOVE_HOWS`, `OBJ_OPS`, `VOICES`);
-    - the marks and props of the place the step plays in;
-    - the cast.
-  - A scene has its own form: the place, time, weather, the place's states, who stands on which mark, and Kerim's perch.
-  - Every step also has a raw JSON drawer for what the forms do not cover. The story check judges it like any other edit.
-- **Step tools.**
-  - Move a step up or down, duplicate it or delete it.
-  - Add a line, a stand-in line, Kerim's narration, a beat, a scene, a spot or a choice after the selected step.
-  - On an option: add an option (at most 3) or a reply.
-- **On the stage** (`src/ui/pick.ts`).
-  - *Show the marks* pins the place's marks over the stage, placed through its camera every frame.
-  - *A click sets* turns a click into staging for the selected step: a person or prop it looks or points at (`at`), the person it is said to (`to`), or the mark its speaker moves to (`move`).
-  - People and props come from the interaction layer's `inspect`; marks come from the pins.
-  - Shot buttons set the step's `cam`.
-- **Problems.**
-  - The stage lints (`lintStory`, `suggest`) run in the browser as you type.
-  - The full story check runs on the server a moment later. A problem the edit brought is marked **new**.
-- **Review** (a tab beside *Edit*).
-  - Where the episode stands: an AI draft, reviewed or approved, and whether AI wrote it.
-  - For the selected step: reviewed, and its Persian checked.
-  - Comments on the episode or on a step, each marked done when it is dealt with.
-  - The reviewer's name is kept in this browser only.
-- **Changes since the last commit** (a tab).
-  - The episode's fields and each changed step against git's HEAD, with the words diffed word by word.
-  - *Put back as committed* restores one step. A person commits; backstage never does.
-- **Undo, redo, revert and save.** Typing into one field is one undo step. Save is refused when the edit brings an error. Problems the file already had do not block it.
+**The episode studio** (`src/ui/studio/`): the script on the left, the stage on the right.
+- **The head:** the title and premise in the series' languages, who is in it (the cast and extras as portraits, each with how many lines they speak; *+ someone* adds from a picker; the story check refuses a speaker not in the cast), and what it teaches.
+- **The script** (`script.ts`, its operations in `src/model/script.ts`): one block per step, typed into like a screenplay.
+  - A **scene** heading: the place (a click picks another from its picture), the time of day, and where each of the cast starts.
+  - A **line**: the speaker in capitals (a click, or `@` in an empty line, picks another), the words in the main language, the translations as smaller rows under it (a dot where one is missing), and the staging as chips; × on a chip clears it. The narrator's lines to the viewer say so.
+  - An **action**: who does what, with no words (a beat).
+  - The learner's **choice**: what it is about and whom it is said to, its options indented under it (each with ✓ for the fitting answer and a tone) and their replies under them.
+  - A **grammar spot** (its lesson and the line it points at, the narrator's words in the translations) and an **act** (how the learner acts, on what, and the prompt).
+  - **The keys:**
+
+    | Key | What |
+    |---|---|
+    | Enter | a new line after this one, said by the one before last (a conversation alternates) |
+    | Tab | an empty line becomes an action, an action a line |
+    | `@` in an empty line | pick the speaker |
+    | `/` in an empty line | insert a block: line, action, narration, scene, choice, spot, act |
+    | `(` | type how it is said: `(waves, happy, to İsmail)` |
+    | Backspace in an empty line | delete it |
+    | ⌘↑ ⌘↓ | move it |
+    | ⌘D | duplicate it |
+    | ⌘Z, ⇧⌘Z | undo, redo |
+    | ⌘S | save |
+    | ↑ ↓ at the start or end of the words | the block before or after |
+
+  - **A parenthetical** (`src/model/parenthetical.ts`) is read phrase by phrase: a gesture of the kit (`waves`, `points at the apple`), a feeling (`happy`, `angry`), whom it is said to (`to İsmail`), where it points (`at the door`), a walk (`walks to counter`), a voice (`whispers`) or a shot (`close`). What it does not understand is named, never written.
+  - Focusing a block selects it and the stage plays that moment; an option not picked is picked. The block playing is marked, and so are a changed block and one with problems.
+- **After the script:** the quiz (each question in every language, three options in the main language, the right one, the line its answer quotes) and the glosses (a word the cards do not have, its meaning in each translation).
+- **The stage:** the whole kit, the narrator's round window, the transport (the opening, back, *Next*, a scrubber over every cue and one through the cue playing: held props and gestures go wrong mid-cue, so look there), the learner's card (say, a choice's options, an act), and one switch for each flag the episode's callbacks read.
+- **Details** opens the selected block's full staging in a drawer (`details.ts`, the forms in `src/ui/staging.ts`): every field with a picker of what is valid there (the kit's emotions, gestures and sounds; the engine's cameras, moves, prop ops and voices; the place's marks and props; the cast), a scene's time, weather and states, a line's note for the learner, the flags that gate it, and the step as JSON.
+- **On the stage** (`src/ui/pick.ts`): the place's marks as pins, a click that sets the selected block's `at`, `to` or `move`, and shot buttons for its `cam`.
+- **Problems, review and changes** are tabs under the stage. The stage lints (`lintStory`, `suggest`, in the series' story language) run as you type, the full story check a moment later on the server; a problem the edit brought is marked **new**. Review: the episode's status, each step reviewed and its translations checked, comments. Changes: each changed step against git's HEAD, with *Put back as committed*. A person commits; backstage never does.
+- **Undo, redo, revert and save.** Typing into one field is one undo step. Save is refused when the edit brings an error; problems the file already had do not block it.
 
 **A character's page** (`src/ui/cast.ts`).
 - Their look, in Sahne's builder in `author` mode: every part, the cast's own included. The size of the look is shown against `AVATAR_MAX_BYTES`.
 - Their outfits, each previewed on them (`applyLook`) and edited as a look (clothes only).
-- Names, role and bio in Turkish and Persian, colour, order, level, voice.
+- Name, role and bio in the series' languages, colour, order, level, voice.
 - How they address each of the others (`sen` or `siz`), and the places they belong to.
 - The whole document as JSON, for the album and the rest.
 - Saving runs the cast check.
@@ -256,8 +242,9 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `store.ts` (signals: the world, the route, each open document's draft, the server's problems);
   - `api.ts`;
   - `stage.ts` (`Preview`: the stage and a story player that follow the document);
-  - `model/` (paths into a document, undo and redo, the step list, what changed, a new episode's skeleton; pure and tested in Node);
-  - `ui/` (the pages: `app`, `home`, `season`, `episode`, `inspector`, `staging`, `pick`, `review`, `changes`, `cast`, `places`, `seasons`, `new`, `ai`, `fields`).
+  - `thumbs.ts` (pictures the stage draws once and keeps);
+  - `model/` (paths into a document, undo and redo, the step list, what changed, the board's weeks, the script's blocks and keys, parentheticals, a new episode's skeleton, the palette's search; pure and tested in Node);
+  - `ui/` (the pages: `app` (the shell), `board`, `new`, `studio/` (the episode: `episode`, `script`, `sections`, `details`), `cast`, `places`, `kitpage`, `review`, `seasons` (settings); and their parts: `galleries`, `lang`, `staging`, `pick`, `changes`, `ai`, `fields`, `theme`, `kit/`).
 - **`index.html`** is the page.
 - **`test/`**: `node --test` covers the save round trip, the model, the server on a temp copy of the samples, and AI help with the network stubbed. `pnpm check` runs it.
 

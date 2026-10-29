@@ -11,7 +11,7 @@ import { puppets as animals } from "sahne-kit/puppets";
 import { K_BUST, K_HEAD, K_HEAD_VB } from "sahne-kit/kerim/art";
 import { kerimOnTalk, kerimPortrait } from "sahne-kit/kerim/portrait";
 import tr from "sahne-tr";
-import { adaptStory, storyPlayer, type CharacterDoc, type StoryDoc, type StoryPlace, type StoryPlayer, type StoryStage } from "sahne-story";
+import { adaptStory, storyPlayer, type CharacterDoc, type Languages, type StoryDoc, type StoryPlace, type StoryPlayer, type StoryStage } from "sahne-story";
 
 export const KIT: Kit = { ...full, puppets: { ...full.puppets, ...kerimPuppets, ...animals } };
 export const LANG = tr;
@@ -32,6 +32,8 @@ export interface PreviewOptions {
   places: Record<string, StoryPlace>;
   characters: Record<string, CharacterDoc>;
   flags?: string[];
+  /** The series' languages: the main one is what the stage plays. */
+  languages?: Languages;
   onChange?(): void;
 }
 
@@ -53,7 +55,7 @@ export class Preview {
     this.load(story);
   }
 
-  private adapt(story: StoryDoc) { return adaptStory(story, { places: this.o.places, characters: this.o.characters, flags: this.o.flags }); }
+  private adapt(story: StoryDoc) { return adaptStory(story, { places: this.o.places, characters: this.o.characters, flags: this.o.flags, languages: this.o.languages }); }
 
   /** Adapt and load the story, at its opening scene. */
   load(story: StoryDoc) {

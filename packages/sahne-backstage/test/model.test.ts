@@ -143,3 +143,36 @@ test("a new episode: a skeleton in the series' languages, or a copy of another w
   assert.ok(!JSON.stringify(copy.steps).includes("Portakal"), "no text of the old episode is left");
   assert.equal(copy.draft, true);
 });
+
+test("script: blocks, the next speaker, add, move, duplicate, delete and convert", async () => {
+  const S = await import("../src/model/script.ts");
+  const langs = { main: "tr", translations: ["en", "fa"] };
+  const bs = S.blocks(STORY);
+  assert.ok(bs.some(b => b.kind === "option" && b.depth === 1));
+  assert.equal(bs.length, rows(STORY).length, "a block for every row of the step list");
+  const story = { ...STORY, cast: ["nima", "ismail"], steps: [{ scene: "bakkal", at: {} }, { who: "ismail", tr: "a" }, { who: "nima", tr: "b" }] } as unknown as StoryDoc;
+  assert.equal(S.nextSpeaker(story, ["steps", 2], { standin: "nima", narrator: "kerim" }), "ismail", "the one before last speaks next");
+  assert.equal(S.nextSpeaker(story, ["steps", 1], { standin: "nima", narrator: "kerim" }), "nima", "after one speaker, someone else of the cast");
+  const added = S.addAfter(story, ["steps", 1], S.emptyLine("nima", langs));
+  assert.deepEqual(added.focus, ["steps", 2]);
+  assert.deepEqual((added.story.steps[2] as unknown as Record<string, unknown>), { who: "nima", tr: "", en: "", fa: "" });
+  const moved = S.moveBy(story, ["steps", 2], -1);
+  assert.equal((moved.story.steps[1] as { who: string }).who, "nima");
+  assert.equal(S.duplicateAt(story, ["steps", 1]).story.steps.length, 4);
+  const gone = S.remove(story, ["steps", 2]);
+  assert.equal(gone.story.steps.length, 2);
+  assert.deepEqual(gone.focus, ["steps", 1]);
+  const beat = S.convert({ ...story, steps: [{ who: "nima", tr: "x", do: "wave" }] } as unknown as StoryDoc, ["steps", 0], "action", langs);
+  assert.deepEqual(beat.steps[0], { beat: { who: "nima", do: "wave" } });
+  assert.deepEqual(S.convert(beat, ["steps", 0], "line", langs).steps[0], { who: "nima", tr: "", en: "", fa: "", do: "wave" });
+});
+
+test("parenthetical: gestures, feelings, who it is said to, where it points, walks, voice and shot", async () => {
+  const { parseParenthetical, chipsOf } = await import("../src/model/parenthetical.ts");
+  const v = { gestures: ["wave", "point", "shrug", "nod"], emotions: ["happy", "annoyed"], cast: [{ id: "ismail", names: ["İsmail"] }], marks: ["counter", "door"], props: [{ id: "apple", names: ["elma"] }] };
+  assert.deepEqual(parseParenthetical("(waves, happy, to İsmail)", v).staging, { do: "wave", emo: "happy", to: "ismail" });
+  assert.deepEqual(parseParenthetical("points at the apple", v).staging, { do: "point", at: "obj:apple" });
+  assert.deepEqual(parseParenthetical("walks to counter, whispers, close", v, "nima").staging, { move: { who: "nima", to: "counter" }, voice: "whisper", cam: "close" });
+  assert.deepEqual(parseParenthetical("angry, juggles", v), { staging: { emo: "annoyed" }, rest: ["juggles"] });
+  assert.deepEqual(chipsOf({ do: "wave", to: "ismail", at: "obj:apple" }, id => (id === "ismail" ? "İsmail" : id)).map(c => c.label), ["wave", "→ İsmail", "at apple"]);
+});

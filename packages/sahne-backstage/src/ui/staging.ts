@@ -9,7 +9,6 @@ import { useEffect, useState } from "preact/hooks";
 import { CAM_KINDS, MOVE_HOWS, OBJ_OPS, VOICES } from "sahne";
 import type { StoryDoc } from "sahne-story";
 import { get, set, type Path } from "../model/path.ts";
-import { kindOf } from "../model/steps.ts";
 import { KIT } from "../stage.ts";
 import { world } from "../store.ts";
 import { Check, NumberField, Select, Text, tx } from "./fields.ts";
@@ -182,37 +181,4 @@ export function Json(p: { label: string; value: unknown; rows?: number; onInput(
       if (!t.trim()) { setBad(""); p.onInput(undefined); return; }
       try { p.onInput(JSON.parse(t)); setBad(""); } catch (err) { setBad((err as Error).message); }
     }} /></div>`;
-}
-
-/** New steps, as a story writes them. */
-export const TEMPLATES: Record<string, (cast: string[], place: string) => unknown> = {
-  line: cast => ({ who: cast.find(c => c !== "nima" && c !== "kerim") ?? cast[0], tr: "…", en: "…", fa: "…" }),
-  "stand-in line": () => ({ who: "nima", tr: "…", en: "…", fa: "…" }),
-  "Kerim narrates": () => ({ who: "kerim", narr: true, tr: "…", en: "…", fa: "…" }),
-  beat: () => ({ beat: { wait: 600 } }),
-  scene: (_c, place) => ({ scene: place, at: {} }),
-  spot: () => ({ spot: { lesson: "", ex: "", en: "", fa: "" } }),
-  choice: (cast) => ({ choice: { id: "secim", kind: "polite", to: cast.find(c => c !== "nima" && c !== "kerim"), options: [{ tr: "…", en: "…", fa: "…", ok: true }, { tr: "…", en: "…", fa: "…" }] } }),
-};
-
-/** Insert, duplicate, delete and move the selected step (or a reply of an option). */
-export function StepTools(p: { story: StoryDoc; path: Path; cast: string[]; edit(fn: (s: StoryDoc) => StoryDoc): void; select(path: Path | null): void }) {
-  const isReply = p.path.at(-2) === "reply", isOption = p.path.at(-2) === "options";
-  const list = p.path.slice(0, -1), i = Number(p.path.at(-1));
-  const arr = (get(p.story, list) as unknown[]) ?? [];
-  const [what, setWhat] = useState("line");
-  const place = placeAt(p.story, Number(p.path[1]));
-  const kinds = isReply ? ["line", "beat"] : isOption ? [] : Object.keys(TEMPLATES);
-  const at = (k: number) => [...list, k] as Path;
-  const put = (a: unknown[]) => p.edit(s => set(s, list, a));
-  return html`<div class="row" style="margin-bottom:8px">
-    <button class="small" disabled=${i === 0} onClick=${() => { const a = [...arr]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; put(a); p.select(at(i - 1)); }} title="Move up">↑</button>
-    <button class="small" disabled=${i >= arr.length - 1} onClick=${() => { const a = [...arr]; [a[i + 1], a[i]] = [a[i], a[i + 1]]; put(a); p.select(at(i + 1)); }} title="Move down">↓</button>
-    <button class="small" onClick=${() => { const a = [...arr]; a.splice(i + 1, 0, structuredClone(arr[i])); put(a); p.select(at(i + 1)); }}>Duplicate</button>
-    <button class="small danger" disabled=${isOption && arr.length <= 2} onClick=${() => { if (!confirm(`Delete ${kindOf(arr[i])} ${p.path.slice(1).join(".")}?`)) return; put(arr.filter((_, k) => k !== i)); p.select(null); }}>Delete</button>
-    ${kinds.length > 0 && html`<span class="grow"></span><select value=${what} style="max-width:150px" aria-label="Kind of step to add" onChange=${(e: Event) => setWhat((e.target as HTMLSelectElement).value)}>${kinds.map(k => html`<option value=${k}>${k}</option>`)}</select>
-      <button class="small" onClick=${() => { const a = [...arr]; const t = isReply && what === "beat" ? { beat: { wait: 600 } } : TEMPLATES[what](p.cast, place); a.splice(i + 1, 0, t); put(a); p.select(at(i + 1)); }}>+ after this</button>`}
-    ${isOption && html`<span class="grow"></span><button class="small" disabled=${arr.length >= 3} onClick=${() => { put([...arr, { tr: "…", en: "…", fa: "…" }]); p.select(at(arr.length)); }}>+ an option</button>
-      <button class="small" onClick=${() => p.edit(s => set(s, [...p.path, "reply"], [...((get(s, [...p.path, "reply"]) as unknown[]) ?? []), TEMPLATES.line(p.cast, place)]))}>+ a reply</button>`}
-  </div>`;
 }
