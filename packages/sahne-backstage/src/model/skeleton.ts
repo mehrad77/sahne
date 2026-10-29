@@ -2,13 +2,14 @@
 // marks, Kerim's opening, a few lines, one choice, one spot, three quiz items), every text a placeholder to write, marked
 // `draft: true`. Pure (test/server.test.ts checks one against the samples).
 
-import type { Arc, StoryDoc, StoryPlace } from "sahne-story";
+import type { Arc, LangText, StoryDoc, StoryPlace } from "sahne-story";
 
 export interface Brief {
   id: string; season: number; releaseDate: string; kind: "episode" | "special"; week: number;
   arc: { id: string } & Omit<Arc, "id">;
   place: string; cast: string[]; words: string[]; lessons: string[];
-  title: string; titleEn?: string; titleFa?: string; summary?: string; summaryFa?: string;
+  /** The title (the main language's at least) and the premise, by language. */
+  title: LangText; summary?: LangText;
   /** The level the season's other episodes name (a story still names one; series and seasons do not). */
   level?: string;
 }
@@ -23,12 +24,12 @@ export function skeleton(b: Brief, o: { narrator: string; standin: string; place
   return {
     id: b.id, releaseDate: b.releaseDate, kind: b.kind, level, season: b.season,
     arc: b.arc, ref: `${level}_${Math.min(Math.max(b.week, 1), 6)}`,
-    title: b.title, titleEn: b.titleEn || b.title, titleFa: b.titleFa || b.title,
-    summary: b.summary || "…", summaryFa: b.summaryFa || "…",
+    title: { tr: b.title.tr, en: b.title.en || b.title.tr, fa: b.title.fa || b.title.tr },
+    summary: { en: b.summary?.en || "…", fa: b.summary?.fa || "…" },
     place: b.place, cast: [...new Set(who)], lessons: b.lessons, words: b.words, gl: {},
     steps: [
       { scene: b.place, at: Object.fromEntries(who.map((c, i) => [c, floor[i] ?? ""]).filter(([, m]) => m)) },
-      { who: narrator, narr: true, tr: "…", en: b.summary || "…", fa: b.summaryFa || "…" },
+      { who: narrator, narr: true, tr: "…", en: b.summary?.en || "…", fa: b.summary?.fa || "…" },
       { who: other, tr: "Merhaba!", en: "Hello!", fa: "سلام!" },
       { who: standin, tr: "Merhaba!", en: "Hello!", fa: "سلام!" },
       { who: other, tr: "Buyrun?", en: "Yes, please?", fa: "بفرمایید؟" },
@@ -36,9 +37,9 @@ export function skeleton(b: Brief, o: { narrator: string; standin: string; place
       { spot: { lesson: b.lessons[0], ex: "Merhaba!", en: "…", fa: "…" } },
     ],
     quiz: [
-      { q: "…?", en: "…?", fa: "…؟", options: ["…", "…", "…"], a: 0, why: "“Merhaba!”", kind: "comp" },
-      { q: "…?", en: "…?", fa: "…؟", options: ["…", "…", "…"], a: 0, why: "“Merhaba!”", kind: "word" },
-      { q: "…?", en: "…?", fa: "…؟", options: ["…", "…", "…"], a: 0, why: "“Merhaba!”", kind: "comp" },
+      { q: { tr: "…?", en: "…?", fa: "…؟" }, options: ["…", "…", "…"], a: 0, why: "“Merhaba!”", kind: "comp" },
+      { q: { tr: "…?", en: "…?", fa: "…؟" }, options: ["…", "…", "…"], a: 0, why: "“Merhaba!”", kind: "word" },
+      { q: { tr: "…?", en: "…?", fa: "…؟" }, options: ["…", "…", "…"], a: 0, why: "“Merhaba!”", kind: "comp" },
     ],
     followUp: [],
     draft: true,

@@ -57,14 +57,18 @@
       }
     }
   },
-  "bio": "Rides across the city with everyone else; also one of the crowd on the street.",
-  "bioFa": "مثلِ بقیه در شهر رفت‌وآمد می‌کند؛ گاهی هم یکی از جمعیتِ خیابان است.",
+  "bio": {
+    "en": "Rides across the city with everyone else; also one of the crowd on the street.",
+    "fa": "مثلِ بقیه در شهر رفت‌وآمد می‌کند؛ گاهی هم یکی از جمعیتِ خیابان است."
+  },
   "color": "#8A8580",
   "id": "passenger_7",
   "kind": "extra",
   "level": "A1",
-  "name": "Yolcu",
-  "nameFa": "مسافر",
+  "name": {
+    "fa": "مسافر",
+    "tr": "Yolcu"
+  },
   "order": 126,
   "places": [
     "metro_m2",
@@ -75,6 +79,8 @@
     "kadikoy",
     "istiklal_street"
   ],
-  "role": "A passenger on the metro, the bus or the ferry",
-  "roleFa": "مسافرِ مترو، اتوبوس یا کشتی"
+  "role": {
+    "en": "A passenger on the metro, the bus or the ferry",
+    "fa": "مسافرِ مترو، اتوبوس یا کشتی"
+  }
 }

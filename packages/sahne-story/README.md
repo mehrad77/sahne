@@ -47,7 +47,7 @@ Story docs are separate from the data. The optional env var `SAHNE_STORY_DOCS` (
 | `SAHNE_STORY_DOCS` | env, an absolute folder | holds `STORIES_WORLD.md` | no sites on the board; the needs-vs-world test skips |
 | stories, characters, places | `<root>/{stories,characters,places}/<id>.json` | `schema/story.json`, `character.json`, `place.json` | required |
 | series, seasons | `<root>/series.json`, `<root>/seasons/s<n>.json` | `schema/series.json`, `season.json` | one warning; the series rules skip |
-| cards | `<root>/cards/`, `<root>/cards-extra/` | `<id>.json` with `tr`, `en`, `fa`, `level`, `ref`, `retired` | `loadCards()` returns `null` (not `{}`); every card rule skips |
+| cards | `<root>/cards/`, `<root>/cards-extra/` | `<id>.json` with the word in each language (`tr`, `en`, `fa`), `level`, `ref`, `retired` | `loadCards()` returns `null` (not `{}`); every card rule skips |
 | grammar | `<root>/grammar/<id>.json` | with `ref`, `level` | lesson refs are not checked |
 | syllabus | `<root>/syllabus/a1.json` | `{ words, lessons, units }` | the known-word ratio uses the cards alone, or skips |
 | calendar | each season's `calendar`, else `<root>/days.json` | `{ "s1e01": { "date": "2026-09-07", "week": 1, "kind": "episode" } }` | the calendar rules skip; a flag's story is dated by its own `releaseDate` |
@@ -61,9 +61,37 @@ The JSON schemas stay in `schema/`. Each file is named by its `id`. The gallery'
 
 ## Series, seasons, episodes
 
-A content root holds one **series**: its story world. `series.json` names it (`title`, `titleEn`, `titleFa`, an optional `summary` and `summaryFa`) and its `narrator` and `standin` (the stage casts `NARRATOR` and `STANDIN`, `src/types.ts`; another id is an error for now). A series has **seasons**, one `seasons/s<n>.json` each: `id` (`s<n>`, the file name), `n`, the titles and summaries, an optional `launch` date, the weeks' `arcs` by arc id (`s<n>wNN`) and the release `calendar` by story id (`{ date, kind, week }`, the shape of `days.json`). The **episodes** are the story documents: `s<n>eNN` is episode NN of season n (`seasonOf`), ordered by id; a story's `kind` says whether it is a weekday episode or a Saturday special. A series and its seasons have no level: a story's own `level` and `ref` are its own.
+A content root holds one **series**: its story world. `series.json` names it (`title`, an optional `summary`), its `languages` ([Languages](#languages)) and its `narrator` and `standin` (the stage casts `NARRATOR` and `STANDIN`, `src/types.ts`; another id is an error for now). A series has **seasons**, one `seasons/s<n>.json` each: `id` (`s<n>`, the file name), `n`, the titles and summaries, an optional `launch` date, the weeks' `arcs` by arc id (`s<n>wNN`) and the release `calendar` by story id (`{ date, kind, week }`, the shape of `days.json`). The **episodes** are the story documents: `s<n>eNN` is episode NN of season n (`seasonOf`), ordered by id; a story's `kind` says whether it is a weekday episode or a Saturday special. A series and its seasons have no level: a story's own `level` and `ref` are its own.
 
 `checkSeries` (in `stories.ts --check`): each document against its schema and its file name; the narrator and stand-in have character documents of that kind; every story's season has a document; where a season has a calendar, a row for each of its stories and a story for each row (one not written yet is a warning); each story's `arc` equals its season's `arcs` entry; while `days.json` is still written beside the calendars, a difference is a warning: the seasons are the source, and `days.json` is regenerated from them. A story's own calendar rules read the season's row: its `releaseDate` and `kind`, and its arc id from the week (`arcId`). Types: `SeriesDoc`, `SeasonDoc`, `CalendarRow` (`src/types.ts`); paths: `SERIES`, `SEASONS`, `seasonFile`, `seasonIds` (`paths.ts`).
+
+## Languages
+
+A series names its languages in `series.json`: `"languages": { "main": "tr", "translations": ["en", "fa"] }`. The main language is the one the stage plays and the learner learns; the translations are what the host shows beside it (the card, the log, the glosses). A root without `languages` is Turkish with English and Persian (`DEFAULT_LANGUAGES`, `src/texts.ts`). A code is a 2–3 letter tag with optional subtags (`pt-BR`), and none may be a step's own key (`STEP_KEYS`: `to`, `do`, `at`, `on`, …), because a line holds its texts beside its staging.
+
+**Where the texts live.**
+
+| Text | Shape | In which languages (`check/languages.ts`) |
+|---|---|---|
+| a line, a choice option, a reply | flat beside the staging: `{ "who": "nima", "tr": "…", "en": "…", "fa": "…", "do": "wave" }` | every one |
+| an arc (a story's, a season's `arcs`) | flat: `{ "tr": "…", "en": "…", "fa": "…", "mechanics": […] }` | every one |
+| an act's prompt | flat: `{ "tr": "…" }` | the main one |
+| a story's, series' or season's `title` | a map: `{ "tr": "…", "en": "…", "fa": "…" }` | every one (a series' summary is optional) |
+| a story's `summary` | a map | the translations |
+| a quiz item's `q` | a map (its `options` and `why` are the main language's) | every one |
+| a gloss, `gl` | the main language's word → a map of its meaning: `"elma": { "fa": "سیب", "en": "apple" }` | the translations |
+| a character's `name` | a map | the main one (others optional) |
+| a character's `role`, `bio` | maps | the translations |
+| a place's `name` | a map | every one (`lintPlace`) |
+
+A missing text is a `schema` error. `textIn(t, lang)` and `textOf(t, …langs)` read a text, and `dirOf(lang)` gives its direction (`fa`, `ar`, `he`, `ur` … run right to left). `adaptStory` takes the series' `languages`: the main language's text reaches the stage, and each cue's `info.text` carries every language (with `tr` as the main language's, `en` and `fa` kept for the hosts that read them).
+
+**The old shape.** Before series named their languages, the texts that are not a line's sat in suffixed fields: `title` (Turkish), `titleEn`, `titleFa`; `summary` (English, in practice), `summaryFa`; a character's `name`, `nameFa`, `role`, `roleFa`, `bio`, `bioFa`; a quiz item's `q`, `en`, `fa`; a gloss as `[fa, en]`. `upgrade(kind, doc)` (`src/upgrade.ts`) turns each into a map by a fixed table, in its field's place. Every loader reads through it (`check/world.ts`), so an old root still checks, with one warning naming its files; `convert/languages.ts` writes the new shape to disk, keeping each number's spelling, the key order and the final newline (`json.ts`):
+
+```bash
+node packages/sahne-story/convert/languages.ts           # $SAHNE_CONTENT (or the samples), in place
+node packages/sahne-story/convert/languages.ts --check   # exits 1 while a file is in the old shape (in pnpm sahne check)
+```
 
 ## Places
 
@@ -111,6 +139,7 @@ pnpm sahne check             # from the repo root: types, sizes and every Sahne 
 - `test/schema.test.ts`, `test/drafts.test.ts`: the schemas accept every document of the content root and refuse a seeded break; every story passes the check with no errors.
 - `test/extras.test.ts`: the extras' generator is deterministic, the extras' files are current, every extra passes the cast check, a broken one is caught, and the generator leaves the roster's files in the shared folder alone.
 - `test/cast.test.ts`: every roster avatar, each outfit applied, and every extra, composed at rest: the stage's lone-figure framing (`figureBox` from `figureDims`) holds every head piece inside its top and sides at head and bust and every piece at full; the still (`renderSvg`) holds the hair and headwear inside its picture at head and bust (a failure there is hair or a hat beyond the still's clamp, 1.5 head heights up and 0.8 head widths out); and each raw document is within the 2 KB cap.
+- `test/languages.test.ts`: the old shape upgraded by its table and in place, once; the converter on a copy of the samples (numbers, key order, newline, `--check`); a missing translation and a language code that is a step's key refused.
 - `test/json.test.ts`: `json.ts`, the Node helpers that read and write a content file without changing what an edit did not touch (each number's spelling, the key order, the final newline, an atomic write). Backstage saves through them.
 - `test/story.test.ts`, `test/places.test.ts`: the adapter and the lints on the bakkal test scene, written as a story (`test/fixtures/`, with a small card index of its own, `fixtures/cards.json`).
 - Tests of Kumru's own stories (s1e01, the seeded breaks of each story-check rule on it, the card index) live in the Kumru repo, which runs them on its data.

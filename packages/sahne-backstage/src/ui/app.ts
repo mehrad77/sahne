@@ -11,6 +11,7 @@ import { html } from "htm/preact";
 import { useState } from "preact/hooks";
 import "@preact/signals";
 import { dirtyKeys, notice, route, world } from "../store.ts";
+import { tx } from "./fields.ts";
 import { Home } from "./home.ts";
 import { Season } from "./season.ts";
 import { Episode } from "./episode.ts";
@@ -28,13 +29,13 @@ export function App() {
   return html`<div class="shell">
     <nav class="nav">
       <h1>Backstage</h1>
-      <div class="sub">${w.series?.titleEn ?? "No series yet"}${w.samples ? " · samples" : ""}${w.writable ? "" : " · read-only"}</div>
+      <div class="sub">${w.series ? tx(w.series.title, "en") : "No series yet"}${w.samples ? " · samples" : ""}${w.writable ? "" : " · read-only"}</div>
       <a href="#/" aria-current=${here()}>The series</a>
       <a href="#/review" aria-current=${here("review")}>Review</a>
       <a href="#/cast" aria-current=${here("cast")}>The cast</a>
       <a href="#/places" aria-current=${here("places")}>Places</a>
       <div class="group">Seasons</div>
-      ${seasons.map(s => html`<${SeasonNav} key=${s.id} id=${s.id} n=${s.n} title=${s.titleEn} />`)}
+      ${seasons.map(s => html`<${SeasonNav} key=${s.id} id=${s.id} n=${s.n} title=${tx(s.title, "en")} />`)}
       ${!seasons.length && html`<p class="note">No seasons yet.</p>`}
       ${dirtyKeys.value.length > 0 && html`<p class="note" style="margin-top:14px">Unsaved: ${dirtyKeys.value.map(k => k.replace(":", " ")).join(", ")}</p>`}
     </nav>
@@ -56,8 +57,8 @@ function SeasonNav(p: { id: string; n: number; title: string }) {
       <button class="caret" aria-expanded=${shown} aria-label=${`${shown ? "Close" : "Open"} ${p.title}`} onClick=${() => setOpen(!shown)}>${shown ? "▾" : "▸"}</button>
       <a class="grow" href=${`#/season/${p.id}`} aria-current=${r[0] === "season" && r[1] === p.id ? "page" : undefined}>${p.title} <small class="note">${eps.length}</small></a>
     </div>
-    ${shown && html`<div class="eps">${eps.map(e => html`<a href=${`#/episode/${e.id}`} aria-current=${r[0] === "episode" && r[1] === e.id ? "page" : undefined} title=${e.titleEn ?? ""}>
-      <span class="id">${e.id.slice(-3)}</span> <span lang="tr">${e.title}</span>${e.kind === "special" ? html` <small class="note">special</small>` : ""}${e.draft ? html` <small class="note">draft</small>` : ""}</a>`)}
+    ${shown && html`<div class="eps">${eps.map(e => html`<a href=${`#/episode/${e.id}`} aria-current=${r[0] === "episode" && r[1] === e.id ? "page" : undefined} title=${tx(e.title, "en")}>
+      <span class="id">${e.id.slice(-3)}</span> <span lang="tr">${tx(e.title)}</span>${e.kind === "special" ? html` <small class="note">special</small>` : ""}${e.draft ? html` <small class="note">draft</small>` : ""}</a>`)}
       <a href=${`#/new/${p.id}`} class="note">+ a new episode</a></div>`}
   </div>`;
 }

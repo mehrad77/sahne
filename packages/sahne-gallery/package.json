@@ -12,7 +12,7 @@
     "golden": "node golden.mjs",
     "golden:update": "node golden.mjs --update",
     "thumbs": "node thumbs.mjs",
-    "check": "tsc -p ../tsconfig.json && node size.mjs && node determinism.mjs && node ../sahne-story/stories.ts --check --quiet && node ../sahne-story/cast/extras.ts --check && node --test ../sahne/test/*.test.ts ../sahne-kit/test/*.test.ts ../sahne-tr/test/*.test.ts ../sahne-story/test/*.test.ts ../sahne-backstage/test/*.test.ts test/*.test.ts && node golden.mjs"
+    "check": "tsc -p ../tsconfig.json && node size.mjs && node determinism.mjs && node ../sahne-story/stories.ts --check --quiet && node ../sahne-story/cast/extras.ts --check && node ../sahne-story/convert/languages.ts --check && node --test ../sahne/test/*.test.ts ../sahne-kit/test/*.test.ts ../sahne-tr/test/*.test.ts ../sahne-story/test/*.test.ts ../sahne-backstage/test/*.test.ts test/*.test.ts && node golden.mjs"
   },
   "dependencies": {
     "sahne": "workspace:*",

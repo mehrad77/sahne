@@ -1,16 +1,22 @@
 {
-  "bio": "A collared dove who knows every rooftop in Istanbul.",
-  "bioFa": "یک قمری که همه‌ی پشت‌بام‌های استانبول را می‌شناسد.",
+  "bio": {
+    "en": "A collared dove who knows every rooftop in Istanbul.",
+    "fa": "یک قمری که همه‌ی پشت‌بام‌های استانبول را می‌شناسد."
+  },
   "color": "#7A6E64",
   "id": "kerim",
   "kind": "narrator",
   "level": "A1",
-  "name": "Kerim",
-  "nameFa": "کریم",
+  "name": {
+    "tr": "Kerim",
+    "fa": "کریم"
+  },
   "order": 1,
   "puppet": "bird",
-  "role": "The kumru who tells the stories",
-  "roleFa": "قمری‌ای که داستان‌ها را تعریف می‌کند",
+  "role": {
+    "en": "The kumru who tells the stories",
+    "fa": "قمری‌ای که داستان‌ها را تعریف می‌کند"
+  },
   "terms": [
     "a1-w-kus"
   ],

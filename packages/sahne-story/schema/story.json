@@ -12,10 +12,7 @@
     "arc",
     "ref",
     "title",
-    "titleEn",
-    "titleFa",
     "summary",
-    "summaryFa",
     "place",
     "cast",
     "lessons",
@@ -55,27 +52,12 @@
       "type": "object",
       "required": [
         "id",
-        "tr",
-        "en",
-        "fa",
         "mechanics"
       ],
       "properties": {
         "id": {
           "type": "string",
           "pattern": "^s[1-9][0-9]?w[0-9]{2}$"
-        },
-        "tr": {
-          "type": "string",
-          "minLength": 1
-        },
-        "en": {
-          "type": "string",
-          "minLength": 1
-        },
-        "fa": {
-          "type": "string",
-          "minLength": 1
         },
         "mechanics": {
           "type": "array",
@@ -91,31 +73,23 @@
           "uniqueItems": true
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "patternProperties": {
+        "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     },
     "ref": {
       "type": "string",
       "pattern": "^(A1|A2|B1)_[1-6]$"
     },
     "title": {
-      "type": "string",
-      "minLength": 1
-    },
-    "titleEn": {
-      "type": "string",
-      "minLength": 1
-    },
-    "titleFa": {
-      "type": "string",
-      "minLength": 1
+      "$ref": "#/$defs/text"
     },
     "summary": {
-      "type": "string",
-      "minLength": 1
-    },
-    "summaryFa": {
-      "type": "string",
-      "minLength": 1
+      "$ref": "#/$defs/text"
     },
     "place": {
       "type": "string",
@@ -163,12 +137,7 @@
         "pattern": "^[^A-ZİÇĞÖŞÜ]+$"
       },
       "additionalProperties": {
-        "type": "array",
-        "minItems": 2,
-        "maxItems": 2,
-        "items": {
-          "type": "string"
-        }
+        "$ref": "#/$defs/text"
       }
     },
     "props": {
@@ -217,8 +186,6 @@
         "type": "object",
         "required": [
           "q",
-          "en",
-          "fa",
           "options",
           "a",
           "why",
@@ -226,16 +193,7 @@
         ],
         "properties": {
           "q": {
-            "type": "string",
-            "minLength": 1
-          },
-          "en": {
-            "type": "string",
-            "minLength": 1
-          },
-          "fa": {
-            "type": "string",
-            "minLength": 1
+            "$ref": "#/$defs/text"
           },
           "options": {
             "type": "array",
@@ -273,6 +231,17 @@
   },
   "additionalProperties": false,
   "$defs": {
+    "text": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "looks": {
       "type": "object",
       "additionalProperties": {
@@ -285,27 +254,12 @@
     "line": {
       "type": "object",
       "required": [
-        "who",
-        "tr",
-        "en",
-        "fa"
+        "who"
       ],
       "properties": {
         "who": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$"
-        },
-        "tr": {
-          "type": "string",
-          "minLength": 1
-        },
-        "en": {
-          "type": "string",
-          "minLength": 1
-        },
-        "fa": {
-          "type": "string",
-          "minLength": 1
         },
         "narr": {
           "const": true
@@ -371,24 +325,8 @@
     },
     "option": {
       "type": "object",
-      "required": [
-        "tr",
-        "en",
-        "fa"
-      ],
+      "required": [],
       "properties": {
-        "tr": {
-          "type": "string",
-          "minLength": 1
-        },
-        "en": {
-          "type": "string",
-          "minLength": 1
-        },
-        "fa": {
-          "type": "string",
-          "minLength": 1
-        },
         "ok": {
           "type": "boolean"
         },

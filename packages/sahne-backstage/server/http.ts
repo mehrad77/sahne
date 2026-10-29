@@ -8,7 +8,7 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { CONTENT, IS_SAMPLES } from "../../sahne-story/paths.ts";
-import { allProblems, check, exists, forget, isKind, lessons, listing, readDoc, save, searchCards, type Edit } from "./content.ts";
+import { allProblems, check, exists, forget, isKind, lessons, listing, oldShape, readDoc, save, searchCards, type Edit } from "./content.ts";
 import { headOf } from "./git.ts";
 import { readReview, writeReview } from "./review.ts";
 import { ai, aiReady } from "./ai.ts";
@@ -58,7 +58,7 @@ export async function serve(o: Options): Promise<Running> {
   async function api(req: http.IncomingMessage, res: http.ServerResponse, path: string[]) {
     const [route, a, b] = path;
     const m = req.method ?? "GET";
-    if (route === "world" && m === "GET") return json(res, 200, { ...listing(), samples: IS_SAMPLES, writable: o.write, ai: aiReady() });
+    if (route === "world" && m === "GET") return json(res, 200, { ...listing(), samples: IS_SAMPLES, writable: o.write && !oldShape().length, oldShape: oldShape().length, ai: aiReady() });
     if (route === "reload" && m === "POST") { forget(); return json(res, 200, { ok: true }); }
     if (route === "doc" && m === "GET" && a && b) {
       if (!isKind(a) || !exists(a, b)) throw new Fail(404, `no ${a} ${b}`);

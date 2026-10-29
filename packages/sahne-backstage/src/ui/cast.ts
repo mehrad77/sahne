@@ -12,7 +12,7 @@ import { set } from "../model/path.ts";
 import { dirty } from "../model/history.ts";
 import { KIT } from "../stage.ts";
 import { change, checkDocs, checked, createDoc, draftOf, go, history, keyOf, openDoc, saveDocs, world } from "../store.ts";
-import { NumberField, Problems, Section, Select, Text } from "./fields.ts";
+import { NumberField, Problems, Section, Select, Text, tx } from "./fields.ts";
 import { Json } from "./staging.ts";
 
 const svg = (doc: unknown, size = 120, framing: "head" | "bust" | "full" = "bust") => {
@@ -26,7 +26,7 @@ export function CastPage() {
   const roster = all.filter(c => c.kind !== "extra"), extras = all.filter(c => c.kind === "extra");
   const card = (c: CharacterDoc) => html`<a class="card" href=${`#/character/${c.id}`}>
     <div class="portrait" dangerouslySetInnerHTML=${{ __html: c.avatar ? svg(c.avatar) : "" }}></div>
-    <b>${c.name}</b><small>${c.id} · ${c.kind}${(c as Record<string, unknown>).role ? ` · ${(c as Record<string, unknown>).role}` : ""}</small></a>`;
+    <b>${tx(c.name)}</b><small>${c.id} · ${c.kind}${c.role ? ` · ${tx(c.role, "en")}` : ""}</small></a>`;
   return html`<section>
     <div class="row"><h2 class="grow">The cast</h2><${NewCharacter} /></div>
     <div class="cards">${roster.map(card)}</div>
@@ -42,7 +42,7 @@ function NewCharacter() {
   const create = () => {
     const order = Math.max(0, ...Object.values(w.characters).filter(c => c.kind !== "extra").map(c => Number(c.order ?? 0))) + 1;
     const base = w.characters[w.series?.standin ?? "nima"]?.avatar;
-    createDoc("character", id, { id, order, name: id[0].toUpperCase() + id.slice(1), nameFa: "…", kind: "cast", role: "…", roleFa: "…", bio: "…", bioFa: "…", color: "#7A6A58", level: "A1", ...(base ? { avatar: base } : {}) });
+    createDoc("character", id, { id, order, name: { tr: id[0].toUpperCase() + id.slice(1), fa: "…" }, kind: "cast", role: { en: "…", fa: "…" }, bio: { en: "…", fa: "…" }, color: "#7A6A58", level: "A1", ...(base ? { avatar: base } : {}) });
     go("character", id);
   };
   return html`<form class="row" onSubmit=${(e: Event) => { e.preventDefault(); if (ok) create(); }}>
@@ -61,7 +61,7 @@ export function CharacterPage(p: { id?: string }) {
 
 function Character(p: { id: string }) {
   const w = world.value!;
-  const d = draftOf("character", p.id)!, c = d.doc as CharacterDoc & Record<string, any>, was = d.saved as Record<string, unknown>;
+  const d = draftOf("character", p.id)!, c = d.doc as CharacterDoc & Record<string, any>, was = d.saved as CharacterDoc;
   const key = keyOf("character", p.id);
   const extra = c.kind === "extra";
   const edit = (fn: (x: CharacterDoc) => CharacterDoc, field?: string) => change<CharacterDoc>("character", p.id, fn, field);
@@ -84,7 +84,7 @@ function Character(p: { id: string }) {
   const others = Object.values(w.characters).filter(o => o.kind === "cast" && o.id !== p.id);
   return html`<section>
     <div class="toolbar row">
-      <div class="grow"><h2 style="margin:0">${c.name} <small class="note">${p.id} · ${c.kind}${d.create ? " · new" : ""}</small></h2></div>
+      <div class="grow"><h2 style="margin:0">${tx(c.name)} <small class="note">${p.id} · ${c.kind}${d.create ? " · new" : ""}</small></h2></div>
       <a href="#/cast">← the cast</a>
       <button onClick=${() => history("character", p.id, "undo")} disabled=${!d.past.length}>↶ Undo</button>
       <button onClick=${() => history("character", p.id, "redo")} disabled=${!d.future.length}>↷ Redo</button>
@@ -106,12 +106,12 @@ function Character(p: { id: string }) {
       </div>
       <div class="fields">
         ${!extra && html`<div class="panel fields">
-          <${Text} label="Name (Turkish)" lang="tr" value=${c.name} changed=${c.name !== was.name} onInput=${(v: string | undefined) => put("name", v ?? "")} />
-          <${Text} label="Name (Persian)" lang="fa" value=${c.nameFa} changed=${c.nameFa !== was.nameFa} onInput=${(v: string | undefined) => put("nameFa", v ?? "")} />
-          <${Text} label="Role · English" value=${c.role} onInput=${(v: string | undefined) => put("role", v ?? "")} />
-          <${Text} label="Role · Persian" lang="fa" value=${c.roleFa} onInput=${(v: string | undefined) => put("roleFa", v ?? "")} />
-          <${Text} label="Bio · English" multi value=${c.bio} onInput=${(v: string | undefined) => put("bio", v ?? "")} />
-          <${Text} label="Bio · Persian" lang="fa" multi value=${c.bioFa} onInput=${(v: string | undefined) => put("bioFa", v ?? "")} />
+          <${Text} label="Name (Turkish)" lang="tr" value=${c.name?.tr} changed=${c.name?.tr !== was.name?.tr} onInput=${(v: string | undefined) => put("name", { ...c.name, tr: v ?? "" })} />
+          <${Text} label="Name (Persian)" lang="fa" value=${c.name?.fa} changed=${c.name?.fa !== was.name?.fa} onInput=${(v: string | undefined) => put("name", { ...c.name, fa: v ?? "" })} />
+          <${Text} label="Role · English" value=${c.role?.en} onInput=${(v: string | undefined) => put("role", { ...c.role, en: v ?? "" })} />
+          <${Text} label="Role · Persian" lang="fa" value=${c.role?.fa} onInput=${(v: string | undefined) => put("role", { ...c.role, fa: v ?? "" })} />
+          <${Text} label="Bio · English" multi value=${c.bio?.en} onInput=${(v: string | undefined) => put("bio", { ...c.bio, en: v ?? "" })} />
+          <${Text} label="Bio · Persian" lang="fa" multi value=${c.bio?.fa} onInput=${(v: string | undefined) => put("bio", { ...c.bio, fa: v ?? "" })} />
           <div class="row">
             <label class="field">Colour <input type="color" style="width:60px;height:34px;padding:2px" value=${c.color} onInput=${(e: Event) => put("color", (e.target as HTMLInputElement).value.toUpperCase())} /></label>
             <div class="grow"><${NumberField} label="Order" value=${c.order} min=${1} onInput=${(v: number | undefined) => put("order", v)} /></div>

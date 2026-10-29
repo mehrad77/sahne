@@ -9,7 +9,7 @@ import type { SeasonDoc, SeriesDoc, StoryDoc } from "sahne-story";
 import { set } from "../model/path.ts";
 import { dirty } from "../model/history.ts";
 import { change, createDoc, draftOf, go, keyOf, openDoc, saveDocs, world } from "../store.ts";
-import { Problems, Select, Text, Tri } from "./fields.ts";
+import { Problems, Select, Text, Tri, tx } from "./fields.ts";
 import { startSeries } from "../model/series.ts";
 import { checked } from "../store.ts";
 
@@ -26,11 +26,11 @@ export function SeriesEditor() {
   if (!ready || !d) return html`<p class="note">Opening the series…</p>`;
   const s = d.doc as SeriesDoc, key = keyOf("series", "series");
   const put = (k: string, v: unknown) => change<SeriesDoc>("series", "series", x => set(x, [k], v), k);
-  const people = Object.values(w.characters).filter(c => c.kind !== "extra").map(c => [c.id, `${c.name} (${c.kind})`] as [string, string]);
+  const people = Object.values(w.characters).filter(c => c.kind !== "extra").map(c => [c.id, `${tx(c.name)} (${c.kind})`] as [string, string]);
   return html`<div class="panel fields">
-    <${Tri} label="Title" keys=${["title", "titleEn", "titleFa"]} doc=${s as unknown as Record<string, unknown>} saved=${d.saved as Record<string, unknown>} onInput=${(k: string, v: string | undefined) => put(k, v ?? "")} />
-    <${Text} label="Summary · English" multi value=${s.summary} onInput=${(v: string | undefined) => put("summary", v)} />
-    <${Text} label="Summary · Persian" lang="fa" multi value=${s.summaryFa} onInput=${(v: string | undefined) => put("summaryFa", v)} />
+    <${Tri} label="Title" doc=${s.title} saved=${(d.saved as SeriesDoc).title} onInput=${(k: string, v: string | undefined) => put("title", { ...s.title, [k]: v ?? "" })} />
+    <${Text} label="Summary · English" multi value=${s.summary?.en} onInput=${(v: string | undefined) => put("summary", { ...s.summary, en: v ?? "" })} />
+    <${Text} label="Summary · Persian" lang="fa" multi value=${s.summary?.fa} onInput=${(v: string | undefined) => put("summary", { ...s.summary, fa: v ?? "" })} />
     <div class="row">
       <div class="grow"><${Select} label="Narrator" value=${s.narrator} options=${people} onInput=${(v: string | undefined) => v && put("narrator", v)} /></div>
       <div class="grow"><${Select} label="Stand-in (the learner)" value=${s.standin} options=${people} onInput=${(v: string | undefined) => v && put("standin", v)} /></div>
@@ -105,9 +105,9 @@ export function SeasonEditor(p: { id: string }) {
 
   return html`<div class="fields">
     <div class="panel fields">
-      <${Tri} label="Title" keys=${["title", "titleEn", "titleFa"]} doc=${se as unknown as Record<string, unknown>} saved=${d.saved as Record<string, unknown>} onInput=${(k: string, v: string | undefined) => put(k, v ?? "")} />
-      <${Text} label="Summary · English" multi value=${se.summary} onInput=${(v: string | undefined) => put("summary", v)} />
-      <${Text} label="Summary · Persian" lang="fa" multi value=${se.summaryFa} onInput=${(v: string | undefined) => put("summaryFa", v)} />
+      <${Tri} label="Title" doc=${se.title} saved=${(d.saved as SeasonDoc).title} onInput=${(k: string, v: string | undefined) => put("title", { ...se.title, [k]: v ?? "" })} />
+      <${Text} label="Summary · English" multi value=${se.summary?.en} onInput=${(v: string | undefined) => put("summary", { ...se.summary, en: v ?? "" })} />
+      <${Text} label="Summary · Persian" lang="fa" multi value=${se.summary?.fa} onInput=${(v: string | undefined) => put("summary", { ...se.summary, fa: v ?? "" })} />
       <div class="field"><label>Launch day</label><input type="date" style="max-width:200px" value=${se.launch ?? ""} onInput=${(e: Event) => put("launch", (e.target as HTMLInputElement).value || undefined)} /></div>
     </div>
     <h3>Weeks and their arcs</h3>
@@ -142,7 +142,7 @@ export function NewSeason() {
   const n = Math.max(0, ...Object.values(w.seasons).map(s => s.n)) + 1;
   const make = async () => {
     const id = `s${n}`;
-    createDoc("season", id, { v: 1, id, n, title: `${n}. sezon`, titleEn: `Season ${n}`, titleFa: `فصل ${n}`, arcs: { [`s${n}w01`]: { tr: "…", en: "…", fa: "…", mechanics: ["say"] } }, calendar: {} });
+    createDoc("season", id, { v: 1, id, n, title: { tr: `${n}. sezon`, en: `Season ${n}`, fa: `فصل ${n}` }, arcs: { [`s${n}w01`]: { tr: "…", en: "…", fa: "…", mechanics: ["say"] } }, calendar: {} });
     if (await saveDocs([keyOf("season", id)])) go("season", id);
   };
   return html`<button disabled=${!w.series || !w.writable} onClick=${() => void make()}>+ Season ${n}</button>`;

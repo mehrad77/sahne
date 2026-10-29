@@ -5,9 +5,13 @@
 import { html } from "htm/preact";
 import type { ComponentChildren } from "preact";
 import { useId } from "preact/hooks";
+import { textOf } from "sahne-story";
 import type { Problem } from "../api.ts";
 
 export type Lang = "tr" | "en" | "fa";
+
+/** A text map's entry in `lang` (or its first), as a string to show. */
+export const tx = (t: unknown, lang: string = "tr"): string => textOf(t, lang) ?? "";
 const LANG_NAME: Record<Lang, string> = { tr: "Turkish", en: "English", fa: "Persian" };
 
 export function Text(p: { label: string; value: unknown; lang?: Lang; multi?: boolean; changed?: boolean; placeholder?: string; onInput(v: string | undefined): void }) {
@@ -23,7 +27,7 @@ export function Text(p: { label: string; value: unknown; lang?: Lang; multi?: bo
   </div>`;
 }
 
-/** Three texts of one thing: keys default to tr / en / fa (a title's are title / titleEn / titleFa). */
+/** Three texts of one thing: keys default to tr / en / fa (a title's map, or a line's own keys). */
 export function Tri(p: { label: string; doc: Record<string, unknown> | undefined; keys?: [string, string, string]; saved?: Record<string, unknown>; multi?: boolean; onInput(key: string, v: string | undefined): void }) {
   const keys = p.keys ?? ["tr", "en", "fa"];
   const langs: Lang[] = ["tr", "en", "fa"];

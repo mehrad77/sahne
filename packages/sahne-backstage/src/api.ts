@@ -1,10 +1,10 @@
 // The server's JSON API (server/http.ts), typed for the pages.
 
-import type { CharacterDoc, SeasonDoc, SeriesDoc, StoryPlace } from "sahne-story";
+import type { CharacterDoc, LangText, SeasonDoc, SeriesDoc, StoryPlace } from "sahne-story";
 
 export type Kind = "series" | "season" | "story" | "character" | "place";
 
-export interface Episode { id: string; season?: number; title: string; titleEn?: string; kind?: "episode" | "special"; releaseDate?: string; draft: boolean; place: string; cast: string[] }
+export interface Episode { id: string; season?: number; title: LangText; kind?: "episode" | "special"; releaseDate?: string; draft: boolean; place: string; cast: string[] }
 export interface World {
   series: SeriesDoc | null;
   seasons: Record<string, SeasonDoc>;
@@ -16,6 +16,8 @@ export interface World {
   cards: boolean;
   samples: boolean;
   writable: boolean;
+  /** How many content files are still in the old language shape (then nothing is saved: convert the root first). */
+  oldShape?: number;
   /** Whether AI help is on (the server has ANTHROPIC_API_KEY). */
   ai?: boolean;
 }

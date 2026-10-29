@@ -51,8 +51,8 @@ test("a character with a break is refused", () => {
 
 test("a place with a break is refused", () => {
   const p = json(new URL("bakkal.json", PLACES));
-  delete p.name.fa;
-  assert.ok(validateDoc("place", p).some(x => x.path === "/name"));
+  p.name = { fa: 7 };
+  assert.ok(validateDoc("place", p).some(x => x.path === "/name/fa"), "a name is text by language (which languages: lintPlace)");
   const q = json(new URL("bakkal.json", PLACES)); q.size = { w: 0, d: 4 };
   assert.ok(validateDoc("place", q).some(x => x.path === "/size/w"));
 });

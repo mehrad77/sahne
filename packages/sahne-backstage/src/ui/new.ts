@@ -10,7 +10,7 @@ import type { SeasonDoc, StoryDoc } from "sahne-story";
 import { api } from "../api.ts";
 import { set } from "../model/path.ts";
 import { change, createDoc, draftOf, go, openDoc, world } from "../store.ts";
-import { Select, Text, Tri } from "./fields.ts";
+import { Select, Text, Tri, tx } from "./fields.ts";
 import { skeleton } from "../model/skeleton.ts";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -20,7 +20,7 @@ export function NewEpisode(p: { season?: string }) {
   const se = p.season ? w.seasons[p.season] : undefined;
   const taken = new Set(w.episodes.map(e => e.id));
   const next = useMemo(() => { if (!se) return ""; let k = 1; while (taken.has(`s${se.n}e${pad(k)}`)) k++; return `s${se.n}e${pad(k)}`; }, [se?.n]);
-  const [f, setF] = useState<Record<string, any>>({ id: next, kind: "episode", cast: [], words: [], lessons: [], title: "", titleEn: "", titleFa: "", summary: "", summaryFa: "" });
+  const [f, setF] = useState<Record<string, any>>({ id: next, kind: "episode", cast: [], words: [], lessons: [], title: { tr: "", en: "", fa: "" }, summary: { en: "", fa: "" } });
   const [q, setQ] = useState(""), [cards, setCards] = useState<{ id: string; tr: string; en: string }[]>([]);
   const [lessons, setLessons] = useState<{ id: string; ref?: string }[]>([]);
   useEffect(() => { void api.get<{ lessons: { id: string; ref?: string }[] }>("lessons").then(r => setLessons(r.lessons ?? [])); }, []);
@@ -43,7 +43,7 @@ export function NewEpisode(p: { season?: string }) {
     !arcId && "the season has no week yet: add one on the season's page",
     words.length < nWords[0] && `${nWords[0]}–${nWords[1]} target words (${words.length} now)${w.cards ? "" : ": type card ids, comma between"}`,
     !ls.length && "1–3 lessons",
-    !f.title && "a Turkish title",
+    !f.title.tr && "a Turkish title",
   ].filter(Boolean) as string[];
 
   const create = async () => {
@@ -52,7 +52,7 @@ export function NewEpisode(p: { season?: string }) {
     const level = levels.sort((a, b) => levels.filter(x => x === b).length - levels.filter(x => x === a).length)[0];
     const a = se.arcs?.[arcId!] ?? { tr: "…", en: "…", fa: "…", mechanics: ["say" as const] };
     const doc = skeleton({ id: f.id, season: se.n, releaseDate: f.releaseDate, kind: f.kind, week, arc: { ...a, id: arcId! }, place: f.place, cast, words, lessons: ls,
-      title: f.title, titleEn: f.titleEn, titleFa: f.titleFa, summary: f.summary, summaryFa: f.summaryFa, level }, { narrator, standin, places: w.places });
+      title: f.title, summary: f.summary, level }, { narrator, standin, places: w.places });
     createDoc("story", f.id, doc);
     // its row in the season's calendar, saved with it
     if (se.calendar) {
@@ -63,7 +63,7 @@ export function NewEpisode(p: { season?: string }) {
   };
 
   return html`<section>
-    <h2>A new episode of ${se.titleEn}</h2>
+    <h2>A new episode of ${tx(se.title, "en")}</h2>
     <p class="note">The brief: what the episode is about and what it teaches. The editor then opens a skeleton to write and stage; it is saved once the story check finds no error. It starts as a draft.</p>
     <div class="episode">
       <div class="fields panel">
@@ -75,10 +75,10 @@ export function NewEpisode(p: { season?: string }) {
         <${Select} label="Week (its arc)" value=${arcId} options=${arcs.map(([id, a]) => [id, `${id} · ${a.en}`] as [string, string])} onInput=${(v: string | undefined) => put("arc", v)} />
         <${Select} label="Place" value=${f.place} options=${Object.entries(w.places).map(([id, pl]) => [id, `${pl.name?.en ?? id} (${id})`] as [string, string])} onInput=${(v: string | undefined) => put("place", v)} />
         <div class="field"><label>Cast (${w.characters[standin]?.name ?? standin} is always in it)</label>
-          <div class="row">${people.filter(c => c.id !== standin && c.id !== narrator).map(c => html`<label class="row"><input type="checkbox" style="width:auto" checked=${cast.includes(c.id)} onChange=${(e: Event) => put("cast", (e.target as HTMLInputElement).checked ? [...cast, c.id] : cast.filter(x => x !== c.id))} /> ${c.name}${c.kind === "extra" ? html` <small class="note">${c.id}</small>` : ""}</label>`)}</div></div>
-        <${Tri} label="Title" keys=${["title", "titleEn", "titleFa"]} doc=${f} onInput=${(k: string, v: string | undefined) => put(k, v ?? "")} />
-        <${Text} label="Premise · English (becomes the summary)" multi value=${f.summary} onInput=${(v: string | undefined) => put("summary", v ?? "")} />
-        <${Text} label="Premise · Persian" lang="fa" multi value=${f.summaryFa} onInput=${(v: string | undefined) => put("summaryFa", v ?? "")} />
+          <div class="row">${people.filter(c => c.id !== standin && c.id !== narrator).map(c => html`<label class="row"><input type="checkbox" style="width:auto" checked=${cast.includes(c.id)} onChange=${(e: Event) => put("cast", (e.target as HTMLInputElement).checked ? [...cast, c.id] : cast.filter(x => x !== c.id))} /> ${tx(c.name)}${c.kind === "extra" ? html` <small class="note">${c.id}</small>` : ""}</label>`)}</div></div>
+        <${Tri} label="Title" doc=${f.title} onInput=${(k: string, v: string | undefined) => put("title", { ...f.title, [k]: v ?? "" })} />
+        <${Text} label="Premise · English (becomes the summary)" multi value=${f.summary.en} onInput=${(v: string | undefined) => put("summary", { ...f.summary, en: v ?? "" })} />
+        <${Text} label="Premise · Persian" lang="fa" multi value=${f.summary.fa} onInput=${(v: string | undefined) => put("summary", { ...f.summary, fa: v ?? "" })} />
       </div>
       <div class="fields">
         <div class="panel fields">

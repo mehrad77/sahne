@@ -19,6 +19,7 @@
 // A document with a `placeholder` (a draft whose art stands in) gets warnings only. The camera check
 // and the owner's review are the gallery's (#/places/<id>, shots.mjs --camera).
 
+import { allLanguages, DEFAULT_LANGUAGES, type Languages } from "./texts.ts";
 import { drawPieces, withVariant, placeSolids, placeState, route, rng, cellSize, fitsAtlas, ATLAS_MAX, TIMES, TIMETABLE, type Kit, type FlatSpec, type Group, type ParamSpec, type PieceDef } from "sahne";
 import { cardProblem, isA1, type CardIndex } from "./cards.ts";
 import { needsOf, type Needs } from "./needs.ts";
@@ -30,7 +31,8 @@ export const PLACE_RULES: PlaceRule[] = ["valid", "needs", "depth", "density", "
 export interface PlaceProblem { rule: PlaceRule; level: "error" | "warning"; message: string }
 
 /** `cards`: the word cards a place's terms must name; without them (null or left out) the card rules do not run. */
-export interface PlaceLintOptions { kit: Kit; cards?: CardIndex | null; needs?: Needs }
+/** `languages`: the series' (src/texts.ts), which a place is named in; without them, Turkish with English and Persian. */
+export interface PlaceLintOptions { kit: Kit; cards?: CardIndex | null; needs?: Needs; languages?: Languages }
 
 /** Depth bands by a piece's z (metres; the camera looks down −z). */
 export const BANDS = [
@@ -102,7 +104,7 @@ export function lintPlace(doc: StoryPlace, o: PlaceLintOptions): PlaceProblem[] 
   const add = (rule: PlaceRule, message: string, lv: PlaceProblem["level"] = level) => out.push({ rule, level: lv, message });
 
   // ---- valid
-  for (const l of ["tr", "en", "fa"] as const) if (!doc.name?.[l]) add("valid", `no name in ${l}`);
+  for (const l of allLanguages(o.languages ?? DEFAULT_LANGUAGES)) if (!doc.name?.[l]) add("valid", `no name in ${l}`);
   if (!doc.district && doc.life !== "run") add("valid", "no district (only a vehicle goes without one)", "warning");
   // a vehicle that stops: its pieces keep the place's timetable and name its stations, so a story's stop lands where they show it
   const timed = doc.pieces.filter(p => "stops" in p && p.stops), tt = { ms: TIMETABLE.ms, run: TIMETABLE.run, ease: TIMETABLE.ease, ...doc.stops };

@@ -1,12 +1,12 @@
 // The server (server/http.ts) on a temp copy of the samples, as an app runs it: it lists the series, its seasons and
 // episodes; a save writes only what changed; an edit that brings an error is refused (422) and writes nothing; a file
 // changed on disk is not overwritten (409); new ids are checked and old ones never change; it answers this machine only;
-// and a read-only backstage writes nothing.
+// a read-only backstage writes nothing; and a root still in the old language shape is shown upgraded but never saved.
 
 import { test, after, before } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync, rmSync, utimesSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -81,7 +81,7 @@ test("an edit that breaks another document is refused: two stories on one date",
   const se = w.seasons.s1, arcId = Object.keys(se.arcs)[0];
   const s0 = (await call(rw.url, "GET", "doc/story/s1e00")).body.doc;
   const doc = skeleton({ id: "s1e02", season: 1, releaseDate: s0.releaseDate, kind: "episode", week: 0, arc: { ...se.arcs[arcId], id: arcId }, place: "bakkal", cast: ["ismail"],
-    words: ["a1-w-a", "a1-w-b", "a1-w-c", "a1-w-d", "a1-w-e"], lessons: ["g_a1_2_var_yok"], title: "İkinci", level: "A1" }, { narrator: "kerim", standin: "nima", places: w.places });
+    words: ["a1-w-a", "a1-w-b", "a1-w-c", "a1-w-d", "a1-w-e"], lessons: ["g_a1_2_var_yok"], title: { tr: "İkinci" }, level: "A1" }, { narrator: "kerim", standin: "nima", places: w.places });
   const r = await call(rw.url, "POST", "save", { edits: [{ kind: "story", id: "s1e02", doc, create: true }] });
   assert.equal(r.status, 422);
   assert.ok(r.body.problems.some((p: { new?: boolean; message: string }) => p.new && /is also .*release date/.test(p.message)));
@@ -91,7 +91,7 @@ test("a file changed on disk since it was opened is not overwritten", async () =
   const { body: { doc, mtime } } = await call(rw.url, "GET", "doc/story/s1e00");
   const t = new Date(Date.now() + 5000);
   utimesSync(file, t, t);
-  doc.titleEn = "Changed";
+  doc.title.en = "Changed";
   const r = await call(rw.url, "POST", "save", { edits: [{ kind: "story", id: "s1e00", doc, mtime }] });
   assert.equal(r.status, 409);
 });
@@ -116,7 +116,7 @@ test("a read-only backstage on the samples writes nothing", async () => {
   assert.equal(w.body.samples, true);
   assert.equal(w.body.writable, false);
   const { body: { doc, mtime } } = await call(ro.url, "GET", "doc/story/s1e00");
-  const r = await call(ro.url, "POST", "save", { edits: [{ kind: "story", id: "s1e00", doc: { ...doc, titleEn: "x" }, mtime }] });
+  const r = await call(ro.url, "POST", "save", { edits: [{ kind: "story", id: "s1e00", doc: { ...doc, title: { ...doc.title, en: "x" } }, mtime }] });
   assert.equal(r.status, 403);
 });
 
@@ -140,7 +140,7 @@ test("a new episode's skeleton, with its calendar row, passes the story check an
   const se = w.seasons.s1;
   const arcId = Object.keys(se.arcs)[0];
   const doc = skeleton({ id: "s1e01", season: 1, releaseDate: "2026-09-15", kind: "episode", week: 0, arc: { ...se.arcs[arcId], id: arcId }, place: "bakkal", cast: ["ismail"],
-    words: ["a1-w-ekmek", "a1-w-su", "a1-w-cay", "a1-w-peynir", "a1-w-zeytin"], lessons: ["g_a1_2_var_yok"], title: "Ekmek var mı?", level: "A1" }, { narrator: "kerim", standin: "nima", places: w.places });
+    words: ["a1-w-ekmek", "a1-w-su", "a1-w-cay", "a1-w-peynir", "a1-w-zeytin"], lessons: ["g_a1_2_var_yok"], title: { tr: "Ekmek var mı?" }, level: "A1" }, { narrator: "kerim", standin: "nima", places: w.places });
   const c = await call(rw.url, "POST", "check", { edits: [{ kind: "story", id: "s1e01", doc, create: true }] });
   assert.deepEqual(c.body.problems.filter((p: { level: string }) => p.level === "error"), []);
   const r = await call(rw.url, "POST", "save", { edits: [{ kind: "story", id: "s1e01", doc, create: true }] });
@@ -174,4 +174,23 @@ test("the page and its bundle are served", async () => {
   const js = await fetch(rw.url + "dist/app/index.js");
   assert.equal(js.status, 200);
   assert.ok((await js.text()).length > 10000);
+});
+
+test("a root in the old language shape opens upgraded and read-only, even with --write", async () => {
+  const old = mkdtempSync(join(tmpdir(), "backstage-old-"));
+  cpSync(SAMPLES, old, { recursive: true });
+  const f = join(old, "series.json"), sr = JSON.parse(readFileSync(f, "utf8"));
+  const { title, ...rest } = sr;
+  writeFileSync(f, JSON.stringify({ ...rest, title: title.tr, titleEn: title.en, titleFa: title.fa }, null, 2) + "\n");
+  const b = await start(["--content", old, "--write"]);
+  try {
+    const w = await call(b.url, "GET", "world");
+    assert.equal(w.body.writable, false);
+    assert.equal(w.body.oldShape, 1);
+    assert.deepEqual((await call(b.url, "GET", "doc/series/series")).body.doc.title, title, "the browser gets the new shape");
+    const { body: { doc, mtime } } = await call(b.url, "GET", "doc/story/s1e00");
+    const r = await call(b.url, "POST", "save", { edits: [{ kind: "story", id: "s1e00", doc, mtime }] });
+    assert.equal(r.status, 403);
+    assert.match(r.body.message, /old language shape/);
+  } finally { b.p.kill(); rmSync(old, { recursive: true, force: true }); }
 });

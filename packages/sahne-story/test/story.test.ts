@@ -48,7 +48,7 @@ test("adapter: every stand-in line is a card, even with one option; the '…' li
   assert.deepEqual(a.turns.map(t => t.kind), ["say", "act", "choice", "say"]);
   const say = info[3].turn!;
   assert.equal(say.kind, "say");
-  assert.deepEqual(say.kind === "say" && say.options, [{ tr: "Ekmek var mı? Süt var mı?", en: "Is there bread? Is there milk?", fa: "نان هست؟ شیر هست؟" }]);
+  assert.deepEqual(say.kind === "say" && say.options, [{ tr: "Ekmek var mı? Süt var mı?", en: "Is there bread? Is there milk?", fa: "نان هست؟ شیر هست؟", text: { tr: "Ekmek var mı? Süt var mı?", en: "Is there bread? Is there milk?", fa: "نان هست؟ شیر هست؟" } }]);
   assert.equal(say.kind === "say" && say.silent, false);
   const dots = info[12].turn!;
   assert.ok(dots.kind === "say" && dots.silent);

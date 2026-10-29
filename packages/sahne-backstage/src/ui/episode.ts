@@ -12,7 +12,7 @@ import { cueOf, cuePath, equal, get, same, within, type Path } from "../model/pa
 import { flagsIn, rows, wordsOnly } from "../model/steps.ts";
 import { dirty } from "../model/history.ts";
 import { KIT, Preview, solidsOf } from "../stage.ts";
-import { Check, Problems } from "./fields.ts";
+import { Check, Problems, tx } from "./fields.ts";
 import { Inspector } from "./inspector.ts";
 import { ReviewPanel } from "./review.ts";
 import { ChangesPanel } from "./changes.ts";
@@ -114,8 +114,8 @@ function Editor(p: { id: string }) {
 
   return html`<section>
     <div class="toolbar row">
-      <div class="grow"><h2 style="margin:0">${p.id} · <span lang="tr">${story.title}</span></h2>
-        <span class="note">${story.titleEn ?? ""}${story.kind ? ` · ${story.kind}` : ""}${story.releaseDate ? ` · ${story.releaseDate}` : ""}${story.draft ? " · draft" : ""}</span></div>
+      <div class="grow"><h2 style="margin:0">${p.id} · <span lang="tr">${tx(story.title)}</span></h2>
+        <span class="note">${tx(story.title, "en")}${story.kind ? ` · ${story.kind}` : ""}${story.releaseDate ? ` · ${story.releaseDate}` : ""}${story.draft ? " · draft" : ""}</span></div>
       <button onClick=${() => openTab("review")} title="Its status, each step reviewed, comments">Review · ${status === "draft" ? "AI draft" : status}${comments ? ` · ${comments} comment${comments > 1 ? "s" : ""}` : ""}</button>
       <button onClick=${() => history("story", p.id, "undo")} disabled=${!d.past.length} title="Undo">↶ Undo</button>
       <button onClick=${() => history("story", p.id, "redo")} disabled=${!d.future.length} title="Redo">↷ Redo</button>

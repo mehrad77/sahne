@@ -1,11 +1,19 @@
 {
   "v": 1,
   "id": "samples",
-  "title": "Sahne örnekleri",
-  "titleEn": "Sahne samples",
-  "titleFa": "نمونه‌های صحنه",
-  "summary": "The sample series: one short story, its cast and two places, for the gallery, the tests and the editor.",
-  "summaryFa": "مجموعهٔ نمونه: یک داستان کوتاه، شخصیت‌ها و دو مکانش، برای گالری، تست‌ها و ویرایشگر.",
+  "title": {
+    "tr": "Sahne örnekleri",
+    "en": "Sahne samples",
+    "fa": "نمونه‌های صحنه"
+  },
+  "summary": {
+    "en": "The sample series: one short story, its cast and two places, for the gallery, the tests and the editor.",
+    "fa": "مجموعهٔ نمونه: یک داستان کوتاه، شخصیت‌ها و دو مکانش، برای گالری، تست‌ها و ویرایشگر."
+  },
+  "languages": {
+    "main": "tr",
+    "translations": ["en", "fa"]
+  },
   "narrator": "kerim",
   "standin": "nima"
 }

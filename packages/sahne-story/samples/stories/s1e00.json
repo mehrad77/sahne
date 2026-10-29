@@ -16,30 +16,30 @@
   ],
   "draft": true,
   "gl": {
-    "akşam": [
-      "عصر",
-      "evening"
-    ],
-    "afiyet olsun": [
-      "نوش جان",
-      "enjoy it"
-    ],
-    "turuncu": [
-      "نارنجی",
-      "orange (the colour)"
-    ],
-    "elma": [
-      "سیب",
-      "apple"
-    ],
-    "güle güle": [
-      "خداحافظ (به کسی که می‌رود)",
-      "goodbye (to someone leaving)"
-    ],
-    "kaç": [
-      "چند تا",
-      "how many"
-    ]
+    "akşam": {
+      "fa": "عصر",
+      "en": "evening"
+    },
+    "afiyet olsun": {
+      "fa": "نوش جان",
+      "en": "enjoy it"
+    },
+    "turuncu": {
+      "fa": "نارنجی",
+      "en": "orange (the colour)"
+    },
+    "elma": {
+      "fa": "سیب",
+      "en": "apple"
+    },
+    "güle güle": {
+      "fa": "خداحافظ (به کسی که می‌رود)",
+      "en": "goodbye (to someone leaving)"
+    },
+    "kaç": {
+      "fa": "چند تا",
+      "en": "how many"
+    }
   },
   "id": "s1e00",
   "kind": "episode",
@@ -51,41 +51,47 @@
   "quiz": [
     {
       "a": 0,
-      "en": "What does Nima buy?",
-      "fa": "نیما چه می‌خرد؟",
       "kind": "comp",
       "options": [
         "Portakal",
         "Domates",
         "Elma"
       ],
-      "q": "Nima ne alıyor?",
+      "q": {
+        "tr": "Nima ne alıyor?",
+        "en": "What does Nima buy?",
+        "fa": "نیما چه می‌خرد؟"
+      },
       "why": "Nima: “Üç portakal, lütfen.”"
     },
     {
       "a": 1,
-      "en": "What is there not at the shop today?",
-      "fa": "امروز در بقالی چه نیست؟",
       "kind": "comp",
       "options": [
         "Portakal",
         "Elma",
         "Domates"
       ],
-      "q": "Bakkalda bugün ne yok?",
+      "q": {
+        "tr": "Bakkalda bugün ne yok?",
+        "en": "What is there not at the shop today?",
+        "fa": "امروز در بقالی چه نیست؟"
+      },
       "why": "İsmail: “Ama bugün elma yok.”"
     },
     {
       "a": 1,
-      "en": "Fill in: today there are no apples.",
-      "fa": "کامل کنید: امروز سیب نیست.",
       "kind": "word",
       "options": [
         "var",
         "yok",
         "ne"
       ],
-      "q": "Bugün elma ___.",
+      "q": {
+        "tr": "Bugün elma ___.",
+        "en": "Fill in: today there are no apples.",
+        "fa": "کامل کنید: امروز سیب نیست."
+      },
       "why": "İsmail: “Ama bugün elma yok.”"
     }
   ],
@@ -337,11 +343,15 @@
       "who": "kerim"
     }
   ],
-  "summary": "A sample story for Sahne: Nima rides the metro home in the evening, then buys oranges at İsmail's corner shop.",
-  "summaryFa": "یک داستان نمونه برای Sahne: نیما عصر با مترو به خانه می‌رود و از بقالیِ اسماعیل پرتقال می‌خرد.",
-  "title": "Portakal var mı?",
-  "titleEn": "Are there oranges?",
-  "titleFa": "پرتقال هست؟",
+  "summary": {
+    "en": "A sample story for Sahne: Nima rides the metro home in the evening, then buys oranges at İsmail's corner shop.",
+    "fa": "یک داستان نمونه برای Sahne: نیما عصر با مترو به خانه می‌رود و از بقالیِ اسماعیل پرتقال می‌خرد."
+  },
+  "title": {
+    "tr": "Portakal var mı?",
+    "en": "Are there oranges?",
+    "fa": "پرتقال هست؟"
+  },
   "words": [
     "a1-w-portakal",
     "a1-w-meyve",

@@ -9,7 +9,7 @@ import type { StoryDoc } from "sahne-story";
 import { allProblems, loadAllProblems, review, reviewer, setReview, setReviewer, world, type Comment, type EpisodeReview, type Status } from "../store.ts";
 import { rows } from "../model/steps.ts";
 import type { Path } from "../model/path.ts";
-import { Select } from "./fields.ts";
+import { Select, tx } from "./fields.ts";
 
 const STATUS_NAME: Record<Status, string> = { draft: "AI draft", reviewed: "reviewed", approved: "approved" };
 const rowKey = (path: Path) => [path[1], path[4], path[6]].filter(x => x !== undefined).join(".");
@@ -71,7 +71,7 @@ export function ReviewPage() {
   const ps = allProblems.value;
   const seasons = Object.values(w.seasons).sort((a, b) => a.n - b.n);
   const orphan = w.episodes.filter(e => !seasons.some(s => s.n === e.season));
-  const groups: [string, typeof w.episodes][] = [...seasons.map(s => [s.titleEn, w.episodes.filter(e => e.season === s.n)] as [string, typeof w.episodes]), ...(orphan.length ? [["Without a season", orphan] as [string, typeof w.episodes]] : [])];
+  const groups: [string, typeof w.episodes][] = [...seasons.map(s => [tx(s.title, "en"), w.episodes.filter(e => e.season === s.n)] as [string, typeof w.episodes]), ...(orphan.length ? [["Without a season", orphan] as [string, typeof w.episodes]] : [])];
   const count = (id: string, level: string) => ps?.filter(p => p.doc === `story:${id}` && p.level === level).length ?? 0;
   return html`<section>
     <div class="row"><h2 class="grow">Review</h2><button onClick=${() => download(markdown())}>Export the notes (markdown)</button></div>
@@ -83,7 +83,7 @@ export function ReviewPage() {
       <tbody>${eps.map(e => {
         const r = review.value[e.id] ?? {}, steps = Object.values(r.steps ?? {});
         const ratio = ps ? ratioOf(ps.filter(p => p.doc === `story:${e.id}`)) : null;
-        return html`<tr><td><a href=${`#/episode/${e.id}`}>${e.id}</a> <span lang="tr">${e.title}</span></td>
+        return html`<tr><td><a href=${`#/episode/${e.id}`}>${e.id}</a> <span lang="tr">${tx(e.title)}</span></td>
           <td><span class=${`chip ${r.status === "approved" ? "ok" : r.status === "reviewed" ? "" : "warn"}`}>${STATUS_NAME[r.status ?? "draft"]}</span>${r.ai !== false ? " · AI" : ""}</td>
           <td>${steps.filter(s => s.reviewed).length}</td><td>${steps.filter(s => s.persian).length}</td>
           <td>${ps ? count(e.id, "error") : "…"}</td><td>${ps ? count(e.id, "warning") : "…"}</td><td>${ratio === null ? "—" : `${ratio}%`}</td>
@@ -95,11 +95,11 @@ export function ReviewPage() {
 
 /** The notes as markdown: each episode's status and its open comments. */
 function markdown(): string {
-  const w = world.value!, out = [`# Review notes: ${w.series?.titleEn ?? "the series"}`, ""];
+  const w = world.value!, out = [`# Review notes: ${w.series ? tx(w.series.title, "en") : "the series"}`, ""];
   for (const e of w.episodes) {
     const r = review.value[e.id];
     if (!r) continue;
-    out.push(`## ${e.id} · ${e.title}`, "", `- Status: ${STATUS_NAME[r.status ?? "draft"]}${r.ai !== false ? " (written by AI)" : ""}${r.reviewer ? `, last by ${r.reviewer}` : ""}`);
+    out.push(`## ${e.id} · ${tx(e.title)}`, "", `- Status: ${STATUS_NAME[r.status ?? "draft"]}${r.ai !== false ? " (written by AI)" : ""}${r.reviewer ? `, last by ${r.reviewer}` : ""}`);
     for (const c of r.comments ?? []) out.push(`- ${c.done ? "[x]" : "[ ]"} ${c.at ? `step ${c.at}: ` : ""}${c.text} (${c.by}, ${c.date})`);
     out.push("");
   }

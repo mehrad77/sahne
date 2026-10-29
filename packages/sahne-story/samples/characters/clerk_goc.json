@@ -49,18 +49,24 @@
       }
     }
   },
-  "bio": "Checks the papers, taps the contract and shakes his head; tired, never a villain.",
-  "bioFa": "مدارک را بررسی می‌کند، روی قرارداد می‌زند و سر تکان می‌دهد؛ خسته است، اما آدمِ بدی نیست.",
+  "bio": {
+    "en": "Checks the papers, taps the contract and shakes his head; tired, never a villain.",
+    "fa": "مدارک را بررسی می‌کند، روی قرارداد می‌زند و سر تکان می‌دهد؛ خسته است، اما آدمِ بدی نیست."
+  },
   "color": "#8A8580",
   "id": "clerk_goc",
   "kind": "extra",
   "level": "A1",
-  "name": "Memur",
-  "nameFa": "مأمور",
+  "name": {
+    "fa": "مأمور",
+    "tr": "Memur"
+  },
   "order": 101,
   "places": [
     "goc_inside"
   ],
-  "role": "The clerk behind the glass at Göç İdaresi",
-  "roleFa": "کارمندِ پشتِ شیشه در اداره‌ی مهاجرت"
+  "role": {
+    "en": "The clerk behind the glass at Göç İdaresi",
+    "fa": "کارمندِ پشتِ شیشه در اداره‌ی مهاجرت"
+  }
 }

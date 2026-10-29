@@ -6,7 +6,7 @@
 
 import { applyLook, AVATAR_MAX_BYTES, portrait, serialize, type AvatarDoc, type Framing } from "sahne";
 import { K_HEAD_VB, K_BUST, K_HEAD } from "sahne-kit/kerim/art";
-import type { CharacterDoc } from "sahne-story";
+import { textIn, textOf, type CharacterDoc } from "sahne-story";
 import { $, chip, choice, css, head, link } from "../shell/dom.ts";
 import type { Ctx } from "../shell/ctx.ts";
 import type { Extra } from "../shell/data.ts";
@@ -90,7 +90,7 @@ export async function render(host: HTMLElement, ctx: Ctx) {
     host.append(head("The cast", "Every character of the stories, from the roster in $SAHNE_CONTENT/characters/ (one document per character, the one every story reads), by order: head, bust and full as the still backend draws them, each outfit as a tab, and a link to the studio where the same look plays live. The clipping test over these is sahne-story/test/cast.test.ts.", "§10"));
     const cast: CharacterDoc[] = await ctx.data("cast");
     const grid = $("div", "cast-grid");
-    for (const c of cast) grid.append(card(ctx, { id: c.id, name: c.name, nameFa: c.nameFa, role: typeof c.role === "string" ? c.role : undefined, color: c.color, avatar: c.avatar, outfits: c.outfits, puppet: c.puppet }));
+    for (const c of cast) grid.append(card(ctx, { id: c.id, name: textOf(c.name) ?? c.id, nameFa: textIn(c.name, "fa"), role: textOf(c.role, "en"), color: c.color, avatar: c.avatar, outfits: c.outfits, puppet: c.puppet }));
     if (!cast.length) grid.append($("p", "note", "No characters in $SAHNE_CONTENT/characters/ yet."));
     host.append(grid);
     return;
@@ -100,7 +100,7 @@ export async function render(host: HTMLElement, ctx: Ctx) {
   const grid = $("div", "cast-grid");
   for (const x of extras) {
     const doc = x.avatar ?? ("v" in x && "body" in x ? (x as unknown as AvatarDoc) : undefined);
-    grid.append(card(ctx, { id: x.file, name: typeof x.name === "string" ? x.name : x.file, nameFa: typeof x.nameFa === "string" ? x.nameFa : undefined, role: typeof x.role === "string" ? x.role : undefined, color: typeof x.color === "string" ? x.color : undefined, avatar: doc, outfits: x.outfits as Record<string, unknown> | undefined, studio: `extra.${x.file}` }));
+    grid.append(card(ctx, { id: x.file, name: textOf(x.name) ?? x.file, nameFa: textIn(x.name, "fa"), role: textOf(x.role, "en"), color: typeof x.color === "string" ? x.color : undefined, avatar: doc, outfits: x.outfits as Record<string, unknown> | undefined, studio: `extra.${x.file}` }));
   }
   if (!extras.length) grid.append($("p", "note", "No extras yet: node packages/sahne-story/cast/extras.ts writes them into $SAHNE_CONTENT/characters/."));
   host.append(grid);

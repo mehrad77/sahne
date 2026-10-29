@@ -6,7 +6,7 @@ import { html } from "htm/preact";
 import type { StoryDoc } from "sahne-story";
 import { get, set, type Path } from "../model/path.ts";
 import { kindOf } from "../model/steps.ts";
-import { Check, Select, Text, Tri } from "./fields.ts";
+import { Check, Select, Text, Tri, tx } from "./fields.ts";
 import { Json, SceneFields, Staging, StepTools } from "./staging.ts";
 import { AiRewrite } from "./ai.ts";
 import { world } from "../store.ts";
@@ -95,14 +95,13 @@ function ChoiceFields(p: InspectorProps & { path: Path }) {
 
 /** The episode's own fields: titles, summary, the quiz, the glosses. */
 function EpisodeFields(p: InspectorProps) {
-  const top = (key: string) => ({ value: (p.story as Record<string, unknown>)[key], put: (v: unknown) => p.edit(s => set(s, [key], v), key) });
   const quiz = (p.story.quiz ?? []) as Record<string, any>[];
   const gl = Object.entries(p.story.gl ?? {});
   return html`<div class="fields">
     <div class="note">The episode · ${p.story.id}</div>
-    <${Tri} label="Title" keys=${["title", "titleEn", "titleFa"]} doc=${p.story as Record<string, unknown>} saved=${p.saved as Record<string, unknown>} onInput=${(k: string, x: string | undefined) => top(k).put(x ?? "")} />
-    <${Text} label="Summary · English" multi value=${top("summary").value} onInput=${(x: string | undefined) => top("summary").put(x ?? "")} />
-    <${Text} label="Summary · Persian" lang="fa" multi value=${top("summaryFa").value} onInput=${(x: string | undefined) => top("summaryFa").put(x ?? "")} />
+    <${Tri} label="Title" doc=${p.story.title} saved=${p.saved.title} onInput=${(k: string, x: string | undefined) => p.edit(s => set(s, ["title", k], x ?? ""), `title.${k}`)} />
+    <${Text} label="Summary · English" multi value=${p.story.summary?.en} onInput=${(x: string | undefined) => p.edit(s => set(s, ["summary", "en"], x ?? ""), "summary.en")} />
+    <${Text} label="Summary · Persian" lang="fa" multi value=${p.story.summary?.fa} onInput=${(x: string | undefined) => p.edit(s => set(s, ["summary", "fa"], x ?? ""), "summary.fa")} />
     <${CastPicker} ...${p} />
     <h3>Quiz</h3>
     ${quiz.map((q, i) => html`<div class="panel fields">
@@ -116,12 +115,12 @@ function EpisodeFields(p: InspectorProps) {
     </div>`)}
     <h3>Glosses (a word the cards do not have: Persian, English)</h3>
     <table class="grid"><tbody>
-      ${gl.map(([w, [fa, en]]) => html`<tr><td lang="tr">${w}</td>
-        <td><input dir="rtl" lang="fa" value=${fa} onInput=${(e: Event) => p.edit(s => set(s, ["gl", w], [(e.target as HTMLInputElement).value, en]), `gl.${w}.fa`)} /></td>
-        <td><input value=${en} onInput=${(e: Event) => p.edit(s => set(s, ["gl", w], [fa, (e.target as HTMLInputElement).value]), `gl.${w}.en`)} /></td>
+      ${gl.map(([w, g]) => html`<tr><td lang="tr">${w}</td>
+        <td><input dir="rtl" lang="fa" value=${g.fa ?? ""} onInput=${(e: Event) => p.edit(s => set(s, ["gl", w, "fa"], (e.target as HTMLInputElement).value), `gl.${w}.fa`)} /></td>
+        <td><input value=${g.en ?? ""} onInput=${(e: Event) => p.edit(s => set(s, ["gl", w, "en"], (e.target as HTMLInputElement).value), `gl.${w}.en`)} /></td>
         <td><button class="small danger" onClick=${() => p.edit(s => set(s, ["gl", w], undefined))}>remove</button></td></tr>`)}
     </tbody></table>
-    <${AddGloss} onAdd=${(w: string) => p.edit(s => set(s, ["gl", w.toLocaleLowerCase("tr")], ["", ""]))} />
+    <${AddGloss} onAdd=${(w: string) => p.edit(s => set(s, ["gl", w.toLocaleLowerCase("tr")], { fa: "", en: "" }))} />
   </div>`;
 }
 
@@ -137,7 +136,7 @@ function CastPicker(p: InspectorProps) {
   const box = (key: "cast" | "extras", list: string[], c: (typeof people)[number]) => {
     const n = lines.get(c.id) ?? 0;
     return html`<label class="row" title=${n ? `${n} lines in this episode` : ""}><input type="checkbox" style="width:auto" checked=${list.includes(c.id)}
-      onChange=${(e: Event) => toggle(key, list, c.id, (e.target as HTMLInputElement).checked)} /> ${c.name ?? c.id}${n ? html` <small class="note">${n} lines</small>` : ""}${key === "extras" ? html` <small class="note">${c.id}</small>` : ""}</label>`;
+      onChange=${(e: Event) => toggle(key, list, c.id, (e.target as HTMLInputElement).checked)} /> ${tx(c.name) || c.id}${n ? html` <small class="note">${n} lines</small>` : ""}${key === "extras" ? html` <small class="note">${c.id}</small>` : ""}</label>`;
   };
   const changed = (key: "cast" | "extras") => JSON.stringify(p.story[key] ?? []) !== JSON.stringify(p.saved[key] ?? []);
   return html`<div class="field"><label>Cast (${cast.length}; 2 to 6, the stand-in among them; ${w.characters[narrator]?.name ?? narrator} narrates in every episode)${changed("cast") ? " · changed" : ""}</label>

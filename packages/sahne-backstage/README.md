@@ -57,7 +57,7 @@ The side bar links the series, review, the cast and the places, and lists the se
 - **Flags.** One switch for each flag the episode's callbacks read (`if`, `unless`). A switch adapts the story again and reloads the stage.
 - **Steps.** Every step, with a choice's options and their replies indented under it. Clicking a row selects it and plays it. A row whose option is not picked picks that option. A changed row is marked, and so is a row with problems.
 - **The inspector.**
-  - For a line, a choice option or a reply: who speaks, the words in Turkish, English and Persian (Persian edits right to left), Kerim's narration, and a note for the learner.
+  - For a line, a choice option or a reply: who speaks, the words in the series' languages (Persian edits right to left), Kerim's narration, and a note for the learner.
   - For a spot: its lesson, example and words.
   - For a choice: its id, kind and whom it is said to.
   - With nothing selected: the episode's titles, summary, cast, quiz and glosses. The cast picker sets the story's `cast` (the roster, 2 to 6, the stand-in among them) and `extras` (the silent people), and shows how many lines each one speaks; the story check refuses a speaker who is not in the cast.

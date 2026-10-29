@@ -13,7 +13,7 @@ import { CHARACTERS, IS_SAMPLES, PLACES, SERIES, seasonFile, seasonIds, storyFil
 import { loadCards, loadNeeds } from "../../sahne-story/load.ts";
 import { checkCast, checkPlaces, checkSeason, checkSeries, checkStory, RETIRED_CHARACTERS, type CheckOptions, type CheckProblem } from "../../sahne-story/check/rules.ts";
 import { calendarOf, charactersOf, loadWorld, type World } from "../../sahne-story/check/world.ts";
-import { lintPlace, seasonOf, type CharacterDoc, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
+import { lintPlace, seasonOf, upgrade, type CharacterDoc, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
 import { plain, readFile, textFor, writeAtomic } from "../../sahne-story/json.ts";
 
 export type Kind = "series" | "season" | "story" | "character" | "place";
@@ -57,9 +57,10 @@ export const isKind = (k: string): k is Kind => (KINDS as string[]).includes(k);
 export const exists = (kind: Kind, id: string) => ID[kind].test(id) && idsOf(kind).includes(id);
 
 /** A document as the browser gets it: plain JSON and the file's mtime (a save names it, so a change on disk is not overwritten). */
+/** A document as the browser edits it: plain JSON, in the new language shape (sahne-story/src/upgrade.ts). */
 export function readDoc(kind: Kind, id: string): { doc: unknown; mtime: number } {
   const r = readFile(fileOf(kind, id));
-  return { doc: plain(r.doc), mtime: r.mtime };
+  return { doc: kind === "place" ? plain(r.doc) : upgrade(kind, plain(r.doc)), mtime: r.mtime };
 }
 
 // ---- checks ----------------------------------------------------------------------------------------------------------------
@@ -69,6 +70,12 @@ export interface Problem extends CheckProblem { doc: string; new?: boolean }
 
 let cached: World | null = null;
 const world = (): World => (cached ??= loadWorld());
+/**
+ * The content files still in the old language shape. While there are any, nothing is saved: a root is converted whole
+ * (sahne-story/convert/languages.ts), never a file at a time, so an app that still reads the old fields gets one shape.
+ */
+export const oldShape = (): string[] => world().oldShape;
+
 /** Forget the world read from disk (after a save, or a change made elsewhere). */
 export const forget = () => { cached = null; every = null; };
 
@@ -181,6 +188,7 @@ function refuse(e: Edit): string | null {
 /** Save a set of documents: refused whole when one is refused, changed on disk since it was read (409), or brings an error (422). */
 export function save(edits: Edit[], o: { write: boolean }): SaveResult {
   if (!o.write) return { status: 403, message: IS_SAMPLES ? "the samples are read-only: start backstage with --write to edit them" : "this backstage is read-only (no --write)" };
+  if (oldShape().length) return { status: 403, message: `the content root is in the old language shape (${oldShape().length} files): run node packages/sahne-story/convert/languages.ts on it first` };
   if (!edits.length) return { status: 400, message: "nothing to save" };
   for (const e of edits) { const why = refuse(e); if (why) return { status: 400, message: why }; }
   for (const e of edits) if (!e.create && e.mtime !== undefined && readFile(fileOf(e.kind, e.id)).mtime !== e.mtime) return { status: 409, message: `${e.kind} ${e.id} changed on disk since it was opened: reload it` };
@@ -225,6 +233,6 @@ export function lessons(): { id: string; ref?: string }[] {
 /** Everything the browser lists: the series, the seasons with their episodes, the cast, the places. */
 export function listing() {
   const w = world();
-  const episodes = w.drafts.map(d => ({ id: d.id, season: d.story.season, title: d.story.title, titleEn: d.story.titleEn, kind: d.story.kind, releaseDate: d.story.releaseDate, draft: !!d.story.draft, place: d.story.place, cast: d.story.cast }));
+  const episodes = w.drafts.map(d => ({ id: d.id, season: d.story.season, title: d.story.title, kind: d.story.kind, releaseDate: d.story.releaseDate, draft: !!d.story.draft, place: d.story.place, cast: d.story.cast }));
   return { series: w.series, seasons: w.seasons, episodes, characters: { ...w.cast, ...w.extras } as Record<string, CharacterDoc>, places: w.places, days: w.days, cards: !!w.cards };
 }

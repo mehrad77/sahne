@@ -5,7 +5,7 @@
 
 import { html } from "htm/preact";
 import { useState } from "preact/hooks";
-import type { StoryDoc } from "sahne-story";
+import { textOf, type StoryDoc } from "sahne-story";
 import { api } from "../api.ts";
 import { diffWords } from "../model/diff.ts";
 import { get, set, type Path } from "../model/path.ts";
@@ -15,7 +15,7 @@ import { Text } from "./fields.ts";
 type T3 = { tr: string; en: string; fa: string };
 const castOf = (story: StoryDoc) => Object.fromEntries([...(story.cast ?? []), ...(story.extras ?? []), world.value?.series?.narrator ?? "kerim"].map(id => {
   const c = world.value?.characters[id] as { name?: string; role?: string; kind?: string } | undefined;
-  return [id, { name: c?.name, role: c?.role, kind: c?.kind }];
+  return [id, { name: textOf(c?.name), role: textOf(c?.role, "en"), kind: c?.kind }];
 }));
 
 async function askAi<T>(what: string, body: object): Promise<T | null> {
@@ -83,7 +83,7 @@ export function AiReview(p: { story: StoryDoc; edit(fn: (s: StoryDoc) => StoryDo
 
 /** A draft's steps written from its brief. */
 export function AiDraft(p: { story: StoryDoc; edit(fn: (s: StoryDoc) => StoryDoc): void }) {
-  const [brief, setBrief] = useState(p.story.summary && p.story.summary !== "…" ? String(p.story.summary) : ""), [busy, setBusy] = useState(false);
+  const [brief, setBrief] = useState(p.story.summary?.en && p.story.summary.en !== "…" ? p.story.summary.en : ""), [busy, setBusy] = useState(false);
   const [out, setOut] = useState<{ steps: unknown[]; quiz: unknown[]; notes: string } | null>(null);
   if (!world.value?.ai || !p.story.draft) return null;
   const run = async () => {

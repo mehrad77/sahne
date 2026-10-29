@@ -37,8 +37,8 @@ test("a root without series.json gets one warning, no error", () => {
 
 test("a season's id and n follow its file name", () => {
   const w = fresh();
-  w.series ??= { v: 1, id: "t", title: "t", titleEn: "t", titleFa: "t", narrator: "kerim", standin: "nima" };
-  w.seasons = { s1: { v: 1, id: "s2", n: 2, title: "t", titleEn: "t", titleFa: "t" } };
+  w.series ??= { v: 1, id: "t", title: { tr: "t", en: "t", fa: "t" }, narrator: "kerim", standin: "nima" };
+  w.seasons = { s1: { v: 1, id: "s2", n: 2, title: { tr: "t", en: "t", fa: "t" } } };
   const es = errors(w);
   assert.ok(es.some(m => /the file is s1 but the season's id is s2/.test(m)));
   assert.ok(es.some(m => /n is 2 but the file is s1/.test(m)));
@@ -46,21 +46,21 @@ test("a season's id and n follow its file name", () => {
 
 test("every story's season has a document", () => {
   const w = fresh();
-  w.series ??= { v: 1, id: "t", title: "t", titleEn: "t", titleFa: "t", narrator: "kerim", standin: "nima" };
+  w.series ??= { v: 1, id: "t", title: { tr: "t", en: "t", fa: "t" }, narrator: "kerim", standin: "nima" };
   w.seasons = {};
   assert.ok(errors(w).some(m => /season s1 has no document/.test(m)));
 });
 
 test("the calendar has a row for every story of its season and a story for every row", () => {
   const w = fresh(), id = w.drafts[0].id, n = seasonOf(id);
-  w.seasons = { [`s${n}`]: { v: 1, id: `s${n}`, n, title: "t", titleEn: "t", titleFa: "t", calendar: { [`s${n}e99`]: { date: "2026-12-01", kind: "episode", week: 1 } } } };
+  w.seasons = { [`s${n}`]: { v: 1, id: `s${n}`, n, title: { tr: "t", en: "t", fa: "t" }, calendar: { [`s${n}e99`]: { date: "2026-12-01", kind: "episode", week: 1 } } } };
   const ps = checkSeries(w);
   assert.ok(ps.some(p => p.level === "error" && p.message === `${id} has no row in season s${n}'s calendar`));
   assert.ok(ps.some(p => p.level === "warning" && /s\d+e99, which is not written yet/.test(p.message)));
 });
 
 test("the seasons' calendars are the release calendar, kept in step with days.json", () => {
-  const seasons = { s1: { v: 1 as const, id: "s1", n: 1, title: "t", titleEn: "t", titleFa: "t", calendar: { s1e01: { date: "2026-10-28", kind: "episode" as const, week: 1 } } } };
+  const seasons = { s1: { v: 1 as const, id: "s1", n: 1, title: { tr: "t", en: "t", fa: "t" }, calendar: { s1e01: { date: "2026-10-28", kind: "episode" as const, week: 1 } } } };
   assert.deepEqual(calendarOf(seasons, null), { s1e01: { id: "s1e01", date: "2026-10-28", kind: "episode", week: 1 } });
   const file = { s1e01: { id: "s1e01", date: "2026-10-28", kind: "episode" as const, week: 1 } };
   assert.equal(calendarOf({}, file), file, "without a season calendar, days.json");
@@ -76,7 +76,7 @@ test("the seasons' calendars are the release calendar, kept in step with days.js
 test("a story's arc is its season's, and its week's", () => {
   const w = fresh(), d = w.drafts[0], n = seasonOf(d.id);
   const arc = d.story.arc!;
-  w.seasons = { [`s${n}`]: { v: 1, id: `s${n}`, n, title: "t", titleEn: "t", titleFa: "t", arcs: { [arc.id]: { tr: "başka", en: arc.en, fa: arc.fa, mechanics: arc.mechanics } } } };
+  w.seasons = { [`s${n}`]: { v: 1, id: `s${n}`, n, title: { tr: "t", en: "t", fa: "t" }, arcs: { [arc.id]: { tr: "başka", en: arc.en, fa: arc.fa, mechanics: arc.mechanics } } } };
   assert.ok(errors(w).some(m => m === `arc ${arc.id} differs from season s${n}'s`));
   // the calendar's week names the arc: week 3 of season n is s<n>w03
   const w2 = fresh();
@@ -86,7 +86,7 @@ test("a story's arc is its season's, and its week's", () => {
 
 test("the narrator and the stand-in are the stage's", () => {
   const w = fresh();
-  w.series = { v: 1, id: "t", title: "t", titleEn: "t", titleFa: "t", narrator: "ismail", standin: "nima" };
+  w.series = { v: 1, id: "t", title: { tr: "t", en: "t", fa: "t" }, narrator: "ismail", standin: "nima" };
   const es = errors(w);
   assert.ok(es.some(m => /the narrator ismail is a cast, not a narrator/.test(m)));
   assert.ok(es.some(m => /another narrator is not supported yet/.test(m)));

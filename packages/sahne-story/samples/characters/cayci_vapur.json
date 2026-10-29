@@ -53,18 +53,24 @@
       }
     }
   },
-  "bio": "Comes round the deck with a tray of tea glasses.",
-  "bioFa": "با سینیِ استکان‌های چای روی عرشه می‌چرخد.",
+  "bio": {
+    "en": "Comes round the deck with a tray of tea glasses.",
+    "fa": "با سینیِ استکان‌های چای روی عرشه می‌چرخد."
+  },
   "color": "#8A8580",
   "id": "cayci_vapur",
   "kind": "extra",
   "level": "A1",
-  "name": "Çaycı",
-  "nameFa": "چای‌فروش",
+  "name": {
+    "fa": "چای‌فروش",
+    "tr": "Çaycı"
+  },
   "order": 103,
   "places": [
     "vapur_deck"
   ],
-  "role": "The çaycı on the ferry",
-  "roleFa": "چای‌فروشِ کشتی"
+  "role": {
+    "en": "The çaycı on the ferry",
+    "fa": "چای‌فروشِ کشتی"
+  }
 }
