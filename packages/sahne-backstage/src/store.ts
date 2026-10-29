@@ -102,7 +102,9 @@ export async function saveDocs(keys: string[]): Promise<boolean> {
 
 export type Status = "draft" | "reviewed" | "approved";
 export interface Comment { id: string; at?: string; by: string; text: string; date: string; done?: boolean }
-export interface EpisodeReview { status?: Status; ai?: boolean; reviewer?: string; steps?: Record<string, { reviewed?: boolean; persian?: boolean }>; comments?: Comment[] }
+/** A step's review: reviewed, and which translations were checked (`persian`: notes from before `checked`). */
+export interface StepNote { reviewed?: boolean; checked?: string[]; persian?: boolean }
+export interface EpisodeReview { status?: Status; ai?: boolean; reviewer?: string; steps?: Record<string, StepNote>; comments?: Comment[] }
 
 export const review = signal<Record<string, EpisodeReview>>({});
 export const allProblems = signal<Problem[] | null>(null);

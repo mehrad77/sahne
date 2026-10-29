@@ -1,5 +1,6 @@
 // The review notes (Node only): where each episode stands (an AI draft, reviewed, approved), which of its steps were
-// reviewed and whose Persian was checked, who reviewed it, whether AI wrote it, and the comments left on it or on one of
+// reviewed and which of their translations were checked (`checked`, by language; `persian` from before languages were
+// the series'), who reviewed it, whether AI wrote it, and the comments left on it or on one of
 // its steps. They are editors' notes, kept beside the content in a sidecar (sahne-story's paths.ts REVIEW:
 // <root>/.backstage/review.json), never in a story (a story's root takes no extra keys) and never read by an app or the
 // checks. Card and lesson text never goes in here.
@@ -12,7 +13,7 @@ export type Status = "draft" | "reviewed" | "approved";
 export const STATUSES: Status[] = ["draft", "reviewed", "approved"];
 
 export interface Comment { id: string; at?: string; by: string; text: string; date: string; done?: boolean }
-export interface StepNote { reviewed?: boolean; persian?: boolean }
+export interface StepNote { reviewed?: boolean; /** The translations checked, by language code. */ checked?: string[]; /** Its Persian checked (notes written before `checked`). */ persian?: boolean }
 export interface EpisodeReview { status?: Status; ai?: boolean; reviewer?: string; steps?: Record<string, StepNote>; comments?: Comment[] }
 export interface Review { v: 1; episodes: Record<string, EpisodeReview> }
 
@@ -39,6 +40,7 @@ function clean(e: unknown): EpisodeReview {
       const n = v as StepNote, s: StepNote = {};
       if (n.reviewed) s.reviewed = true;
       if (n.persian) s.persian = true;
+      if (Array.isArray(n.checked)) { const c = [...new Set(n.checked.filter((l): l is string => typeof l === "string" && /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(l)))].sort(); if (c.length) s.checked = c; }
       if (Object.keys(s).length) steps[k] = s;
     }
     if (Object.keys(steps).length) out.steps = steps;

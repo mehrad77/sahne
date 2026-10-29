@@ -122,9 +122,9 @@ test("a read-only backstage on the samples writes nothing", async () => {
 
 test("review notes go to the sidecar, cleaned, never into a story", async () => {
   const story = readFileSync(file, "utf8");
-  const r = await call(rw.url, "POST", "review", { id: "s1e00", review: { status: "reviewed", ai: true, reviewer: "Ada", steps: { "4": { reviewed: true, persian: true }, "x": { reviewed: true } }, comments: [{ id: "c1", at: "4", by: "Ada", text: "Persian first", date: "2026-10-29 10:00" }, { text: "  " }], junk: 1 } });
+  const r = await call(rw.url, "POST", "review", { id: "s1e00", review: { status: "reviewed", ai: true, reviewer: "Ada", steps: { "4": { reviewed: true, persian: true }, "5.1": { checked: ["fa", "en", "en", "x y"] }, "x": { reviewed: true } }, comments: [{ id: "c1", at: "4", by: "Ada", text: "Persian first", date: "2026-10-29 10:00" }, { text: "  " }], junk: 1 } });
   assert.equal(r.status, 200);
-  assert.deepEqual(r.body.episodes.s1e00, { status: "reviewed", ai: true, reviewer: "Ada", steps: { "4": { reviewed: true, persian: true } }, comments: [{ id: "c1", at: "4", by: "Ada", text: "Persian first", date: "2026-10-29 10:00" }] });
+  assert.deepEqual(r.body.episodes.s1e00, { status: "reviewed", ai: true, reviewer: "Ada", steps: { "4": { reviewed: true, persian: true }, "5.1": { checked: ["en", "fa"] } }, comments: [{ id: "c1", at: "4", by: "Ada", text: "Persian first", date: "2026-10-29 10:00" }] });
   assert.deepEqual(JSON.parse(readFileSync(join(root, ".backstage", "review.json"), "utf8")).episodes.s1e00.status, "reviewed");
   assert.equal(readFileSync(file, "utf8"), story);
   assert.equal((await call(rw.url, "POST", "review", { id: "../x", review: {} })).status, 400);

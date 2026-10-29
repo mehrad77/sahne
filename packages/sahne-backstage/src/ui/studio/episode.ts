@@ -10,12 +10,12 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { langFor, lintStory, seasonOf, suggest, textOf, type StoryDoc } from "sahne-story";
 import type { Run } from "sahne";
 import { checkDocs, checked, change, draftOf, history, keyOf, openDoc, review, saveDocs, world } from "../../store.ts";
-import { cueOf, cuePath, within, type Path } from "../../model/path.ts";
+import { cueOf, cuePath, type Path } from "../../model/path.ts";
 import { flagsIn, wordsOnly } from "../../model/steps.ts";
 import { dirty } from "../../model/history.ts";
 import { KIT, Preview, solidsOf } from "../../stage.ts";
-import { Problems } from "../fields.ts";
-import { ReviewPanel } from "../review.ts";
+import { ReviewGutter, ReviewPanel } from "../review.ts";
+import { NotesPanel } from "./notes.ts";
 import { ChangesPanel } from "../changes.ts";
 import { AiDraft, AiReview } from "../ai.ts";
 import { Drawer, Icon, MOD } from "../kit/index.ts";
@@ -53,6 +53,7 @@ function Studio(p: { id: string }) {
   const [path, setPath] = useState<Path | null>(null), [focusTick, setFocusTick] = useState(0);
   const [flags, setFlags] = useState<string[]>([]);
   const [tab, setTab] = useState<"problems" | "review" | "changes" | "ai">("problems");
+  const [here, setHere] = useState(false);
   const [details, setDetails] = useState(false);
   const cast = useMemo(() => [...new Set([w.series?.narrator ?? "kerim", w.series?.standin ?? "nima", ...(story.cast ?? []), ...(story.extras ?? [])])], [story.cast, story.extras]);
   const lang = langFor(langs.main);
@@ -148,7 +149,8 @@ function Studio(p: { id: string }) {
     <div class="studio-split">
       <div class="script-col">
         <${EpisodeHead} story=${story} saved=${saved} edit=${edit} />
-        <${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} ghosts=${ghosts} suggestions=${suggestions} />
+        <${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} ghosts=${ghosts} suggestions=${suggestions}
+          gutter=${(b: { path: Path }) => html`<${ReviewGutter} id=${p.id} path=${b.path} onComments=${() => { select(b.path); setTab("review"); }} />`} />
         <${Quiz} story=${story} saved=${saved} edit=${edit} />
         <${Glosses} story=${story} saved=${saved} edit=${edit} />
       </div>
@@ -162,10 +164,10 @@ function Studio(p: { id: string }) {
           setFlags(next); pv!.setFlags(next, Math.max(0, player!.next - 1)); redraw();
         }}>${f}</button>`)}</div>`}
         <div class="tabs" role="tablist">
-          ${(["problems", "review", "changes", ...(w.ai ? ["ai"] as const : [])] as const).map(t => html`<button role="tab" aria-selected=${tab === t} onClick=${() => setTab(t)}>${t === "problems" ? `Problems${errors ? ` (${errors})` : ""}` : t === "review" ? "Review" : t === "ai" ? "Second reader" : "Changes"}</button>`)}
+          ${(["problems", "review", "changes", ...(w.ai ? ["ai"] as const : [])] as const).map(t => html`<button role="tab" aria-selected=${tab === t} onClick=${() => setTab(t)}>${t === "problems" ? `Notes${errors ? ` (${errors})` : ""}` : t === "review" ? "Review" : t === "ai" ? "Second reader" : "Changes"}</button>`)}
         </div>
-        ${tab === "problems" && html`<${Problems} problems=${path ? problems.filter(x => x.step === undefined || within(path, ["steps", x.step])) : problems} empty="No problems: the story check and the stage lints pass."
-          onPick=${(x: Problem) => x.step !== undefined && select(["steps", x.step], true)} />`}
+        ${tab === "problems" && html`<label class="row note"><input type="checkbox" style="width:auto" checked=${here} onChange=${(e: Event) => setHere((e.target as HTMLInputElement).checked)} /> only the selected block</label>
+          <${NotesPanel} problems=${problems} path=${path} select=${select} edit=${edit} onlyHere=${here} />`}
         ${tab === "review" && html`<${ReviewPanel} id=${p.id} story=${story} path=${path} />`}
         ${tab === "ai" && html`<${AiDraft} story=${story} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} /><${AiReview} story=${story} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} select=${(x: Path) => select(x, true)} />`}
         ${tab === "changes" && html`<${ChangesPanel} id=${p.id} story=${story} savedAt=${d.mtime} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} select=${(x: Path) => select(x, true)} />`}

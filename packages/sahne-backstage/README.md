@@ -63,7 +63,7 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 | `#/character/<id>` | A character, described below |
 | `#/places` | Every place as its wide shot, with how many episodes it opens; *New place* starts one |
 | `#/place/<id>` | A place, described below |
-| `#/review` | Where every episode stands: status, steps reviewed, Persian checked, errors, warnings, the known-word ratio (when the root has cards), open comments; *Export the notes* downloads them as markdown |
+| `#/review` | Where every episode stands: status, blocks reviewed, each translation checked, errors, warnings, the known-word ratio (when the root has cards), open comments; *Export the notes* downloads them as markdown |
 
 **The board** (`src/ui/board.ts`, its dates in `src/model/board.ts`):
 - A season's weeks are rows and Monday to Saturday the columns: an episode on a weekday, a special on Saturday, no Sunday. The rows run from the season's launch week (or its first episode's) to its last episode's, and one more to plan into. A row's week is the one its episodes' calendar rows (or arcs) name; an empty row between two weeks is a break.
@@ -109,7 +109,10 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
   - **suggested** (dashed): what the rules would add: the lints' fixes (a deixis gesture at the thing named, a prop shown or hidden, a count, a link from a word to a prop on stage), a gesture the words motivate (the story language's `motive` words: *merhaba* suggests a wave), a feeling the punctuation does (a question, an exclamation). A click takes one, ⌥ Enter every one of the block, *Take n suggestions* in the toolbar every one of the episode; undo takes them back.
 - **Directing on the stage** (`direct.ts`). With *Direct* on, a click on a person opens a menu of gestures (each a picture of it), feelings (each a face), what they look at, where they walk, and *says it to them*; on a prop: point at it, hold it up, touch it, show it, hide it, give it. What the speaker does goes on the block; what someone else does goes on it as their reaction (`react`). A click on a mark's pin walks the speaker there, and dragging a person onto a pin walks them. The shot bar sets the block's camera (*auto* leaves it to the director).
 - **Details** opens the selected block's full staging in a drawer (`details.ts`, the forms in `src/ui/staging.ts`): every field with a picker of what is valid there (the kit's emotions, gestures and sounds; the engine's cameras, moves, prop ops and voices; the place's marks and props; the cast), a scene's time, weather and states, a line's note for the learner, the flags that gate it, and the step as JSON.
-- **Problems, review and changes** are tabs under the stage. The stage lints (`lintStory`, `suggest`, in the series' story language) run as you type, the full story check a moment later on the server; a problem the edit brought is marked **new**. Review: the episode's status, each step reviewed and its translations checked, comments. Changes: each changed step against git's HEAD, with *Put back as committed*. A person commits; backstage never does.
+- **Notes, review and changes** are tabs under the stage.
+  - **Notes** (`notes.ts`, `src/model/notes.ts`): every problem as a stage manager's note in plain words ("İsmail speaks but isn't in the cast", "The line has no Persian yet"), the ones the last edit brought first, each with *Go* to its block and, where one is obvious, a fix (*Add İsmail*, *Stage it*, *Gloss them*); for the whole episode or only the selected block. The stage lints (`lintStory`, in the series' story language) run as you type, the full story check a moment later on the server. A block with problems has a dot in its gutter.
+  - **Review** is in the script itself: ✓ in a block's gutter marks it reviewed, ✓ beside a translation marks that language checked, 💬 opens its comments. The Review tab holds the episode's status (to review, reviewed, approved), whether AI wrote it, how much is reviewed and checked per language, and the comments on the episode or the selected block.
+  - **Changes**: each changed step against git's HEAD, with *Put back as committed*. A person commits; backstage never does.
 - **Undo, redo, revert and save.** Typing into one field is one undo step. Save is refused when the edit brings an error; problems the file already had do not block it.
 
 **A character's page** (`src/ui/cast.ts`).
@@ -203,12 +206,13 @@ Review state is editors' notes, so it is not part of a story: a story's root tak
 
 ```json
 { "v": 1, "episodes": { "s1e01": { "status": "reviewed", "ai": true, "reviewer": "…",
-  "steps": { "4": { "reviewed": true, "persian": true }, "12.0.1": { "reviewed": true } },
+  "steps": { "4": { "reviewed": true, "checked": ["en", "fa"] }, "12.0.1": { "reviewed": true } },
   "comments": [{ "id": "…", "at": "4", "by": "…", "text": "…", "date": "2026-10-29 10:00", "done": true }] } } }
 ```
 
 - **Status** is `draft`, `reviewed` or `approved`.
 - **A step key** is the step's number, then the option's, then the reply's (`12.0.1`).
+- **`checked`** lists the translations checked, by language code. Notes written before it say `persian: true`, read as `fa` checked.
 - **The notes are saved at once.** They are written apart from the story's Save, and only when backstage runs with `--write`.
 - **What is never in them:** card or lesson text. No app and no check reads the sidecar.
 - **Commit it or not.** An app may commit the sidecar, so the review is shared, or git-ignore it.
@@ -248,8 +252,8 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `api.ts`;
   - `stage.ts` (`Preview`: the stage and a story player that follow the document);
   - `thumbs.ts` (pictures the stage draws once and keeps);
-  - `model/` (paths into a document, undo and redo, the step list, what changed, the board's weeks, the script's blocks and keys, parentheticals, ghosts and suggestions, a new episode's skeleton, the palette's search; pure and tested in Node);
-  - `ui/` (the pages: `app` (the shell), `board`, `new`, `studio/` (the episode: `episode`, `script`, `sections`, `details`, `direct`, `strip`), `cast`, `places`, `kitpage`, `review`, `seasons` (settings); and their parts: `galleries`, `lang`, `staging`, `changes`, `ai`, `fields`, `theme`, `kit/`).
+  - `model/` (paths into a document, undo and redo, the step list, what changed, the board's weeks, the script's blocks and keys, parentheticals, ghosts and suggestions, notes, a new episode's skeleton, the palette's search; pure and tested in Node);
+  - `ui/` (the pages: `app` (the shell), `board`, `new`, `studio/` (the episode: `episode`, `script`, `sections`, `details`, `direct`, `strip`, `notes`), `cast`, `places`, `kitpage`, `review`, `seasons` (settings); and their parts: `galleries`, `lang`, `staging`, `changes`, `ai`, `fields`, `theme`, `kit/`).
 - **`index.html`** is the page.
 - **`test/`**: `node --test` covers the save round trip, the model, the server on a temp copy of the samples, and AI help with the network stubbed. `pnpm check` runs it.
 

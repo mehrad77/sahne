@@ -1,61 +1,83 @@
-// Review: on an episode's page, where it stands (an AI draft, reviewed, approved), whether AI wrote it, each step reviewed
-// and its Persian checked, and comments on it or on a step; and the review page (#/review): every episode of each season
-// with its status, how much of it is reviewed and Persian-checked, its problems and its known-word ratio, and the notes
+// Review: on an episode's page, where it stands (to review, reviewed, approved), whether AI wrote it, each block reviewed
+// and each of its translations checked (in the script's gutter and beside each translation), and comments on it or on a
+// block; and the review page (#/review): every episode of each season
+// with its status, how much of it is reviewed and how much of each translation checked, its problems and its known-word ratio, and the notes
 // exported as markdown. The notes live in the sidecar (server/review.ts), never in a story.
 
 import { html } from "htm/preact";
 import { useEffect, useState } from "preact/hooks";
 import type { StoryDoc } from "sahne-story";
-import { allProblems, loadAllProblems, review, reviewer, setReview, setReviewer, world, type Comment, type EpisodeReview, type Status } from "../store.ts";
+import { allProblems, loadAllProblems, review, reviewer, setReview, setReviewer, world, type Comment, type EpisodeReview, type Status, type StepNote } from "../store.ts";
 import { rows } from "../model/steps.ts";
 import type { Path } from "../model/path.ts";
 import { Select, tx } from "./fields.ts";
+import { langName, useLangs } from "./lang.ts";
 
-const STATUS_NAME: Record<Status, string> = { draft: "AI draft", reviewed: "reviewed", approved: "approved" };
-const rowKey = (path: Path) => [path[1], path[4], path[6]].filter(x => x !== undefined).join(".");
+export const STATUS_NAME: Record<Status, string> = { draft: "to review", reviewed: "reviewed", approved: "approved" };
+/** A block's key in the review notes: its step, option and reply (`3`, `5.1`, `5.1.0`). */
+export const rowKey = (path: Path) => [path[1], path[4], path[6]].filter(x => x !== undefined).join(".");
+/** The translations a step's note says were checked (Persian from notes before languages were the series'). */
+export const checkedOf = (n: StepNote | undefined): string[] => [...new Set([...(n?.checked ?? []), ...(n?.persian ? ["fa"] : [])])];
 const pad = (n: number) => String(n).padStart(2, "0");
 const now = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; };
 
-/** The panel on an episode's page, for the selected step (or the whole episode). */
-export function ReviewPanel(p: { id: string; story: StoryDoc; path: Path | null }) {
-  const r: EpisodeReview = review.value[p.id] ?? {};
-  const [text, setText] = useState("");
-  const key = p.path ? rowKey(p.path) : null;
-  const note = key ? r.steps?.[key] ?? {} : null;
-  const all = rows(p.story), done = all.filter(x => r.steps?.[rowKey(x.path)]?.reviewed).length, fa = all.filter(x => r.steps?.[rowKey(x.path)]?.persian).length;
-  const comments = (r.comments ?? []).filter(c => (key ? c.at === key : true));
-  const put = (fn: (r: EpisodeReview) => EpisodeReview) => void setReview(p.id, x => ({ ...fn(x), reviewer: reviewer.value || x.reviewer }));
-  const mark = (what: "reviewed" | "persian", on: boolean) => put(x => {
-    const steps = { ...(x.steps ?? {}) }, s = { ...(steps[key!] ?? {}) };
-    if (on) s[what] = true; else delete s[what];
-    if (Object.keys(s).length) steps[key!] = s; else delete steps[key!];
+/** Change one episode's notes, signed with the reviewer's name. */
+export const putReview = (id: string, fn: (r: EpisodeReview) => EpisodeReview) => void setReview(id, x => ({ ...fn(x), reviewer: reviewer.value || x.reviewer }));
+
+/** Mark a block reviewed, or one of its translations checked. */
+export function markStep(id: string, path: Path, what: "reviewed" | string, on: boolean) {
+  const key = rowKey(path);
+  putReview(id, x => {
+    const steps = { ...(x.steps ?? {}) }, s: StepNote = { ...(steps[key] ?? {}) };
+    if (what === "reviewed") { if (on) s.reviewed = true; else delete s.reviewed; }
+    else {
+      const c = new Set(checkedOf(s)); if (on) c.add(what); else c.delete(what);
+      delete s.persian;
+      if (c.size) s.checked = [...c].sort(); else delete s.checked;
+    }
+    if (Object.keys(s).length) steps[key] = s; else delete steps[key];
     return { ...x, steps };
   });
+}
+
+/** A block's review in the script's gutter: reviewed, and its comments. */
+export function ReviewGutter(p: { id: string; path: Path; onComments(): void }) {
+  const r = review.value[p.id], key = rowKey(p.path), n = r?.steps?.[key];
+  const open = (r?.comments ?? []).filter(c => c.at === key && !c.done).length;
+  return html`<button class=${`gut-btn${n?.reviewed ? " on" : ""}`} title=${n?.reviewed ? "Reviewed (click to undo)" : "Mark reviewed"} aria-pressed=${!!n?.reviewed} onClick=${() => markStep(p.id, p.path, "reviewed", !n?.reviewed)}>✓</button>
+    <button class=${`gut-btn${open ? " on" : ""}`} title=${open ? `${open} open comments` : "Comment on it"} onClick=${p.onComments}>${open ? `💬${open}` : "💬"}</button>`;
+}
+
+/** The review tab on an episode's page, for the selected block (or the whole episode). */
+export function ReviewPanel(p: { id: string; story: StoryDoc; path: Path | null }) {
+  const r: EpisodeReview = review.value[p.id] ?? {};
+  const langs = useLangs();
+  const [text, setText] = useState("");
+  const key = p.path ? rowKey(p.path) : null;
+  const all = rows(p.story), done = all.filter(x => r.steps?.[rowKey(x.path)]?.reviewed).length;
+  const comments = (r.comments ?? []).filter(c => (key ? c.at === key : true));
   const add = () => {
     if (!text.trim()) return;
     const c: Comment = { id: Math.random().toString(36).slice(2, 10), ...(key ? { at: key } : {}), by: reviewer.value || "someone", text: text.trim(), date: now() };
-    put(x => ({ ...x, comments: [...(x.comments ?? []), c] }));
+    putReview(p.id, x => ({ ...x, comments: [...(x.comments ?? []), c] }));
     setText("");
   };
   return html`<div class="fields">
     <div class="row">
-      <div class="grow"><${Select} label="This episode is" value=${r.status ?? "draft"} options=${(Object.keys(STATUS_NAME) as Status[]).map(s => [s, STATUS_NAME[s]] as [string, string])} onInput=${(s: string | undefined) => put(x => ({ ...x, status: (s ?? "draft") as Status }))} /></div>
-      <label class="row"><input type="checkbox" style="width:auto" checked=${r.ai !== false} onChange=${(e: Event) => put(x => ({ ...x, ai: (e.target as HTMLInputElement).checked }))} /> AI wrote it</label>
+      <div class="grow"><${Select} label="This episode is" value=${r.status ?? "draft"} options=${(Object.keys(STATUS_NAME) as Status[]).map(s => [s, STATUS_NAME[s]] as [string, string])} onInput=${(s: string | undefined) => putReview(p.id, x => ({ ...x, status: (s ?? "draft") as Status }))} /></div>
+      <label class="row"><input type="checkbox" style="width:auto" checked=${r.ai !== false} onChange=${(e: Event) => putReview(p.id, x => ({ ...x, ai: (e.target as HTMLInputElement).checked }))} /> AI wrote it</label>
     </div>
-    <p class="note">${done} of ${all.length} steps reviewed · Persian checked in ${fa}${r.reviewer ? ` · last by ${r.reviewer}` : ""}</p>
-    ${note && html`<div class="row">
-      <label class="row"><input type="checkbox" style="width:auto" checked=${!!note.reviewed} onChange=${(e: Event) => mark("reviewed", (e.target as HTMLInputElement).checked)} /> step ${key} reviewed</label>
-      <label class="row"><input type="checkbox" style="width:auto" checked=${!!note.persian} onChange=${(e: Event) => mark("persian", (e.target as HTMLInputElement).checked)} /> its Persian checked</label>
-    </div>`}
-    <h3>${key ? `Comments on step ${key}` : "Comments on the episode"}</h3>
-    ${comments.map(c => html`<div class="panel" style=${c.done ? "opacity:.55" : ""}>
-      <div class="note">${c.by} · ${c.date}${c.at && !key ? ` · step ${c.at}` : ""}</div><div>${c.text}</div>
-      <div class="row"><button class="small" onClick=${() => put(x => ({ ...x, comments: (x.comments ?? []).map(y => (y.id === c.id ? { ...y, done: !y.done } : y)) }))}>${c.done ? "Open again" : "Done"}</button>
-        <button class="small danger" onClick=${() => put(x => ({ ...x, comments: (x.comments ?? []).filter(y => y.id !== c.id) }))}>Delete</button></div>
+    <p class="note">${done} of ${all.length} blocks reviewed${langs.translations.map(l => ` · ${langName(l)} checked in ${all.filter(x => checkedOf(r.steps?.[rowKey(x.path)]).includes(l)).length}`).join("")}${r.reviewer ? ` · last by ${r.reviewer}` : ""}</p>
+    <p class="note">Mark a block reviewed with ✓ in the script's gutter, and a translation checked with ✓ beside it.</p>
+    <h3>${key ? `Comments on block ${key}` : "Comments on the episode"}</h3>
+    ${comments.map(c => html`<div class=${`comment${c.done ? " done" : ""}`}>
+      <div class="note">${c.by} · ${c.date}${c.at && !key ? ` · block ${c.at}` : ""}</div><div>${c.text}</div>
+      <div class="row"><button class="small" onClick=${() => putReview(p.id, x => ({ ...x, comments: (x.comments ?? []).map(y => (y.id === c.id ? { ...y, done: !y.done } : y)) }))}>${c.done ? "Open again" : "Done"}</button>
+        <button class="small danger" onClick=${() => putReview(p.id, x => ({ ...x, comments: (x.comments ?? []).filter(y => y.id !== c.id) }))}>Delete</button></div>
     </div>`)}
     <div class="row">
       <input placeholder="Your name" value=${reviewer.value} style="max-width:140px" aria-label="Your name" onInput=${(e: Event) => setReviewer((e.target as HTMLInputElement).value)} />
-      <input class="grow" placeholder=${key ? "A comment on this step" : "A comment on the episode"} value=${text} aria-label="New comment" onInput=${(e: Event) => setText((e.target as HTMLInputElement).value)} onKeyDown=${(e: KeyboardEvent) => e.key === "Enter" && add()} style="flex:1" />
+      <input class="grow" placeholder=${key ? "A comment on this block" : "A comment on the episode"} value=${text} aria-label="New comment" onInput=${(e: Event) => setText((e.target as HTMLInputElement).value)} onKeyDown=${(e: KeyboardEvent) => e.key === "Enter" && add()} style="flex:1" />
       <button onClick=${add} disabled=${!text.trim()}>Comment</button>
     </div>
   </div>`;
@@ -66,7 +88,7 @@ const ratioOf = (msgs: { rule: string; message: string }[]) => { const m = msgs.
 
 /** #/review: where every episode stands. */
 export function ReviewPage() {
-  const w = world.value!;
+  const w = world.value!, langs = useLangs();
   useEffect(() => { if (!allProblems.value) void loadAllProblems(); }, []);
   const ps = allProblems.value;
   const seasons = Object.values(w.seasons).sort((a, b) => a.n - b.n);
@@ -79,13 +101,13 @@ export function ReviewPage() {
     ${groups.map(([title, eps]) => {
       const n = eps.length, by = (s: Status) => eps.filter(e => (review.value[e.id]?.status ?? "draft") === s).length;
       return html`<h3>${title} · ${by("approved")} of ${n} approved, ${by("reviewed")} reviewed</h3>
-      <table class="grid"><thead><tr><th>Episode</th><th>Status</th><th>Steps reviewed</th><th>Persian</th><th>Errors</th><th>Warnings</th><th>Known words</th><th>Open comments</th></tr></thead>
+      <table class="grid"><thead><tr><th>Episode</th><th>Status</th><th>Blocks reviewed</th>${langs.translations.map(l => html`<th>${langName(l)} checked</th>`)}<th>Errors</th><th>Warnings</th><th>Known words</th><th>Open comments</th></tr></thead>
       <tbody>${eps.map(e => {
         const r = review.value[e.id] ?? {}, steps = Object.values(r.steps ?? {});
         const ratio = ps ? ratioOf(ps.filter(p => p.doc === `story:${e.id}`)) : null;
         return html`<tr><td><a href=${`#/episode/${e.id}`}>${e.id}</a> <span lang="tr">${tx(e.title)}</span></td>
           <td><span class=${`chip ${r.status === "approved" ? "ok" : r.status === "reviewed" ? "" : "warn"}`}>${STATUS_NAME[r.status ?? "draft"]}</span>${r.ai !== false ? " · AI" : ""}</td>
-          <td>${steps.filter(s => s.reviewed).length}</td><td>${steps.filter(s => s.persian).length}</td>
+          <td>${steps.filter(s => s.reviewed).length}</td>${langs.translations.map(l => html`<td>${steps.filter(s => checkedOf(s).includes(l)).length}</td>`)}
           <td>${ps ? count(e.id, "error") : "…"}</td><td>${ps ? count(e.id, "warning") : "…"}</td><td>${ratio === null ? "—" : `${ratio}%`}</td>
           <td>${(r.comments ?? []).filter(c => !c.done).length}</td></tr>`;
       })}</tbody></table>`;

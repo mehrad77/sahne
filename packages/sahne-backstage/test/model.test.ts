@@ -190,3 +190,20 @@ test("autostage: the director's choices as ghosts, the rules' as suggestions", a
   assert.equal(s["steps/3"], undefined, "a gesture already written is not suggested again");
   assert.deepEqual(taken({ link: { a: "obj:a" }, do: "nod" }, { link: { b: "obj:b" }, do: "wave" }), { link: { a: "obj:a", b: "obj:b" }, do: "wave" });
 });
+
+test("notes: problems in plain words, with a fix where one is obvious", async () => {
+  const { notesOf } = await import("../src/model/notes.ts");
+  const c = { name: (id: string) => (id === "ismail" ? "İsmail" : id), langName: (l: string) => (l === "fa" ? "Persian" : l), standin: "nima" };
+  const story = { ...STORY, cast: ["nima"], steps: [{ who: "ismail", tr: "a" }] } as unknown as StoryDoc;
+  const ns = notesOf([
+    { rule: "lint", level: "warning", message: "x", step: 0 },
+    { rule: "cast", level: "error", message: "ismail speaks but is not in cast", step: 0, new: true },
+    { rule: "schema", level: "error", message: "/steps/0: the line has no fa text" },
+    { rule: "suggest", level: "info", message: "link a" },
+  ], c);
+  assert.deepEqual(ns.map(n => n.text), ["İsmail speaks but isn't in the cast.", "The line has no Persian yet.", "X."], "the new first; suggestions are chips, not notes");
+  assert.deepEqual(ns[1].path, ["steps", 0]);
+  assert.deepEqual(ns[0].fix!.apply(story).cast, ["nima", "ismail"]);
+  const [deixis] = notesOf([{ rule: "deixis", level: "error", message: "\"bu elma\" needs a deixis gesture at obj:elma (hold_up)", step: 0, fix: { do: "hold_up", at: "obj:elma" } }], c);
+  assert.deepEqual(deixis.fix!.apply(story).steps[0], { who: "ismail", tr: "a", do: "hold_up", at: "obj:elma" });
+});
