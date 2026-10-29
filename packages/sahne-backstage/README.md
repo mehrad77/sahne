@@ -40,6 +40,17 @@ The page is a studio: a top bar, a rail on the left, and the page.
 - **Languages.** Every text is edited in the series' languages (`series.json` `languages`, sahne-story's Languages section): the main language as the large field, each translation a smaller row under it with its code, in its own direction (Persian, Arabic, Hebrew, Urdu right to left), and a dot where a translation is missing (`src/ui/lang.ts`, `<Texts>`).
 - **A root in the old language shape** opens read-only, with a banner naming the converter: a root is converted whole, never a file at a time.
 
+## The kit as galleries
+
+Everything a scene is made of is picked from a gallery of pictures, not a list of ids (`src/ui/kit/gallery.ts`, the items in `src/ui/galleries.ts`):
+- **Characters** as portraits (`portrait`), the extras on their own tab.
+- **Places** as their wide shot.
+- **Props and set pieces** as sketches (`pieceSvg`, `sahne-kit/set-svg`).
+- **Emotions** as the stand-in's face, **gestures** as the stand-in caught at the gesture's stroke.
+- **Sounds** with their word; a click plays one.
+
+A gallery has a search box and filters by tag; a picker is a gallery in a popover. The pictures the stage draws (a place's wide shot, a gesture, a step for the storyboard) come from one hidden stage, one at a time, and are kept in the browser's IndexedDB under a key that changes with what they show, so each is drawn once (`src/thumbs.ts`). `#/kit` shows the kit's galleries on their own.
+
 ## The pages
 
 | Route | What |
@@ -48,9 +59,10 @@ The page is a studio: a top bar, a rail on the left, and the page.
 | `#/season/<id>` | A season: its episodes in order, each with its title, kind, release date, week, place, and draft or not. *Edit the season* is described below. *+ New episode* opens the wizard |
 | `#/new/<season>` | A new episode from its brief, described below |
 | `#/episode/<id>` | An episode, described below |
-| `#/cast` | Everyone of the series as a portrait, the extras apart. *New character* starts one with a new id: ids are permanent, and a retired one is refused |
+| `#/kit` | The kit as galleries: props, set pieces, gestures, emotions, sounds |
+| `#/cast` | Everyone of the series as a portrait, the extras on their own tab. *New character* starts one with a new id: ids are permanent, and a retired one is refused |
 | `#/character/<id>` | A character, described below |
-| `#/places` | Every place, with how many episodes it opens; *New place* starts one |
+| `#/places` | Every place as its wide shot, with how many episodes it opens; *New place* starts one |
 | `#/place/<id>` | A place, described below |
 | `#/review` | Where every episode stands: status, steps reviewed, Persian checked, errors, warnings, the known-word ratio (when the root has cards), open comments; *Export the notes* downloads them as markdown |
 

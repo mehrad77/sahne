@@ -17,6 +17,9 @@ import { change, checkDocs, checked, createDoc, draftOf, go, history, keyOf, ope
 import { Check, NumberField, Problems, Section, Select, Text } from "./fields.ts";
 import { Json } from "./staging.ts";
 import type { Problem } from "../api.ts";
+import { Gallery } from "./kit/gallery.ts";
+import { placeItems } from "./galleries.ts";
+import { useLangs } from "./lang.ts";
 
 const SOUNDS = Object.keys(KIT.sounds ?? {}).sort();
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -26,14 +29,13 @@ export function PlacesPage() {
   const w = world.value!;
   const [id, setId] = useState("");
   const ok = /^[a-z0-9_]+$/.test(id) && !w.places[id];
-  const used = (pid: string) => w.episodes.filter(e => e.place === pid).length;
+  const { main, translations } = useLangs();
   return html`<section>
-    <div class="row"><h2 class="grow">Places</h2>
-      <form class="row" onSubmit=${(e: Event) => { e.preventDefault(); if (!ok) return; createDoc("place", id, { v: 1, id, name: { tr: id, en: id, fa: id }, size: { w: 6, d: 4 }, pieces: [], marks: { a: { x: 0, z: 0 } } }); go("place", id); }}>
+    <div class="pagehead"><h2 class="grow">Places</h2>
+      <form class="row" onSubmit=${(e: Event) => { e.preventDefault(); if (!ok) return; createDoc("place", id, { v: 1, id, name: Object.fromEntries([main, ...translations].map(l => [l, id])), size: { w: 6, d: 4 }, pieces: [], marks: { a: { x: 0, z: 0 } } }); go("place", id); }}>
         <input value=${id} placeholder="new place id" style="max-width:200px" aria-label="A new place's id" onInput=${(e: Event) => setId((e.target as HTMLInputElement).value.trim().toLowerCase())} />
         <button disabled=${!ok}>New place</button></form></div>
-    <div class="cards">${Object.entries(w.places).map(([pid, p]) => html`<a class="card" href=${`#/place/${pid}`}><b>${p.name?.en ?? pid}</b>
-      <small lang="tr">${p.name?.tr ?? ""}</small><small>${pid} · ${p.pieces.length} pieces · ${Object.keys(p.marks).length} marks · opens ${used(pid)} episodes</small></a>`)}</div>
+    <${Gallery} items=${placeItems({ href: true })} label="Places" size="l" />
   </section>`;
 }
 

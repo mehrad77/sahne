@@ -7,6 +7,7 @@
 //   #/cast, #/character/<id> the cast, a character's look and words
 //   #/places, #/place/<id>   the places, a place's marks, props and set pieces
 //   #/new/<season>          a new episode from its brief
+//   #/kit                   the kit: props, set pieces, gestures, emotions, sounds
 
 import { html } from "htm/preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
@@ -25,9 +26,10 @@ import { ReviewPage } from "./review.ts";
 import { CastPage, CharacterPage } from "./cast.ts";
 import { PlacePage, PlacesPage } from "./places.ts";
 import { NewEpisode } from "./new.ts";
+import { KitPage } from "./kitpage.ts";
 
 /** The places to work, in the rail. */
-const RAIL: [string, string, string][] = [["", "board", "Board"], ["cast", "cast", "Cast"], ["places", "places", "Places"], ["review", "review", "Review"]];
+const RAIL: [string, string, string][] = [["", "board", "Board"], ["cast", "cast", "Cast"], ["places", "places", "Places"], ["kit", "hand", "Kit"], ["review", "review", "Review"]];
 
 export function App() {
   const w = world.value, r = route.value;
@@ -44,7 +46,7 @@ export function App() {
   // the season on screen: its page, an episode of it, or a new episode in it
   const current = page === "season" || page === "new" ? id : page === "episode" && id ? `s${seasonOf(id)}` : undefined;
   const dirty = dirtyKeys.value.length;
-  const area = page === "character" ? "cast" : page === "place" ? "places" : page === "review" ? "review" : page === "cast" || page === "places" ? page : "";
+  const area = page === "character" ? "cast" : page === "place" ? "places" : page === "review" ? "review" : page === "cast" || page === "places" || page === "kit" ? page : "";
   return html`<div class="studio">
     <header class="topbar">
       <a class="brand" href="#/" style="text-decoration:none;color:inherit"><${Icon} name="stage" size=${22} /> Backstage</a>
@@ -79,6 +81,7 @@ function commandsOf(): Command[] {
     { id: "go-review", what: "Go", label: "Review: where every episode stands", run: () => go("review") },
     { id: "go-cast", what: "Go", label: "The cast", run: () => go("cast") },
     { id: "go-places", what: "Go", label: "The places", run: () => go("places") },
+    { id: "go-kit", what: "Go", label: "The kit: props, gestures, emotions, sounds", run: () => go("kit") },
     { id: "theme", what: "Do", label: "Switch the theme (system, light, dark)", run: cycleTheme },
   ];
 }
@@ -94,6 +97,7 @@ function pageFor(page: string | undefined, id: string | undefined) {
     case "places": return html`<${PlacesPage} />`;
     case "place": return html`<${PlacePage} key=${id} id=${id} />`;
     case "new": return html`<${NewEpisode} key=${id} season=${id} />`;
+    case "kit": return html`<${KitPage} />`;
     default: return html`<p>No page ${page}. <a href="#/">The board</a></p>`;
   }
 }

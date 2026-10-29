@@ -1,6 +1,6 @@
 // The cast: everyone of the series as a portrait (#/cast), and a character's page (#/character/<id>): their look in
 // Sahne's builder in author mode (every part, the cast's own included), their outfits (each previewed on them), their
-// names, role and bio in Turkish and Persian, colour, voice, how they address the others, the places they belong to, and
+// name, role and bio in the series' languages, colour, voice, how they address the others, the places they belong to, and
 // the raw document for the rest (the album, the catchphrases). Extras are generated (sahne-story/cast/extras.ts): they are
 // shown, never edited. A new character gets a new id: ids are permanent, and a retired one is refused.
 
@@ -12,7 +12,10 @@ import { set } from "../model/path.ts";
 import { dirty } from "../model/history.ts";
 import { KIT } from "../stage.ts";
 import { change, checkDocs, checked, createDoc, draftOf, go, history, keyOf, openDoc, saveDocs, world } from "../store.ts";
-import { NumberField, Problems, Section, Select, Text, tx } from "./fields.ts";
+import { NumberField, Problems, Section, Select, tx } from "./fields.ts";
+import { Gallery } from "./kit/gallery.ts";
+import { characterItems } from "./galleries.ts";
+import { Texts, useLangs } from "./lang.ts";
 import { Json } from "./staging.ts";
 
 const svg = (doc: unknown, size = 120, framing: "head" | "bust" | "full" = "bust") => {
@@ -21,17 +24,17 @@ const svg = (doc: unknown, size = 120, framing: "head" | "bust" | "full" = "bust
 const bytes = (doc: AvatarDoc) => new TextEncoder().encode(serialize(doc)).length;
 
 export function CastPage() {
-  const w = world.value!;
-  const all = Object.values(w.characters).sort((a, b) => Number(a.order ?? 999) - Number(b.order ?? 999));
-  const roster = all.filter(c => c.kind !== "extra"), extras = all.filter(c => c.kind === "extra");
-  const card = (c: CharacterDoc) => html`<a class="card" href=${`#/character/${c.id}`}>
-    <div class="portrait" dangerouslySetInnerHTML=${{ __html: c.avatar ? svg(c.avatar) : "" }}></div>
-    <b>${tx(c.name)}</b><small>${c.id} · ${c.kind}${c.role ? ` · ${tx(c.role, "en")}` : ""}</small></a>`;
+  const w = world.value!, { main } = useLangs();
+  const [tab, setTab] = useState<"cast" | "extras">("cast");
+  const items = characterItems({ main, href: true }).filter(i => (tab === "extras") === i.tags?.includes("extras"));
+  const n = Object.values(w.characters).filter(c => c.kind === "extra").length;
   return html`<section>
-    <div class="row"><h2 class="grow">The cast</h2><${NewCharacter} /></div>
-    <div class="cards">${roster.map(card)}</div>
-    <h3>Extras (${extras.length}, written by sahne-story/cast/extras.ts)</h3>
-    <div class="cards">${extras.map(card)}</div>
+    <div class="pagehead"><h2 class="grow">The cast</h2><${NewCharacter} /></div>
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected=${tab === "cast"} onClick=${() => setTab("cast")}>Characters (${Object.keys(w.characters).length - n})</button>
+      <button role="tab" aria-selected=${tab === "extras"} onClick=${() => setTab("extras")}>Extras (${n})</button></div>
+    ${tab === "extras" && html`<p class="note">The silent people of the places, written by <code>sahne-story/cast/extras.ts</code>: shown here, never edited by hand.</p>`}
+    <${Gallery} items=${items} label=${tab === "extras" ? "Extras" : "Characters"} size="l" />
   </section>`;
 }
 
@@ -106,12 +109,9 @@ function Character(p: { id: string }) {
       </div>
       <div class="fields">
         ${!extra && html`<div class="panel fields">
-          <${Text} label="Name (Turkish)" lang="tr" value=${c.name?.tr} changed=${c.name?.tr !== was.name?.tr} onInput=${(v: string | undefined) => put("name", { ...c.name, tr: v ?? "" })} />
-          <${Text} label="Name (Persian)" lang="fa" value=${c.name?.fa} changed=${c.name?.fa !== was.name?.fa} onInput=${(v: string | undefined) => put("name", { ...c.name, fa: v ?? "" })} />
-          <${Text} label="Role · English" value=${c.role?.en} onInput=${(v: string | undefined) => put("role", { ...c.role, en: v ?? "" })} />
-          <${Text} label="Role · Persian" lang="fa" value=${c.role?.fa} onInput=${(v: string | undefined) => put("role", { ...c.role, fa: v ?? "" })} />
-          <${Text} label="Bio · English" multi value=${c.bio?.en} onInput=${(v: string | undefined) => put("bio", { ...c.bio, en: v ?? "" })} />
-          <${Text} label="Bio · Persian" lang="fa" multi value=${c.bio?.fa} onInput=${(v: string | undefined) => put("bio", { ...c.bio, fa: v ?? "" })} />
+          <${Texts} label="Name" value=${c.name} saved=${was.name} onInput=${(l: string, v: string | undefined) => put("name", { ...c.name, [l]: v ?? "" })} />
+          <${Texts} label="Role" need="translations" value=${c.role} saved=${was.role} onInput=${(l: string, v: string | undefined) => put("role", { ...c.role, [l]: v ?? "" })} />
+          <${Texts} label="Bio" need="translations" multi value=${c.bio} saved=${was.bio} onInput=${(l: string, v: string | undefined) => put("bio", { ...c.bio, [l]: v ?? "" })} />
           <div class="row">
             <label class="field">Colour <input type="color" style="width:60px;height:34px;padding:2px" value=${c.color} onInput=${(e: Event) => put("color", (e.target as HTMLInputElement).value.toUpperCase())} /></label>
             <div class="grow"><${NumberField} label="Order" value=${c.order} min=${1} onInput=${(v: number | undefined) => put("order", v)} /></div>
