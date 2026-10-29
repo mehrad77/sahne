@@ -1,4 +1,5 @@
-// A set piece or prop drawn on its own as SVG (the gallery's sketch of a tile until the stage has drawn it, and kit-sheet.ts):
+// A set piece or prop drawn on its own as SVG (sahne-kit/set-svg: the gallery's sketch of a tile until the stage has drawn it,
+// kit-sheet.ts, and backstage's prop gallery):
 // its flats, each moved by its offset; floor flats are shown as drawn, from above.
 
 import { groupBounds, groupSvg, moveAt, rng, SVG_BASE, whenWeight, withVariant, type FlatSpec, type Kit, type PieceDef } from "sahne";

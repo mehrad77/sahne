@@ -8,7 +8,7 @@ import { $, bar, button, chip, choice, facts, frame, head, link, select, toggle 
 import { envBar, envFromQuery, env } from "../shell/env.ts";
 import type { Ctx } from "../shell/ctx.ts";
 import { thumb } from "../shell/thumbs.ts";
-import { pieceSvg } from "../piece-svg.ts";
+import { pieceSvg } from "sahne-kit/set-svg";
 import { generator, usage, asked, FEATURES } from "./catalog.ts";
 import { solo } from "./solo.ts";
 

@@ -11,7 +11,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import kit from "../sahne-kit/src/full.ts";
 import { FAMILY_MODULES } from "../sahne-kit/src/set/all.ts";
-import { pieceSvg } from "./src/piece-svg.ts";
+import { pieceSvg } from "../sahne-kit/src/set-svg.ts";
 
 const { values: o } = parseArgs({ options: { family: { type: "string" }, ids: { type: "string" }, glow: { type: "boolean" }, out: { type: "string", default: "kit-sheet" }, px: { type: "string", default: "170" } } });
 const fam = FAMILY_MODULES[o.family ?? ""];
