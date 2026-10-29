@@ -79,14 +79,15 @@ export function loadPlaces(): Record<string, StoryPlace> {
   return out;
 }
 
-function loadCardUnits(): Record<string, CardUnit> | null {
+/** The cards' units, each with its word in the main language (`tr` here whatever the language). */
+function loadCardUnits(main = "tr"): Record<string, CardUnit> | null {
   if (!existsSync(CARDS)) return null;
   const out: Record<string, CardUnit> = {};
   for (const dir of [CARDS, CARDS_EXTRA]) {
     if (!existsSync(dir)) continue;
     for (const f of readdirSync(dir).filter(f => f.endsWith(".json"))) {
       const c = json(new URL(f, dir));
-      out[f.slice(0, -5)] = { level: c.level, ref: c.ref, tr: c.tr ?? "" };
+      out[f.slice(0, -5)] = { level: c.level, ref: c.ref, tr: c[main] ?? c.tr ?? "" };
     }
   }
   return out;
@@ -147,6 +148,7 @@ export function loadSyllabus(): Syllabus | null {
 export function loadWorld(): World {
   oldShape.clear();
   const seasons = loadSeasons(), daysFile = loadDaysFile();
-  const w = { drafts: loadDrafts(), places: loadPlaces(), cards: loadCardUnits(), lessons: loadLessons(), days: calendarOf(seasons, daysFile), daysFile, series: loadSeries(), seasons, syllabus: loadSyllabus(), cast: loadCast(), extras: loadExtras() };
+  const series = loadSeries();
+  const w = { drafts: loadDrafts(), places: loadPlaces(), cards: loadCardUnits(series?.languages?.main), lessons: loadLessons(), days: calendarOf(seasons, daysFile), daysFile, series, seasons, syllabus: loadSyllabus(), cast: loadCast(), extras: loadExtras() };
   return { ...w, oldShape: [...oldShape].sort() };
 }

@@ -1,6 +1,7 @@
 // sahne-story: Kumru's story documents on the Sahne stage (Kumru's STORIES_STAGE.md §3, §4).
 // `adaptStory` turns a story (Kumru's STORIES_SCHEMA.md) into a script with its cards;
-// `lintStory` checks that the staging agrees with the Turkish; `suggest` proposes staging.
+// `lintStory` checks that the staging agrees with the text (in the series' story language, src/lang.ts); `suggest`
+// proposes staging.
 
 export { adaptStory, type AdaptOptions, type Picks, type CardOption, type Turn, type CueInfo, type Shown, type Performance, type StoryStage } from "./adapt.ts";
 export { lintStory, suggest, NEAR, FAR, type Problem, type Rule, type LintOptions, type Suggestion } from "./lint.ts";
@@ -14,3 +15,5 @@ export { flagsOf, warmthOf, albumBand, metIn, unlockedOf, type StoryPicks, type 
 export * from "./types.ts";
 export * from "./texts.ts";
 export { upgrade, isOldShape, type UpgradeKind } from "./upgrade.ts";
+export { langFor, plainLang, LANGS, type StoryLang, type LineWord, type LineContext, type PropView, type Resolver } from "./lang.ts";
+export { trLang } from "./langs/tr.ts";

@@ -105,3 +105,20 @@ test("a place is named in each of the series' languages", () => {
   assert.ok(!lintPlace(bakkal, { kit }).some(p => /no name/.test(p.message)));
   assert.ok(lintPlace(bakkal, { kit, languages: { main: "tr", translations: ["en", "de"] } }).some(p => p.message === "no name in de"));
 });
+
+test("the story language: Turkish by plugin, another by plain words", async () => {
+  const { langFor, lintStory, suggest, trLang } = await import("../src/index.ts");
+  assert.equal(langFor("tr"), trLang);
+  const de = langFor("de");
+  assert.equal(de.id, "de");
+  assert.deepEqual(de.words("Guten Tag, Nima!").map(w => w.w), ["guten", "tag", ",", "nima", "."]);
+  assert.ok(de.resolver(["Brot"])("brot") && !de.resolver(["Brot"])("brote"), "exact words only");
+  // the samples' story, read as Turkish by default and by name, gives the same lints and suggestions
+  const d = world.drafts[0], o = { places: world.places, characters: d.characters, kit };
+  assert.deepEqual(lintStory(d.story, { ...o, lang: trLang }), lintStory(d.story, o));
+  assert.deepEqual(suggest(d.story, { ...o, lang: trLang }), suggest(d.story, o));
+  // a series in German has no Turkish lints: its line keys are de
+  const story = structuredClone(d.story) as StoryDoc & { steps: Record<string, unknown>[] };
+  for (const s of story.steps) if ("who" in s) { s.de = s.tr; delete s.tr; }
+  assert.ok(!lintStory(story, { ...o, lang: de }).some(p => ["deixis", "var_yok", "number", "time"].includes(p.rule)));
+});

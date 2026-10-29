@@ -15,9 +15,9 @@
 // prop labels and phone screens, an act's prompt, a spot's example and the display names.
 
 import type { ActCue, AvatarDoc, Cue, LoadOptions, PlaceDoc, PuppetRef, Script, Staging, VoiceSpec } from "sahne";
-import { lowerTr } from "sahne-tr";
 import { isAct, isBeat, isChoice, isLine, isScene, isSpot, NARRATOR, STANDIN, type CharacterDoc, type ChoiceOption, type Gate, type LineStep, type BeatStep, type Step, type StoryDoc, type Text3 } from "./types.ts";
 import { storyProps } from "./props.ts";
+import { langFor, type StoryLang } from "./lang.ts";
 import { allLanguages, DEFAULT_LANGUAGES, textOf, type Languages, type LangText } from "./texts.ts";
 import { dressing } from "./looks.ts";
 
@@ -35,6 +35,8 @@ export interface AdaptOptions {
   personalise?: (text: string, lang?: string) => string;
   /** The series' languages (`series.json`, src/texts.ts): the main one reaches the stage. Without them, Turkish with English and Persian. */
   languages?: Languages;
+  /** The story language (src/lang.ts) that reads a link's word; the main language's by default. */
+  lang?: StoryLang;
   /** Flags set by earlier stories, for `if` / `unless` lines (Kumru's STORIES_SCHEMA.md §4.7). */
   flags?: Iterable<string>;
 }
@@ -111,7 +113,8 @@ export function adaptStory(story: StoryDoc, o: AdaptOptions): StoryStage {
   /** A step's main-language text. */
   const said = (t: object) => String((t as Record<string, unknown>)[main] ?? "");
   const flags = new Set(o.flags ?? []);
-  const word = (k: string) => { const a = lowerTr(p(k)); return a !== k ? a : lowerTr(p(k[0].toUpperCase() + k.slice(1))); };
+  const lower = (o.lang ?? langFor(main)).lower;
+  const word = (k: string) => { const a = lower(p(k)); return a !== k ? a : lower(p(k[0].toUpperCase() + k.slice(1))); };
 
   /** The staging fields of a step, with the texts in them personalised. */
   function staging(s0: Staging): Staging {

@@ -3,7 +3,6 @@
 // World (check/world.ts), so tests seed breaks by editing a clone. Errors stop `pnpm sahne check`;
 // warnings and info are the report.
 
-import { lowerTr } from "sahne-tr";
 import { applyLook, AVATAR_MAX_BYTES, compose, GARMENT_FIELDS, normalize, serialize, type AvatarDoc, type AvatarNote, type Kit, type KitManifest, type Solid } from "sahne";
 import { puppets as KERIM_PUPPETS } from "../../sahne-kit/src/kerim/index.ts";
 import { puppets as ANIMAL_PUPPETS } from "../../sahne-kit/src/puppets/index.ts";
@@ -12,7 +11,7 @@ import type { CardIndex } from "../src/index.ts";
 import { languagesOf, textOf, type Languages } from "../src/texts.ts";
 import { validateDoc, type SchemaKind } from "./schema.ts";
 import { characterLanguageGaps, languageCodeGaps, seasonLanguageGaps, seriesLanguageGaps, storyLanguageGaps } from "./languages.ts";
-import { resolver, words, type Resolver } from "./words.ts";
+import { langFor, type Resolver, type StoryLang } from "../src/lang.ts";
 import type { Draft, World } from "./world.ts";
 
 export type CheckRule = "schema" | "id" | "series" | "calendar" | "ref" | "cast" | "counts" | "flags" | "quiz" | "mistake" | "text" | "words" | "recycle" | "character" | "lint" | "place";
@@ -66,14 +65,14 @@ export function texts(story: StoryDoc, main = "tr"): Text[] {
   return out;
 }
 
-const norm = (t: string) => lowerTr(t.replace(/[“”"‘’'.,!?…:;—-]/g, " ")).replace(/\s+/g, " ").trim();
-/** The learner's hometown in the stories' text, replaced by the host (s1e01: "Tahran"). */
-const HOMETOWN = "Tahran";
+/** The story language of a world's series (src/lang.ts). */
+export const langOf = (world: World): StoryLang => langFor(languagesOf(world.series).main);
+const normIn = (lang: StoryLang) => (t: string) => lang.lower(t.replace(/[“”"‘’'.,!?…:;—-]/g, " ")).replace(/\s+/g, " ").trim();
 const nameWords = (d: Draft, world: World, story: StoryDoc, main = languagesOf(world.series).main) => {
   const names: string[] = [];
   // every roster character's name (a story may mention one not in its cast), and the hometown token the app personalises
   for (const c of [...Object.values(d.characters), ...Object.values(world.cast ?? {})]) { const n = textOf(c.name, main); if (n) names.push(n); }
-  names.push(HOMETOWN, `${HOMETOWN}lı`);
+  names.push(...(langOf(world).names ?? []));
   for (const p of [story.place, ...story.steps.filter(isScene).map(s => s.scene)]) { const pl = world.places[p]; if (pl?.name?.[main]) names.push(pl.name[main]); }
   return names;
 };
@@ -99,7 +98,7 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   const out: CheckProblem[] = [];
   const add = (rule: CheckProblem["rule"], level: CheckProblem["level"], message: string, step?: number) => out.push({ rule, level, story: id, step, message });
 
-  const langs = languagesOf(world.series);
+  const langs = languagesOf(world.series), lang = langOf(world), norm = normIn(lang), { checkWords: words, resolver } = lang;
   for (const p of [...validateDoc("story", s), ...storyLanguageGaps(s, langs)]) add("schema", "error", `${p.path}: ${p.message}`);
   for (const [cid, c] of Object.entries(d.characters)) for (const p of [...validateDoc("character", c), ...characterLanguageGaps(c, langs)]) add("schema", "error", `character ${cid} ${p.path}: ${p.message}`);
   if (s.id !== d.id) add("id", "error", `the folder is ${d.id} but the story's id is ${s.id}`);
@@ -194,10 +193,7 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   });
 
   // text: the language-neutral stand-in, glossed names, unknown tokens
-  for (const t of all) {
-    if (t.who === STANDIN && /İran|Farsça|[؀-ۿ]/.test(t.tr)) add("text", "warning", `a stand-in line names a country or language: “${t.tr}”`, t.step);
-    if (/Kırlangıç/.test(t.tr) && !s.gl?.["kırlangıç"]) add("text", "warning", "Kırlangıç is used but not glossed in gl", t.step);
-  }
+  for (const t of all) for (const m of lang.hints?.({ text: t.tr, standin: t.who === STANDIN }, s.gl ?? {}) ?? []) add("text", "warning", m, t.step);
   const glKeys = Object.keys(s.gl ?? {});
   // unknown tokens and the known-word ratio need a dictionary: the cards (or the syllabus)
   const dictionary = !!world.cards || !!world.syllabus;
@@ -224,7 +220,7 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   const missing = [s.place, ...s.steps.filter(isScene).map(x => x.scene)].filter(p => !places[p]);
   for (const p of new Set(missing)) add("place", "error", `place ${p} has no document in places/`);
   if (!missing.length) {
-    for (const p of lintStory(s, { places, characters: d.characters, kit: o.kit, solids: o.solids?.[id] })) {
+    for (const p of lintStory(s, { places, characters: d.characters, kit: o.kit, solids: o.solids?.[id], lang })) {
       out.push({ rule: p.rule, level: p.level, story: id, step: p.step, message: p.message });
     }
     if (o.kit) {
@@ -281,8 +277,8 @@ export function checkSeason(world: World, drafts: Draft[] = world.drafts, o: Che
   const uses = (d: Draft, card: string): boolean => {
     const c = world.cards?.[card];
     if (!c) return false;
-    const r = resolver([c.tr], { particles: false });
-    return texts(d.story, languagesOf(world.series).main).some(t => words(t.tr).some(r));
+    const lang = langOf(world), r = lang.resolver([c.tr], { particles: false });
+    return texts(d.story, lang.id).some(t => lang.checkWords(t.tr).some(r));
   };
   for (const d of drafts) {
     const date = d.story.releaseDate;

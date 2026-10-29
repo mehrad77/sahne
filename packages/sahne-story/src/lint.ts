@@ -1,14 +1,11 @@
-// The story lints (Kumru's STORIES_STAGE.md §4): staging that contradicts the Turkish it
-// stages. They walk the story as the stage would play it, keeping where everyone stands and which
-// props are shown, and read each line with sahne-tr:
+// The story lints (Kumru's STORIES_STAGE.md §4): staging that contradicts the text it stages. They walk the story as
+// the stage would play it, keeping where everyone stands and which props are shown, and read each line with the
+// series' story language (src/lang.ts; Turkish's own lints, deixis, var/yok, numbers and clock times, are in
+// langs/tr.ts):
 //
-//   deixis    bu/şu/o + a linked noun needs a deixis gesture at that thing, and they agree: bu is near, o is far
-//   var_yok   "X var" / "X yok" about a linked prop needs it shown / hidden by then
-//   number    a number before a linked prop matches the `n` of the count or of the prop change
 //   budget    one gesture per speaker and a word that motivates it, one move per character, two reactions, `on` a word of the line
 //   via       a phone or video line needs its speaker off stage
 //   silent    voice "silent" only on a stand-in line whose text is "…"
-//   time      a clock time said aloud matches the linked clock
 //   link      every link key is a word of its line, and every obj: target is a prop on stage
 //   standin   no two stand-in lines in a row; the learner's first turn within the first four lines
 //   mechanics an act needs `act` among the arc's mechanics
@@ -22,8 +19,9 @@
 // A problem can carry a `fix`: the staging that would settle it. `suggest()` returns the fixes plus
 // the links a line could have (the `--suggest` of Kumru's STORIES_STAGE.md §4).
 
-import { applyLook, inState, placeState, route, detour, WEATHER, CLOTHING_FIELDS, lookFields, normalize, type AvatarDoc, type AvatarNote, type KitManifest, type Look, type ObjOp, type PlaceDoc, type PropRef, type Solid, type Staging, type Target, type Vec3 } from "sahne";
-import { deixis, lowerTr, match, readClock, clockMinutes, readNumber, tokens } from "sahne-tr";
+import { applyLook, inState, placeState, route, detour, WEATHER, CLOTHING_FIELDS, lookFields, normalize, type AvatarDoc, type AvatarNote, type KitManifest, type Look, type PlaceDoc, type PropRef, type Solid, type Staging, type Target, type Vec3 } from "sahne";
+import { langFor, type LineContext, type StoryLang } from "./lang.ts";
+import { DEIXIS_GESTURES } from "./langs/tr.ts";
 import { placesOf, storyProps } from "./props.ts";
 import { canon, dress, forLearner, LEARNER_FIELDS, looksOf } from "./looks.ts";
 import { isAct, isBeat, isChoice, isLine, isScene, isSpot, NARRATOR, STANDIN, type BeatStep, type CharacterDoc, type ChoiceOption, type LineStep, type LookRef, type StoryDoc } from "./types.ts";
@@ -50,36 +48,11 @@ export interface LintOptions {
   kit?: KitManifest;
   /** Each place's solid lines (`placeSolids` from sahne): a walk that goes round one is a warning, one with no way through an error. */
   solids?: Record<string, Solid[]>;
+  /** The story language of the series' main language (src/lang.ts); Turkish without one. */
+  lang?: StoryLang;
 }
 
-/** Within reach for *bu* (metres, on the floor plan); beyond `FAR` it is *o*. */
-export const NEAR = 1.5, FAR = 3;
-const DEIXIS_GESTURES = new Set(["point", "point_far", "hold_up", "touch"]);
-/** Which deixis gestures each demonstrative takes. `point` for *bu* and *o* only by distance. */
-const AGREE: Record<"bu" | "şu" | "o", string[]> = { bu: ["hold_up", "touch", "point"], şu: ["point"], o: ["point_far", "point"] };
-const ADVICE: Record<"bu" | "şu" | "o", string> = { bu: "hold_up", şu: "point", o: "point_far" };
-
-/** Words that motivate a gesture (prefixes of the lower-case word). Gestures not listed need none. */
-const MOTIVE: Record<string, string[]> = {
-  count: [], // a number
-  give: ["buyr", "al", "ver", "işte"],
-  take: ["al", "teşekkür", "sağ ol", "sağol"],
-  welcome: ["hoş", "buyr", "gel"],
-  wave: ["merhaba", "selam", "hoşça", "güle", "görüşür", "bay", "günaydın", "iyi akşam", "iyi gece"],
-  nod: ["evet", "tamam", "tabii", "olur", "peki", "doğru", "elbette", "anladım", "aynen"],
-  shake_head: ["hayır", "yok", "değil", "olmaz"],
-  cik: ["yok", "hayır", "cık", "değil"],
-  shrug: ["yok", "bilmiyor", "bilmem", "belki", "maalesef", "ama", "ne bileyim"],
-  hand_heart: ["teşekkür", "sağ", "lütfen", "rica", "memnun", "allah"],
-  me: ["ben", "bana", "beni"],
-  you: ["sen", "siz", "sana", "size", "seni", "sizi"],
-  beckon: ["gel", "buraya"],
-  stop: ["dur", "bekle", "hayır", "yeter"],
-  thumb_up: ["süper", "harika", "güzel", "tamam", "aferin", "bravo", "çok iyi", "oldu"],
-  shush: ["şş", "sus", "sessiz"],
-  bow_head: ["özür", "pardon", "kusura", "affedersiniz"],
-  phone: ["alo", "telefon"],
-};
+export { NEAR, FAR } from "./langs/tr.ts";
 
 type Vec = { x: number; z: number };
 interface PropState { shown: boolean; n?: number; params: Record<string, unknown>; at: Vec | null; holder?: string; kit: string; names: string[]; keep?: boolean; /** waiting for another place of this site */ site?: string }
@@ -89,31 +62,27 @@ interface State { id: string | null; place: PlaceDoc | null; on: Record<string, 
 /** A unit of staging the stage performs: a line, a picked option, a reply line or a beat. */
 interface Unit { who?: string; text?: string; st: Staging; at: Pick<Problem, "step" | "option" | "reply">; standin: boolean }
 
-const ascii = (s: string) => lowerTr(s).replace(/ı/g, "i").replace(/ş/g, "s").replace(/ç/g, "c").replace(/ğ/g, "g").replace(/ö/g, "o").replace(/ü/g, "u");
-/** A word of a line (lower case), or a pause: "," or "." (`q` for a question mark). */
-type W = { w: string; i: number; pause?: true; q?: boolean };
-const words = (text: string): W[] => tokens(text).map(t => (t.kind === "word" ? { w: lowerTr(t.text).replace(/[’']/g, "'"), i: t.i } : { w: t.mark === "comma" ? "," : ".", i: t.i, pause: true, q: t.text === "?" }));
 
 /** The props on stage that a word names: its `link`, else one whose id or card term it is a form of. */
-function linkOf(word: string, st: Staging, props: Record<string, PropState>): Target | null {
-  for (const [k, t] of Object.entries(st.link ?? {})) if (match(word, k)) return t;
-  const a = ascii(word.split("'")[0]);
-  for (const [id, p] of Object.entries(props)) for (const n of p.names) if (match(word, n) || a === n || match(a, n)) return `obj:${id}`;
+function linkOf(lang: StoryLang, word: string, st: Staging, props: Record<string, PropState>): Target | null {
+  for (const [k, t] of Object.entries(st.link ?? {})) if (lang.match(word, k)) return t;
+  const a = lang.fold(word.split("'")[0]);
+  for (const [id, p] of Object.entries(props)) for (const n of p.names) if (lang.match(word, n) || a === n || lang.match(a, n)) return `obj:${id}`;
   return null;
 }
 
-function startProps(place: PlaceDoc, extra: Record<string, PropRef>): Record<string, PropState> {
+function startProps(place: PlaceDoc, extra: Record<string, PropRef>, fold: (w: string) => string): Record<string, PropState> {
   const out: Record<string, PropState> = {};
   for (const [id, ref] of Object.entries({ ...(place.props ?? {}), ...extra })) {
     const { kit, at, n, terms, shown, keep, in: _in, ...params } = ref;
     const pos = typeof at === "string" ? place.marks[at] ?? null : at;
-    out[id] = { kit, n: typeof n === "number" ? n : undefined, params, shown: shown !== false, at: pos ? { x: pos.x, z: pos.z } : null, names: [id, ...(terms ?? []).map(t => ascii(t.split("-").pop() ?? t))], ...(keep ? { keep } : {}) };
+    out[id] = { kit, n: typeof n === "number" ? n : undefined, params, shown: shown !== false, at: pos ? { x: pos.x, z: pos.z } : null, names: [id, ...(terms ?? []).map(t => fold(t.split("-").pop() ?? t))], ...(keep ? { keep } : {}) };
   }
   return out;
 }
 
 /** The world a scene starts: in the same place the props stay and whoever leaves takes what they hold; a new place follows `enterPlace` (a place of the same site carries every prop). */
-function sceneState(story: StoryDoc, s: State, id: string, place: PlaceDoc | null, at: Record<string, string>): State {
+function sceneState(story: StoryDoc, s: State, id: string, place: PlaceDoc | null, at: Record<string, string>, fold: (w: string) => string): State {
   const on: Record<string, string | null> = Object.fromEntries(Object.entries(at).filter(([, m]) => !place || place.marks[m]));
   const props = Object.fromEntries(Object.entries(s.props).map(([k, p]) => [k, { ...p, params: { ...p.params } }]));
   if (s.id === id) {
@@ -122,7 +91,7 @@ function sceneState(story: StoryDoc, s: State, id: string, place: PlaceDoc | nul
   }
   if (!place) return { id, place, on, props: {}, away: s.away };
   const site = place.site ?? id, sibling = !!s.place && (s.place.site ?? s.id) === site;
-  const next = startProps(place, storyProps(story, id));
+  const next = startProps(place, storyProps(story, id), fold);
   const away = Object.fromEntries(Object.entries(s.away).filter(([, p]) => !p.site || (sibling && p.site === site)));
   for (const [k, p] of Object.entries(props)) {
     if (!p.keep && !sibling) continue;
@@ -141,9 +110,11 @@ function sceneState(story: StoryDoc, s: State, id: string, place: PlaceDoc | nul
 const dist = (a: Vec, b: Vec) => Math.hypot(a.x - b.x, a.z - b.z);
 
 export function lintStory(story: StoryDoc, o: LintOptions): Problem[] {
-  const out: Problem[] = [];
+  const out: Problem[] = [], lang = o.lang ?? langFor("tr");
+  /** A step's text in the story language. */
+  const said = (t: object) => String((t as Record<string, unknown>)[lang.id] ?? "");
   const add = (u: Pick<Unit, "at">, rule: Rule, message: string, fix?: Staging, level: Problem["level"] = "error") => out.push({ rule, level, ...u.at, message, ...(fix ? { fix } : {}) });
-  let state: State = { id: story.place, place: o.places[story.place] ?? null, on: {}, props: o.places[story.place] ? startProps(o.places[story.place], storyProps(story, story.place)) : {}, away: {} };
+  let state: State = { id: story.place, place: o.places[story.place] ?? null, on: {}, props: o.places[story.place] ? startProps(o.places[story.place], storyProps(story, story.place), lang.fold) : {}, away: {} };
 
   // ---- props: where the story's own props stand
   const visited = new Set([story.place, ...story.steps.filter(isScene).map(s => s.scene)]);
@@ -209,91 +180,37 @@ export function lintStory(story: StoryDoc, o: LintOptions): Problem[] {
     for (const w of new Set(movers)) if (movers.filter(x => x === w).length > 1) add(u, "budget", `${w} moves twice in one line: one move per character`);
     if (u.text === undefined) return;
 
-    const ws = words(u.text), plain = ws.filter(w => !w.pause).map(w => w.w);
-    if (st.on && !plain.some(w => match(w, st.on!) || w === lowerTr(st.on!))) add(u, "budget", `on: "${st.on}" is not a word of the line`);
-    for (const k of Object.keys(st.link ?? {})) if (!plain.some(w => match(w, k))) add(u, "link", `link "${k}" is not a word of the line`);
+    const ws = lang.words(u.text), plain = ws.filter(w => !w.pause).map(w => w.w);
+    if (st.on && !plain.some(w => lang.match(w, st.on!) || w === lang.lower(st.on!))) add(u, "budget", `on: "${st.on}" is not a word of the line`);
+    for (const k of Object.keys(st.link ?? {})) if (!plain.some(w => lang.match(w, k))) add(u, "link", `link "${k}" is not a word of the line`);
 
     // ---- a gesture needs a word to motivate it
-    if (st.do && MOTIVE[st.do]) {
+    const motive = st.do ? lang.motive[st.do] : undefined;
+    if (st.do && motive) {
       const said = plain.join(" ");
-      const ok = st.do === "count" ? plain.some((_, i) => { const r = readNumber(plain, i); return !!r && (r.n !== 1 || st.n === 1); }) : MOTIVE[st.do].some(m => said.split(" ").some(w => w.startsWith(m)) || said.includes(m + " "));
+      const ok = st.do === "count" ? !lang.number || plain.some((_, i) => { const r = lang.number!(plain, i); return !!r && (r.n !== 1 || st.n === 1); }) : motive.some(m => said.split(" ").some(w => w.startsWith(m)) || said.includes(m + " "));
       if (!ok) add(u, "budget", `"${st.do}" has no word in the line to motivate it`, undefined, "warning");
     }
     if (st.do && DEIXIS_GESTURES.has(st.do) && st.at?.startsWith("obj:")) {
-      const named = plain.some(w => linkOf(w, st, after.props) === st.at) || plain.some(w => deixis(w));
+      const named = plain.some(w => linkOf(lang, w, st, after.props) === st.at) || plain.some(w => lang.pointing(w));
       if (!named) add(u, "budget", `"${st.do}" at ${st.at}, but no word of the line names it`, undefined, "warning");
     }
 
-    // ---- walk the words: deixis, var/yok, numbers
-    ws.forEach((t, i) => {
-      if (t.pause) return;
-      // "Bu da bavul": the clitic da/de between the demonstrative and its noun is skipped
-      const next = ws[i + 1];
-      const noun = next && !next.pause && /^d[ae]$/.test(next.w) && ws[i + 2] && !ws[i + 2].pause ? ws[i + 2] : next;
-      // deixis: bu/şu/o + a linked noun
-      // burası / şurası / orası (and burada …) name the place itself: "Burası metro." is the scene, not a gesture at a prop
-      const d = /^(bura|şura|ora)/.test(t.w) ? null : deixis(t.w);
-      const tgt = noun && !noun.pause ? linkOf(noun.w, st, after.props) : null;
-      if (d && tgt) {
-        const phrase = `${t.w} ${noun !== next ? next.w + " " : ""}${noun!.w}`;
-        if (!st.do || !DEIXIS_GESTURES.has(st.do) || st.at !== tgt) {
-          add(u, "deixis", `"${phrase}" needs a deixis gesture at ${tgt} (${ADVICE[d]})`, { do: ADVICE[d], at: tgt });
-        } else {
-          const sp = u.who ? markPos(after, u.who) : null, tp = targetPos(after, tgt);
-          const held = tgt.startsWith("obj:") && after.props[tgt.slice(4)]?.holder === u.who;
-          const far = sp && tp && !held ? dist(sp, tp) : held ? 0 : null;
-          if (!AGREE[d].includes(st.do)) add(u, "deixis", `"${phrase}" with ${st.do}: ${d} takes ${AGREE[d].filter(g => g !== "point" || d === "şu").join(" or ")}`, { do: ADVICE[d], at: tgt });
-          else if (held && d !== "bu") add(u, "deixis", `"${phrase}": ${u.who} holds it, so it is bu`, undefined, "warning");
-          else if (d === "bu" && st.do === "point" && far !== null && far > NEAR) add(u, "deixis", `"${phrase}": bu is near, but ${tgt} is ${far.toFixed(1)} m away (şu or o, or hold it up)`);
-          else if (d === "o" && st.do === "point" && far !== null && far < FAR) add(u, "deixis", `"${phrase}": o is far, but ${tgt} is ${far.toFixed(1)} m away (bu or şu)`, { do: "point", at: tgt }, "warning");
-          else if (d === "bu" && far !== null && far > NEAR) add(u, "deixis", `"${phrase}": bu is near, but ${tgt} is ${far.toFixed(1)} m away`, undefined, "warning");
-          else if (d === "o" && far !== null && far <= NEAR) add(u, "deixis", `"${phrase}": o is far, but ${tgt} is within reach (${far.toFixed(1)} m)`, undefined, "warning");
-        }
-      }
-      // var / yok: the assertion, not the question
-      if (t.w === "var" || t.w === "yok") {
-        if (next && !next.pause && /^m[ıiuü]/.test(next.w)) return;
-        if (next && next.pause && next.q) return;
-        let subj: Target | null = null;
-        for (let k = i - 1; k >= 0 && !(ws[k].pause && ws[k].w === "."); k--) {
-          const w = ws[k];
-          if (!w.pause && (subj = linkOf(w.w, st, after.props))) break;
-        }
-        const id = subj?.startsWith("obj:") ? subj.slice(4) : null, p = id ? after.props[id] : null;
-        if (p && t.w === "var" && !p.shown) add(u, "var_yok", `"${t.w}": ${subj} is hidden here; show it on this line or before`, { obj: [{ id: id!, op: "show" }] });
-        if (p && t.w === "yok" && p.shown) add(u, "var_yok", `"${t.w}": ${subj} is still shown; hide it (a dashed outline) on this line`, { obj: [{ id: id!, op: "hide" }] });
-      }
-      // numbers: iki ekmek → n = 2
-      const plainIdx = plain.indexOf(t.w, ws.slice(0, i).filter(w => !w.pause).length);
-      const num = plainIdx > 0 && readNumber(plain, plainIdx - 1) ? null : readNumber(plain, plainIdx);
-      if (num && plainIdx >= 0) {
-        const noun = plain[plainIdx + num.len];
-        const nt = noun ? linkOf(noun, st, after.props) : null;
-        const id = nt?.startsWith("obj:") ? nt.slice(4) : null;
-        if (id) {
-          const ns = [...(st.do === "count" && st.n !== undefined ? [st.n] : []), ...(st.obj ?? []).filter((op: ObjOp) => op.id === id && op.n !== undefined).map(op => op.n!)];
-          const assert = plain.slice(plainIdx + num.len).includes("var");
-          const have = after.props[id]?.n;
-          if (ns.length && !ns.includes(num.n)) add(u, "number", `"${plain.slice(plainIdx, plainIdx + num.len + 1).join(" ")}" says ${num.n}, but the line's n is ${ns.join(", ")}`, st.do === "count" ? { do: "count", n: num.n } : undefined);
-          else if (!ns.length && assert && have !== undefined && have !== num.n && num.n !== 1) add(u, "number", `"${num.n} ${noun} var", but ${nt} shows ${have}`, { obj: [{ id, op: "set", set: { n: num.n } }] });
-        }
-      }
-    });
-
-    // ---- clock times
-    const times = readClock(u.text);
-    if (times.length) {
-      const clocks = Object.values(st.link ?? {}).filter((t): t is string => t.startsWith("obj:")).map(t => t.slice(4)).filter(id => after.props[id] && (after.props[id].params.time !== undefined || /clock|watch|saat/.test(after.props[id].kit)));
-      for (const id of clocks) {
-        const shown = after.props[id].params.time;
-        const m = typeof shown === "string" ? clockMinutes(shown) : null;
-        if (!times.some(t => clockMinutes(t) === m)) {
-          const said = `${times[0].h}:${String(times[0].m).padStart(2, "0")}`;
-          add(u, "time", `the line says ${said}, but obj:${id} shows ${shown ?? "no time"}`, { obj: [{ id, op: "set", set: { time: said } }] });
-        }
-      }
+    // ---- the language's own lints (Turkish: deixis, var/yok, numbers, clock times)
+    if (lang.lintLine) {
+      const sp = u.who ? markPos(after, u.who) : null;
+      const c: LineContext = {
+        who: u.who, text: u.text, st, words: ws, plain,
+        linkOf: w => linkOf(lang, w, st, after.props),
+        prop: id => after.props[id],
+        holds: t => t.startsWith("obj:") && after.props[t.slice(4)]?.holder === u.who,
+        distance: t => { if (c.holds(t)) return 0; const tp = targetPos(after, t); return sp && tp ? dist(sp, tp) : null; },
+        add: (rule, message, fix, level = "error") => add(u, rule as Rule, message, fix, level),
+      };
+      lang.lintLine(c);
     }
   }
+
 
   /** A walk that goes round a wall or a railing, or finds no way at all (DESIGN.md §7): the same router the stage walks by. */
   function ways(u: Unit, s: State) {
@@ -337,14 +254,14 @@ export function lintStory(story: StoryDoc, o: LintOptions): Problem[] {
   story.steps.forEach((s, step) => {
     if (isScene(s)) {
       const place = o.places[s.scene] ?? null;
-      state = sceneState(story, state, s.scene, place, s.at ?? {});
+      state = sceneState(story, state, s.scene, place, s.at ?? {}, lang.fold);
       // Kerim on stage perches on the scene's mark, else the place's (as the director does), so ch:kerim resolves there
       const perch = s.kerim ?? place?.perch;
       if (o.characters?.[NARRATOR]?.puppet && !state.on[NARRATOR] && perch && place?.marks[perch]) state.on[NARRATOR] = perch;
     } else if (isLine(s)) {
       const l = s as LineStep;
       turn(l.who === STANDIN, step, !l.narr);
-      unit({ who: l.who, text: l.tr, st: l, at: { step }, standin: l.who === STANDIN });
+      unit({ who: l.who, text: said(l), st: l, at: { step }, standin: l.who === STANDIN });
     } else if (isBeat(s)) unit({ who: s.beat.who, st: s.beat, at: { step }, standin: false });
     else if (isSpot(s)) unit({ who: "kerim", st: s.spot, at: { step }, standin: false });
     else if (isChoice(s)) {
@@ -353,10 +270,10 @@ export function lintStory(story: StoryDoc, o: LintOptions): Problem[] {
       let first: State | null = null;
       s.choice.options.forEach((op: ChoiceOption, option) => {
         state = clone(start);
-        unit({ who: STANDIN, text: op.tr, st: op, at: { step, option }, standin: true });
+        unit({ who: STANDIN, text: said(op), st: op, at: { step, option }, standin: true });
         (op.reply ?? []).forEach((r: LineStep | BeatStep, reply) => {
           if (isBeat(r)) unit({ who: r.beat.who, st: r.beat, at: { step, option, reply }, standin: false });
-          else unit({ who: r.who, text: r.tr, st: r, at: { step, option, reply }, standin: r.who === STANDIN });
+          else unit({ who: r.who, text: said(r), st: r, at: { step, option, reply }, standin: r.who === STANDIN });
         });
         first ??= state;
       });
@@ -548,32 +465,33 @@ export interface Suggestion { step: number; option?: number; reply?: number; rul
  * for words that name a prop on stage (ekmek → obj:ekmek), so staging stays quick to write.
  */
 export function suggest(story: StoryDoc, o: LintOptions): Suggestion[] {
+  const lang = o.lang ?? langFor("tr"), said = (t: object) => String((t as Record<string, unknown>)[lang.id] ?? "");
   const out: Suggestion[] = lintStory(story, o).flatMap(p => (p.fix ? [{ step: p.step, ...(p.option !== undefined ? { option: p.option } : {}), ...(p.reply !== undefined ? { reply: p.reply } : {}), rule: p.rule, message: p.message, fix: p.fix }] : []));
-  let props: Record<string, PropState> = o.places[story.place] ? startProps(o.places[story.place], storyProps(story, story.place)) : {}, here = story.place;
+  let props: Record<string, PropState> = o.places[story.place] ? startProps(o.places[story.place], storyProps(story, story.place), lang.fold) : {}, here = story.place;
   const links = (text: string, st: Staging, at: Pick<Suggestion, "step" | "option" | "reply">) => {
     const add: Record<string, Target> = {};
     let place = false;
-    for (const t of tokens(text)) {
-      if (t.kind !== "word") { place = false; continue; }
-      const w = lowerTr(t.text);
+    for (const t of lang.words(text)) {
+      if (t.pause) { place = false; continue; }
+      const w = t.w;
       // "Burası metro.": the noun after burası / şurası / orası names the place, not a prop on stage
       const after = place;
-      place = /^(burası|şurası|orası)$/.test(w);
+      place = lang.namesPlace(w);
       if (after) continue;
       // a pointing word (bu, şu, o and their forms) never names a prop: "şu" is not the water (su)
-      if (deixis(w)) continue;
-      if (Object.keys(st.link ?? {}).some(k => match(w, k))) continue;
-      const tg = linkOf(w, {}, props);
+      if (lang.pointing(w)) continue;
+      if (Object.keys(st.link ?? {}).some(k => lang.match(w, k))) continue;
+      const tg = linkOf(lang, w, {}, props);
       if (tg) add[w.split("'")[0]] = tg;
     }
     if (Object.keys(add).length) out.push({ ...at, rule: "link", message: `link ${Object.entries(add).map(([k, v]) => `${k} → ${v}`).join(", ")}`, fix: { link: { ...(st.link ?? {}), ...add } } });
   };
   story.steps.forEach((s, step) => {
-    if (isScene(s) && s.scene !== here) { const pl = o.places[s.scene]; here = s.scene; props = pl ? startProps(pl, storyProps(story, s.scene)) : {}; }
-    else if (isLine(s)) links(s.tr, s, { step });
+    if (isScene(s) && s.scene !== here) { const pl = o.places[s.scene]; here = s.scene; props = pl ? startProps(pl, storyProps(story, s.scene), lang.fold) : {}; }
+    else if (isLine(s)) links(said(s), s, { step });
     else if (isChoice(s)) s.choice.options.forEach((op, option) => {
-      links(op.tr, op, { step, option });
-      (op.reply ?? []).forEach((r, reply) => { if (isLine(r)) links(r.tr, r, { step, option, reply }); });
+      links(said(op), op, { step, option });
+      (op.reply ?? []).forEach((r, reply) => { if (isLine(r)) links(said(r), r, { step, option, reply }); });
     });
   });
   return out.sort((a, b) => a.step - b.step || (a.option ?? -1) - (b.option ?? -1) || (a.reply ?? -1) - (b.reply ?? -1));
