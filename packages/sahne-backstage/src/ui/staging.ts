@@ -12,7 +12,7 @@ import { get, set, type Path } from "../model/path.ts";
 import { kindOf } from "../model/steps.ts";
 import { KIT } from "../stage.ts";
 import { world } from "../store.ts";
-import { Check, NumberField, Select, Text } from "./fields.ts";
+import { Check, NumberField, Select, Text, tx } from "./fields.ts";
 
 export interface StagingProps {
   story: StoryDoc;
@@ -101,7 +101,7 @@ export function SceneFields(p: StagingProps) {
       put("state", !next.length ? undefined : next.length === 1 ? next[0] : next);
     }} />`)}</div>`}
     <b>Who stands where</b>
-    ${p.cast.filter(c => c !== "kerim").map(c => html`<div class="row"><span style="min-width:90px">${world.value?.characters[c]?.name ?? c}</span>
+    ${p.cast.filter(c => c !== "kerim").map(c => html`<div class="row"><span style="min-width:90px">${tx(world.value?.characters[c]?.name) || c}</span>
       <div class="grow"><${Select} label="" none="off stage" value=${at[c]} options=${marks} onInput=${(x: string | undefined) => put("at", { ...at, [c]: x })} /></div></div>`)}
     <${Select} label="Kerim's perch" value=${v.kerim} options=${marks} onInput=${(x: string | undefined) => put("kerim", x)} />
   </div>`;
@@ -139,7 +139,7 @@ function Reacts(p: { value: unknown; cast: string[]; onInput(v: unknown): void }
   const emo = (r: unknown) => (typeof r === "string" ? r : (r as { emo?: string })?.emo);
   return html`<div><b>Others react (react)</b> <button class="small" onClick=${() => { const c = p.cast.find(x => !(x in map)); if (c) write({ ...map, [c]: "happy" }); }}>+ a reaction</button>
     ${Object.entries(map).map(([c, r]) => html`<div class="row">
-      <span style="min-width:90px">${world.value?.characters[c]?.name ?? c}</span>
+      <span style="min-width:90px">${tx(world.value?.characters[c]?.name) || c}</span>
       <div class="grow"><${Select} label="Feeling" value=${emo(r)} options=${EMOTIONS} onInput=${(x: string | undefined) => write({ ...map, [c]: typeof r === "string" || !r ? x : { ...r, emo: x } })} /></div>
       <div class="grow"><${Select} label="Gesture" value=${typeof r === "object" ? r?.do : undefined} options=${GESTURES} onInput=${(x: string | undefined) => write({ ...map, [c]: { ...(typeof r === "string" ? { emo: r } : r), do: x } })} /></div>
       <button class="small danger" onClick=${() => { const { [c]: _gone, ...rest } = map; write(rest); }} aria-label="Remove the reaction">×</button></div>`)}

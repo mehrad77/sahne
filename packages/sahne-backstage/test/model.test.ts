@@ -104,3 +104,12 @@ test("what changed since a version: the rows, the fields, a word diff", async ()
   assert.deepEqual(c.rows.map(r => r.row.path), [["steps", 1]]);
   assert.equal(changes(null, STORY).added, STORY.steps.length);
 });
+
+test("search: every word of the query in a label or its keywords, accents ignored, the closest first", async () => {
+  const { search } = await import("../src/model/search.ts");
+  const items = [{ label: "s1e00 · Portakal var mı?", keywords: "bakkal ismail" }, { label: "İsmail", keywords: "ismail grocer" }, { label: "Bakkal", keywords: "bakkal" }];
+  assert.deepEqual(search(items, "ismail").map(i => i.label), ["İsmail", "s1e00 · Portakal var mı?"]);
+  assert.deepEqual(search(items, "bak var").map(i => i.label), ["s1e00 · Portakal var mı?"]);
+  assert.equal(search(items, "").length, 3);
+  assert.deepEqual(search(items, "zzz"), []);
+});

@@ -16,7 +16,7 @@ export function Home() {
     <h2>${s ? tx(s.title, "en") : "No series"}</h2>
     ${s ? html`<p><span lang="tr">${tx(s.title)}</span> · <span dir="rtl" lang="fa">${tx(s.title, "fa")}</span></p>
       ${s.summary && html`<p class="note">${tx(s.summary, "en")}</p>`}
-      <p class="row"><span class="chip">narrator: ${w.characters[s.narrator]?.name ?? s.narrator}</span><span class="chip">stand-in: ${w.characters[s.standin]?.name ?? s.standin}</span>
+      <p class="row"><span class="chip">narrator: ${tx(w.characters[s.narrator]?.name) || s.narrator}</span><span class="chip">stand-in: ${tx(w.characters[s.standin]?.name) || s.standin}</span>
         <span class="chip">${w.episodes.length} episodes</span><span class="chip">${Object.keys(w.characters).length} characters</span><span class="chip">${Object.keys(w.places).length} places</span></p>`
     : html`<p class="note">This content root has no series.json yet. The story check warns until one is added, with a ${"seasons/s<n>.json"} per season.</p>`}
     <button onClick=${() => setEditing(!editing)} aria-pressed=${editing}>${editing ? "Done" : s ? "Edit the series" : "Start the series"}</button>

@@ -152,7 +152,7 @@ function Editor(p: { id: string }) {
             const np = r.depth === 0 ? stepProblems(n) : 0;
             return html`<li class=${cls} role="option" aria-selected=${same(path, r.path)} onClick=${() => select(r.path)}>
               <span class="n">${r.n}</span>
-              <span><span class="kind">${r.kind}</span>${r.who && html`<span class="who">${w.characters[r.who]?.name ?? r.who}</span>`}<span lang="tr">${r.text}</span>${r.gate && html` <span class="chip">${r.gate}</span>`}</span>
+              <span><span class="kind">${r.kind}</span>${r.who && html`<span class="who">${tx(w.characters[r.who]?.name) || r.who}</span>`}<span lang="tr">${r.text}</span>${r.gate && html` <span class="chip">${r.gate}</span>`}</span>
               <span>${np ? html`<span class="chip warn">${np}</span>` : ""}</span>
             </li>`;
           })}

@@ -123,7 +123,7 @@ function Character(p: { id: string }) {
           </div>
         </div>
         <${Section} title="How they address the others (sen or siz)">
-          ${others.map(o => html`<div class="row"><span style="min-width:110px">${o.name}</span><div class="grow"><${Select} label="" value=${c.address?.[o.id]} options=${["sen", "siz"]}
+          ${others.map(o => html`<div class="row"><span style="min-width:110px">${tx(o.name)}</span><div class="grow"><${Select} label="" value=${c.address?.[o.id]} options=${["sen", "siz"]}
             onInput=${(v: string | undefined) => { const a = { ...(c.address ?? {}) }; if (v) a[o.id] = v; else delete a[o.id]; put("address", Object.keys(a).length ? a : undefined); }} /></div></div>`)}
         </${Section}>
         <${Section} title="Where they belong (places)">

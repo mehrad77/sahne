@@ -74,7 +74,7 @@ export function NewEpisode(p: { season?: string }) {
         </div>
         <${Select} label="Week (its arc)" value=${arcId} options=${arcs.map(([id, a]) => [id, `${id} · ${a.en}`] as [string, string])} onInput=${(v: string | undefined) => put("arc", v)} />
         <${Select} label="Place" value=${f.place} options=${Object.entries(w.places).map(([id, pl]) => [id, `${pl.name?.en ?? id} (${id})`] as [string, string])} onInput=${(v: string | undefined) => put("place", v)} />
-        <div class="field"><label>Cast (${w.characters[standin]?.name ?? standin} is always in it)</label>
+        <div class="field"><label>Cast (${tx(w.characters[standin]?.name) || standin} is always in it)</label>
           <div class="row">${people.filter(c => c.id !== standin && c.id !== narrator).map(c => html`<label class="row"><input type="checkbox" style="width:auto" checked=${cast.includes(c.id)} onChange=${(e: Event) => put("cast", (e.target as HTMLInputElement).checked ? [...cast, c.id] : cast.filter(x => x !== c.id))} /> ${tx(c.name)}${c.kind === "extra" ? html` <small class="note">${c.id}</small>` : ""}</label>`)}</div></div>
         <${Tri} label="Title" doc=${f.title} onInput=${(k: string, v: string | undefined) => put("title", { ...f.title, [k]: v ?? "" })} />
         <${Text} label="Premise · English (becomes the summary)" multi value=${f.summary.en} onInput=${(v: string | undefined) => put("summary", { ...f.summary, en: v ?? "" })} />

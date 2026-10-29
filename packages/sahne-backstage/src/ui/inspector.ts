@@ -139,7 +139,7 @@ function CastPicker(p: InspectorProps) {
       onChange=${(e: Event) => toggle(key, list, c.id, (e.target as HTMLInputElement).checked)} /> ${tx(c.name) || c.id}${n ? html` <small class="note">${n} lines</small>` : ""}${key === "extras" ? html` <small class="note">${c.id}</small>` : ""}</label>`;
   };
   const changed = (key: "cast" | "extras") => JSON.stringify(p.story[key] ?? []) !== JSON.stringify(p.saved[key] ?? []);
-  return html`<div class="field"><label>Cast (${cast.length}; 2 to 6, the stand-in among them; ${w.characters[narrator]?.name ?? narrator} narrates in every episode)${changed("cast") ? " · changed" : ""}</label>
+  return html`<div class="field"><label>Cast (${cast.length}; 2 to 6, the stand-in among them; ${tx(w.characters[narrator]?.name) || narrator} narrates in every episode)${changed("cast") ? " · changed" : ""}</label>
       <div class="row">${people.filter(c => c.kind !== "extra").map(c => box("cast", cast, c))}</div></div>
     <details open=${extras.length > 0}><summary>Extras (${extras.length}): the silent people of the place${changed("extras") ? " · changed" : ""}</summary>
       <div class="row">${people.filter(c => c.kind === "extra").map(c => box("extras", extras, c))}</div></details>`;

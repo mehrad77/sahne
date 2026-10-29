@@ -31,9 +31,16 @@ console.log(b.url);
 - **One content root per process.** sahne-story's `paths.ts` reads `SAHNE_CONTENT` once, so a second call with another root throws.
 - **Its own port.** Backstage is a separate page on its own port (default 5181), not part of the app's dev server. An app's watcher reloads its own page when a content file changes, and that reload must not wipe the editor.
 
-## The pages
+## The studio
 
-The side bar links the series, review, the cast and the places, and lists the seasons. A season opens in place to its episodes (open by itself while the season or one of its episodes is on screen; its caret opens and closes it), with a link to a new episode.
+The page is a studio: a top bar, a rail on the left, and the page.
+- **The top bar.** The series, a tab per season (`S1`, `S2`), the search box, whether everything is saved (or why nothing can be: read-only, the samples, a root in the old language shape), and the theme (as the system is, light or dark, kept in this browser).
+- **Search and commands** (`⌘ K`, or Ctrl K, or the search box): type a few letters of an episode, a season, a character, an extra or a place to go there, or of a command (a new episode in a season, the theme). Words match anywhere in a name or its keywords, accents ignored (`src/model/search.ts`).
+- **The rail:** the board, the cast, the places, review.
+- **Languages.** Every text is edited in the series' languages (`series.json` `languages`, sahne-story's Languages section): the main language as the large field, each translation a smaller row under it with its code, in its own direction (Persian, Arabic, Hebrew, Urdu right to left), and a dot where a translation is missing (`src/ui/lang.ts`, `<Texts>`).
+- **A root in the old language shape** opens read-only, with a banner naming the converter: a root is converted whole, never a file at a time.
+
+## The pages
 
 | Route | What |
 |---|---|
@@ -240,7 +247,7 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `review.ts`;
   - `ai.ts`.
 - The server reads sahne-story's Node-only files (`paths.ts`, `check/`, `load.ts`) by path. The package exports only `"."`.
-- **`src/`** is the browser side, built with Preact and htm tagged templates (no JSX, so the source stays erasable TypeScript). It contains:
+- **`src/`** is the browser side (the studio's shared parts in `src/ui/kit/`: icons, chips, drawers, popovers, the palette; the theme in `src/ui/theme.ts`), built with Preact and htm tagged templates (no JSX, so the source stays erasable TypeScript). It contains:
   - `index.ts`;
   - `store.ts` (signals: the world, the route, each open document's draft, the server's problems);
   - `api.ts`;
