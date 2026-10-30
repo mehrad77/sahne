@@ -12,12 +12,14 @@ import { K_BUST, K_HEAD, K_HEAD_VB } from "sahne-kit/kerim/art";
 import { kerimOnTalk, kerimPortrait } from "sahne-kit/kerim/portrait";
 import de from "sahne-de";
 import tr from "sahne-tr";
-import { adaptStory, storyPlayer, type CharacterDoc, type Languages, type StoryDoc, type StoryPlace, type StoryPlayer, type StoryStage } from "sahne-story";
+import { world } from "./store.ts";
+import { adaptStory, languagesOf, storyPlayer, type CharacterDoc, type Languages, type StoryDoc, type StoryPlace, type StoryPlayer, type StoryStage } from "sahne-story";
 
 export const KIT: Kit = { ...full, puppets: { ...full.puppets, ...kerimPuppets, ...animals } };
-export const LANG = tr;
-/** The plugin of a series' main language (Turkish when it names none); none for a language without one. */
+/** The plugin of a series' main language: Turkish when none is named (the samples' default); none for a language without a plugin. */
 export const langPlugin = (main?: string): LangPlugin | undefined => ({ tr, de } as Record<string, LangPlugin>)[main ?? "tr"];
+/** The plugin of the open series' main language, for the shared stages (live previews, thumbnails, the place stage). */
+export const seriesLang = (): LangPlugin | undefined => langPlugin(languagesOf(world.value?.series).main);
 /** Where the kit's recordings are served. */
 export const SOUNDS = new URL("/sounds/", location.href).href;
 

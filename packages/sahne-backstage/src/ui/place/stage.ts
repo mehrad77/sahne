@@ -8,7 +8,7 @@ import { useEffect, useRef } from "preact/hooks";
 import { interact, mountStage, rayZ, type Interaction, type Stage } from "sahne";
 import type { StoryPlace } from "sahne-story";
 import { heightOn, posOf, selOfTarget, shownDoc, targetOf, type Sel } from "../../model/place.ts";
-import { KIT, LANG, SOUNDS } from "../../stage.ts";
+import { KIT, seriesLang, SOUNDS } from "../../stage.ts";
 
 /** What the catalogue is putting down. */
 export type Drop = { kind: "piece" | "prop"; kit: string } | { kind: "mark" };
@@ -89,7 +89,7 @@ export function PlaceStage(p: {
   };
 
   useEffect(() => {
-    const st = mountStage(box.current!, { kit: KIT, lang: LANG, bubbles: false, motion: "full", sounds: SOUNDS });
+    const st = mountStage(box.current!, { kit: KIT, lang: seriesLang(), bubbles: false, motion: "full", sounds: SOUNDS });
     const ix = interact(st, { explore: false });
     stage.current = { st, ix };
     show();
