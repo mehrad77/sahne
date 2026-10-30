@@ -12,7 +12,7 @@ import * as H from "./model/history.ts";
 import { change, createDoc, drafts, go, keyOf, loadWorld, openDoc, say } from "./store.ts";
 import { loadKitDocs } from "./kitdocs.ts";
 
-export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean }
+export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean; paths?: Path[] }
 export interface Proposal extends ProposalEdit {
   id: string; also?: ProposalEdit[]; paths: Path[]; summary: string; by: string; at: number;
   problems: { level: string; message: string; new?: boolean; step?: number }[]; after?: string;
@@ -71,20 +71,21 @@ export function connectEvents() {
   source.addEventListener("usage", e => { usage.value = JSON.parse((e as MessageEvent).data) as Usage; });
 }
 
-/** Put one proposed document into the editor: whole, or only its changed places over unsaved edits. */
-async function applyEdit(e: ProposalEdit, paths: Path[]) {
+/** Put one proposed document into the editor: whole, or only its changed places over unsaved edits (always only those, `exact`). */
+async function applyEdit(e: ProposalEdit, paths: Path[], exact = false) {
   const k = keyOf(e.kind, e.doc);
   if (e.create && !drafts.value[k]) { createDoc(e.kind, e.doc, e.next); return; }
   const d = drafts.value[k] ?? await openDoc(e.kind, e.doc);
   if (!d) return;
-  if (!H.dirty(d) || !paths.length) change(e.kind, e.doc, () => e.next, `proposal.${k}`);
+  if ((!H.dirty(d) && !exact) || !paths.length) change(e.kind, e.doc, () => e.next, `proposal.${k}`);
   else change(e.kind, e.doc, doc => paths.reduce((x, p) => set(x, p, get(e.next, p)), doc), `proposal.${k}`);
 }
 
 /** Accept a proposal: applied as an edit (and the ones it was built on, which it holds), then answered. */
 export async function accept(p: Proposal) {
   await applyEdit(p, p.paths);
-  for (const a of p.also ?? []) await applyEdit(a, []);
+  // a document carried along changes only where the proposal says, when it says
+  for (const a of p.also ?? []) await applyEdit(a, a.paths ?? [], !!a.paths?.length);
   await api.post(`proposals/${p.id}`, { accepted: true });
   await refresh();
   say(`taken: ${p.summary}. Save to write it.`);

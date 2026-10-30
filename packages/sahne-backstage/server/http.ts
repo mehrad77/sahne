@@ -125,7 +125,8 @@ export async function serve(o: Options): Promise<Running> {
     const edit = (e: Partial<ProposalEdit>, what: string): ProposalEdit => {
       if (!e || !isKind(String(e.kind)) || typeof e.doc !== "string" || !e.next || typeof e.next !== "object" || Array.isArray(e.next)) throw new Fail(400, `${what} is { kind, doc, next, base?, create? }`);
       if (!e.create && !exists(e.kind!, e.doc)) throw new Fail(400, `${what}: there is no ${e.kind} ${e.doc}`);
-      return { kind: e.kind!, doc: e.doc, next: e.next, ...(typeof e.base === "number" ? { base: e.base } : {}), ...(e.create === true ? { create: true } : {}) };
+      const paths = Array.isArray(e.paths) ? e.paths.filter(p => Array.isArray(p) && p.every(k => typeof k === "string" || typeof k === "number")) : undefined;
+      return { kind: e.kind!, doc: e.doc, next: e.next, ...(typeof e.base === "number" ? { base: e.base } : {}), ...(e.create === true ? { create: true } : {}), ...(paths ? { paths } : {}) };
     };
     const main = edit(b as Partial<ProposalEdit>, "a proposal");
     const also = Array.isArray(b.also) ? b.also.map((e, i) => edit(e, `also[${i}]`)) : [];
