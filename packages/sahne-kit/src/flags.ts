@@ -77,7 +77,7 @@ const F: Record<string, Def> = {
 /** Every flag id, Turkey first: the values of a `country` param. */
 export const COUNTRIES: string[] = ["tr", ...Object.keys(F)];
 /** A country id from a param, else Turkey. */
-export const countryOf = (c: unknown): string => typeof c === "string" && (c === "tr" || F[c]) ? c : "tr";
+export const countryOf = (c: unknown): string => typeof c === "string" && (c === "tr" || Object.hasOwn(F, c)) ? c : "tr";
 /** The cloth's length for a height `h`: Turkey's 1.5 h, a Swiss flag's h. */
 export const flagWidth = (h: number, country = "tr"): number => { const c = countryOf(country); return c === "tr" ? h * 1.5 : h * F[c][0] / F[c][1]; };
 
