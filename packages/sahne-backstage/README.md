@@ -64,6 +64,10 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 - **Details.** A click opens a card's details: its id to copy, what it is, its tags, other names and parameters with their defaults. A sound also plays, with a playhead over its waveform and the time into it. A loop's playhead goes round from where the engine started it. The waveform is the recording where one loads, so it matches what plays.
 - **Hover.** A gesture or an emotion plays on the stand-in while the pointer rests on its card. One shared stage is laid over the card (`src/live.ts`). With reduced motion, the pictures stay still.
 
+## Piece sheets as PNG (`server/render.ts`)
+
+An agent cannot open a gallery, so a kit item is drawn as a picture it can read. `kitSheetSvg` (`sahne-kit/set-svg`) lays out labelled cells: each look of an item (its default, each variant; for a prop also `n: 3` and held), by day and by night, every cell on a faint 10 cm grid with a 170 cm adult beside it, the cheapest check of puppet scale. `pieceSvg` takes `{text, night}` options: `text` writes each flat's `TextSpec` as SVG `<text>` so a sign's words can be read, `night` dims the day art and lays the emissive glow over it. `renderPng(svg)` turns that into a PNG with `@resvg/resvg-js`, at most 1600 px wide, using the stage's Comic Neue from `server/fonts/` (the `.ttf` of the `@fontsource` latin files, which resvg can load where it cannot load WOFF) and the system's fonts for what that lacks.
+
 ## The pages
 
 | Route | What |
