@@ -352,6 +352,10 @@ test("kit_search lists set pieces and props with family, use and variants, and f
     const all = (await search({ kind: "props", limit: 200 })).length;
     assert.equal(all, Object.keys(fullKit.props).length, "kind props lists every prop, the both ones too");
     assert.equal((await search({ kind: "set", limit: 200 })).length, Object.keys(fullKit.set).length);
+    // no kind: props and set pieces together, each saying which
+    const any = await search({ query: "flag" });
+    assert.ok(any.some(r => r.as !== "prop") && any.every(r => typeof r.as === "string"), JSON.stringify(any.map(r => [r.id, r.as])));
+    assert.ok((await search({ query: "cup" })).some(r => r.id === "cup"));
   } finally { await close(); }
 });
 
