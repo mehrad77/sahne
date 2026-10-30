@@ -106,7 +106,7 @@ export function Activity(p: { limit?: number }) {
   if (!list.length) return html`<p class="note">No agent has done anything yet.</p>`;
   return html`<ol class="activity">${list.map(c => html`<li class=${c.ok ? "" : "bad"}>
     <span class="when" title=${new Date(c.at).toLocaleString()}>${ago(c.at)}</span>
-    <span class="grow"><b>${who(c.by)}</b> <code>${c.tool}</code>${c.summary ? html` <span class="note">${c.summary}</span>` : ""}</span>
+    <span class="grow"><b>${who(c.by)}</b> ${c.label ?? html`<code>${c.tool}</code>`}${c.summary ? html` <span class="note">${c.summary}</span>` : ""}</span>
     <span class="note">${c.ms < 1000 ? `${c.ms} ms` : `${(c.ms / 1000).toFixed(1)} s`}</span></li>`)}</ol>`;
 }
 

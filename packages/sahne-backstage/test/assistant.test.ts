@@ -95,10 +95,15 @@ test("anthropic: a streamed tool_use loop reads a real step through MCP, keeps i
   process.env.ANTHROPIC_API_KEY = "test-key";
   answers(toolTurn("toolu_1", "read_step", { id: "s1e00", path: "steps/4" }), textTurn("İsmail welcomes Nima in."));
   const evs = await ask("Who speaks in this step?");
-  assert.deepEqual(evs.filter(e => e.type !== "text").map(e => e.type), ["tool", "tool_result", "done"]);
-  assert.deepEqual(evs[0], { type: "tool", name: "read_step", input: { id: "s1e00", path: "steps/4" } });
-  assert.equal(evs[1].ok, true);
-  assert.match(evs[1].summary, /s1e00 steps\/4/);
+  assert.deepEqual(evs.filter(e => e.type !== "text").map(e => e.type), ["thinking", "tool", "tool_result", "done"]);
+  // the thinking streams to the editor; each call and its result carry the call's id, the result its time and detail
+  assert.deepEqual(evs[0], { type: "thinking", text: "Look at the step." });
+  assert.deepEqual(evs[1], { type: "tool", id: "toolu_1", name: "read_step", input: { id: "s1e00", path: "steps/4" } });
+  assert.equal(evs[2].id, "toolu_1");
+  assert.equal(evs[2].ok, true);
+  assert.match(evs[2].summary, /s1e00 steps\/4/);
+  assert.match(evs[2].detail, /"who": "ismail"/);
+  assert.equal(typeof evs[2].ms, "number");
   assert.equal(text(evs), "İsmail welcomes Nima in.");
   const usd = (1000 * 4 + 200 * 20 + 1500 * 4 + 30 * 20) / 1e6;
   assert.deepEqual(evs.at(-1)!.usage, { input: 2500, output: 230, usd });
@@ -109,7 +114,9 @@ test("anthropic: a streamed tool_use loop reads a real step through MCP, keeps i
   assert.equal(r1.headers["anthropic-version"], "2023-06-01");
   assert.equal(r1.body.model, "claude-opus-5-5");
   assert.equal(r1.body.stream, true);
-  assert.deepEqual(r1.body.thinking, { type: "adaptive" });
+  assert.deepEqual(r1.body.thinking, { type: "adaptive", display: "summarized" });
+  assert.deepEqual(r1.body.cache_control, { type: "ephemeral" });
+  assert.match(r1.body.system, /before a batch of tools/i);
   assert.equal(r1.body.tool_choice, undefined);
   const tool = r1.body.tools.find((t: { name: string }) => t.name === "read_step");
   assert.equal(tool.input_schema.type, "object");
@@ -131,6 +138,20 @@ test("anthropic: a streamed tool_use loop reads a real step through MCP, keeps i
   assert.equal(log[0].provider, "anthropic");
   assert.equal(log[0].usd, (1000 * 4 + 200 * 20) / 1e6);
   assert.ok(Math.abs(totals().today.usd - usd) < 1e-12);
+});
+
+test("stopped: no tool runs after the stop, and an answer with no words drops out of the history", async () => {
+  process.env.ANTHROPIC_API_KEY = "test-key";
+  const stopper = new AbortController();
+  answers(toolTurn("toolu_9", "read_step", { id: "s1e00", path: "steps/4" }));
+  const events: Ev[] = [];
+  const req = requestOf({ messages: [{ role: "user", content: "Read it" }, { role: "assistant", content: "" }, { role: "user", content: "Again" }] });
+  assert.equal(typeof req, "object");
+  assert.deepEqual((req as { messages: unknown[] }).messages, [{ role: "user", content: "Read it" }, { role: "user", content: "Again" }]);
+  // the person stops while the model is answering: its tool call does not run
+  await runAssistant(req as Exclude<typeof req, string>, e => { events.push(e); if (e.type === "thinking") stopper.abort(); }, { write: true, agentEdits: "direct", shareCards: false, events: new Events(), settings: settings(), signal: stopper.signal });
+  assert.equal(events.filter(e => e.type === "tool").length, 0, JSON.stringify(events));
+  assert.equal(sent.length, 1);
 });
 
 test("an edit by the assistant is a proposal, by \"assistant\"; a quick ask takes the faster model", async () => {
@@ -186,6 +207,25 @@ test("a big ask asks first; the second reader starts fresh", async () => {
   await ask([{ role: "user", content: "Draft the episode." }, { role: "assistant", content: "Drafted it, with these choices…" }, { role: "user", content: "Now review it." }], { fresh: true });
   assert.deepEqual(sent[0].body.messages, [{ role: "user", content: "Now review it." }]);
   assert.match(sent[0].body.system, /You are a second reader/);
+});
+
+test("openai-compatible: reasoning goes to the thinking, never into the answer, a <think> tag cut across chunks too", async () => {
+  const { thinkSplitter } = await import("../server/ai/providers/openai.ts");
+  let said = "", thought = "";
+  const sp = thinkSplitter(x => { said += x; }, x => { thought += x; });
+  for (const c of ["Hi <thi", "nk>weigh it", " up</th", "ink> there <", "b>"]) sp.push(c);
+  sp.end();
+  assert.equal(said, "Hi  there <b>");
+  assert.equal(thought, "weigh it up");
+  answers(() => openaiSse([
+    { choices: [{ delta: { reasoning_content: "Short answer." } }] },
+    { choices: [{ delta: { content: "<think>also this</think>Merhaba!" } }] },
+    { choices: [{ delta: {}, finish_reason: "stop" }] },
+  ]));
+  const evs = await ask("Say hi", { settings: { provider: "openai", baseUrl: "http://localhost:1234/v1" } });
+  assert.ok(!evs.some(e => e.type === "error"), JSON.stringify(evs));
+  assert.equal(text(evs), "Merhaba!");
+  assert.equal(evs.filter(e => e.type === "thinking").map(e => e.text).join(""), "Short answer.also this");
 });
 
 test("openai-compatible: a streamed tool_calls loop, usage estimated when the server gives none, at no cost", async () => {

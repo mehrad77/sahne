@@ -20,7 +20,7 @@ export interface Turn {
   model: string;
 }
 
-export interface TurnOptions { system: string; messages: unknown[]; tools: ToolDef[]; onText: (t: string) => void; signal?: AbortSignal; maxTokens?: number }
+export interface TurnOptions { system: string; messages: unknown[]; tools: ToolDef[]; onText: (t: string) => void; /** The model's thinking as it streams, where the provider gives it. */ onThinking?: (t: string) => void; signal?: AbortSignal; maxTokens?: number }
 
 export interface Provider {
   id: "anthropic" | "openai";

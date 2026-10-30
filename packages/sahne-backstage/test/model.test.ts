@@ -225,3 +225,15 @@ test("abilities: by mode, and the page's own first", async () => {
   assert.ok(direct.can.some(x => /^Set where an episode stands/.test(x)));
   assert.ok(!direct.cannot.some(x => /^Save anything/.test(x)));
 });
+
+test("tool calls in plain words: labels, paths as places, and a run of calls in one line", async () => {
+  const { toolLabel, pathWords, groupSummary } = await import("../src/model/tools.ts");
+  assert.equal(pathWords("steps/12/choice/options/0/reply/1"), "step 12 · option 1 · reply 2");
+  assert.equal(pathWords(["quiz", 0]), "quiz question 1");
+  assert.equal(pathWords(""), "the whole document");
+  assert.deepEqual(toolLabel("read_episode", { id: "s1e01" }), { label: "Read episode s1e01", kind: "read" });
+  assert.equal(toolLabel("edit_step", { id: "s1e01", path: "steps/3", patch: { tr: "Merhaba", emo: "happy" } }).label, "Edited s1e01 · step 3: tr, emo");
+  assert.equal(toolLabel("web_search", { query: "simit fiyatı" }).kind, "web");
+  assert.deepEqual(toolLabel("no_such_tool"), { label: "no such tool", kind: "read" });
+  assert.equal(groupSummary([{ name: "read_episode" }, { name: "read_step" }, { name: "check_episode" }, { name: "edit_step", ok: false }]), "2 reads · 1 check · 1 edit · 1 refused");
+});

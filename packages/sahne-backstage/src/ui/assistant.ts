@@ -5,8 +5,13 @@
 // are written, in direct mode), never as hidden changes. A big ask says what it would cost and waits for a yes. It runs
 // on Claude or on any OpenAI-compatible server (LM Studio, Ollama), within the budget (#/settings).
 //
+// An answer shows its work (chat/parts.ts): the model's thinking, folded once it moves on, and its tool calls grouped, in
+// plain words, each opening to what it was given and what came back. A live line says what it is doing; *Stop* ends it.
+//
 // Conversations are kept in this browser (localStorage, per series), never on the server: the last one opens again after
 // a reload, *New conversation* keeps the one before it, and *History* lists them to open again or delete (the newest 30).
+// What is kept is trimmed (the thinking shortened, the tools' results left out), and the oldest go when the browser's
+// storage is full.
 
 import { html } from "htm/preact";
 import { signal } from "@preact/signals";
@@ -17,9 +22,10 @@ import { proposals, selection, usage } from "../events.ts";
 import { abilities } from "../model/abilities.ts";
 import { Icon } from "./kit/index.ts";
 import { Markdown } from "./md.ts";
+import { liveLine, ThinkingBlock, tick, ToolGroup, type Thinking, type ToolPart } from "./chat/parts.ts";
 
-type Part = { type: "text"; text: string } | { type: "tool"; name: string; input?: unknown; ok?: boolean; summary?: string } | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number };
-interface Turn { role: "user" | "assistant"; content: string; parts?: Part[]; fresh?: boolean }
+type Part = { type: "text"; text: string } | Thinking | ToolPart | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number } | { type: "stopped" };
+interface Turn { role: "user" | "assistant"; content: string; parts?: Part[]; fresh?: boolean; at?: number }
 
 /** The side panel is open (side.ts), and the tab it shows; an ask turns it to the assistant. */
 export const assistantOpen = signal(false);
@@ -35,7 +41,19 @@ interface Chat { id: string; title: string; at: number; turns: Turn[] }
 const KEEP = 30;
 const storeKey = () => `backstage:chats:${world.value?.series?.id ?? "root"}`;
 const readChats = (): Chat[] => { try { return JSON.parse(localStorage.getItem(storeKey()) ?? "[]") as Chat[]; } catch { return []; } };
-const writeChats = (cs: Chat[]) => { try { localStorage.setItem(storeKey(), JSON.stringify(cs.slice(0, KEEP))); } catch { /* full or blocked: the conversation stays in this tab */ } };
+/** The longest thinking kept with a conversation, and the most of one conversation kept. */
+const KEEP_THINKING = 2000, KEEP_CHAT = 200_000;
+/** A turn as it is kept: the thinking shortened, no tool's result (it can be long and is not needed to read it again). */
+const trimmed = (t: Turn): Turn => !t.parts ? t : { ...t, parts: t.parts.map(p => p.type === "thinking" ? { ...p, text: p.text.slice(0, KEEP_THINKING) } : p.type === "tool" ? { ...p, detail: undefined } : p) };
+const chatJson = (c: Chat) => { const turns = c.turns.map(trimmed); let j = JSON.stringify({ ...c, turns }); for (let n = 1; j.length > KEEP_CHAT && n < turns.length; n++) j = JSON.stringify({ ...c, turns: turns.slice(n) }); return j; };
+/** Write the conversations; when the browser's storage is full, the oldest go until they fit. */
+const writeChats = (cs: Chat[]) => {
+  const list = cs.slice(0, KEEP).map(chatJson);
+  for (let n = list.length; n > 0; n--) {
+    try { localStorage.setItem(storeKey(), `[${list.slice(0, n).join(",")}]`); return; } catch { /* full: try with fewer */ }
+  }
+  // blocked: the conversation stays in this tab
+};
 /** The conversations kept, newest first, and the one open. */
 export const chats = signal<Chat[]>([]);
 const chatId = signal<string>("");
@@ -112,19 +130,28 @@ const contextNow = () => {
   return { page, ...(s?.kind ?? shown.kind ? { kind: s?.kind ?? shown.kind } : {}), ...(s?.id ?? shown.id ? { id: s?.id ?? shown.id } : {}), ...(s?.path ? { path: s.path } : {}) };
 };
 
+let stopper: AbortController | null = null;
+/** Stop the answer that is running: the request is aborted, so the server stops before its next tool or word. */
+export function stop() { stopper?.abort(); }
+
 /** Send a message (or an ask), streaming the answer into the conversation. */
 export async function send(content: string, o: { fresh?: boolean; confirm?: boolean } = {}) {
   if (busy.value || !content.trim()) return;
   assistantOpen.value = true;
   sideTab.value = "assistant";
-  const history = o.fresh ? [] : turns.value.filter(t => !t.fresh || t.role === "user").map(t => ({ role: t.role, content: t.content }));
+  // an answer with no words (only tools, or stopped) is not sent again
+  const history = o.fresh ? [] : turns.value.filter(t => (!t.fresh || t.role === "user") && t.content.trim()).map(t => ({ role: t.role, content: t.content }));
   if (!o.confirm) turns.value = [...turns.value, { role: "user", content, fresh: o.fresh }];
-  const reply: Turn = { role: "assistant", content: "", parts: [], fresh: o.fresh };
+  const reply: Turn = { role: "assistant", content: "", parts: [], fresh: o.fresh, at: Date.now() };
   turns.value = [...turns.value, reply];
   const update = (fn: (t: Turn) => void) => { fn(reply); turns.value = [...turns.value.slice(0, -1), { ...reply, parts: [...(reply.parts ?? [])] }]; };
+  /** The thinking before this part is over: how long it took. */
+  const endThinking = (t: Turn) => { const th = t.parts!.at(-1); if (th?.type === "thinking" && th.ms === undefined) th.ms = Date.now() - (th.at ?? Date.now()); };
   busy.value = true;
+  tick(true);
+  stopper = new AbortController();
   try {
-    const r = await fetch("/api/assistant", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: [...history, { role: "user", content }], context: contextNow(), fresh: !!o.fresh, confirm: !!o.confirm }) });
+    const r = await fetch("/api/assistant", { method: "POST", signal: stopper.signal, headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: [...history, { role: "user", content }], context: contextNow(), fresh: !!o.fresh, confirm: !!o.confirm }) });
     if (!r.ok || !r.body) { const b = await r.json().catch(() => ({})) as { message?: string }; update(t => t.parts!.push({ type: "error", message: b.message ?? `the assistant answered ${r.status}` })); return; }
     const reader = r.body.pipeThrough(new TextDecoderStream()).getReader();
     let buf = "";
@@ -137,18 +164,38 @@ export async function send(content: string, o: { fresh?: boolean; confirm?: bool
         const block = buf.slice(0, i); buf = buf.slice(i + 2);
         const data = block.split("\n").filter(l => l.startsWith("data:")).map(l => l.slice(5).trimStart()).join("\n");
         if (!data) continue;
-        const e = JSON.parse(data) as Part & { usage?: { usd?: number } };
+        const e = JSON.parse(data) as { type: string; [k: string]: any };
         update(t => {
-          if (e.type === "text") { t.content += e.text; const last = t.parts!.at(-1); if (last?.type === "text") last.text += e.text; else t.parts!.push({ type: "text", text: e.text }); }
-          else if (e.type === "tool") t.parts!.push({ type: "tool", name: e.name, input: e.input });
-          else if ((e as { type: string }).type === "tool_result") { const x = e as unknown as { name: string; ok: boolean; summary: string }; const tool = [...t.parts!].reverse().find(p => p.type === "tool" && p.name === x.name && p.ok === undefined) as Extract<Part, { type: "tool" }> | undefined; if (tool) { tool.ok = x.ok; tool.summary = x.summary; } }
-          else if (e.type === "done") t.parts!.push({ type: "done", usd: e.usage?.usd });
-          else t.parts!.push(e);
+          const parts = t.parts!, last = parts.at(-1);
+          if (e.type === "thinking") { if (last?.type === "thinking" && last.ms === undefined) last.text += e.text; else parts.push({ type: "thinking", text: e.text, at: Date.now() }); return; }
+          if (e.type !== "tool_result" && e.type !== "proposal") endThinking(t);
+          if (e.type === "text") { t.content += e.text; if (last?.type === "text") last.text += e.text; else parts.push({ type: "text", text: e.text }); }
+          else if (e.type === "tool") parts.push({ type: "tool", id: e.id, name: e.name, input: e.input, at: Date.now() });
+          else if (e.type === "tool_result") {
+            const tool = [...parts].reverse().find((p): p is ToolPart => p.type === "tool" && (e.id ? p.id === e.id : p.name === e.name && p.ok === undefined));
+            if (tool) Object.assign(tool, { ok: e.ok, summary: e.summary, detail: e.detail, ms: e.ms ?? (tool.at ? Date.now() - tool.at : undefined) });
+          } else if (e.type === "proposal") {
+            // shown under the call that made it
+            const tool = [...parts].reverse().find((p): p is ToolPart => p.type === "tool");
+            if (tool && !tool.proposal) tool.proposal = e.id; else parts.push({ type: "proposal", id: e.id });
+          } else if (e.type === "done") parts.push({ type: "done", usd: e.usage?.usd });
+          else parts.push(e as Part);
         });
       }
     }
-  } catch (e) { update(t => t.parts!.push({ type: "error", message: (e as Error).message })); }
-  finally { busy.value = false; }
+  } catch (e) {
+    if ((e as Error).name === "AbortError") update(t => { endThinking(t); t.parts!.push({ type: "stopped" }); });
+    else update(t => t.parts!.push({ type: "error", message: (e as Error).message }));
+  } finally { busy.value = false; stopper = null; tick(false); }
+}
+
+/** Ask again after an error: the failed exchange is replaced, not added to. */
+function retry() {
+  const at = turns.value.map(t => t.role).lastIndexOf("user");
+  if (at < 0 || busy.value) return;
+  const q = turns.value[at];
+  turns.value = turns.value.slice(0, at);
+  void send(q.content, { fresh: q.fresh });
 }
 
 /** An ask from the list, about what is selected. */
@@ -199,6 +246,32 @@ function Proposed(p: { id: string }) {
   return html`<div class="tool ok">Proposed an edit to <b>${x.doc}</b>: <a href=${href}>accept or reject it</a> above the ${x.kind === "story" ? "script" : "page"}.</div>`;
 }
 
+/** An answer, its parts in order: thinking, runs of tool calls (one group each), words, cards. */
+function Answer(p: { turn: Turn; live: boolean }) {
+  const parts = p.turn.parts ?? [];
+  const stopped = parts.some(x => x.type === "stopped");
+  // the answer proper: the words after the last tool call, once it is done
+  const lastTool = parts.map(x => x.type).lastIndexOf("tool");
+  const out: unknown[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    const x = parts[i];
+    if (x.type === "tool") {
+      const run: ToolPart[] = [];
+      while (i < parts.length && parts[i].type === "tool") run.push(parts[i++] as ToolPart);
+      i--;
+      const made = run.filter(c => c.proposal).map(c => html`<${Proposed} id=${c.proposal!} />`);
+      out.push(html`<${ToolGroup} calls=${run} live=${p.live} stopped=${stopped} after=${made} />`);
+    } else if (x.type === "thinking") out.push(html`<${ThinkingBlock} part=${x} live=${p.live && i === parts.length - 1} />`);
+    else if (x.type === "text") out.push(html`<${Markdown} class=${`said${!p.live && lastTool >= 0 && i > lastTool ? " answer" : ""}`} text=${x.text} />`);
+    else if (x.type === "proposal") out.push(html`<${Proposed} id=${x.id} />`);
+    else if (x.type === "confirm") out.push(html`<div class="confirm">${x.why} It would cost about ${fmtUsd(x.estimateUsd)}. <button class="small primary" onClick=${() => { const q = [...turns.value].reverse().find(y => y.role === "user"); if (q) void send(q.content, { confirm: true, fresh: q.fresh }); }}>Go ahead</button></div>`);
+    else if (x.type === "error") out.push(html`<div class="chat-error"><span class="grow">${x.message}</span>${!p.live && p.turn === turns.value.at(-1) && html`<button type="button" class="small" onClick=${retry}>Try again</button>`}</div>`);
+    else if (x.type === "stopped") out.push(html`<div class="note">Stopped. Nothing more ran after that.</div>`);
+    else if (x.type === "done" && x.usd !== undefined) out.push(html`<div class="note cost">${fmtUsd(x.usd)}</div>`);
+  }
+  return html`${out}`;
+}
+
 /** The conversation, in the side panel's Assistant tab. */
 export function AssistantChat() {
   const w = world.value!;
@@ -217,15 +290,10 @@ export function AssistantChat() {
     ${!w.ai ? html`<p>The assistant is off. Set up Claude (an API key) or a local model (LM Studio, Ollama) in <a href="#/settings">Settings</a>.</p>` : html`
     <div class="chat">
       ${empty && html`<div class="note">Ask anything about the series, or pick an ask. It sees ${ctx.id ? html`${ctx.kind === "season" ? "season " : ctx.kind === "place" ? "the place " : ctx.kind === "character" ? "the character " : ""}<b>${ctx.id}</b>${(ctx as { path?: Path }).path ? html` at <b>${(ctx as { path: Path }).path.slice(1).join(".")}</b>` : ""}` : `the ${ctx.page} page`}.<${Abilities} /><${AskMenu} /></div>`}
-      ${turns.value.map(t => html`<div class=${`turn ${t.role}${t.fresh ? " fresh" : ""}`}>
-        ${t.role === "user" ? t.content : (t.parts ?? []).map(p => p.type === "text" ? html`<${Markdown} class="said" text=${p.text} />`
-          : p.type === "tool" ? html`<div class=${`tool${p.ok === false ? " bad" : ""}`} title=${p.input ? JSON.stringify(p.input) : undefined}><${Icon} name="plug" size=${12} /> ${p.name.replace(/_/g, " ")}${p.summary ? `: ${p.summary}` : p.ok === undefined ? " …" : ""}</div>`
-          : p.type === "proposal" ? html`<${Proposed} id=${p.id} />`
-          : p.type === "confirm" ? html`<div class="confirm">${p.why} It would cost about ${fmtUsd(p.estimateUsd)}. <button class="small primary" onClick=${() => { const q = [...turns.value].reverse().find(x => x.role === "user"); if (q) void send(q.content, { confirm: true, fresh: q.fresh }); }}>Go ahead</button></div>`
-          : p.type === "error" ? html`<div class="tool bad">${p.message}</div>`
-          : html`<div class="note">${p.usd !== undefined ? fmtUsd(p.usd) : ""}</div>`)}
+      ${turns.value.map((t, i) => html`<div class=${`turn ${t.role}${t.fresh ? " fresh" : ""}`}>
+        ${t.role === "user" ? t.content : html`<${Answer} turn=${t} live=${busy.value && i === turns.value.length - 1} />`}
       </div>`)}
-      ${busy.value && html`<div class="note">Thinking…</div>`}
+      ${busy.value && html`<div class="live-line" role="status" aria-live="polite"><span class="spin" aria-hidden="true"></span>${liveLine(turns.value.at(-1)?.parts ?? [], turns.value.at(-1)?.at ?? Date.now())}</div>`}
       <div ref=${end}></div>
     </div>
     <form class="chat-input" onSubmit=${(e: Event) => { e.preventDefault(); void send(text); setText(""); }}>
@@ -233,7 +301,7 @@ export function AssistantChat() {
         onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(text); setText(""); } }} />
       <div class="row"><button type="button" class="small" disabled=${busy.value || !turns.value.length} onClick=${() => { newChat(); setPast(false); }}>New conversation</button>
         <button type="button" class="small" aria-expanded=${past} disabled=${!chats.value.length} onClick=${() => setPast(!past)}>History${chats.value.length ? ` (${chats.value.length})` : ""}</button>
-        <span class="grow"></span><button class="primary" disabled=${busy.value || !text.trim()}>Send</button></div>
+        <span class="grow"></span>${busy.value ? html`<button type="button" class="stop" onClick=${stop} title="Stop the answer: nothing more runs">Stop</button>` : html`<button class="primary" disabled=${!text.trim()}>Send</button>`}</div>
       ${past && html`<div class="chat-history" role="list" aria-label="Past conversations">
         <p class="note">Kept in this browser only, the newest ${KEEP}.</p>
         ${chats.value.map(c => html`<div role="listitem" class=${`chat-past${c.id === chatId.value ? " on" : ""}`}>

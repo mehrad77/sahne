@@ -1,7 +1,9 @@
 // Any OpenAI-compatible chat completions server (Node only): LM Studio (http://localhost:1234/v1, the default), Ollama
 // (http://localhost:11434/v1), llama.cpp's server, or a hosted one. Plain fetch to <base>/chat/completions, streamed, with
 // `tools` and `tool_calls`; OPENAI_API_KEY is sent as a bearer token when the environment has one. A local server may
-// report no usage: the tokens are then estimated (about four characters a token), so the token caps still bind.
+// report no usage: the tokens are then estimated (about four characters a token), so the token caps still bind. A
+// reasoning model's thinking (`reasoning_content` deltas, or <think>…</think> in the text, as DeepSeek and Qwen write it)
+// goes to `onThinking`, never into the answer.
 
 import { estimateTokens, net, ProviderError, readSse, schemaFor, type Provider, type ToolResult, type Turn, type TurnOptions } from "../provider.ts";
 import { LOCAL_BASE } from "../../settings.ts";
@@ -34,6 +36,7 @@ export function openai(o: { baseUrl?: string; model?: string } = {}): Provider {
         throw new ProviderError(r.status === 429 ? 503 : 502, `the model server answered ${r.status}: ${why}`);
       }
       let text = "", stop = "", served = model || "local", failed: string | null = null;
+      const think = thinkSplitter(x => { text += x; t.onText(x); }, x => t.onThinking?.(x));
       let usage: { input: number; output: number } | null = null;
       const calls: { id: string; name: string; args: string }[] = [];
       await readSse(r.body, (_event, data) => {
@@ -46,7 +49,8 @@ export function openai(o: { baseUrl?: string; model?: string } = {}): Provider {
         const c = e.choices?.[0];
         if (!c) return;
         const d = c.delta ?? {};
-        if (typeof d.content === "string" && d.content) { text += d.content; t.onText(d.content); }
+        if (typeof d.reasoning_content === "string" && d.reasoning_content) t.onThinking?.(d.reasoning_content);
+        if (typeof d.content === "string" && d.content) think.push(d.content);
         for (const tc of d.tool_calls ?? []) {
           const i = typeof tc.index === "number" ? tc.index : calls.length;
           const cur = (calls[i] ??= { id: "", name: "", args: "" });
@@ -56,6 +60,7 @@ export function openai(o: { baseUrl?: string; model?: string } = {}): Provider {
         }
         if (c.finish_reason) stop = c.finish_reason;
       });
+      think.end();
       if (failed) throw new ProviderError(502, `the model server stopped: ${failed}`);
       const list = calls.filter(Boolean).map((c, i) => {
         const id = c.id || `call_${i}`;
@@ -67,5 +72,31 @@ export function openai(o: { baseUrl?: string; model?: string } = {}): Provider {
       const word = stop === "length" ? "max_tokens" : stop === "content_filter" ? "refusal" : list.length ? "tools" : "end";
       return { text, calls: list.map(({ args: _a, ...c }) => c), usage: u, stop: word, message, model: served };
     },
+  };
+}
+
+/**
+ * Text with <think>…</think> in it, split as it streams: the thinking to `thinking`, the rest to `text`. A tag cut across
+ * two chunks is held back until the next one says what it is.
+ */
+export function thinkSplitter(text: (s: string) => void, thinking: (s: string) => void) {
+  let inside = false, held = "";
+  const emit = (s: string) => { if (s) (inside ? thinking : text)(s); };
+  return {
+    push(chunk: string) {
+      let s = held + chunk;
+      held = "";
+      for (;;) {
+        const tag = inside ? "</think>" : "<think>", i = s.indexOf(tag);
+        if (i >= 0) { emit(s.slice(0, i)); s = s.slice(i + tag.length); inside = !inside; continue; }
+        // the end may be the start of a tag: keep it for the next chunk
+        let keep = 0;
+        for (let n = Math.min(tag.length - 1, s.length); n > 0; n--) if (tag.startsWith(s.slice(-n))) { keep = n; break; }
+        emit(s.slice(0, s.length - keep));
+        held = s.slice(s.length - keep);
+        return;
+      }
+    },
+    end() { emit(held); held = ""; },
   };
 }

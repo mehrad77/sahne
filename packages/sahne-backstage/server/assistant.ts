@@ -5,7 +5,8 @@
 // and stand-in, and a summary of the format; nothing in it is any one language's.
 //
 // `POST /api/assistant` streams what happens as Server-Sent Events, each `data` a JSON object with its `type`:
-//   text { text } · tool { name, input } · tool_result { name, ok, summary } · proposal { id }
+//   text { text } · thinking { text } (the model's thinking, as it streams, where the provider gives it)
+//   tool { id, name, input } · tool_result { id, name, ok, summary, detail, ms } (detail: the result, capped) · proposal { id }
 //   confirm { estimateUsd, why }   a big ask (drafting or reviewing a season): nothing ran; re-send with confirm: true
 //   done { usage: { input, output, usd } } · error { message }
 // `fresh: true` is the second reader: a new conversation of the last message alone, never given the drafting history.
@@ -28,8 +29,9 @@ export interface AssistantContext { page: string; kind?: string; id?: string; pa
 export interface AssistantRequest { messages: { role: "user" | "assistant"; content: string }[]; context?: AssistantContext; fresh?: boolean; confirm?: boolean; quick?: boolean }
 export type AssistantEvent =
   | { type: "text"; text: string }
-  | { type: "tool"; name: string; input: unknown }
-  | { type: "tool_result"; name: string; ok: boolean; summary: string }
+  | { type: "thinking"; text: string }
+  | { type: "tool"; id: string; name: string; input: unknown }
+  | { type: "tool_result"; id: string; name: string; ok: boolean; summary: string; detail: string; ms: number }
   | { type: "proposal"; id: string }
   | { type: "confirm"; estimateUsd: number; why: string }
   | { type: "done"; usage: { input: number; output: number; usd: number } }
@@ -56,7 +58,9 @@ const MAX_TURNS = 40;
 export function requestOf(v: unknown): AssistantRequest | string {
   const b = v as Partial<AssistantRequest>;
   if (!b || !Array.isArray(b.messages) || !b.messages.length) return "expected { messages: [{ role, content }], context?, fresh?, confirm?, quick? }";
-  const messages = b.messages.map(m => ({ role: m?.role, content: m?.content }));
+  // an answer that was only tools, or stopped before a word, has nothing to send again
+  const messages = b.messages.map(m => ({ role: m?.role, content: m?.content })).filter(m => !(m.role === "assistant" && typeof m.content === "string" && !m.content.trim()));
+  if (!messages.length) return "expected { messages: [{ role, content }], context?, fresh?, confirm?, quick? }";
   if (messages.some(m => (m.role !== "user" && m.role !== "assistant") || typeof m.content !== "string" || !m.content.trim())) return "each message is { role: \"user\" | \"assistant\", content: text }";
   if (messages.at(-1)!.role !== "user") return "the last message is the person's";
   const c = b.context as Partial<AssistantContext> | undefined;
@@ -93,6 +97,7 @@ export function systemPrompt(o: { agentEdits: AgentEdits; writable: boolean; sha
     `What you can do:\n${ab.can.map(x => `- ${x}`).join("\n")}\nWhat you cannot do:\n${ab.cannot.map(x => `- ${x}`).join("\n")}\nWhen the person asks for something you cannot do, say so plainly in one sentence and where in the editor they can do it themselves; never write as if you did it, and never promise to do it later. When a tool refuses, say what was refused and why in plain words.`,
     "A new episode you propose (create_episode) exists only as your proposal until the person accepts it: you can read it and keep editing it, and every edit builds on your proposal. Tell the person to open it to accept or reject it. Pick its week from the season's arc weeks (series_overview).",
     "An edit that brings a new error is refused with the problems: fix them and try again. Answer briefly, in the language the person writes to you in.",
+    "The person sees each tool you call. Before a batch of tools, say in one short sentence what you are about to do; after the last one, give your answer.",
   ];
   if (o.fresh) parts.push("You are a second reader. You did not write this episode and have not seen how it was drafted. Read it fresh, as a careful reviewer would, and report what must be fixed: wrong or unnatural words, words above the level, translations that do not say what the line says, lines that do not fit the scene, quiz answers that do not hold, staging that contradicts the words. Leave a comment on each step that needs one; change nothing unless you are asked to.");
   const c = o.context;
@@ -115,6 +120,9 @@ export function estimate(req: AssistantRequest, p: Provider): { usd: number; tok
 }
 
 const summaryOf = (texts: string[]) => (texts[0] ?? "").split("\n")[0].slice(0, 240);
+/** How much of a tool's result the editor gets, to show when a call is opened. */
+const DETAIL = 4000;
+const detailOf = (texts: string[]) => { const t = texts.join("\n\n"); return t.length > DETAIL ? `${t.slice(0, DETAIL)}\n…` : t; };
 
 /** Run one ask, sending what happens. Never throws: a failure is an `error` event. */
 export async function runAssistant(req: AssistantRequest, send: (e: AssistantEvent) => void, o: AssistantOptions): Promise<void> {
@@ -147,7 +155,7 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
     for (let turn = 0; ; turn++) {
       if (turn >= MAX_TURNS) { send({ type: "error", message: `stopped after ${MAX_TURNS} rounds of tools: ask for less at a time` }); return; }
       guard(s.caps);
-      const r = await p.turn({ system, messages, tools, signal: o.signal, maxTokens: req.quick ? 16000 : 32000, onText: text => send({ type: "text", text }) });
+      const r = await p.turn({ system, messages, tools, signal: o.signal, maxTokens: req.quick ? 16000 : 32000, onText: text => send({ type: "text", text }), onThinking: text => send({ type: "thinking", text }) });
       const e = record(p.id, p.model, r.usage);
       total.input += r.usage.input + (r.usage.cacheRead ?? 0) + (r.usage.cacheWrite ?? 0); total.output += r.usage.output; total.usd += e.usd;
       o.events.emit("usage", usageSummary(s.caps));
@@ -157,10 +165,13 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
       if (!r.calls.length) break;
       const results = [];
       for (const c of r.calls) {
-        send({ type: "tool", name: c.name, input: c.input });
+        // stopped: no further tool runs (in direct mode one would save)
+        if (o.signal?.aborted) return;
+        send({ type: "tool", id: c.id, name: c.name, input: c.input });
+        const t0 = Date.now();
         if (c.bad !== undefined) {
           results.push({ id: c.id, name: c.name, text: JSON.stringify({ INVALID_JSON: c.bad }), isError: true });
-          send({ type: "tool_result", name: c.name, ok: false, summary: "the call's input was not valid JSON" });
+          send({ type: "tool_result", id: c.id, name: c.name, ok: false, summary: "the call's input was not valid JSON", detail: c.bad.slice(0, DETAIL), ms: 0 });
           continue;
         }
         let texts: string[], isError: boolean;
@@ -169,7 +180,7 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
           texts = (out.content ?? []).filter(x => x.type === "text").map(x => x.text ?? "");
           isError = !!out.isError;
         } catch (err) { texts = [`the tool failed: ${(err as Error).message}`]; isError = true; }
-        send({ type: "tool_result", name: c.name, ok: !isError, summary: summaryOf(texts) });
+        send({ type: "tool_result", id: c.id, name: c.name, ok: !isError, summary: summaryOf(texts), detail: detailOf(texts), ms: Date.now() - t0 });
         if (!isError) {
           try { const id = JSON.parse(texts.at(-1) ?? "").proposal; if (typeof id === "string") send({ type: "proposal", id }); } catch { /* no proposal */ }
         }
