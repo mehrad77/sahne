@@ -803,6 +803,64 @@ const ferry: PieceDef = { draw(p, r) {
     tags: ["vehicle", "water"],
   } };
 
+/** A tram that is not İstiklal's: `lisbon` (a small yellow wooden-look car, cream roof, one trolley pole) or `modern` (a long low-floor articulated car, white with a coloured band, glass sides, a pantograph). Side on, facing right (`dir` -1 left). */
+function euroTram(kind: string, p: Record<string, unknown>, r: Rng): PieceOut {
+  const lis = kind === "lisbon", len = num(p.len, lis ? 800 : 1700), half = len / 2, k = 1, dir = num(p.dir, 1) < 0 ? -1 : 1, move = goes(p);
+  const body = hex(p.color, lis ? "#E4B230" : "#F2F3F1"), band = lis ? "#F3E9CF" : hex(p.stripe, "#2F8C88"), under = "#2E2A28", glass = "#4E5E6E";
+  const sh: Shape[] = [], glow: Shape[] = [], text: TextSpec[] = [];
+  const wheel = (x: number, R = 26) => sh.push(S(ellipse(x, -R - 6, R), "#2B2726"), S(ellipse(x, -R - 6, R * 0.7), "#4A4440", { flat: true }), S(ellipse(x, -R - 6, 6), "#6E6660"));
+  if (lis) {
+    // a short wooden-look car: yellow lower panels with a cream belt line, a window band with rounded ends, platforms with handrails, the cream curved roof
+    for (const x of [-half * 0.5, half * 0.5]) wheel(x, 24);
+    sh.push(S(rect(-half + 20, -76, len - 40, 14), under), P([[-half, -70, 0], [half, -70, 0], [half - 10, -190, 0], [-half + 10, -190, 0]], body), S(rect(-half + 8, -118, len - 16, 5), band), S(rect(-half + 12, -178, len - 24, 7), band));
+    for (let x = -half + 60; x < half - 50; x += 110) sh.push(L([[x, -128], [x, -178]], tone(body, "shade"), 1.2, 0.6));
+    sh.push(S(rect(-half + 6, -290, len - 12, 112), body), S(rect(-half + 6, -190, len - 12, 12), band), S(rect(-half + 6, -300, len - 12, 10), band));
+    const n = Math.max(3, Math.round(len / 120)), pitch = (len - 140) / n;
+    for (let i = 0; i < n; i++) {
+      const x = -half + 70 + i * pitch, wd = pitch - 14;
+      sh.push(S(rrect(x, -280, wd, 84, [18, 18, 3, 3]), glass));
+      if (r.chance(0.6)) sh.push(...rider(r, x + wd / 2 + r.range(-8, 8), -202, 1));
+      sh.push(L([[x + 12, -208], [x + wd * 0.5, -272]], "#FFFFFF", 3, 0.22));
+      glow.push(S(rrect(x, -280, wd, 84, [18, 18, 3, 3]), "#FFE6B0", { flat: true, opacity: 0.85 }));
+    }
+    for (const e of [-1, 1]) {
+      sh.push(S(rrect(e > 0 ? half - 66 : -half + 6, -290, 60, 100, 8), "#5E6E7E"), L([[e * (half - 8), -80], [e * (half - 8), -300]], "#B8BEC4", 3, 1), S(ellipse(e * (half - 2), -130, 9), e > 0 ? "#F4F1E0" : "#B3261E"));
+      glow.push(S(ellipse(e * (half - 2), -130, e > 0 ? 15 : 9), e > 0 ? "#FFF3C4" : "#FF4A3A", { flat: true }));
+    }
+    sh.push(P([[-half - 4, -300, 0], [half + 4, -300, 0], [half - 30, -330], [-half + 30, -330]], "#EFE6CE"), S(rect(-half + 70, -344, len - 140, 16), "#DDD3B8"), S(rrect(-70, -400, 140, 38, 4), under), S(rrect(-66, -396, 132, 30, 3), "#F7F1DE"));
+    sh.push(L([[-40, -330], [34, -372]], "#3B3F45", 4, 1), L([[34, -372], [150, -430]], "#3B3F45", 3.4, 1), S(ellipse(152, -431, 6, 4), "#3B3F45"));
+    text.push({ text: str(p.route, "28 Martim Moniz"), x: -66, y: -396, w: 132, h: 30, size: 17, color: "#2B2420", font: "print", weight: 700, lang: "pt" });
+  } else {
+    // a long low-floor car in two halves joined by bellows: continuous glass, door panels, a band below the windows, the pantograph
+    for (const x of [-half * 0.78, -half * 0.28, half * 0.28, half * 0.78]) wheel(x, 22);
+    const cut = (x0: number, x1: number) => { sh.push(P([[x0, -48, 0], [x1, -48, 0], [x1, -330, 0], [x0 + (x0 < 0 ? 0 : 34), -330, 0]], body)); };
+    sh.push(S(rect(-half + 40, -62, len - 80, 18), under), P([[-half, -50, 0], [half, -50, 0], [half - 8, -340, 0], [-half + 8, -340, 0]], body));
+    sh.push(S(rect(-half + 4, -120, len - 8, 26), band), S(rect(-half + 4, -330, len - 8, 8), band), S(rect(-half + 12, -52, len - 24, 6), tone(body, "shade")));
+    void cut;
+    const n = Math.max(4, Math.round(len / 150)), pitch = (len - 220) / n;
+    for (let i = 0; i < n; i++) {
+      const x = -half + 110 + i * pitch, door = i % 3 === 1, wd = pitch - 10;
+      if (door) sh.push(S(rect(x, -318, wd, 192), "#37475A"), L([[x + wd / 2, -318], [x + wd / 2, -126]], tone(body, "shade"), 2, 1), S(rect(x + 8, -306, wd / 2 - 12, 100), "#5E7388"), S(rect(x + wd / 2 + 4, -306, wd / 2 - 12, 100), "#5E7388"));
+      else sh.push(S(rrect(x, -312, wd, 164, 6), glass), L([[x + 14, -150], [x + wd * 0.5, -300]], "#FFFFFF", 4, 0.2));
+      if (!door && r.chance(0.55)) sh.push(...rider(r, x + wd / 2 + r.range(-12, 12), -152, 1.15));
+      glow.push(S(rrect(x, -312, wd, door ? 192 : 164, 6), "#FFE6B0", { flat: true, opacity: 0.8 }));
+    }
+    sh.push(S(rect(-14, -336, 28, 292), "#2A2D31"), ...[-1, 1].map(e => L([[e * 14, -330], [e * 14, -50]], "#1F2124", 2, 1)));
+    for (const e of [-1, 1]) {
+      sh.push(P([[e * (half - 100), -50, 0], [e * half, -50, 0], [e * (half - 6), -330, 0], [e * (half - 100), -340, 0]], body), P([[e * (half - 120), -300, 0], [e * (half - 14), -300, 0], [e * (half - 16), -200, 0], [e * (half - 120), -200, 0]], "#26323E"), S(ellipse(e * (half - 22), -90, 9), e > 0 ? "#F4F1E0" : "#B3261E"));
+      glow.push(S(ellipse(e * (half - 22), -90, e > 0 ? 15 : 9), e > 0 ? "#FFF3C4" : "#FF4A3A", { flat: true }));
+    }
+    sh.push(S(rect(-half + 30, -352, len - 60, 14), "#C9C9C5"), S(rect(-half * 0.34, -366, 80, 14), under), S(rect(half * 0.12 - 80, -358, 160, 6), under), L([[half * 0.12 - 70, -358], [half * 0.12, -420], [half * 0.12 + 70, -358]], "#3B3F45", 3.4, 1), S(rect(half * 0.12 - 50, -424, 100, 6), "#3B3F45"));
+    sh.push(S(rrect(half - 150, -318, 128, 28, 3), "#14171B"), S(rrect(half - 146, -314, 120, 20, 2), "#2B1F10"));
+    text.push({ text: str(p.route, "4 Central"), x: half - 146, y: -314, w: 120, h: 20, size: 14, color: "#FFB84A", font: "screen", lang: "en", lit: 0 });
+  }
+  const gt = text.map(t => ({ ...t, x: dir < 0 ? -t.x - t.w : t.x }));
+  return { flats: [{
+    group: { shapes: fit(sh, k, dir), edge: 1 }, emissive: { shapes: fit(glow, k, dir), edge: 0 }, switch: false, ppcm: Math.min(1.8, 1900 / (len * 1.1)), text: gt,
+    ...(move ? { move: { ...move, sway: { rot: 0.002, dy: 0.6, ms: 900 } } } : {}),
+  }] };
+}
+
 /**
  * The red nostalgic tram of İstiklal, one car side on, facing right (`dir` -1 left), `len` cm long: red panels with gold
  * lining, a cream window band with riders in its windows (lit at night), open platforms at both ends with the headlamp,
@@ -811,6 +869,7 @@ const ferry: PieceDef = { draw(p, r) {
  * the back step (`hanger`, else seeded). It passes along `go` (`ms`, `wait`, `phase`), rocking on the rails.
  */
 const tram: PieceDef = { draw(p, r) {
+  if (p.kind === "lisbon" || p.kind === "modern") return euroTram(p.kind, p, r);
   const len = num(p.len, 880), k = len / 880, dir = num(p.dir, 1) < 0 ? -1 : 1, wire = num(p.wire, 520), red = "#A8322A", cream = "#EFE3C6", under = "#2E2A28", gold = "#D9B25A";
   const sh: Shape[] = [], glow: Shape[] = [], move = goes(p);
   // the underframe, the truck with its springs and spoked wheels, the steps and lifeguards
@@ -859,15 +918,18 @@ const tram: PieceDef = { draw(p, r) {
     group: { shapes: fit(sh, k, dir), edge: 1 }, emissive: { shapes: fit(glow, k, dir), edge: 0 }, switch: false, ppcm: Math.min(1.8, 1900 / (len * 1.07)), text,
     ...(move ? { move: { ...move, sway: { rot: 0.002, dy: 0.6, ms: 900 } } } : {}),
   }] };
-}, meta: {
-  about: "İstiklal's red nostalgic tram, side on: riders in its windows, the route board, the trolley pole to the wire; it can pass along a path.",
+}, variants: { lisbon: { kind: "lisbon" }, modern: { kind: "modern" } }, meta: {
+  about: "A tram side on, İstiklal's red nostalgic one (or a small yellow Lisbon car, or a long modern low-floor one): riders in its windows, the route board, the trolley pole to the wire; it can pass along a path.",
   params: {
-    len: { type: "num", default: 880, about: "cm" },
+    kind: { type: "enum", values: ["istiklal", "lisbon", "modern"], default: "istiklal", about: "istiklal: the red nostalgic tram; lisbon: a small yellow car with its trolley pole; modern: a long low-floor articulated car with a pantograph" },
+    color: { type: "color", about: "lisbon, modern: the body colour (yellow, white)" },
+    stripe: { type: "color", about: "modern: the band along its side" },
+    len: { type: "num", default: 880, about: "cm (800 lisbon, 1700 modern)" },
     dir: { type: "int", min: -1, max: 1, default: 1, about: "-1 faces left" },
     wire: { type: "num", default: 520, about: "the wire's height, cm" },
     pantograph: { type: "bool", about: "a pantograph instead of the trolley pole" },
     hanger: { type: "bool", about: "a child riding on the back step; default seeded" },
-    route: { type: "text", default: "Taksim – Tünel" },
+    route: { type: "text", default: "Taksim – Tünel", about: "the route board (28 Martim Moniz lisbon, 4 Central modern)" },
       go: { type: "list", about: "a path of [x, y, z] points (cm) it passes along" },
       ms: { type: "num", min: 500, default: 20000, about: "the time along go, ms" },
       wait: { type: "num", min: 0, default: 0, about: "ms between passes" },
