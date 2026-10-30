@@ -126,18 +126,18 @@ function cellSvg(kit: Kit, item: SheetItem, label: string, params: Record<string
     + `<g transform="translate(${sx} ${floor})">${ADULT}</g><g${SVG_BASE}>${a.body}</g></g></svg>${cap}</g>`;
 }
 
-/** A contact sheet as one SVG (render it with server/render.ts): a titled row per item, in cells of each look by day and by night, held and counted for a prop, every cell on a faint 10 cm grid with a 170 cm adult beside it. Words are written (`text`). */
-export function kitSheetSvg(kit: Kit, items: readonly SheetItem[], opts: { seed?: string; text?: boolean; columns?: number } = {}) {
-  const { w: W, h: H } = CELL, cols = opts.columns ?? 6, gap = 8, seed = opts.seed ?? "a", text = opts.text ?? true;
+/** A contact sheet as one SVG (render it with server/render.ts): a titled row per item, in cells of each look by day and by night (`views` picks), held and counted for a prop, every cell on a faint 10 cm grid with a 170 cm adult beside it. Words are written (`text`). */
+export function kitSheetSvg(kit: Kit, items: readonly SheetItem[], opts: { seed?: string; text?: boolean; columns?: number; views?: readonly ("day" | "night")[] } = {}) {
+  const { w: W, h: H } = CELL, cols = opts.columns ?? 6, gap = 8, seed = opts.seed ?? "a", text = opts.text ?? true, views = opts.views?.length ? opts.views : ["day", "night"];
   let y = gap, body = "", n = 0;
   for (const item of items) {
     const cells: string[] = [];
-    for (const [label, params] of sheetLooks(item)) for (const night of [false, true]) cells.push(cellSvg(kit, item, label, params, night, `${item.id}/${seed}`, `s${n++}`, text));
+    for (const [label, params] of sheetLooks(item)) for (const view of views) cells.push(cellSvg(kit, item, label, params, view === "night", `${item.id}/${seed}`, `s${n++}`, text));
     body += `<text x="${gap}" y="${y + 14}" font-family="${TEXT_FONT.replace(/'/g, "&apos;")}" font-size="15" font-weight="700" fill="#2B2420">${esc(item.id)} <tspan font-size="11" font-weight="400" fill="#6B645C">${item.kind === "set" ? "set piece" : "prop"}</tspan></text>`;
     y += 22;
     cells.forEach((c, i) => { body += `<g transform="translate(${gap + (i % cols) * (W + gap)} ${y + Math.floor(i / cols) * (H + gap)})">${c}</g>`; });
     y += Math.ceil(cells.length / cols) * (H + gap) + 6;
   }
-  const width = gap + Math.min(cols, Math.max(2, items.reduce((m, it) => Math.max(m, sheetLooks(it).length * 2), 2))) * (W + gap);
+  const width = gap + Math.min(cols, Math.max(2, items.reduce((m, it) => Math.max(m, sheetLooks(it).length * views.length), 2))) * (W + gap);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${y + gap}" viewBox="0 0 ${width} ${y + gap}"><rect width="${width}" height="${y + gap}" fill="#E8E1D4"/>${body}</svg>`;
 }

@@ -7,7 +7,8 @@ import type { Usage } from "./budget.ts";
 
 export interface ToolDef { name: string; description: string; schema: Record<string, unknown> }
 export interface Call { id: string; name: string; input: Record<string, unknown>; bad?: string }
-export interface ToolResult { id: string; name: string; text: string; isError: boolean }
+/** A tool's answer: its text, and any pictures (base64 PNG) a provider that can see sends on beside it. */
+export interface ToolResult { id: string; name: string; text: string; isError: boolean; images?: { data: string; mimeType: string }[] }
 
 export interface Turn {
   text: string;

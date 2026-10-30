@@ -106,7 +106,7 @@ const docKey = (d: DrawingDoc | VariantDoc) => ("of" in d ? `kit_variant:${d.of}
  * the kit (a taken id, a generator or param the kit does not have). Pieces go in before variants, one at a time, so one
  * bad item leaves out only itself.
  */
-function kitWithEdits(edits: Edit[]): { kit: Kit; problems: Problem[] } {
+export function kitWithEdits(edits: Edit[]): { kit: Kit; problems: Problem[] } {
   const mine = edits.filter(e => isKitKind(e.kind)), keys = new Set(mine.map(e => `${e.kind}:${e.id}`)), problems: Problem[] = [];
   const bad = (e: Edit, message: string) => problems.push({ rule: "kit", level: "error", story: `${e.kind}:${e.id}`, message, doc: `${e.kind}:${e.id}` });
   const docs: { doc: DrawingDoc | VariantDoc; edit?: Edit }[] = own().docs.filter(d => !keys.has(docKey(d))).map(doc => ({ doc }));

@@ -9,6 +9,7 @@ import { html } from "htm/preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { search } from "../model/search.ts";
 import { EMOTION_SHELVES, GESTURE_SHELVES, PROP_SHELVES, SERIES_SHELF, SET_SHELVES, SOUND_SHELVES, shelvesWith, type Shelf } from "../model/kitgroups.ts";
+import { shownKit } from "../events.ts";
 import { kitVersion } from "../kitdocs.ts";
 import { liveOff, liveOn } from "../live.ts";
 import { KIT } from "../stage.ts";
@@ -43,6 +44,9 @@ export function KitPage() {
   // a new section or shelf starts afresh; leaving the page stops what plays
   useEffect(() => { setTag(null); setOpen(null); setLimit(PAGE); liveOff(); }, [section, shelfId]);
   useEffect(() => { setQ(""); stopSounds(); }, [section]);
+  // an agent's `show` of a set piece or prop opens its card (after the effects above, which clear it)
+  const pointed = shownKit.value;
+  useEffect(() => { if (pointed && pointed.section === section) setOpen(pointed.id); }, [pointed?.n, section]);
   useEffect(() => () => { stopSounds(); liveOff(); }, []);
   const pickSize = (s: "s" | "m" | "l") => { setSize(s); try { localStorage.setItem(SIZE_KEY, s); } catch { /* a private window */ } };
 

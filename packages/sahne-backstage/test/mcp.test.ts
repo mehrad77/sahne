@@ -8,7 +8,7 @@
 import { test, after, before } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, type ChildProcess } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,8 +43,9 @@ async function connect(o: { write: boolean; agentEdits: Mode; shareCards?: boole
   return { client, events, close: () => client.close() };
 }
 const call = async (c: Client, name: string, args: Record<string, unknown> = {}) => {
-  const r = await c.callTool({ name, arguments: args }) as { content: { type: string; text: string }[]; isError?: boolean };
-  return { text: r.content.map(x => x.text).join("\n\n"), last: r.content.at(-1)!.text, isError: !!r.isError };
+  const r = await c.callTool({ name, arguments: args }) as { content: { type: string; text?: string; data?: string; mimeType?: string }[]; isError?: boolean };
+  const texts = r.content.filter(x => x.type === "text").map(x => x.text!);
+  return { text: texts.join("\n\n"), last: texts.at(-1)!, isError: !!r.isError, images: r.content.filter(x => x.type === "image") as { data: string; mimeType: string }[] };
 };
 const json = (r: string | { last: string }) => JSON.parse(typeof r === "string" ? r : r.last);
 const story = join(root, "stories", "s1e00.json");
@@ -115,7 +116,7 @@ test("the read tools: the series, the episodes, a script with paths, a step, the
     assert.match(chk.text, /s1e00: 0 errors, 0 warnings/);
     assert.deepEqual(json(await call(client, "read_notes", { id: "s1e00" })), {});
     const res = (await client.listResources()).resources.map(r => r.uri).sort();
-    assert.deepEqual(res, ["sahne://format", "sahne://languages", "sahne://selection"]);
+    assert.deepEqual(res, ["sahne://format", "sahne://kit-guide", "sahne://languages", "sahne://selection"]);
     assert.match(((await client.readResource({ uri: "sahne://format" })).contents[0] as { text: string }).text, /## Languages/);
     assert.deepEqual(JSON.parse(((await client.readResource({ uri: "sahne://languages" })).contents[0] as { text: string }).text).main, "tr");
   } finally { await close(); }
@@ -314,4 +315,188 @@ test("over stdio: nothing but MCP on stdout, and proposals reach a running backs
     assert.equal(list.at(-1).by, "stdio-agent");
     assert.ok(list.at(-1).problems.every((p: { new?: boolean; level: string }) => !(p.new && p.level === "error")));
   } finally { await client.close(); }
+});
+
+// ---- the drawing loop: kit items -----------------------------------------------------------------------------------------------
+
+const chalkboard = () => ({
+  id: "x_cafe_chalkboard", as: "prop", about: "A chalkboard menu, on an easel or hung on the wall.", tags: ["cafe"], terms: [],
+  params: { color: { type: "color", default: "#2F3B35", about: "the board" }, label: { type: "text", default: "Menu" }, kind: { type: "enum", values: ["easel", "wall"], default: "easel" } },
+  kinds: {
+    easel: { size: [60, 110], ppcm: 8, grip: [0, -60], flats: [{ shapes: [{ d: "M-30 0L-24 -110H24L30 0Z", fill: "$color" }, { d: "M-20 -20H20V-90H-20Z", fill: { tone: "$color", step: "shade" }, flat: true }], text: [{ text: "$label", x: -18, y: -86, w: 36, h: 60, font: "hand", lang: "fr" }], glow: [], sway: null, shadow: "drop" }] },
+    wall: { size: [80, 60], ppcm: 6, grip: [0, -30], flats: [{ shapes: [{ d: "M-40 0V-60H40V0Z", fill: "$color" }], text: [{ text: "$label", x: -36, y: -56, w: 72, h: 50, lang: "tr" }] }] },
+  },
+  repeat: { gap: 6 }, variants: { wall: { kind: "wall" } }, solid: null,
+});
+const isPng = (img: { data: string; mimeType: string }) => img.mimeType === "image/png" && Buffer.from(img.data, "base64").subarray(0, 8).toString("hex") === "89504e470d0a1a0a";
+const kitFile = (...p: string[]) => join(root, "kit", ...p);
+
+test("kit_search lists set pieces and props with family, use and variants, and filters them", async () => {
+  const { client, close } = await connect({ write: false, agentEdits: "proposals" });
+  try {
+    type Row = { id: string; family: string; as: string; about: string; variants: string[] };
+    const search = async (a: Record<string, unknown>) => json(await call(client, "kit_search", a)) as Row[];
+    const set = await search({ kind: "set", query: "frontage" });
+    assert.equal(set[0].id, "frontage");
+    assert.equal(set[0].family, "street");
+    assert.equal(set[0].as, "set");
+    assert.ok(Array.isArray(set[0].variants) && set[0].about.length > 8);
+    const food = await search({ kind: "props", family: "food" });
+    assert.ok(food.length > 3 && food.every(r => r.family === "food" && r.as !== "set"));
+    assert.ok((await search({ kind: "set", family: "street", as: "prop" })).every(r => r.as === "prop"));
+    const tag = (await search({ kind: "props", query: "" })).find(r => r.id === "tea")!;
+    assert.deepEqual((await search({ kind: "props", family: "food", query: "tea" })).map(r => r.id).includes(tag.id), true);
+    assert.deepEqual(await search({ kind: "set", family: "nonesuch" }), []);
+  } finally { await close(); }
+});
+
+test("kit_read shows a generator's params, variants and source, with its sheet; kit_render returns the picture and the checks", async () => {
+  const { client, close } = await connect({ write: false, agentEdits: "proposals" });
+  try {
+    const r = await call(client, "kit_read", { id: "tea" });
+    assert.ok(!r.isError, r.text);
+    const d = json(r);
+    assert.equal(d.id, "tea");
+    assert.equal(d.family, "food");
+    assert.ok(Object.keys(d.params).length > 0 && d.source.file === "packages/sahne-kit/src/set/food.ts");
+    assert.match(d.source.text, /tea/i);
+    assert.equal(r.images.length, 1);
+    assert.ok(isPng(r.images[0]));
+    const g = await call(client, "kit_render", { id: "frontage", views: ["day"], seeds: ["a", "b"] });
+    assert.ok(!g.isError, g.text);
+    assert.equal(g.images.length, 2);
+    assert.ok(g.images.every(isPng));
+    assert.match(g.text, /^frontage: 0 errors/);
+    assert.ok(Array.isArray(json(g).problems));
+    const one = await call(client, "kit_render", { id: "tea", params: { n: 3 } });
+    assert.equal(one.images.length, 1);
+    assert.match((await call(client, "kit_render", { id: "tea", params: { nonesuch: 1 } })).text, /nonesuch/);
+    assert.match((await call(client, "kit_render", { id: "tea", variant: "nonesuch" })).text, /no variant nonesuch/);
+    assert.ok((await call(client, "kit_render", { id: "nonesuch" })).isError);
+    assert.ok((await call(client, "kit_render", {})).isError);
+    assert.ok((await call(client, "kit_read", { id: "x_nothing" })).isError);
+    const guide = ((await client.readResource({ uri: "sahne://kit-guide" })).contents[0] as { text: string }).text;
+    assert.match(guide, /^# Pieces drawn as data/);
+    assert.match(guide, /## Paper/);
+    assert.match(guide, /## Props/);
+  } finally { await close(); }
+});
+
+test("draft_kit_item renders a drawing and writes nothing; a bad drawing is refused with what to fix", async () => {
+  const { client, close } = await connect({ write: false, agentEdits: "proposals" });
+  try {
+    const good = await call(client, "draft_kit_item", { doc: chalkboard() });
+    assert.ok(!good.isError, good.text);
+    assert.match(good.text, /^x_cafe_chalkboard: 0 errors/);
+    assert.equal(good.images.length, 1);
+    assert.ok(isPng(good.images[0]));
+    assert.deepEqual(json(good).problems.filter((p: string) => p.startsWith("error")), []);
+    assert.ok(!existsSync(kitFile("pieces", "x_cafe_chalkboard.json")));
+    const rendered = await call(client, "kit_render", { doc: chalkboard(), as: "set", views: ["night"] });
+    assert.ok(!rendered.isError, rendered.text);
+    assert.equal(rendered.images.length, 1);
+    // an undeclared param in a variant, a colour that is no param, and an id that is not the content's
+    const stray = chalkboard(); (stray.variants as Record<string, unknown>).wall = { kind: "wall", nonesuch: 1 };
+    const bad = await call(client, "draft_kit_item", { doc: stray });
+    assert.ok(bad.isError);
+    assert.match(bad.text, /nonesuch/);
+    assert.equal(bad.images.length, 0);
+    assert.match((await call(client, "draft_kit_item", { doc: { ...chalkboard(), id: "cafe_chalkboard" } })).text, /x_/);
+    assert.match((await call(client, "draft_kit_item", { doc: { ...chalkboard(), id: "chair" } })).text, /x_/);
+    const dollar = chalkboard(); dollar.kinds.easel.flats[0].shapes[0].fill = "$colour";
+    assert.match((await call(client, "draft_kit_item", { doc: dollar })).text, /colour/);
+    // a variant of a generator of the kit: its params must be ones it declares, with legal values
+    const v = await call(client, "draft_variant", { of: "flag", name: "x_club", params: { kind: "bunting" } });
+    assert.ok(!v.isError, v.text);
+    assert.equal(v.images.length, 1);
+    assert.match((await call(client, "draft_variant", { of: "flag", name: "x_club", params: { nonesuch: 1 } })).text, /nonesuch/);
+    assert.match((await call(client, "draft_variant", { of: "flag", name: "club", params: {} })).text, /x_/);
+    assert.match((await call(client, "draft_variant", { of: "nonesuch", name: "x_a", params: {} })).text, /nonesuch/);
+  } finally { await close(); }
+});
+
+test("save_kit_item and save_variant: a proposal in proposals mode, a file in direct mode; replacing needs the mtime", async () => {
+  const events = new Events();
+  const p = await connect({ write: true, agentEdits: "proposals" }, events);
+  try {
+    const r = await call(p.client, "save_kit_item", { doc: chalkboard() });
+    assert.ok(!r.isError, r.text);
+    assert.match(r.text, /proposal p\w+ is waiting/);
+    assert.ok(!existsSync(kitFile("pieces", "x_cafe_chalkboard.json")), "a proposal writes nothing");
+    const pending = await proposalsOf(events).pending();
+    const mine = pending.find(x => x.doc === "x_cafe_chalkboard")!;
+    assert.equal(mine.kind, "kit_piece");
+    assert.equal(mine.create, true);
+    const sv = await call(p.client, "save_variant", { of: "flag", name: "x_club", params: { kind: "bunting" } });
+    assert.ok(!sv.isError, sv.text);
+    assert.equal((await proposalsOf(events).pending()).find(x => x.doc === "flag.x_club")!.kind, "kit_variant");
+    assert.ok(!existsSync(kitFile("variants", "flag.x_club.json")));
+    // the same drawing again builds on the first
+    const again = await call(p.client, "save_kit_item", { doc: chalkboard() });
+    assert.match(again.text, /earlier proposal/);
+  } finally { await p.close(); }
+
+  const d = await connect({ write: true, agentEdits: "direct" });
+  try {
+    forget();
+    const r = await call(d.client, "save_kit_item", { doc: chalkboard() });
+    assert.ok(!r.isError, r.text);
+    assert.deepEqual(Object.keys(json(r).saved), ["kit_piece:x_cafe_chalkboard"]);
+    assert.equal(JSON.parse(readFileSync(kitFile("pieces", "x_cafe_chalkboard.json"), "utf8")).id, "x_cafe_chalkboard");
+    // a saved drawing is in the kit now: kit_search finds it in this series, kit_read gives its mtime, and it renders by id
+    const found = json(await call(d.client, "kit_search", { kind: "props", family: "series" })) as { id: string; family: string }[];
+    assert.deepEqual(found.map(x => x.id), ["x_cafe_chalkboard"]);
+    const read = await call(d.client, "kit_read", { id: "x_cafe_chalkboard" });
+    const mtime = json(read).mtime as number;
+    assert.equal(json(read).doc.id, "x_cafe_chalkboard");
+    assert.ok(isPng((await call(d.client, "kit_render", { id: "x_cafe_chalkboard", variant: "wall" })).images[0]));
+    // replacing: not without the mtime, not with a stale one
+    assert.match((await call(d.client, "save_kit_item", { doc: chalkboard() })).text, /exists already/);
+    assert.match((await call(d.client, "save_kit_item", { doc: chalkboard(), mtime: mtime - 1000 })).text, /changed on disk/);
+    const next = { ...chalkboard(), about: "A chalkboard menu on an easel or on the wall." };
+    assert.ok(!(await call(d.client, "save_kit_item", { doc: next, mtime })).isError);
+    assert.match(readFileSync(kitFile("pieces", "x_cafe_chalkboard.json"), "utf8"), /on an easel or on the wall/);
+    // a variant of the saved drawing
+    const v = await call(d.client, "save_variant", { of: "x_cafe_chalkboard", name: "x_green", params: { color: "#2E5B3A" } });
+    assert.ok(!v.isError, v.text);
+    assert.deepEqual(JSON.parse(readFileSync(kitFile("variants", "x_cafe_chalkboard.x_green.json"), "utf8")), { of: "x_cafe_chalkboard", name: "x_green", params: { color: "#2E5B3A" } });
+    assert.deepEqual(json(await call(d.client, "kit_read", { id: "x_cafe_chalkboard.x_green" })).doc.params, { color: "#2E5B3A" });
+    // refusals: an id that is not the content's, an error in the drawing
+    const before = readdirSync(kitFile("pieces")).length;
+    assert.match((await call(d.client, "save_kit_item", { doc: { ...chalkboard(), id: "cafe_chalkboard" } })).text, /x_/);
+    assert.match((await call(d.client, "save_kit_item", { doc: { ...chalkboard(), id: "chair" } })).text, /x_/);
+    const stray = { ...chalkboard(), id: "x_stray" }; (stray.variants as Record<string, unknown>).wall = { nonesuch: 1 };
+    const bad = await call(d.client, "save_kit_item", { doc: stray });
+    assert.ok(bad.isError);
+    assert.match(bad.text, /nonesuch/);
+    assert.match((await call(d.client, "save_variant", { of: "flag", name: "x_bad", params: { nonesuch: 1 } })).text, /nonesuch/);
+    assert.equal(readdirSync(kitFile("pieces")).length, before);
+    // the story check still passes with the kit items in the root
+    assert.match((await call(d.client, "check_episode", { id: "s1e00" })).text, /s1e00: 0 errors/);
+  } finally { await d.close(); rmSync(kitFile(), { recursive: true, force: true }); forget(); }
+});
+
+test("read-only: saving a kit item is refused, and says why", async () => {
+  const { client, close } = await connect({ write: false, agentEdits: "direct" });
+  try {
+    for (const [name, args] of [["save_kit_item", { doc: chalkboard() }], ["save_variant", { of: "flag", name: "x_club", params: { kind: "bunting" } }]] as const) {
+      const r = await call(client, name, args);
+      assert.ok(r.isError, name);
+      assert.match(r.text, /read-only/, name);
+    }
+    assert.ok(!existsSync(kitFile("pieces", "x_cafe_chalkboard.json")));
+  } finally { await close(); }
+});
+
+test("show opens a set piece or prop on the kit page", async () => {
+  const events = new Events(), seen: unknown[] = [];
+  const { client, close } = await connect({ write: false, agentEdits: "proposals" }, events);
+  try {
+    assert.match((await call(client, "show", { id: "tea" })).text, /no editor is listening/);
+    events.on((n, data) => { if (n === "show") seen.push(data); });
+    assert.match((await call(client, "show", { id: "tea" })).text, /prop tea on the kit page/);
+    assert.match((await call(client, "show", { id: "frontage" })).text, /set piece frontage/);
+    assert.deepEqual(seen, [{ id: "tea", kit: "props" }, { id: "frontage", kit: "set" }]);
+    assert.ok((await call(client, "show", { id: "nonesuch" })).isError);
+  } finally { await close(); }
 });

@@ -31,6 +31,8 @@ export const usage = signal<Usage | null>(null);
 export const conflicts = signal<Set<string>>(new Set());
 /** An episode and step an agent pointed at (`show`), with a count so the same one twice is still news. */
 export const shown = signal<{ id: string; step: Path | null; n: number } | null>(null);
+/** A set piece or prop an agent pointed at (`show`), on its kit section; the kit page opens its card. */
+export const shownKit = signal<{ id: string; section: "set" | "props"; n: number } | null>(null);
 
 async function refresh() {
   const r = await api.get<{ proposals: Proposal[] }>("proposals");
@@ -53,9 +55,10 @@ export function connectEvents() {
     if (d.kind === "kit_piece" || d.kind === "kit_variant") void loadKitDocs();
   });
   source.addEventListener("show", e => {
-    const d = JSON.parse((e as MessageEvent).data) as { id: string; step: Path | null };
+    const d = JSON.parse((e as MessageEvent).data) as { id: string; step?: Path | null; kit?: "set" | "props" };
+    if (d.kit) { go("kit", d.kit); shownKit.value = { id: d.id, section: d.kit, n: (shownKit.value?.n ?? 0) + 1 }; return; }
     go("episode", d.id);
-    shown.value = { ...d, n: (shown.value?.n ?? 0) + 1 };
+    shown.value = { id: d.id, step: d.step ?? null, n: (shown.value?.n ?? 0) + 1 };
   });
   source.addEventListener("activity", e => {
     const c = JSON.parse((e as MessageEvent).data) as Call | null;

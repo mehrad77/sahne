@@ -279,7 +279,12 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 | `list_episodes` `{ season? }` | The episodes, with title, kind, date, place, cast and draft |
 | `read_episode` `{ id, raw? }` | The episode as a script: one line per step, option and reply, each with its path, speaker, main text, translations and staging; the quiz; the `mtime`. `raw` adds the JSON |
 | `read_step` `{ id, path }` | The JSON at a path |
-| `kit_search` `{ kind, query?, limit? }` | Characters, places (with marks and props), the kit's props, gestures, emotions and sounds (`sahne-kit` `full`) |
+| `kit_search` `{ kind, query?, limit?, family?, tag?, as? }` | Characters, places (with marks and props), the kit's props and set pieces (kind `set`; each `{ id, family, as, about, variants, tags }`, filtered by `family` (`series` for this root's own drawings), `tag` and `as`), gestures, emotions and sounds (`sahne-kit` `full`, with this root's kit items) |
+| `kit_read` `{ id, as? }` | A set piece or prop: its family, params, variants and source (a TypeScript generator's definition and file) or its document and `mtime` (a drawing of this series; `<of>.<x_name>` reads a variant document), with its sheet as a picture |
+| `kit_render` `{ id \| doc, as?, params?, variant?, views?, seeds? }` | A PNG sheet (a picture per seed) of a kit item or of a drawing not yet saved, with `checkPiece`'s problems: default, variants, and for a prop `n 3` and held, by day and night, on a 10 cm grid beside a 170 cm adult |
+| `draft_kit_item` `{ doc, as?, views?, seeds? }` | Check a drawing as it would be saved (schema, `x_` id, caps, paths, `$param`s, `checkPiece`) and render its sheet. Writes nothing. A drawing that cannot be drawn is answered with what to fix |
+| `draft_variant` `{ of, name, params, views? }` | The same for a variant `{ of, name: "x_…", params }`: `paramProblems` and its sheet beside the default |
+| `save_kit_item` `{ doc, mtime? }`, `save_variant` `{ of, name, params, mtime? }` | Save the drawing (`kit/pieces/<id>.json`) or the variant (`kit/variants/<of>.<name>.json`) through the same `submit()` as any edit: a proposal, or a file in direct mode. Refused on an error, an id without `x_`, an id already saved (unless the `mtime` `kit_read` gave is passed), or a file changed since |
 | `search_words` `{ query, limit? }` | Card ids and levels, and the word with `--share-cards` |
 | `check_episode` `{ id }` | The story check's problems for the episode |
 | `read_notes` `{ id }` | The episode's review notes |
@@ -291,12 +296,25 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 | `set_calendar` `{ season, story, row: { date, kind, week }, mtime? }` | The season's calendar row and the episode's `releaseDate`, `kind` and arc, together |
 | `comment` `{ id, step?, text }` | A review comment. It is a note, not content, so it is written at once (with `--write`) in both modes |
 | `set_review` `{ id, status }` | Direct mode only. In proposals mode a person decides where an episode stands |
-| `show` `{ id, step? }` | The open editors go to the episode and step (`show` event) |
+| `show` `{ id, step?, as? }` | The open editors go to the episode and step, or to a set piece or prop's card on the kit page (`show` event `{ id, step }` or `{ id, kit: "set" \| "props" }`) |
 
 **The resources.**
 - `sahne://format`: sahne-story's README.
 - `sahne://languages`: the series' `languages`.
 - `sahne://selection`: what the open editor last posted to `POST /api/selection`.
+- `sahne://kit-guide`: sahne-kit's `DRAWING.md` and STYLE.md's *Paper*, *Places* and *Props*, read from the files: the format and the look a drawing must have.
+
+**Drawing kit items** (`server/kittools.ts`). An agent adds a set piece, a prop or a variant to this content root's own kit, and looks at what it drew:
+1. read `sahne://kit-guide`, then `kit_search` for what exists (`family`, `tag`, `as`);
+2. `kit_read` a neighbour: its params, variants and source;
+3. `draft_kit_item` (or `draft_variant`) and look at the sheet;
+4. revise until there are no problems (`kit_render` shows any item by id or doc, one look, day or night, other seeds);
+5. `save_kit_item` (or `save_variant`);
+6. use it in a place and run `check_episode`.
+
+- **Pictures.** A tool's answer is a text line, then any images (`{ type: "image", data, mimeType: "image/png" }`, from `server/render.ts`), then the data as JSON in the last block (`server/result.ts`). The editor's assistant sends them on to the model as image blocks in the tool result (Anthropic; the OpenAI-compatible provider is told that pictures are not shown).
+- **TypeScript generators** are read when the process starts, so a render shows the source of the worktree it started from. `kit_read` and `kit_render` say when the kit's source changed after that; a new process sees it (a one-shot client that starts a process per call always does).
+- **Kit item saves** go through `submit()`, so `--write`, proposals and direct mode and `--backstage` forwarding behave as for an episode. A proposal's `kind` is `kit_piece` or `kit_variant`.
 
 **Proposals** (`server/proposals.ts`, in memory, one queue per backstage process, never on disk).
 - A proposal is `{ id, kind, doc, next, base?, create?, also?, paths, summary, by, at, problems, after? }`:
@@ -321,7 +339,7 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 
 | Request | Answer |
 |---|---|
-| `GET /api/events` | `text/event-stream`, a keep-alive comment every 20 s. Events: `proposal` `{ action: "added" \| "resolved", proposal, accepted?, with? }`, `doc` `{ kind, id, mtime, by? }`, `show` `{ id, step }` (a path, or null), `usage`, `activity` `{ at, by, tool, ok, ms, summary }` or null |
+| `GET /api/events` | `text/event-stream`, a keep-alive comment every 20 s. Events: `proposal` `{ action: "added" \| "resolved", proposal, accepted?, with? }`, `doc` `{ kind, id, mtime, by? }`, `show` `{ id, step }` (a path, or null) or `{ id, kit: "set" \| "props" }`, `usage`, `activity` `{ at, by, tool, ok, ms, summary }` or null |
 | `GET /api/proposals` | `{ proposals }` |
 | `POST /api/proposals` `{ kind, doc, next, base?, create?, also?, paths, summary, by, after? }` | `{ proposal }`: one queued from another process (`cli.ts mcp --backstage`), checked here; 403 when read-only |
 | `POST /api/proposals/<id>` `{ accepted }` | `{ resolved: [ids] }`: the person's answer (the browser applies an accepted one itself); 404 for an unknown id |
@@ -410,7 +428,7 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `content.ts` (kinds, files, checks, saves);
   - `git.ts`;
   - `review.ts`;
-  - `mcp.ts` (the MCP server: its tools and resources), `proposals.ts` (agents' edits waiting for a person), `events.ts` (the editors' event stream and selection) and `agents.ts` (the connected agents and their calls);
+  - `mcp.ts` (the MCP server: its tools and resources), `kittools.ts` (its kit tools: search, read, render, draft and save kit items), `result.ts` (what a tool answers: text, pictures, data), `render.ts` (SVG to PNG), `proposals.ts` (agents' edits waiting for a person), `events.ts` (the editors' event stream and selection) and `agents.ts` (the connected agents and their calls);
   - `assistant.ts` (the assistant's loop and its system prompt), `settings.ts` (the person's AI settings), and `ai/`: `provider.ts` (what a provider does, and the stream reader), `providers/anthropic.ts`, `providers/openai.ts` and `budget.ts` (the prices, the caps and the usage log).
 - The server reads sahne-story's Node-only files (`paths.ts`, `check/`, `load.ts`) by path. The package exports only `"."`.
 - **`src/`** is the browser side (the studio's shared parts in `src/ui/kit/`: icons, chips, drawers, popovers, the palette; the theme in `src/ui/theme.ts`), built with Preact and htm tagged templates (no JSX, so the source stays erasable TypeScript). It contains:
