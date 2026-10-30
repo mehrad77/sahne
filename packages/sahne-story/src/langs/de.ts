@@ -20,26 +20,27 @@ type Dx = "dies" | "jen" | "da";
 const AGREE: Record<Dx, string[]> = { dies: ["hold_up", "touch", "point"], jen: ["point_far", "point"], da: ["point", "point_far"] };
 const ADVICE: Record<Dx, string> = { dies: "hold_up", jen: "point_far", da: "point" };
 
-/** Words that motivate a gesture (prefixes of the lower-case word, or a phrase). Gestures not listed need none. */
+/** Words that motivate a gesture: prefixes of the lower-case word (stems, "nehm"), "=" whole words (short words that would
+ *  prefix others: "=ja" is not "Jahr"), or a phrase.  Gestures not listed need none. */
 const MOTIVE: Record<string, string[]> = {
   count: [], // a number
-  give: ["bitte", "hier", "nimm", "nehm", "gib", "geb", "bitteschön"],
-  take: ["danke", "dankeschön", "vielen dank", "nimm", "nehm"],
-  welcome: ["willkommen", "herzlich", "herein", "komm", "bitte"],
-  wave: ["hallo", "hi", "servus", "moin", "tschüss", "tschüs", "tschau", "auf wiedersehen", "wiedersehen", "guten tag", "guten morgen", "guten abend", "gute nacht", "grüß", "bis bald", "bis morgen"],
-  nod: ["ja", "okay", "ok", "klar", "genau", "gut", "stimmt", "richtig", "natürlich", "gern", "einverstanden", "verstanden", "in ordnung", "alles klar"],
-  shake_head: ["nein", "kein", "nicht", "nie", "nee", "nö"],
-  cik: ["nein", "nee", "nö", "nicht", "kein"],
-  shrug: ["weiß", "weiss", "keine ahnung", "vielleicht", "leider", "aber", "tja", "naja", "hm"],
-  hand_heart: ["danke", "dankeschön", "bitte", "gern", "freut", "herzlich", "vielen dank"],
-  me: ["ich", "mich", "mir", "mein"],
-  you: ["du", "sie", "dich", "dir", "ihr", "euch", "dein"],
-  beckon: ["komm", "her", "hierher", "hierhin"],
-  stop: ["halt", "stopp", "stop", "warte", "moment", "nein", "genug"],
-  thumb_up: ["super", "toll", "prima", "klasse", "gut", "wunderbar", "perfekt", "sehr gut", "bravo", "schön", "ausgezeichnet", "lecker"],
-  shush: ["pst", "sch", "leise", "ruhe", "still"],
-  bow_head: ["entschuldig", "verzeih", "tut mir leid", "sorry", "pardon"],
-  phone: ["hallo", "telefon", "handy", "anruf", "anruf"],
+  give: ["=bitte", "=hier", "nimm", "nehm", "=gib", "=geb", "bitteschön"],
+  take: ["=danke", "dankeschön", "vielen dank", "nimm", "nehm"],
+  welcome: ["willkommen", "=herzlich", "=herein", "komm", "=bitte"],
+  wave: ["=hallo", "=hi", "=servus", "=moin", "=tschüss", "=tschüs", "=tschau", "auf wiedersehen", "wiedersehen", "guten tag", "guten morgen", "guten abend", "gute nacht", "grüß", "bis bald", "bis morgen"],
+  nod: ["=ja", "=okay", "=ok", "=klar", "=genau", "=gut", "=stimmt", "=richtig", "=natürlich", "=gern", "=gerne", "einverstanden", "verstanden", "in ordnung", "alles klar"],
+  shake_head: ["=nein", "kein", "=nicht", "=nichts", "=nie", "=nee", "=nö"],
+  cik: ["=nein", "=nee", "=nö", "=nicht", "=nichts", "kein"],
+  shrug: ["=weiß", "=weiss", "keine ahnung", "=vielleicht", "=leider", "=aber", "=tja", "=naja", "=hm"],
+  hand_heart: ["=danke", "dankeschön", "=bitte", "=gern", "=gerne", "=freut", "=herzlich", "vielen dank"],
+  me: ["=ich", "=mich", "=mir", "=mein", "=meine", "=meinen", "=meinem"],
+  you: ["=du", "=sie", "=dich", "=dir", "=ihr", "=euch", "=dein", "=deine", "=deinen", "=deinem"],
+  beckon: ["komm", "=her", "hierher", "hierhin"],
+  stop: ["=halt", "=stopp", "=stop", "=warte", "=moment", "=nein", "=genug"],
+  thumb_up: ["=super", "=toll", "=tolle", "=prima", "=klasse", "=gut", "=wunderbar", "=perfekt", "sehr gut", "=bravo", "=schön", "ausgezeichnet", "=lecker"],
+  shush: ["=pst", "=sch", "=leise", "=ruhe", "=still"],
+  bow_head: ["entschuldig", "verzeih", "tut mir leid", "=sorry", "=pardon"],
+  phone: ["=hallo", "=telefon", "=handy", "=anruf"],
 };
 
 const ascii = (s: string) => lowerDe(s).replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss");
@@ -47,6 +48,7 @@ const words = (text: string): LineWord[] => tokens(text).map(t => (t.kind === "w
 
 const ADVERB = /^(hier|da|dort)$/;
 const NEGATION = /^(kein\p{L}*|nichts|nicht)$/u;
+const CLAUSE = /^(aber|und|oder|sondern|doch)$/;
 
 /** The German lints of a line: deixis, es gibt, numbers, clock times. */
 function lintLine(c: LineContext) {
@@ -85,15 +87,25 @@ function lintLine(c: LineContext) {
     if (t.w === "gibt" && (ws[i - 1]?.w === "es" || ws[i + 1]?.w === "es")) { // "gibt" alone is also "gives"
       let from = i, to = i;
       while (from > 0 && !(ws[from - 1].pause && ws[from - 1].w === ".")) from--;
-      while (to < ws.length - 1 && !(ws[to].pause && ws[to].w === ".")) to++;
+      while (to < ws.length && !(ws[to].pause && ws[to].w === ".")) to++; // `to` is past the last word of the sentence
       const sentence = ws.slice(from, to + 1), question = sentence.some(w => w.q) || sentence.find(w => !w.pause)?.w === "gibt";
       if (question) return;
-      const negated = sentence.some(w => !w.pause && NEGATION.test(w.w));
-      let subj: Target | null = null;
-      for (let k = i + 1; k < to && !subj; k++) if (!ws[k].pause) subj = c.linkOf(ws[k].w);
-      const id = subj?.startsWith("obj:") ? subj.slice(4) : null, p = id ? c.prop(id) : null;
-      if (p && !negated && !p.shown) add("var_yok", `"gibt": ${subj} is hidden here; show it on this line or before`, { obj: [{ id: id!, op: "show" }] });
-      if (p && negated && p.shown) add("var_yok", `"gibt … kein": ${subj} is still shown; hide it (a dashed outline) on this line`, { obj: [{ id: id!, op: "hide" }] });
+      // each clause after "gibt" (split at a comma or aber / und / oder / sondern) is negated, or not, on its own
+      const seen = new Set<string>();
+      let negated = false;
+      for (let k = i + 1; k < to && ws[k].w !== "gibt"; k++) {
+        const w = ws[k];
+        if (w.pause || CLAUSE.test(w.w)) { negated = false; continue; }
+        if (NEGATION.test(w.w)) { negated = true; continue; }
+        const subj = c.linkOf(w.w), id = subj?.startsWith("obj:") ? subj.slice(4) : null, p = id ? c.prop(id) : null;
+        if (!p || seen.has(id!)) continue;
+        // "keine Milch" may also be negated after the noun in the same clause: "Milch gibt es ..." is not handled
+        let neg = negated;
+        for (let j = k + 1; !neg && j < to && !ws[j].pause && !CLAUSE.test(ws[j].w) && ws[j].w !== "gibt"; j++) if (NEGATION.test(ws[j].w)) neg = true;
+        seen.add(id!);
+        if (!neg && !p.shown) add("var_yok", `"gibt": ${subj} is hidden here; show it on this line or before`, { obj: [{ id: id!, op: "show" }] });
+        if (neg && p.shown) add("var_yok", `"gibt … kein": ${subj} is still shown; hide it (a dashed outline) on this line`, { obj: [{ id: id!, op: "hide" }] });
+      }
     }
     // numbers: zwei Brote → n = 2
     const plainIdx = plain.indexOf(t.w, ws.slice(0, i).filter(w => !w.pause).length);

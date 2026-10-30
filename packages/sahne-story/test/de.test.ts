@@ -94,6 +94,15 @@ test("lint es gibt: the prop is shown or hidden by then; questions are not asser
   assert.deepEqual(rules(lint(s)), [], "a question by its mark");
 });
 
+test("lint es gibt: negation belongs to its own clause, and a line needs no final stop", () => {
+  const at = (text: string, link: Record<string, string>) => { const s = german(); line(s, 9).de = text; line(s, 9).link = link; delete line(s, 9).do; return rules(lint(s)); };
+  const both = { brot: "obj:ekmek", milch: "obj:sut" };
+  assert.deepEqual(at("Es gibt Brot, aber keine Milch.", both), [], "Brot is shown, Milch hidden");
+  assert.deepEqual(at("Es gibt Milch, aber keine Butter.", { milch: "obj:sut" }), ["var_yok@9"], "Milch is hidden but asserted");
+  assert.deepEqual(at("Es gibt Milch", { milch: "obj:sut" }), ["var_yok@9"], "no final stop");
+  assert.deepEqual(at("Es gibt kein Brot", { brot: "obj:ekmek" }), ["var_yok@9"], "no final stop, negated and shown");
+});
+
 test("lint es gibt: \"gibt\" alone is the verb to give, not the existential", () => {
   let s = german(); line(s, 9).de = "Nima gibt dem Kunden Milch."; line(s, 9).link = { milch: "obj:sut" }; delete line(s, 9).do;
   assert.deepEqual(rules(lint(s)), [], "a hidden prop, and gibt means gives");
@@ -138,6 +147,15 @@ test("lint budget: a gesture needs a German word to motivate it", () => {
   assert.deepEqual(rules(lint(s)), []);
   s = german(); line(s, 6).do = "wave";
   assert.deepEqual(rules(lint(s), "warning"), ["budget@6"], "no greeting in the line");
+});
+
+test("lint budget: short motive words match whole words only", () => {
+  const nod = (text: string) => { const s = german(); line(s, 9).de = text; line(s, 9).do = "nod"; delete line(s, 9).link; return rules(lint(s), "warning").filter(r => r.endsWith("@9")); };
+  assert.deepEqual(nod("Ja, gern."), []);
+  assert.deepEqual(nod("Das Jahr ist neu."), ["budget@9"], "Jahr is not ja");
+  const wave = (text: string) => { const s = german(); line(s, 9).de = text; line(s, 9).do = "wave"; delete line(s, 9).link; return rules(lint(s), "warning").filter(r => r.endsWith("@9")); };
+  assert.deepEqual(wave("Hilfe ist nah."), ["budget@9"], "Hilfe is not hi");
+  assert.deepEqual(wave("Hallo, Nima."), []);
 });
 
 test("the check's words: nouns, plurals, verbs, numbers and particles resolve", () => {
