@@ -19,7 +19,7 @@ export interface Proposal extends ProposalEdit {
 }
 export interface Usage { today: { usd: number; tokens: number }; month: { usd: number; tokens: number }; caps: { dayUsd?: number; monthUsd?: number; dayTokens?: number; monthTokens?: number } }
 
-export interface Call { at: number; by: string; tool: string; ok: boolean; ms: number; summary: string }
+export interface Call { at: number; by: string; tool: string; ok: boolean; ms: number; summary: string; label?: string }
 
 export const proposals = signal<Proposal[]>([]);
 /** Agents' tool calls heard since the page opened, newest first (the Agents page starts it from the server's). */

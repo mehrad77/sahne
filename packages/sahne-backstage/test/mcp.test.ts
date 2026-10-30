@@ -17,6 +17,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { LABELLED } from "../src/model/tools.ts";
 
 const SAMPLES = fileURLToPath(new URL("../../sahne-story/samples/", import.meta.url));
 const CLI = fileURLToPath(new URL("../server/cli.ts", import.meta.url));
@@ -88,6 +89,8 @@ test("the read tools: the series, the episodes, a script with paths, a step, the
   try {
     const tools = (await client.listTools()).tools.map(t => t.name).sort();
     for (const t of ["series_overview", "list_episodes", "read_episode", "read_step", "kit_search", "search_words", "check_episode", "read_notes", "edit_step", "insert_step", "delete_step", "move_step", "set_staging", "set_texts", "create_episode", "set_calendar", "comment", "set_review", "show"]) assert.ok(tools.includes(t), t);
+    // every tool reads in plain words in the chat and the activity log (src/model/tools.ts)
+    for (const t of tools) assert.ok(LABELLED.includes(t), `${t} has no words in src/model/tools.ts`);
     const ov = json(await call(client, "series_overview"));
     assert.deepEqual(ov.languages, { main: "tr", translations: ["en", "fa"] });
     assert.equal(ov.narrator.id, "kerim");

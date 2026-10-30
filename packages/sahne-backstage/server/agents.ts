@@ -10,7 +10,7 @@ import type { Events } from "./events.ts";
 import type { AgentEdits } from "./mcp.ts";
 
 /** One tool call by an agent. */
-export interface Call { at: number; by: string; tool: string; ok: boolean; ms: number; summary: string }
+export interface Call { at: number; by: string; tool: string; ok: boolean; ms: number; summary: string; /** The call in words (src/model/tools.ts). */ label?: string }
 /** An MCP client connected over HTTP. */
 export interface Session { id: string; client: string; version?: string; agentEdits: AgentEdits; since: number; lastAt?: number; calls: number }
 /** A tool as an agent sees it. */
@@ -23,7 +23,7 @@ const KEEP = 200;
 export function callOf(v: unknown): Call | null {
   const c = v as Partial<Call>;
   if (!c || typeof c.tool !== "string" || typeof c.by !== "string") return null;
-  return { at: typeof c.at === "number" ? c.at : Date.now(), by: c.by.slice(0, 80), tool: c.tool.slice(0, 80), ok: c.ok !== false, ms: typeof c.ms === "number" ? Math.max(0, Math.round(c.ms)) : 0, summary: String(c.summary ?? "").slice(0, 300) };
+  return { at: typeof c.at === "number" ? c.at : Date.now(), by: c.by.slice(0, 80), tool: c.tool.slice(0, 80), ok: c.ok !== false, ms: typeof c.ms === "number" ? Math.max(0, Math.round(c.ms)) : 0, summary: String(c.summary ?? "").slice(0, 300), ...(typeof c.label === "string" ? { label: c.label.slice(0, 200) } : {}) };
 }
 
 export class Agents {

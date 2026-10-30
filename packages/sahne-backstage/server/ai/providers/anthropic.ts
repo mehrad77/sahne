@@ -1,6 +1,7 @@
 // Claude through the Messages API (Node only): plain fetch to https://api.anthropic.com/v1/messages, the key from the
 // environment (ANTHROPIC_API_KEY, never stored), streamed (`stream: true`) so text reaches the editor as it is written,
-// with tools and adaptive thinking. A turn's content comes back whole, thinking blocks and their signatures included,
+// with tools and adaptive thinking (its summary shown: `display: "summarized"`, since the current models leave it out by
+// default), and the request cached (one top-level `cache_control`). A turn's content comes back whole, thinking blocks and their signatures included,
 // since the next request of a tool loop must carry them as they were. Refusals and errors are the caller's to show:
 // `stop: "refusal"`, or a ProviderError.
 
@@ -31,7 +32,7 @@ export function anthropic(model: string = MODELS.full): Provider {
           method: "POST", signal: o.signal,
           headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
           body: JSON.stringify({
-            model, max_tokens: o.maxTokens ?? 32000, stream: true, thinking: { type: "adaptive" },
+            model, max_tokens: o.maxTokens ?? 32000, stream: true, thinking: { type: "adaptive", display: "summarized" }, cache_control: { type: "ephemeral" },
             system: o.system, messages: o.messages,
             tools: o.tools.map(t => ({ name: t.name, description: t.description, input_schema: schemaFor(t.schema) })),
           }),
@@ -72,7 +73,7 @@ export function anthropic(model: string = MODELS.full): Provider {
             const b = blocks[e.index], d = e.delta ?? {};
             if (!b) break;
             if (d.type === "text_delta") { b.text = (b.text ?? "") + d.text; o.onText(d.text); }
-            else if (d.type === "thinking_delta") b.thinking = (b.thinking ?? "") + d.thinking;
+            else if (d.type === "thinking_delta") { b.thinking = (b.thinking ?? "") + d.thinking; o.onThinking?.(d.thinking); }
             else if (d.type === "signature_delta") b.signature = (b.signature ?? "") + d.signature;
             else if (d.type === "input_json_delta") json[e.index] = (json[e.index] ?? "") + (d.partial_json ?? "");
             break;

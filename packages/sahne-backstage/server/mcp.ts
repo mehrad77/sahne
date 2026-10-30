@@ -29,6 +29,7 @@ import type { Call } from "./agents.ts";
 import type { Events, Selection } from "./events.ts";
 import { latestOf, proposalsOf, type ProposalEdit, type Queue } from "./proposals.ts";
 import { get, insert, move, set, type Key } from "../src/model/path.ts";
+import { toolLabel } from "../src/model/tools.ts";
 import { skeleton } from "../src/model/skeleton.ts";
 
 export type AgentEdits = "proposals" | "direct";
@@ -198,7 +199,7 @@ export function createMcp(o: McpOptions): McpServer {
     const t0 = Date.now();
     let r: Result;
     try { r = await fn(a); } catch (e) { r = fail(e instanceof Refusal ? e.message : `failed: ${(e as Error).message}`); }
-    o.onCall?.({ at: t0, by: by(), tool, ok: !r.isError, ms: Date.now() - t0, summary: (r.content[0]?.type === "text" ? r.content[0].text : "").split("\n")[0].slice(0, 300) });
+    o.onCall?.({ at: t0, by: by(), tool, ok: !r.isError, ms: Date.now() - t0, summary: (r.content[0]?.type === "text" ? r.content[0].text : "").split("\n")[0].slice(0, 300), label: toolLabel(tool, a).label });
     return r;
   };
 
