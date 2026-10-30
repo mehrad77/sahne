@@ -201,7 +201,7 @@ function Studio(p: { id: string }) {
       </div>
     </div>
     ${asks && html`<${Popover} x=${asks.x} y=${asks.y} onClose=${() => setAsks(null)} label="Ask the assistant"><${AskMenu} onDone=${() => setAsks(null)} /></${Popover}>`}
-    ${details && html`<${Drawer} title="Details" onClose=${() => setDetails(false)}><${Details} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} /></${Drawer}>`}
+    ${details && html`<${Drawer} float title="Details" onClose=${() => setDetails(false)}><${Details} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} /></${Drawer}>`}
   </section>`;
 }
 

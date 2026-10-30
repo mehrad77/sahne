@@ -116,6 +116,7 @@ kbd { font: 11.5px ui-monospace, monospace; border: 1px solid var(--line); borde
 .page { grid-area: page; overflow: auto; min-width: 0; }
 .page > main { padding: 18px 22px 60px; }
 .drawer { grid-area: drawer; width: min(420px, 92vw); border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+.drawer.float { position: fixed; top: 52px; right: 0; bottom: 0; z-index: 40; box-shadow: var(--shadow); }
 .drawer > header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .drawer > header b { flex: 1; }
 .drawer > .body { flex: 1; overflow: auto; padding: 12px; }

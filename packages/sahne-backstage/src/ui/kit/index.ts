@@ -15,8 +15,9 @@ export const Chip = (p: { tone?: "bad" | "warn" | "ok" | ""; title?: string; chi
 export const Empty = (p: { icon?: string; title: string; children?: ComponentChildren }) => html`<div class="empty">
   ${p.icon && html`<${Icon} name=${p.icon} size=${28} />`}<b>${p.title}</b>${p.children}</div>`;
 
-/** A panel on the page's right: the assistant, a step's details. */
-export const Drawer = (p: { title: ComponentChildren; onClose(): void; children?: ComponentChildren; label?: string }) => html`<aside class="drawer" aria-label=${p.label ?? "Side panel"}>
+/** A panel on the page's right: the assistant (in the shell's drawer column), or, `float` from inside a page, a step's
+ *  details over the page's right edge (a page's own drawer would fall under its content). */
+export const Drawer = (p: { title: ComponentChildren; onClose(): void; children?: ComponentChildren; label?: string; float?: boolean }) => html`<aside class=${`drawer${p.float ? " float" : ""}`} aria-label=${p.label ?? "Side panel"}>
   <header><b>${p.title}</b><button class="iconbtn" onClick=${p.onClose} aria-label="Close"><${Icon} name="close" /></button></header>
   <div class="body">${p.children}</div></aside>`;
 
