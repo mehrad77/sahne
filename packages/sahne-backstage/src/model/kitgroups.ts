@@ -21,6 +21,7 @@ export const SET_SHELVES: readonly Shelf[] = [
   { id: "transit", label: "Airport & metro", tags: ["airport", "metro", "station", "vehicle", "rail", "gate"] },
   { id: "room", label: "Rooms & walls", tags: ["wall", "floor", "room", "window", "door", "barrier"] },
   { id: "outside", label: "Streets & buildings", tags: ["street", "building", "landmark", "city", "park", "market"] },
+  { id: "houses", label: "Houses & squares", tags: ["house", "cafe", "pavement", "canal"] },
   { id: "nature", label: "Sky, water & trees", tags: ["sky", "water", "tree", "plant", "ground", "view"] },
   { id: "shop", label: "Shops & food", tags: ["shop", "food", "vendor", "kitchen"] },
   { id: "furniture", label: "Furniture & seating", tags: ["seating", "furniture", "rug", "home", "tech", "machine", "appliance"] },
