@@ -57,7 +57,7 @@ Story docs are separate from the data. The optional env var `SAHNE_STORY_DOCS` (
 
 A missing optional file is never an error: each rule that needs it skips. The samples have no cards, grammar, syllabus, calendar or needs (their season has arcs but no calendar), and pass `stories.ts --check` with 0 errors and 0 warnings.
 
-The JSON schemas stay in `schema/`. Each file is named by its `id`. The gallery's two bundled JSON imports (`sahne-gallery/src/bakkal.ts`, `src/systems/places.ts`) are the only literal paths, and they read the samples.
+The JSON schemas stay in `schema/`. `kit-piece.json` and `kit-variant.json` hold the kit's pieces drawn as data (`sahne-kit/DRAWING.md`); `validateDoc("kit_piece" | "kit_variant", doc)` checks one, and `paramProblems` (exported here) checks a variant's params. Each file is named by its `id`. The gallery's two bundled JSON imports (`sahne-gallery/src/bakkal.ts`, `src/systems/places.ts`) are the only literal paths, and they read the samples.
 
 ## Series, seasons, episodes
 

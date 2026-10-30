@@ -91,6 +91,7 @@ Pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the setup, 
 | Each set family (`sahne-kit/set`) | 40 KB |
 | Kerim's puppet (`sahne-kit/kerim`) | 8 KB |
 | The animal puppets (`sahne-kit/puppets`) | 8 KB |
+| Pieces drawn as data (`sahne-kit/drawing`) | 8 KB |
 | Portraits (`normalize`, `portrait`, `silhouette`) | 20 KB |
 | The builder with its stage | 100 KB |
 | All place documents together | 100 KB |

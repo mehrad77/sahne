@@ -568,6 +568,7 @@ Mid-range means a Galaxy A15/A25-class phone; low-end means Android Go with 2–
 | A set family (`sahne-kit/set`), loaded when a story's places use it | ≤ 40 KB gzip each, measured without the kit code it shares; a family that outgrows it splits. The whole set is reported, not held |
 | Kerim's puppet (`sahne-kit/kerim`: her art, moods and gestures), loaded only by pages that cast her | ≤ 8 KB gzip |
 | The animal puppets (`sahne-kit/puppets`: Pisi and the gulls), loaded only by pages that cast them | ≤ 8 KB gzip (4.6 KB) |
+| The drawing interpreter (`sahne-kit/drawing`: pieces drawn as data), loaded by an app with content items | ≤ 8 KB gzip (2.9 KB) |
 | What an app loads for its lists: `normalize` and `portrait` | ≤ 20 KB gzip (15 KB) |
 | What an app loads for its builder: `mountBuilder` with its stage | ≤ 100 KB gzip (80.3 KB; raised from 80 on 2026-10-13) |
 | All A1 places (28) | ≤ 100 KB gzip |

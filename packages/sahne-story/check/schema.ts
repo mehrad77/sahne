@@ -1,17 +1,17 @@
-// The JSON schemas of schema/ (Kumru's STORIES_SCHEMA.md §3, §5, §6, and the series and seasons) run with ajv. Node-only: the app never
+// The JSON schemas of schema/ (Kumru's STORIES_SCHEMA.md §3, §5, §6, the series and seasons, and the kit's drawn pieces and variants) run with ajv. Node-only: the app never
 // bundles this (src/index.ts does not import it).
 
 import { readFileSync } from "node:fs";
 import Ajv2020 from "ajv/dist/2020.js";
 import { SCHEMA } from "../paths.ts";
 
-export type SchemaKind = "story" | "character" | "place" | "series" | "season";
+export type SchemaKind = "story" | "character" | "place" | "series" | "season" | "kit_piece" | "kit_variant";
 export interface SchemaProblem { rule: "schema"; level: "error"; path: string; message: string }
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 const validators = {} as Record<SchemaKind, ReturnType<typeof ajv.compile>>;
-for (const k of ["story", "character", "place", "series", "season"] as const) {
-  validators[k] = ajv.compile(JSON.parse(readFileSync(new URL(`${k}.json`, SCHEMA), "utf8")));
+for (const k of ["story", "character", "place", "series", "season", "kit_piece", "kit_variant"] as const) {
+  validators[k] = ajv.compile(JSON.parse(readFileSync(new URL(`${k.replace("_", "-")}.json`, SCHEMA), "utf8")));
 }
 
 /** Schema errors of a document, each with its JSON path and a readable message. [] when it is valid. */

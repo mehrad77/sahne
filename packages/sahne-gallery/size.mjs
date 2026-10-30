@@ -18,6 +18,7 @@ const BUNDLES = [
   { name: "engine and Turkish plugin", entries: ["sahne/src/index.ts", "sahne-tr/src/index.ts"], budget: 150 },
   { name: "kit code", entries: ["sahne-kit/src/index.ts"], budget: 150 },
   { name: "Kerim's puppet (sahne-kit/kerim)", entries: ["sahne-kit/src/kerim/index.ts"], budget: 8 },
+  { name: "pieces drawn as data (sahne-kit/drawing)", entries: ["sahne-kit/src/drawing.ts"], budget: 8 },
   { name: "the animal puppets (sahne-kit/puppets: Pisi, the gulls)", entries: ["sahne-kit/src/puppets/index.ts"], budget: 8 },
   { name: "portraits (normalize, portrait, silhouette)", ...E("normalize, serialize, isAvatarDoc, isLegacyChar, portrait, silhouette"), budget: 20 },
   { name: "the builder with its stage", ...E("normalize, serialize, portrait, mountBuilder"), budget: 100 },
