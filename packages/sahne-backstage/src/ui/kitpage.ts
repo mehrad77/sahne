@@ -24,7 +24,7 @@ const SECTIONS: [Section, string, string, readonly Shelf[], string][] = [
 ];
 /** Cards a shelf shows in the overview, and cards per page when listing. */
 const ROW = 12, PAGE = 96;
-const SIZE_KEY = "backstage-kit-size", OPEN_KEY = "backstage-kit-open";
+const SIZE_KEY = "backstage-kit-size", NARROW_KEY = "backstage-kit-narrow";
 
 export function KitPage() {
   const r = route.value;
@@ -36,16 +36,9 @@ export function KitPage() {
   const [q, setQ] = useState(""), [tag, setTag] = useState<string | null>(null), [open, setOpen] = useState<string | null>(null);
   const [size, setSize] = useState<"s" | "m" | "l">(() => { try { return (localStorage.getItem(SIZE_KEY) as "s" | "m" | "l") || "m"; } catch { return "m"; } });
   const [limit, setLimit] = useState(PAGE);
-  // the sections whose shelves show on the side (remembered); the one on screen opens when it is chosen
-  const [unfolded, setUnfolded] = useState<Set<Section>>(() => { try { return new Set(JSON.parse(localStorage.getItem(OPEN_KEY) ?? "null") ?? [section]); } catch { return new Set([section]); } });
-  const fold = (s: Section, open = !unfolded.has(s)) => {
-    if (open === unfolded.has(s)) return;
-    const next = new Set(unfolded);
-    if (open) next.add(s); else next.delete(s);
-    setUnfolded(next);
-    try { localStorage.setItem(OPEN_KEY, JSON.stringify([...next])); } catch { /* a private window */ }
-  };
-  useEffect(() => { fold(section, true); }, [section]);
+  // the side folds to its icons (remembered)
+  const [narrow, setNarrow] = useState(() => { try { return localStorage.getItem(NARROW_KEY) === "1"; } catch { return false; } });
+  const toggleSide = () => { setNarrow(!narrow); try { localStorage.setItem(NARROW_KEY, narrow ? "0" : "1"); } catch { /* a private window */ } };
   // a new section or shelf starts afresh; leaving the page stops what plays
   useEffect(() => { setTag(null); setOpen(null); setLimit(PAGE); liveOff(); }, [section, shelfId]);
   useEffect(() => { setQ(""); stopSounds(); }, [section]);
@@ -82,18 +75,17 @@ export function KitPage() {
   const detail = open ? items.find(i => i.id === open) : undefined;
   return html`<section class="kitlib">
     <div class="pagehead"><h2 class="grow">The kit</h2><span class="note">What a scene is staged with: ${SECTIONS.map(([s, l]) => `${all[s].length} ${l.toLowerCase()}`).join(", ")}.</span></div>
-    <div class="kitlib-body">
+    <div class=${`kitlib-body${narrow ? " narrow" : ""}`}>
       <nav class="kitlib-side" aria-label="Kit sections">
-        ${SECTIONS.map(([s, l, , sh, icon]) => {
-          const list = shelvesWith(sh, all[s], i => i.shelf ?? "other"), open = unfolded.has(s) && list.length > 1;
-          return html`<div class=${`kitlib-sec${section === s ? " here" : ""}`}>
-            <div class="kitlib-head">
-              <button class="fold" aria-expanded=${open} aria-controls=${`kit-shelves-${s}`} aria-label=${`${open ? "Fold" : "Unfold"} ${l}`} onClick=${() => fold(s)} disabled=${list.length < 2}><${Icon} name="chevron" size=${14} /></button>
-              <a href=${`#/kit/${s}`} aria-current=${section === s && !shelfId ? "page" : undefined}><${Icon} name=${icon} size=${17} /><span>${l}</span><small>${all[s].length}</small></a>
-            </div>
-            ${open && html`<ul id=${`kit-shelves-${s}`}>${list.map(({ shelf, n }) => html`<li><a href=${`#/kit/${s}/${shelf.id}`} aria-current=${section === s && shelfId === shelf.id ? "page" : undefined}><span>${shelf.label}</span><small>${n}</small></a></li>`)}</ul>`}
-          </div>`;
-        })}
+        <button class="iconbtn fold" aria-expanded=${!narrow} aria-controls="kit-side-list" onClick=${toggleSide} title=${narrow ? "Show the sections" : "Fold the sections to icons"} aria-label=${narrow ? "Show the sections" : "Fold the sections to icons"}><${Icon} name="panel" size=${17} /></button>
+        <div id="kit-side-list" class="kitlib-secs">${SECTIONS.map(([s, l, , , icon]) => html`<div class=${`kitlib-sec${section === s ? " here" : ""}`}>
+          <a href=${`#/kit/${s}`} aria-current=${section === s && !shelfId ? "page" : undefined} title=${narrow ? `${l} (${all[s].length})` : undefined} aria-label=${narrow ? `${l}, ${all[s].length}` : undefined}><${Icon} name=${icon} size=${17} /><span>${l}</span><small>${all[s].length}</small></a>
+          ${section === s && !narrow && counts.length > 1 && html`<ul>${counts.map(({ shelf, n }) => html`<li><a href=${`#/kit/${s}/${shelf.id}`} aria-current=${shelfId === shelf.id ? "page" : undefined}><span>${shelf.label}</span><small>${n}</small></a></li>`)}</ul>`}
+        </div>`)}</div>
+        ${counts.length > 1 && html`<ul class="kitlib-row" aria-label=${`${label}: shelves`}>
+          <li><a href=${`#/kit/${section}`} aria-current=${!shelfId ? "page" : undefined}>All</a></li>
+          ${counts.map(({ shelf, n }) => html`<li><a href=${`#/kit/${section}/${shelf.id}`} aria-current=${shelfId === shelf.id ? "page" : undefined}>${shelf.label} <small>${n}</small></a></li>`)}
+        </ul>`}
       </nav>
       <div class="kitlib-main">
         <div class="kitlib-bar">
