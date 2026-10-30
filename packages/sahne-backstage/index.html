@@ -167,6 +167,28 @@ kbd { font: 11.5px ui-monospace, monospace; border: 1px solid var(--line); borde
 .pagehead { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .pagehead h2 { margin: 0; }
 .pagehead .grow { flex: 1; }
+/* the home: a paper theatre's stage over the series' name and the way in */
+a.button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 10px; padding: 9px 16px; text-decoration: none; font-weight: 500; }
+a.button:hover { border-color: var(--accent); }
+a.button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.home { max-width: 560px; margin: clamp(12px, 6vh, 64px) auto 40px; display: grid; justify-items: center; text-align: center; gap: 10px; }
+.home-stage { position: relative; width: min(440px, 100%); padding: 30px 26px 0; margin-bottom: 26px; border-radius: 16px 16px 0 0; background: linear-gradient(90deg, #0003, transparent 9%, transparent 91%, #0003), var(--curtain); box-shadow: var(--shadow); }
+.home-stage::before { content: ""; position: absolute; inset: 0 0 auto; height: 24px; border-radius: 16px 16px 0 0; background: radial-gradient(circle at 50% 0, #0000 12px, #00000024 13px, #0000 15px) 0 6px / 26px 26px repeat-x, linear-gradient(#0002, #0000); }
+.home-stage::after { content: ""; position: absolute; left: -10px; right: -10px; bottom: -14px; height: 14px; border-radius: 3px; background: linear-gradient(#a8744c, #7c5233); box-shadow: 0 6px 14px #0004; }
+.home-scene { position: relative; border-radius: 6px 6px 0 0; overflow: hidden; box-shadow: inset 0 0 0 1px #0003; }
+.home-scene::before, .home-scene::after { content: ""; position: absolute; top: 0; bottom: 0; width: 12%; z-index: 1; background: repeating-linear-gradient(90deg, #0000 0 7px, #0000001f 7px 9px), var(--curtain); }
+.home-scene::before { left: 0; border-radius: 0 0 60% 0; } .home-scene::after { right: 0; border-radius: 0 0 0 60%; }
+.home-scene .art { aspect-ratio: 16 / 10; display: grid; place-items: center; background: var(--chip); color: var(--mute); }
+.home-scene .art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.home-kicker { margin: 4px 0 0; font-size: 12.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.home h1 { margin: 0; font: 600 clamp(30px, 6vw, 44px)/1.1 "Iowan Old Style", "Palatino Linotype", Georgia, serif; }
+.home-lead { margin: 2px 0 8px; color: var(--mute); font-size: 16px; max-width: 44ch; }
+.home-go { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.home-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 18px; }
+.home-links a { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 99px; color: var(--mute); text-decoration: none; font-size: 14px; }
+.home-links a:hover { background: var(--chip); color: var(--ink); }
+.home-links small { color: var(--faint); }
+.home-hint { margin-top: 10px; font-size: 12.5px; color: var(--faint); }
 /* the kit page: sections and shelves on the left, cards, a card's details on the right */
 .kitlib-body { display: grid; grid-template-columns: 200px minmax(0, 1fr) auto; gap: 18px; align-items: start; transition: grid-template-columns .18s ease; }
 .kitlib-body.narrow { grid-template-columns: 40px minmax(0, 1fr) auto; }

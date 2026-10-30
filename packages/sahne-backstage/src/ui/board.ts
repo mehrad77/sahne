@@ -1,4 +1,4 @@
-// The season board, the studio's home (#/ and #/season/<id>): a season's weeks as rows and Monday to Saturday as
+// The season board (#/board and #/season/<id>): a season's weeks as rows and Monday to Saturday as
 // columns (model/board.ts), each episode a card on its release day: the picture of its place, its title, a special or not,
 // a draft, its review status and its problems. Each week's row starts with its theme (its arc, edited in place in the
 // main language, and in every language and with its mechanics from its menu: written in the season and in every story of

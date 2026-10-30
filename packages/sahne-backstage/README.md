@@ -68,7 +68,8 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 
 | Route | What |
 |---|---|
-| `#/`, `#/season/<id>` | The board of a season (the first, or the one named), described below |
+| `#/` | The home: the series' name, the next episode's place on a paper theatre's stage, *Continue* into that episode (the next to be released, else the last), the board, and the cast, places, kit and guides. A root with no series or no episode asks for the first |
+| `#/board`, `#/season/<id>` | The board of a season (the first, or the one named), described below |
 | `#/new/<season>[/<date>]` | A new episode (on that day), described below |
 | `#/episode/<id>` | An episode, described below |
 | `#/kit/<section>/<shelf>` | The kit as a library: props, set pieces, gestures, emotions, sounds, by shelf |

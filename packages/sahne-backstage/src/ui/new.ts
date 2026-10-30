@@ -25,7 +25,7 @@ const long = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString(
 export function NewEpisode(p: { season?: string; date?: string }) {
   const w = world.value!, langs = useLangs(), all = allLanguages(langs);
   const se = p.season ? (draftOf("season", p.season)?.doc as SeasonDoc | undefined) ?? w.seasons[p.season] : undefined;
-  if (!se) return html`<${Empty} icon="board" title=${`No season ${p.season ?? ""}`}><a href="#/">Back to the board</a></${Empty}>`;
+  if (!se) return html`<${Empty} icon="board" title=${`No season ${p.season ?? ""}`}><a href="#/board">Back to the board</a></${Empty}>`;
   const eps = w.episodes.filter(e => e.season === se.n);
   const taken = new Set(w.episodes.map(e => e.id));
   const id = useMemo(() => { let k = 1; while (taken.has(`s${se.n}e${pad(k)}`)) k++; return `s${se.n}e${pad(k)}`; }, [se.n]);

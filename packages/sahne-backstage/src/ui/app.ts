@@ -1,7 +1,8 @@
 // The studio: a top bar (the series, its seasons, search and commands, whether everything is saved, the theme), a rail
 // of the places to work (the board, the cast, the places, the kit, review; then the agents, the guides and settings),
 // the page the hash names, and the side panel (the assistant, the agents, the guides: side.ts).
-//   #/, #/season/<id>       the board: a season's weeks and days, each episode on its release day
+//   #/                      the home: the series, the next episode, the way in
+//   #/board, #/season/<id>  the board: a season's weeks and days, each episode on its release day
 //   #/episode/<id>          one episode: play it, fix its words, stage it, review it
 //   #/review                where every episode stands
 //   #/cast, #/character/<id> the cast, a character's look and words
@@ -29,6 +30,7 @@ import { SettingsPage } from "./settings.ts";
 import { cycleTheme, theme } from "./theme.ts";
 import { tx } from "./fields.ts";
 import { BoardPage } from "./board.ts";
+import { HomePage } from "./home.ts";
 import { Episode } from "./studio/episode.ts";
 import { ReviewPage } from "./review.ts";
 import { CastPage, CharacterPage } from "./cast.ts";
@@ -37,7 +39,7 @@ import { NewEpisode } from "./new.ts";
 import { KitPage } from "./kitpage.ts";
 
 /** The places to work, in the rail; after the gap, the ones about the work. */
-const RAIL: [string, string, string][] = [["", "board", "Board"], ["cast", "cast", "Cast"], ["places", "places", "Places"], ["kit", "hand", "Kit"], ["review", "review", "Review"]];
+const RAIL: [string, string, string][] = [["board", "board", "Board"], ["cast", "cast", "Cast"], ["places", "places", "Places"], ["kit", "hand", "Kit"], ["review", "review", "Review"]];
 const RAIL_END: [string, string, string][] = [["agents", "plug", "Agents"], ["docs", "book", "Docs"], ["settings", "settings", "Settings"]];
 
 export function App() {
@@ -55,7 +57,7 @@ export function App() {
   // the season on screen: its page, an episode of it, or a new episode in it
   const current = page === "season" || page === "new" ? id : page === "episode" && id ? `s${seasonOf(id)}` : undefined;
   const dirty = dirtyKeys.value.length;
-  const area = page === "character" ? "cast" : page === "place" ? "places" : page === "review" ? "review" : page === "cast" || page === "places" || page === "kit" || page === "settings" || page === "agents" || page === "docs" ? page : "";
+  const area = page === "board" || page === "season" || page === "new" || page === "episode" ? "board" : page === "character" ? "cast" : page === "place" ? "places" : page === "review" ? "review" : page === "cast" || page === "places" || page === "kit" || page === "settings" || page === "agents" || page === "docs" ? page : "";
   const open = assistantOpen.value, waiting = proposals.value.length;
   const link = ([path, icon, label]: [string, string, string]) => html`<a href=${`#/${path}`} aria-current=${area === path ? "page" : undefined}><${Icon} name=${icon} size=${22} />${label}${path === "agents" && waiting ? html`<span class="badge" title=${`${waiting} proposed edit${waiting > 1 ? "s" : ""} waiting`}>${waiting}</span>` : ""}</a>`;
   return html`<div class="studio">
@@ -93,7 +95,8 @@ function commandsOf(): Command[] {
     ...seasons.map(s => ({ id: `new-${s.id}`, what: "New", label: `A new episode in season ${s.n}`, keywords: "create add write", run: () => go("new", s.id) })),
     ...Object.values(w.characters).map(c => ({ id: `ch-${c.id}`, what: c.kind === "extra" ? "Extra" : "Character", label: tx(c.name) || c.id, keywords: `${c.id} ${tx(c.role, "en")}`, run: () => go("character", c.id) })),
     ...Object.entries(w.places).map(([pid, p]) => ({ id: `pl-${pid}`, what: "Place", label: tx(p.name, "en") || pid, keywords: `${pid} ${tx(p.name)}`, run: () => go("place", pid) })),
-    { id: "go-board", what: "Go", label: "The board", run: () => go() },
+    { id: "go-home", what: "Go", label: "Home", run: () => go() },
+    { id: "go-board", what: "Go", label: "The board", run: () => go("board") },
     { id: "go-review", what: "Go", label: "Review: where every episode stands", run: () => go("review") },
     { id: "go-cast", what: "Go", label: "The cast", run: () => go("cast") },
     { id: "go-places", what: "Go", label: "The places", run: () => go("places") },
@@ -110,7 +113,8 @@ function commandsOf(): Command[] {
 
 function pageFor(page: string | undefined, id: string | undefined) {
   switch (page) {
-    case undefined: case "season": return html`<${BoardPage} />`;
+    case undefined: return html`<${HomePage} />`;
+    case "board": case "season": return html`<${BoardPage} />`;
     case "episode": return html`<${Episode} key=${id} id=${id} />`;
     case "review": return html`<${ReviewPage} />`;
     case "cast": return html`<${CastPage} />`;
@@ -122,6 +126,6 @@ function pageFor(page: string | undefined, id: string | undefined) {
     case "settings": return html`<${SettingsPage} />`;
     case "agents": return html`<${AgentsPage} />`;
     case "docs": return html`<${DocsPage} guide=${id} at=${route.value[2]} />`;
-    default: return html`<p>No page ${page}. <a href="#/">The board</a></p>`;
+    default: return html`<p>No page ${page}. <a href="#/">Home</a></p>`;
   }
 }

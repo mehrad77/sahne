@@ -57,7 +57,7 @@ function NewSeries() {
     for (const se of seasons) if (!w.seasons[se.id]) createDoc("season", se.id, se);
     const ok = await saveDocs([keyOf("series", "series"), ...seasons.map(se => keyOf("season", se.id))]);
     setBusy(false);
-    if (ok) go();
+    if (ok) go("board");
   };
   return html`<div class="fields">
     <p>This content root has no <code>series.json</code> yet.</p>
