@@ -846,7 +846,7 @@ function oldLamp(kind: string, p: Record<string, unknown>) {
     glow.push(S(ellipse(hx, -h + 7, 17, 3), "#FFF1C4", pr()), P([[hx - 17, -h + 8, 0], [hx + 17, -h + 8, 0], [hx + 40, -h * 0.55, 0], [hx - 40, -h * 0.55, 0]], "#FFE9AE", pr(0.1)));
     lights.push({ x: hx, y: h - 8, z: 20, color: "#FFE3A8", radius: 5, intensity: 0.8, switch: false, at: ["dawn", "dusk", "night"] });
   }
-  return { flats: [{ group: { shapes: sh, edge: 0.6 }, emissive: { shapes: glow, edge: 0 }, switch: false, glowAt: 0.05, ppcm: Math.min(2.4, 1900 / (h + 140)) }], lights };
+  return { flats: [{ group: { shapes: sh, edge: 0.6 }, emissive: { shapes: glow, edge: 0 }, switch: false as const, glowAt: 0.05, ppcm: Math.min(2.4, 1900 / (h + 140)) }], lights };
 }
 
 /**
