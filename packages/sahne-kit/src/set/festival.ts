@@ -211,23 +211,23 @@ const RIBBONS = ["#C8283A", "#3B7DC4", "#F2C230", "#FFFFFF", "#2F8F5B", "#E8788C
 
 /**
  * A maypole: a tall spiral-striped pole on a small mound, a green wreath with flowers at its crown, carved trade signs on a
- * crosspiece and coloured ribbons streaming down to the ground, swaying a little. `h` cm (520); `color` and `color2` its stripes.
+ * crosspiece and, if asked, coloured dance ribbons hanging down beside it, swaying a little. `h` cm (520); `color` and `color2` its stripes.
  */
 const maypole: PieceDef = { draw(p, r) {
-  const h = clamp(num(p.h, 520), 300, 700), c1 = hex(p.color, "#3B7DC4"), c2 = hex(p.color2, WHITE), pw = 8, n = Math.round(clamp(num(p.ribbons, 6), 0, 12));
-  const sh: Shape[] = [], pole = rect(-pw, -h, pw * 2, h);
+  const h = clamp(num(p.h, 520), 300, 700), c1 = hex(p.color, "#3B7DC4"), c2 = hex(p.color2, WHITE), pw = 8, n = Math.round(clamp(num(p.ribbons, 0), 0, 12));
+  const sh: Shape[] = [], front: Shape[] = [], pole = rect(-pw, -h, pw * 2, h);
   sh.push(S(ellipse(0, 0, 38, 11), "#7A9A4E"), F(ellipse(8, 2, 26, 6), tone("#7A9A4E", "shade"), 0.5), S(pole, c2));
   for (let y = 0; y < h + 60; y += 44) sh.push(F(poly([[-pw - 1, -y], [pw + 1, -y - 22], [pw + 1, -y - 44], [-pw - 1, -y - 22]]), c1, 1, pole));
   sh.push(...lit(pole, c2, 0.28), F(rect(-pw, -h * 0.04, pw * 2, 5), GOLD, 0.9, pole));
   // the crosspiece with carved trade signs
   const cy = -h * 0.82, bar = rect(-58, cy - 3.5, 116, 7);
-  sh.push(...O(bar, WOOD, 0.2));
+  front.push(...O(bar, WOOD, 0.2));
   const signs: [number, (x: number, y: number) => Shape[]][] = [
     [-42, (x, y) => [S(ellipse(x, y, 7, 6.4).add(ellipse(x, y, 3, 2.6)), "#C98A35", { evenodd: true }), F(ellipse(x - 3, y - 3.4, 1.6, 1), "#F3DDA0", 0.8)]],
     [0, (x, y) => [S(heart(x, y + 7, 0.78), RED)]],
     [42, (x, y) => [S(star(x, y, 7.6), GOLD), S(ellipse(x, y, 2.6), "#FFF1C4")]],
   ];
-  for (const [x, f] of signs) sh.push(R([[x - 6, cy + 3], [x - 6, cy + 11]], CREAM, 0.5), R([[x + 6, cy + 3], [x + 6, cy + 11]], CREAM, 0.5), ...O(rrect(x - 16, cy + 10, 32, 28, 2), "#F2E2BC", 0.18), ...f(x, cy + 24));
+  for (const [x, f] of signs) front.push(R([[x - 6, cy + 3], [x - 6, cy + 11]], CREAM, 0.5), R([[x + 6, cy + 3], [x + 6, cy + 11]], CREAM, 0.5), ...O(rrect(x - 16, cy + 10, 32, 28, 2), "#F2E2BC", 0.18), ...f(x, cy + 24));
   // the crown: a wreath of green with flowers, a finial
   const wy = -h - 4, wreath = ellipse(0, wy, 30, 27).add(ellipse(0, wy, 15, 12));
   sh.push(S(wreath, PINE, { evenodd: true }), ...lit(wreath, PINE, 0.2), dots(Array.from({ length: 10 }, (_, i) => [Math.cos(i * 0.628) * 18, wy + Math.sin(i * 0.628) * 16] as Vec2), 3, "#E8788C", 1, { flat: false }), dots(Array.from({ length: 10 }, (_, i) => [Math.cos(i * 0.628 + 0.3) * 18, wy + Math.sin(i * 0.628 + 0.3) * 16] as Vec2), 2, "#F2C230", 1, { flat: false }));
@@ -235,24 +235,25 @@ const maypole: PieceDef = { draw(p, r) {
   // the ribbons hang from the crown (a flat of their own that sways about the pole's top)
   const rib: Shape[] = [];
   for (let i = 0; i < n; i++) {
-    const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1, ex = t * h * 0.2 + r.range(-4, 4), c = RIBBONS[i % RIBBONS.length], len = h * 0.97, pts: Vec2[] = [[t * 9, 6], [ex * 0.3 + t * 8, len * 0.3], [ex * 0.75, len * 0.7], [ex, len]];
+    const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1, ex = t * h * 0.04 + Math.sin(i * 1.7) * 3 + r.range(-1.5, 1.5), c = RIBBONS[i % RIBBONS.length], len = h * 0.97, pts: Vec2[] = [[t * 9, 6], [t * 12 + Math.sin(i * 2.3) * 5, len * 0.3], [ex * 0.8 - Math.sin(i * 1.3) * 4, len * 0.7], [ex, len]];
     rib.push(R(pts, tone(c, "shade"), 7.4, { flat: false }), R(pts, c, 6.2));
   }
   const ppcm = Math.min(2.4, 1900 / (h + 90)), tall = h + 70;
   return { flats: [
     { group: { shapes: sh, edge: 0.5 }, ppcm: Math.min(ppcm, 1900 / tall), id: "maypole" },
     ...(n ? [{ group: { shapes: rib, edge: 0.4 }, y: h, z: 5, ppcm: Math.min(2, 1900 / (h + 20)), move: { sway: { rot: 0.012, ms: 5400 }, phase: r() } } as FlatSpec] : []),
+    { group: { shapes: front, edge: 0.5 }, ppcm: Math.min(ppcm, 1900 / tall), z: 6 },
   ] };
 },
-  variants: { bavarian: {}, red: { color: "#C8283A", color2: "#F3EBD8" }, green: { color: "#2F8F5B", color2: "#F3EBD8" } },
+  variants: { bavarian: {}, red: { color: "#C8283A", color2: "#F3EBD8", ribbons: 6 }, green: { color: "#2F8F5B", color2: "#F3EBD8", ribbons: 6 } },
   solid() { return solidLine(-8, 8); },
   meta: {
-    about: "A maypole: a spiral-striped pole on a mound, a flowered wreath at its crown, carved trade signs on a crosspiece and ribbons streaming down, swaying.",
+    about: "A maypole: a spiral-striped pole on a mound, a flowered wreath at its crown, carved trade signs on a crosspiece, and (red, green) dance ribbons hanging beside it, swaying.",
     params: {
       h: { type: "num", min: 300, max: 700, default: 520, about: "height, cm" },
       color: { type: "color", about: "the stripe's colour; default blue" },
       color2: { type: "color", about: "the pole's ground colour; default white" },
-      ribbons: { type: "int", min: 0, max: 12, default: 6, about: "ribbons streaming down from the crown" },
+      ribbons: { type: "int", min: 0, max: 12, default: 0, about: "dance ribbons hanging beside the pole from the crown (the Bavarian pole has none; the red and green variants have six)" },
     },
     terms: [], tags: ["festival", "spring", "folk"],
   } };
@@ -278,13 +279,16 @@ function horse(c: string, saddle: string): Shape[] {
   ];
 }
 
+/** The shapes mirrored left to right (strokes keep their width). */
+const flip = (sh: Shape[], on: boolean): Shape[] => !on ? sh : sh.map(s => ({ ...s, path: s.path.transform([-1, 0, 0, 1, 0, 0]), ...(s.clip ? { clip: (Array.isArray(s.clip) ? s.clip : [s.clip]).map(c => c.transform([-1, 0, 0, 1, 0, 0])) } : {}) }));
+
 /**
  * A fairground carousel: a striped tent roof over a scalloped valance, a mirrored column, brass poles and `horses`
  * prancing up and down, on a painted platform. Bulbs under the roof and along the scallops light by turns at night (`lit`).
  * `w` cm across (420); `color` its roof stripes.
  */
 const carousel: PieceDef = { draw(p, r) {
-  const w = clamp(num(p.w, 420), 300, 600), a = w / 2, hn = Math.round(clamp(num(p.horses, 4), 2, 6)), on = p.lit !== false, c1 = hex(p.color, "#C8283A"), c2 = hex(p.color2, CREAM);
+  const w = clamp(num(p.w, 420), 300, 600), a = w / 2, hn = Math.min(Math.round(clamp(num(p.horses, 4), 2, 6)), Math.floor(clamp(num(p.w, 420), 300, 600) / 90)), on = p.lit !== false, c1 = hex(p.color, "#C8283A"), c2 = hex(p.color2, CREAM);
   const eave = -w * 0.72, peak = eave - w * 0.2, sh: Shape[] = [], bulbs: Shape[] = [], glow: Shape[] = [];
   // the platform and its painted panels
   sh.push(...O(rect(-a, -22, w, 22), tone(c1, "deep"), 0.12), S(rect(-a - 4, -26, w + 8, 6), GOLD));
@@ -295,7 +299,7 @@ const carousel: PieceDef = { draw(p, r) {
   for (const f of [-0.7, 0, 0.7]) { const mw = cw * 0.26; sh.push(S(rect(f * cw * 0.34 - mw / 2, eave + 24, mw, -eave - 60), GLASS), F(poly([[f * cw * 0.34 - mw / 2, eave + 24], [f * cw * 0.34 - mw / 2 + mw * 0.5, eave + 24], [f * cw * 0.34 - mw / 2 + 2, eave + 80]]), WHITE, 0.4)); }
   sh.push(S(rect(-cw / 2 - 3, -50, cw + 6, 8), GOLD), S(rect(-cw / 2 - 3, eave + 18, cw + 6, 8), GOLD));
   // brass poles for the horses, stout posts at the sides
-  const hx = Array.from({ length: hn }, (_, i) => (hn === 1 ? 0 : (i / (hn - 1)) * 2 - 1) * a * 0.8);
+  const hx = Array.from({ length: hn }, (_, i) => (hn === 1 ? 0 : (i / (hn - 1)) * 2 - 1) * Math.min(a * 0.8, a - 62));
   for (const x of hx) sh.push(S(rect(x - 1.8, eave + 24, 3.6, -eave - 50), GOLD), F(rect(x - 1.8, eave + 24, 1.2, -eave - 50), "#FFF1C4", 0.6));
   for (const s of [-1, 1]) sh.push(...O(rect(s * (a - 6) - 4, eave + 24, 8, -eave - 50), c2, 0.3), lines(Array.from({ length: Math.floor(-eave / 14) }, (_, i) => [[s * (a - 6) - 4, eave + 30 + i * 14], [s * (a - 6) + 4, eave + 22 + i * 14]] as Vec2[]), GOLD, 1.4, 0.95));
   // the roof: striped wedges from the apex over a gold cornice, a valance of scallops beneath
@@ -311,7 +315,7 @@ const carousel: PieceDef = { draw(p, r) {
   const ppcm = Math.min(2.4, 1900 / (w + 60), 1900 / (-peak + 50)), lights: LightSpec[] = on ? [{ x: -a * 0.4, y: -eave * 0.6, z: 60, color: "#FFC878", radius: 4, intensity: 0.7, switch: false, at: ["dawn", "dusk", "night"] }, { x: a * 0.4, y: -eave * 0.6, z: 60, color: "#FFC878", radius: 4, intensity: 0.7, switch: false, at: ["dawn", "dusk", "night"] }] : [];
   // the horses: each a flat of its own, rising and falling about its pole
   const flats: FlatSpec[] = [{ group: { shapes: [...sh, ...bulbs], edge: 0.6 }, ppcm, id: "carousel" }];
-  hx.forEach((x, i) => flats.push({ group: { shapes: horse(HORSES[(i * 2 + r.int(0, 1)) % HORSES.length], i % 2 ? c1 : "#3B7DC4"), edge: 0.5 }, x: x + 8, y: 34 + (i % 2) * 22, z: 4 + (i % 2) * 0.5, ppcm: Math.min(3, 1900 / 130), move: { sway: { dy: 4.5, ms: 3800 }, phase: (i / hn + (i % 2) * 0.5) % 1 } }));
+  hx.forEach((x, i) => flats.push({ group: { shapes: flip(horse(HORSES[(i * 2 + r.int(0, 1)) % HORSES.length], i % 2 ? c1 : "#3B7DC4"), i % 2 === 1), edge: 0.5 }, x: x + 8, y: 34 + (i % 2) * 22, z: 4 + (i % 2) * 0.5, ppcm: Math.min(3, 1900 / 130), move: { sway: { dy: 4.5, ms: 3800 }, phase: (i / hn + (i % 2) * 0.5) % 1 } }));
   if (on) flats.push(...litByTurns(glow, { ppcm, z: 0.5 }, 5, 0.1, 0.7));
   return { flats, lights };
 },
@@ -321,7 +325,7 @@ const carousel: PieceDef = { draw(p, r) {
     about: "A fairground carousel: a striped tent roof over a scalloped valance, a mirrored column and brass poles with horses rising and falling, on a painted platform; bulbs light by turns at night.",
     params: {
       w: { type: "num", min: 300, max: 600, default: 420, about: "width across, cm" },
-      horses: { type: "int", min: 2, max: 6, default: 4, about: "how many horses" },
+      horses: { type: "int", min: 2, max: 6, default: 4, about: "how many horses (at most one per 90 cm of width: 3 at the narrowest, 6 at the widest; alternate ones face the other way)" },
       color: { type: "color", about: "the roof's stripes; default red" },
       color2: { type: "color", about: "the roof's other stripes and the column; default cream" },
       lit: { type: "bool", default: true, about: "the bulbs under the roof glow at night" },
@@ -362,11 +366,17 @@ const FEL: Record<string, Kd> = {
     const m = smooth([[-13, -9], [-10.6, -12.4], [-4, -12.4], [0, -10.6], [4, -12.4], [10.6, -12.4], [13, -9], [8, -3.6], [4, -4.6], [0, -5.6], [-4, -4.6], [-8, -3.6]], true, 1), mask = new Path().add(m).add(ellipse(-5.6, -8, 2.9, 1.9)).add(ellipse(5.6, -8, 2.9, 1.9));
     return { sh: [R([[-12, -10], [-18, -13], [-20, -17]], "#2F8F5B", 2.2), R([[12, -10], [18, -13], [20, -17]], "#2F8F5B", 2.2), R([[11, -11], [16, -18], [15, -24]], "#F2C230", 2), R([[-11, -11], [-16, -18], [-15, -24]], "#F2C230", 2), R([[9, -11.4], [10, -19], [7, -26]], "#E8788C", 1.8), S(mask, c, { evenodd: true }), ...lit(m, c, 0.2), F(ellipse(-9.4, -6.8, 1.9, 1.3), GOLD, 0.95), F(ellipse(9.4, -6.8, 1.9, 1.3), GOLD, 0.95), { path: m, stroke: { color: GOLD, width: 0.9 }, flat: true, opacity: 0.95 }, F(star(0, -9.6, 1.5), GOLD, 1), dots([[-3, -11], [3, -11], [-11, -9], [11, -9], [-1, -6], [1.6, -6.2]], 0.55, "#FFF1C4", 0.95)] }; } },
   flower_crown: { w: 26, ppcm: 16, c: "#5DA14E", g: [0, -3], d: ({ c }) => {
-    const cy = -6, rx = 10.6, ry = 4.6, flower = (x: number, y: number, pc: string, k: number): Shape[] => [dots(Array.from({ length: 5 }, (_, i) => [x + Math.cos(i * 1.2566) * 1.7 * k, y + Math.sin(i * 1.2566) * 1.7 * k] as Vec2), 1.35 * k, pc, 1, { flat: false }), S(ellipse(x, y, 0.95 * k), "#F2C230")];
-    const sh: Shape[] = [R([[-rx, cy - 1], [-rx - 2, cy + 3], [-rx - 1, cy + 7]], "#E8788C", 1.6), R([[-rx + 1, cy], [-rx + 1, cy + 6], [-rx + 3, cy + 9]], "#7FC4E8", 1.4), R(Array.from({ length: 13 }, (_, i) => [Math.cos(i * 0.5236) * rx, cy + Math.sin(i * 0.5236) * ry] as Vec2).slice(0, 7), tone(c, "deep"), 1.8)];
+    // a closed ring seen a little from above: leaves all round, the flowers along its front, two ribbons tied at the back
+    const cy = -8, rx = 11, ry = 5, at = (t: number): Vec2 => [Math.cos(t) * rx, cy + Math.sin(t) * ry];
+    const flower = (x: number, y: number, pc: string, k: number): Shape[] => [dots(Array.from({ length: 5 }, (_, i) => [x + Math.cos(i * 1.2566) * 1.7 * k, y + Math.sin(i * 1.2566) * 1.7 * k] as Vec2), 1.35 * k, pc, 1, { flat: false }), S(ellipse(x, y, 0.95 * k), "#F2C230")];
+    const leaf = (t: number): Shape => { const [x, y] = at(t); return S(ellipse(x, y, 2.3, 1.1), tone(c, Math.sin(t) < 0 ? "deep" : "base")); };
+    const nL = 14, back = Array.from({ length: nL }, (_, i) => (i + 0.5) / nL * 2 * Math.PI).filter(t => Math.sin(t) < 0), frontL = Array.from({ length: nL }, (_, i) => (i + 0.5) / nL * 2 * Math.PI).filter(t => Math.sin(t) >= 0);
+    const sh: Shape[] = [...back.map(leaf),
+      R([[3, cy - ry + 0.6], [9, cy - 1], [12.4, cy + 3], [11.6, cy + 8]], "#E8788C", 1.5), R([[4, cy - ry + 0.6], [11, cy - 2], [14.6, cy + 1], [15.4, cy + 5]], "#7FC4E8", 1.4),
+      { path: ellipse(0, cy, rx, ry), stroke: { color: tone(c, "deep"), width: 1.8 }, flat: false }, ...frontL.map(leaf)];
     const cols = ["#E8788C", "#FFFFFF", "#F2B632", "#B65CA8", "#7FC4E8", "#FFFFFF", "#E8788C"];
-    cols.forEach((pc, i) => { const t = (i / (cols.length - 1)) * Math.PI, x = -Math.cos(t) * (rx - 0.6), y = cy + Math.sin(t) * (ry - 0.2); sh.push(S(ellipse(x + 2.2, y + 0.6, 2.4, 1.1), c), ...flower(x, y - 0.6, pc, 1 + (i % 2) * 0.2)); });
-    sh.push(...Array.from({ length: 4 }, (_, i) => S(ellipse(-7 + i * 4.6, cy + ry + (i % 2 ? -0.2 : 0.8), 2.1, 1), c)));
+    cols.forEach((pc, i) => { const t = Math.PI * (0.1 + 0.8 * i / (cols.length - 1)), [x, y] = at(t); sh.push(...flower(x, y - 0.4, pc, 0.8 + (i % 2) * 0.12)); });
+    sh.push(S(ellipse(0, cy - ry, 1.4, 1), "#E8788C"));
     return { sh }; } },
   st_martin_lantern: { w: 24, ppcm: 12, c: "#D9532E", g: [0, -20], d: ({ c }) => {
     const cy = -54, body = ellipse(0, cy, 9, 9.6), cut = star(-2.4, cy - 2, 3.4), moon = poly(arcPoints(3.4, cy + 3.6, 3, 3, -1.6, 2.6, 8).concat(arcPoints(4.6, cy + 3.2, 2.4, 2.4, 2.4, -1.6, 8)));
