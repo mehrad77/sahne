@@ -135,12 +135,12 @@ const city_bus: PieceDef = { draw(p, r) {
  * and a pantograph on the roof. The head car carries its line (`line`, text). Faceless riders in the windows, lit at night.
  */
 const train: PieceDef = { draw(p, r) {
-  const hs = str(p.kind, "regional") === "high_speed", cars = Math.max(1, Math.min(4, Math.round(num(p.cars, 2)))), CL = hs ? 1000 : 900, gap = 16;
+  const hs = str(p.kind, "regional") === "high_speed", cars = Math.max(1, Math.min(3, Math.round(num(p.cars, 2)))), CL = hs ? 2200 : 1800, gap = 16;
   const c = hex(p.color, hs ? "#B3261E" : "#2E5E8C"), tot = cars * CL + (cars - 1) * gap, sh: Shape[] = [], glow: Shape[] = [], text: TextSpec[] = [];
   for (let i = 0; i < cars; i++) {
     const x0 = -tot / 2 + i * (CL + gap), x1 = x0 + CL, head = i === cars - 1;
     const nose: Pt[] = hs
-      ? [[x0, -64, 0], [x0, -360, 0], [x0 + 12, -372, 0], [x1 - 400, -372, 0], [x1 - 260, -354], [x1 - 120, -302], [x1 - 34, -222], [x1, -150], [x1, -104], [x1 - 36, -78], [x1 - 100, -64, 0]]
+      ? [[x0, -64, 0], [x0, -360, 0], [x0 + 12, -372, 0], [x1 - 800, -372, 0], [x1 - 560, -354], [x1 - 300, -302], [x1 - 120, -222], [x1, -150], [x1, -104], [x1 - 36, -78], [x1 - 100, -64, 0]]
       : [[x0, -64, 0], [x0, -358, 0], [x0 + 12, -370, 0], [x1 - 70, -370, 0], [x1 - 18, -330], [x1, -240], [x1, -90], [x1 - 10, -64, 0]];
     const body = head ? P(nose, hs ? WHITE : WHITE) : P([[x0, -64, 0], [x0, -358, 0], [x0 + 12, -370, 0], [x1 - 12, -370, 0], [x1, -358, 0], [x1, -64, 0]], WHITE);
     const cut = body.path;
@@ -148,32 +148,32 @@ const train: PieceDef = { draw(p, r) {
     if (hs) sh.push(F(rect(x0 - 2, -140, CL + 4, 8), c, 1, cut), F(rect(x0 - 2, -132, CL + 4, 3), tone(c, "deep"), 0.7, cut), F(rect(x0 - 2, -70, CL + 4, 28), tone(WHITE, "shade"), 0.55, cut), F(rect(x0 - 2, -372, CL + 4, 22), tone(WHITE, "shade"), 0.5, cut));
     else sh.push(F(rect(x0 - 2, -190, CL + 4, 118), c, 1, cut), F(rect(x0 - 2, -190, CL + 4, 4), tone(c, "deep"), 0.7, cut), F(rect(x0 - 2, -372, CL + 4, 20), tone(WHITE, "shade"), 0.5, cut), F(rect(x0 - 2, -340, CL + 4, 4), c, 0.8, cut));
     // doors, then the windows between them
-    const doors = (head && hs ? [x0 + CL * 0.1, x0 + CL * 0.4] : [x0 + CL * 0.2, x0 + CL * 0.8 - 80]).map(x => x - 4);
+    const doors = (head && hs ? [x0 + CL * 0.08, x0 + CL * 0.36] : [x0 + CL * 0.14, x0 + CL * 0.86 - 200]).map(x => x - 4);
     for (const d of doors) {
       sh.push(S(rrect(d - 3, -342, 90, 276, 4), DARK), S(rrect(d, -338, 38, 270, 3), c), S(rrect(d + 44, -338, 38, 270, 3), c), S(rrect(d + 5, -326, 28, 118, 3), GLASS), S(rrect(d + 49, -326, 28, 118, 3), GLASS), F(rect(d + 40, -338, 4, 270), DARK, 0.7));
       glow.push(S(rrect(d + 5, -326, 28, 118, 3), "#FFE6B0", { flat: true, opacity: 0.8 }), S(rrect(d + 49, -326, 28, 118, 3), "#FFE6B0", { flat: true, opacity: 0.8 }));
     }
-    const cab = head ? (hs ? 330 : 90) : 0;
-    for (let x = x0 + 34; x + 88 < x1 - 24 - cab; x += 104) {
-      if (doors.some(d => x + 88 > d - 14 && x < d + 104)) continue;
-      if (hs) { sh.push(S(rrect(x, -306, 88, 62, 8), GLASS)); if (r.chance(0.6)) sh.push(...rider(r, x + 44 + r.range(-18, 18), -242, 1.0).map(s => ({ ...s, clip: rrect(x, -306, 88, 62, 8) }))); glow.push(S(rrect(x, -306, 88, 62, 8), "#FFE6B0", { flat: true, opacity: 0.8 })); }
-      else pane(sh, glow, r, x, -320, 88, 96, 0.55, 1.2, [8, 8, 3, 3]);
+    const cab = head ? (hs ? 700 : 90) : 0;
+    for (let x = x0 + 34; x + 140 < x1 - 24 - cab; x += 176) {
+      if (doors.some(d => x + 140 > d - 14 && x < d + 104)) continue;
+      if (hs) { sh.push(S(rrect(x, -306, 140, 62, 8), GLASS)); if (r.chance(0.6)) sh.push(...rider(r, x + 70 + r.range(-30, 30), -242, 1.0).map(s => ({ ...s, clip: rrect(x, -306, 140, 62, 8) }))); glow.push(S(rrect(x, -306, 140, 62, 8), "#FFE6B0", { flat: true, opacity: 0.8 })); }
+      else pane(sh, glow, r, x, -320, 140, 96, 0.55, 1.2, [8, 8, 3, 3]);
     }
     if (head) {
-      const sc = hs ? poly([[x1 - 330, -358], [x1 - 250, -346], [x1 - 130, -296], [x1 - 74, -236], [x1 - 330, -236]]) : rrect(x1 - 74, -320, 52, 108, [6, 18, 3, 3]);
-      sh.push(S(sc, GLASS), F(poly([[x1 - 270, -250], [x1 - 250, -336], [x1 - 232, -336], [x1 - 252, -250]]), "#FFFFFF", 0.14, sc));
+      const sc = hs ? poly([[x1 - 700, -358], [x1 - 480, -346], [x1 - 270, -296], [x1 - 150, -236], [x1 - 700, -236]]) : rrect(x1 - 74, -320, 52, 108, [6, 18, 3, 3]);
+      sh.push(S(sc, GLASS), F(poly([[x1 - 560, -250], [x1 - 520, -336], [x1 - 490, -336], [x1 - 530, -250]]), "#FFFFFF", 0.14, sc));
       sh.push(S(ellipse(x1 - (hs ? 12 : 12), hs ? -128 : -110, 9, 11), "#F4F1E0"), F(rect(x1 - (hs ? 30 : 20), hs ? -96 : -84, 28, 6), "#8E979E", 0.8));
       glow.push(S(ellipse(x1 - 8, hs ? -128 : -110, 14, 16), "#FFF3C4", { flat: true }));
-      text.push({ text: str(p.line, hs ? "HS 9" : "RE 7"), x: x0 + 180, y: hs ? -366 : -362, w: 160, h: hs ? 26 : 22, size: 18, color: "#2B2420", font: "print", weight: 800, lang: "en" });
+      text.push({ text: str(p.line, hs ? "HS 9" : "RE 7"), x: x0 + 300, y: hs ? -366 : -362, w: 160, h: hs ? 26 : 22, size: 18, color: "#2B2420", font: "print", weight: 800, lang: "en" });
     } else if (i === 0) {
       sh.push(P([[x0 - 3, -130, 0], [x0 - 10, -130, 0], [x0 - 10, -100, 0], [x0 - 3, -100, 0]], "#B3261E"));
       glow.push(S(ellipse(x0 - 4, -115, 8, 16), "#FF4A3A", { flat: true }));
     }
     // the roof gear, the gangway, the bogies
-    sh.push(S(rrect(x0 + 80, -386, CL - (head ? hs ? 520 : 200 : 160), 16, 6), "#9AA2A8"));
+    sh.push(S(rrect(x0 + 80, -386, CL - (head ? hs ? 1000 : 200 : 160), 16, 6), "#9AA2A8"));
     if (hs && i === Math.max(0, cars - 2)) sh.push(S(rect(x0 + 360, -392, 90, 8), DARK), L([[x0 + 380, -392], [x0 + 420, -440], [x0 + 400, -480]], "#3B3F45", 3.4, 1), L([[x0 + 430, -392], [x0 + 420, -440]], "#3B3F45", 2.4, 1), S(rect(x0 + 372, -484, 60, 5), "#3B3F45"));
     if (i < cars - 1) sh.push(S(rect(x1 - 2, -330, gap + 4, 262), "#20242A"), S(rect(x1 - 2, -352, gap + 4, 22), "#3A3F45"));
-    for (const b of [x0 + 160, x1 - 160]) sh.push(S(rect(b - 72, -66, 144, 14), "#3B3F45"), ...[-44, 44].flatMap(d => [S(ellipse(b + d, -38, 38), TYRE), S(ellipse(b + d, -38, 26), "#6E757B"), F(ellipse(b + d, -38, 7), DARK, 0.7)]));
+    for (const b of [x0 + 280, x1 - 280]) sh.push(S(rect(b - 72, -66, 144, 14), "#3B3F45"), ...[-44, 44].flatMap(d => [S(ellipse(b + d, -38, 38), TYRE), S(ellipse(b + d, -38, 26), "#6E757B"), F(ellipse(b + d, -38, 7), DARK, 0.7)]));
   }
   return flatOf(p, "train", sh, glow, text, Math.min(1.6, 1900 / (tot + 60)), { rot: 0.0006, dy: 0.5, ms: 700 });
 }, variants: { regional: { kind: "regional" }, high_speed: { kind: "high_speed" } },
@@ -181,7 +181,7 @@ const train: PieceDef = { draw(p, r) {
     about: "A train side on: a regional (white with a painted band, doors and a blunt cab) or a high-speed one (a long streamlined nose, a window strip, a pantograph), coupled cars, riders lit at night; it can run along a path.",
     params: {
       kind: { type: "enum", values: ["regional", "high_speed"], default: "regional" },
-      cars: { type: "int", min: 1, max: 4, default: 2, about: "coupled cars, the head car at the front" },
+      cars: { type: "int", min: 1, max: 3, default: 2, about: "coupled cars, the head car at the front" },
       dir: DIR,
       color: { type: "color", about: "the band or stripe (a palette id or a hex); default blue for a regional, red for a high-speed" },
       line: { type: "text", about: "the line on the head car; default RE 7 or HS 9" },
