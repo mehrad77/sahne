@@ -195,3 +195,14 @@ test("the default --out is a private folder, and two calls at once into one --ou
     for (const f of files) assert.ok(isPng(f));
   } finally { rmSync(shared, { recursive: true, force: true }); }
 });
+
+test("a drawing the schema refuses is answered with a hint at the usual mistake", () => {
+  const bad = doc("x_board_bad", "Menu");
+  (bad.kinds.default.flats[0].shapes as unknown[]).push({ d: "M0 0H5", fill: "none", stroke: "#2F3B35", strokeWidth: 0.6 });
+  const r = call("draft_kit_item", JSON.stringify({ doc: bad }));
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /strokeWidth/);
+  assert.match(r.stderr, /^hint: a shape is \{ d, fill\?, stroke\?: \{ color, width, cap\? \}/m);
+  assert.match(r.stderr, /^hint: a colour is "#RRGGBB"/m);
+  assert.equal(r.stderr.match(/^hint: a shape/gm)?.length, 1, "each hint once");
+});

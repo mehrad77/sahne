@@ -112,12 +112,20 @@ interface Target { kit: Kit; row: Row; slot: KitSlot }
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
+/** The schema's complaints about a drawing, each once, then a hint for the mistakes they usually mean (the format is DRAWING.md's). */
+export function withHints(messages: string[]): string[] {
+  const out = [...new Set(messages)], hints: string[] = [];
+  if (out.some(m => /\/shapes\/\d+(\/(fill|stroke)\b| must NOT have additional properties)/.test(m))) hints.push("hint: a shape is { d, fill?, stroke?: { color, width, cap? }, opacity?, flat?, evenodd? }: a stroke's colour and width go inside \"stroke\", and a shape with no fill leaves \"fill\" out (\"none\" is not a colour)");
+  if (out.some(m => /\/(fill|color|tone)\b[^ ]* must (match pattern|be object)/.test(m))) hints.push("hint: a colour is \"#RRGGBB\", a palette id like \"fab_12\", \"$param\" (a color param), or { \"tone\": colour, \"step\": \"shade\" | \"deep\" | \"light\" | \"edge\" | \"base\" }");
+  return [...out, ...hints];
+}
+
 /** A drafted drawing in the kit, or what is wrong with it: the schema, the id rules, the caps, the paths. Writes nothing. */
 function draftPiece(doc: unknown): Target {
   if (!isObject(doc) || typeof doc.id !== "string") throw new Refusal("a drawing is an object with an id (x_ then lowercase letters, digits and _)");
   if (!CONTENT_ID.test(doc.id)) throw new Refusal(`id ${JSON.stringify(doc.id)}: a content id starts with x_ (then lowercase letters, digits and _): the kit's own ids are never changed or taken`);
   const { kit, problems } = kitWithEdits([{ kind: "kit_piece", id: doc.id, doc }]);
-  if (problems.length) throw new Refusal(`${doc.id} is not a good drawing:\n${problems.map(p => p.message).join("\n")}`);
+  if (problems.length) throw new Refusal(`${doc.id} is not a good drawing:\n${withHints(problems.map(p => p.message)).join("\n")}`);
   const row = rowOf(doc.id, undefined, kit);
   return { kit, row, slot: (doc as unknown as DrawingDoc).as === "prop" ? "props" : row.slot };
 }
@@ -168,7 +176,7 @@ function many(reqs: Req[], o: { views?: ("day" | "night")[]; seeds?: string[]; z
   let kit = kitOf();
   if (docs.length) {
     const r = kitWithEdits(docs.map(d => ({ kind: "kit_piece" as const, id: (d as { id: string }).id, doc: d })));
-    if (r.problems.length) throw new Refusal(`not drawable:\n${r.problems.map(p => p.message).join("\n")}`);
+    if (r.problems.length) throw new Refusal(`not drawable:\n${withHints(r.problems.map(p => p.message)).join("\n")}`);
     kit = r.kit;
   }
   const items: SheetItem[] = [], lines: string[] = [], rows: { id: string; problems: string[]; errors: number }[] = [];
