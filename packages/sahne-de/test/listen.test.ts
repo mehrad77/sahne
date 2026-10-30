@@ -127,3 +127,22 @@ test("the plugin hears", () => {
   assert.equal(de.normalise, normalise);
   assert.equal(de.matchLine, matchLine);
 });
+
+test("numerals: a decimal comma reads its fraction digit by digit, a price in euros and cents", () => {
+  assert.equal(normalise("3,14"), "drei komma eins vier");
+  assert.equal(normalise("3,50"), "drei komma fünf null");
+  assert.equal(normalise("3,50 Euro"), "drei euro fünfzig");
+  assert.equal(normalise("3,50 €"), "drei euro fünfzig");
+  assert.equal(normalise("1,00 Euro"), "ein euro");
+  assert.ok(matchLine("drei euro fünfzig", ["3,50 Euro"]).matched);
+  assert.ok(matchLine("drei komma fünf null", ["3,50"]).matched);
+});
+
+test("ordinals: 'N.' after an article or preposition, in -n after am, im, zum, den", () => {
+  assert.equal(normalise("am 2. Mai"), "am zweiten mai");
+  assert.equal(normalise("im 3. Stock"), "im dritten stock");
+  assert.equal(normalise("die 1. Tür"), "die erste tür");
+  assert.equal(normalise("der 3. Oktober"), "der dritte oktober");
+  assert.equal(normalise("Es sind 5. Dann"), "es sind fünf dann", "a sentence end, not an ordinal");
+  assert.ok(matchLine("am dritten Mai", ["Am 3. Mai"]).matched);
+});

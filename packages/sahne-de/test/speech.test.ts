@@ -161,8 +161,8 @@ test("numbers are timed as their German words, and the span covers the digits", 
   const y = speech("21");
   assert.deepEqual(y.words.map(w => w.text), ["21"]);
   assert.equal(y.dur, speech("einundzwanzig").dur);
-  // "am 2. Mai": an ordinal, read "zweite", with no full stop after it
-  assert.deepEqual(tokens("am 2. mai").map(t => t.kind === "word" ? t.said : t.mark), ["am", "zweite", "mai"]);
+  // "am 2. Mai": an ordinal, read "zweiten" (-n after am), with no full stop after it
+  assert.deepEqual(tokens("am 2. mai").map(t => t.kind === "word" ? t.said : t.mark), ["am", "zweiten", "mai"]);
   assert.equal(sayNumeral("3", true), "dritte");
   assert.deepEqual([1, 2, 3, 7, 8, 12, 19, 20, 21, 100].map(ordinal), ["erste", "zweite", "dritte", "siebte", "achte", "zwölfte", "neunzehnte", "zwanzigste", "einundzwanzigste", "hundertste"]);
 });

@@ -11,7 +11,7 @@ import { normalise, matchLine } from "./listen.ts";
 export { speech, phonemes, syllables, TIMING, VISEME, type Syllable } from "./speech.ts";
 export { match, deixis } from "./match.ts";
 export { lowerDe, sayWord, tokens, isVowel, VOWELS, type Token, type Mark } from "./text.ts";
-export { sayNumber, sayNumeral, sayDigits, ordinal, readNumber } from "./numbers.ts";
+export { sayNumber, sayNumeral, sayDigits, sayEuro, ordinal, readNumber } from "./numbers.ts";
 export { normalise, matchLine, sayWords, letters, allowance } from "./listen.ts";
 export { readClock, clockMinutes, type ClockTime } from "./time.ts";
 
