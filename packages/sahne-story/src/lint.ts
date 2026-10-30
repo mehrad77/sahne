@@ -188,7 +188,7 @@ export function lintStory(story: StoryDoc, o: LintOptions): Problem[] {
     const motive = st.do ? lang.motive[st.do] : undefined;
     if (st.do && motive) {
       const said = plain.join(" ");
-      const ok = st.do === "count" ? !lang.number || plain.some((_, i) => { const r = lang.number!(plain, i); return !!r && (r.n !== 1 || st.n === 1); }) : motive.some(m => said.split(" ").some(w => w.startsWith(m)) || said.includes(m + " "));
+      const ok = st.do === "count" ? !lang.number || plain.some((_, i) => { const r = lang.number!(plain, i); return !!r && (r.n !== 1 || st.n === 1); }) : motive.some(m => (m.endsWith("$") ? plain.includes(m.slice(0, -1)) : said.split(" ").some(w => w.startsWith(m)) || said.includes(m + " ")));
       if (!ok) add(u, "budget", `"${st.do}" has no word in the line to motivate it`, undefined, "warning");
     }
     if (st.do && DEIXIS_GESTURES.has(st.do) && st.at?.startsWith("obj:")) {
