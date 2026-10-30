@@ -31,9 +31,12 @@ export const conflicts = signal<Set<string>>(new Set());
 /** An episode and step an agent pointed at (`show`), with a count so the same one twice is still news. */
 export const shown = signal<{ id: string; step: Path | null; n: number } | null>(null);
 
+/** Whether the proposals have been read once (a page that may show a proposed new document waits for it). */
+export const proposalsRead = signal(false);
 async function refresh() {
   const r = await api.get<{ proposals: Proposal[] }>("proposals");
   if (r.status === 200) proposals.value = r.proposals ?? [];
+  proposalsRead.value = true;
 }
 
 let source: EventSource | null = null;

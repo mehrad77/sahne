@@ -4,6 +4,9 @@
 // reader that never saw the drafting. Its answer streams in, with the tools it uses; its edits arrive as proposals (or
 // are written, in direct mode), never as hidden changes. A big ask says what it would cost and waits for a yes. It runs
 // on Claude or on any OpenAI-compatible server (LM Studio, Ollama), within the budget (#/settings).
+//
+// Conversations are kept in this browser (localStorage, per series), never on the server: the last one opens again after
+// a reload, *New conversation* keeps the one before it, and *History* lists them to open again or delete (the newest 30).
 
 import { html } from "htm/preact";
 import { signal } from "@preact/signals";
@@ -24,6 +27,52 @@ const saved = (() => { try { return localStorage.getItem("backstage:side"); } ca
 export const sideTab = signal<SideTab>(saved === "agents" || saved === "docs" ? saved : "assistant");
 const turns = signal<Turn[]>([]);
 const busy = signal(false);
+
+// ---- the conversations kept in this browser ----------------------------------------------------------------------------
+
+interface Chat { id: string; title: string; at: number; turns: Turn[] }
+const KEEP = 30;
+const storeKey = () => `backstage:chats:${world.value?.series?.id ?? "root"}`;
+const readChats = (): Chat[] => { try { return JSON.parse(localStorage.getItem(storeKey()) ?? "[]") as Chat[]; } catch { return []; } };
+const writeChats = (cs: Chat[]) => { try { localStorage.setItem(storeKey(), JSON.stringify(cs.slice(0, KEEP))); } catch { /* full or blocked: the conversation stays in this tab */ } };
+/** The conversations kept, newest first, and the one open. */
+export const chats = signal<Chat[]>([]);
+const chatId = signal<string>("");
+const newId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+let loadedFor = "";
+/** Read the kept conversations once per series, and open the newest. */
+function loadChats() {
+  const k = storeKey();
+  if (loadedFor === k) return;
+  loadedFor = k;
+  chats.value = readChats();
+  const last = chats.value[0];
+  chatId.value = last?.id ?? newId();
+  turns.value = last?.turns ?? [];
+}
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
+/** Keep the open conversation (a moment after it changes, so a streaming answer is not written at every word). */
+function keep() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    // nothing new: an empty one, or one just opened as it was kept (its time stays)
+    if (!turns.value.length || chats.value.find(c => c.id === chatId.value)?.turns === turns.value) return;
+    const first = turns.value.find(t => t.role === "user")?.content ?? "A conversation";
+    const chat: Chat = { id: chatId.value, title: first.replace(/\s+/g, " ").slice(0, 80), at: Date.now(), turns: turns.value };
+    chats.value = [chat, ...chats.value.filter(c => c.id !== chat.id)].slice(0, KEEP);
+    writeChats(chats.value);
+  }, 400);
+}
+turns.subscribe(() => { if (loadedFor) keep(); });
+/** Start a new conversation (the one open stays in the history). */
+export function newChat() { chatId.value = newId(); turns.value = []; }
+function openChat(id: string) { const c = chats.value.find(x => x.id === id); if (c && !busy.value) { chatId.value = c.id; turns.value = c.turns; } }
+function forgetChat(id: string) {
+  chats.value = chats.value.filter(c => c.id !== id);
+  writeChats(chats.value);
+  if (chatId.value === id) newChat();
+}
+const ago = (t: number) => { const m = Math.round((Date.now() - t) / 6e4); return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : new Date(t).toLocaleDateString(); };
 
 /** One-click asks, by what is selected. */
 export const ASKS: { id: string; label: string; prompt: string; on: "block" | "episode"; fresh?: boolean }[] = [
@@ -109,7 +158,9 @@ export function Meter() {
 /** The conversation, in the side panel's Assistant tab. */
 export function AssistantChat() {
   const w = world.value!;
+  loadChats();
   const [text, setText] = useState("");
+  const [past, setPast] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [turns.value]);
   const ai = typeof w.ai === "object" ? w.ai : null;
@@ -132,6 +183,14 @@ export function AssistantChat() {
     <form class="chat-input" onSubmit=${(e: Event) => { e.preventDefault(); void send(text); setText(""); }}>
       <textarea rows=${2} value=${text} placeholder="Ask the assistant…" aria-label="Message" onInput=${(e: Event) => setText((e.target as HTMLTextAreaElement).value)}
         onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(text); setText(""); } }} />
-      <div class="row"><button type="button" class="small" onClick=${() => { turns.value = []; }}>New conversation</button><span class="grow"></span><button class="primary" disabled=${busy.value || !text.trim()}>Send</button></div>
+      <div class="row"><button type="button" class="small" disabled=${busy.value || !turns.value.length} onClick=${() => { newChat(); setPast(false); }}>New conversation</button>
+        <button type="button" class="small" aria-expanded=${past} disabled=${!chats.value.length} onClick=${() => setPast(!past)}>History${chats.value.length ? ` (${chats.value.length})` : ""}</button>
+        <span class="grow"></span><button class="primary" disabled=${busy.value || !text.trim()}>Send</button></div>
+      ${past && html`<div class="chat-history" role="list" aria-label="Past conversations">
+        <p class="note">Kept in this browser only, the newest ${KEEP}.</p>
+        ${chats.value.map(c => html`<div role="listitem" class=${`chat-past${c.id === chatId.value ? " on" : ""}`}>
+          <button type="button" class="open" disabled=${busy.value} onClick=${() => { openChat(c.id); setPast(false); }}><b>${c.title}</b><small>${ago(c.at)} · ${c.turns.filter(t => t.role === "user").length} message${c.turns.filter(t => t.role === "user").length === 1 ? "" : "s"}${c.id === chatId.value ? " · open now" : ""}</small></button>
+          <button type="button" class="iconbtn" title="Delete this conversation" aria-label=${`Delete “${c.title}”`} onClick=${() => forgetChat(c.id)}><${Icon} name="trash" size=${14} /></button></div>`)}
+      </div>`}
     </form>`}`;
 }

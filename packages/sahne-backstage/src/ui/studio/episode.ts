@@ -31,8 +31,8 @@ import { Details } from "./details.ts";
 import { Direct } from "./direct.ts";
 import { Strip } from "./strip.ts";
 import { rememberScene, takeResume } from "../../recent.ts";
-import { ProposalsBar } from "./proposals.ts";
-import { conflicts, postSelection, proposals, shown as agentShown } from "../../events.ts";
+import { ProposalsBar, ProposedEpisode } from "./proposals.ts";
+import { conflicts, postSelection, proposals, proposalsRead, shown as agentShown } from "../../events.ts";
 import { ghostsOf, suggestionsOf, taken, type Suggest } from "../../model/autostage.ts";
 import { get, set } from "../../model/path.ts";
 
@@ -40,11 +40,15 @@ declare global { interface Window { backstage?: { preview: Preview; select(path:
 
 export function Episode(p: { id?: string }) {
   const id = p.id ?? "";
-  const [ready, setReady] = useState(!!draftOf("story", id));
-  useEffect(() => { void openDoc("story", id).then(d => setReady(!!d)); }, [id]);
+  // a new episode an agent proposes is not on disk: its page shows the proposal until it is taken (then its draft opens)
+  const proposed = proposals.value.find(x => x.kind === "story" && x.doc === id && x.create);
+  const [missing, setMissing] = useState(false);
+  const read = proposalsRead.value;
+  useEffect(() => { setMissing(false); if (read && !draftOf("story", id) && !proposed) void openDoc("story", id).then(d => setMissing(!d)); }, [id, !!proposed, read]);
   const d = draftOf("story", id);
-  if (!ready || !d) return html`<p class="note">Opening ${id}…</p>`;
-  return html`<${Studio} id=${id} />`;
+  if (d) return html`<${Studio} key=${id} id=${id} />`;
+  if (proposed) return html`<${ProposedEpisode} x=${proposed} />`;
+  return html`<p class="note">${missing ? html`There is no episode ${id}. <a href="#/board">Back to the board</a>` : `Opening ${id}…`}</p>`;
 }
 
 function Studio(p: { id: string }) {

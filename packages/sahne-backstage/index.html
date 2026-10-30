@@ -133,6 +133,15 @@ kbd { font: 11.5px ui-monospace, monospace; border: 1px solid var(--line); borde
 /* popovers and menus */
 .modal { width: min(560px, calc(100vw - 32px)); max-height: min(86vh, 900px); padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--ink); box-shadow: var(--shadow); display: flex; flex-direction: column; }
 .modal:not([open]) { display: none; }
+/* a new episode an agent proposes, before it is taken (studio/proposals.ts) */
+.proposed-ep .banner { margin: 0 0 12px; }
+.proposed-facts { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-bottom: 12px; font-size: 14px; } .proposed-facts b { color: var(--mute); font-weight: 600; margin-right: 4px; }
+.proposed-steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 2px; max-width: 860px; }
+.proposed-steps li { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 10px; padding: 6px 8px; border-radius: 8px; }
+.proposed-steps li:nth-child(odd) { background: var(--panel); }
+.proposed-steps .who { font: 700 12px/1.6 var(--script); text-transform: uppercase; letter-spacing: .05em; color: var(--mute); }
+.proposed-steps .what { display: grid; gap: 2px; } .proposed-steps .what small { color: var(--mute); }
+.proposed-steps li:not(.k-line):not(.k-option):not(.k-reply) .what { color: var(--mute); font-style: italic; }
 .sugg-review { gap: 12px; }
 .sugg-block { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: grid; gap: 4px; }
 .sugg-line { justify-self: start; border: 0; background: none; padding: 0 0 2px; text-align: left; font-size: 14px; color: var(--ink); cursor: pointer; }
@@ -509,6 +518,10 @@ select.tone { width: auto; font-size: 12px; padding: 0 4px; }
 .turn.fresh.user::before { content: "second reader · "; color: var(--mute); }
 .turn .tool { font-size: 12px; color: var(--mute); background: var(--bg); border-radius: 6px; padding: 2px 6px; } .turn .tool.bad { color: var(--bad); } .turn .tool.ok { color: var(--ok); }
 .turn .confirm { background: var(--new); padding: 6px 8px; border-radius: 8px; }
+.chat-history { display: grid; gap: 4px; max-height: 40vh; overflow: auto; border-top: 1px solid var(--line); padding-top: 6px; } .chat-history .note { margin: 0; font-size: 12px; }
+.chat-past { display: flex; align-items: center; gap: 4px; border-radius: 8px; } .chat-past:hover, .chat-past.on { background: var(--chip); }
+.chat-past .open { flex: 1; min-width: 0; display: grid; text-align: left; border: 0; background: none; padding: 6px 8px; gap: 1px; }
+.chat-past .open b { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .chat-past .open small { color: var(--mute); font-size: 11.5px; }
 /* the composer covers the panel's bottom padding too, so no answer shows through under it */
 .chat-input { position: sticky; bottom: -12px; margin-bottom: -12px; padding: 8px 0 12px; background: var(--panel); display: grid; gap: 6px; border-top: 1px solid var(--line); }
 .settings { max-width: 860px; }
