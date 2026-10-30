@@ -1,3 +1,7 @@
+<!-- sahne:brand: written by packages/sahne-gallery/brand/build.mjs, edit that and run it -->
+<p><picture><source media="(prefers-color-scheme: dark)" srcset="../../assets/brand/sahne-fa-header-dark.svg"><img src="../../assets/brand/sahne-fa-header.svg" alt="sahne FA" height="64"></picture></p>
+<!-- /sahne:brand -->
+
 # sahne-fa
 
 The Persian plugin of [Sahne](../sahne/README.md) ([DESIGN.md](../sahne/DESIGN.md) §4.1, §7, §9). Sahne knows no language: mouth timing and word matching come from a `LangPlugin`, and this is the Persian one (`fa-IR`, written right to left: the plugin carries `dir: "rtl"`, which the stage gives the bubbles).
