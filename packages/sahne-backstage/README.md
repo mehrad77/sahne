@@ -370,17 +370,17 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 **Proposals** (`server/proposals.ts`, in memory, one queue per backstage process, never on disk).
 - A proposal is `{ id, kind, doc, next, base?, create?, also?, paths, summary, by, at, problems, after? }`:
   - `next` is the whole proposed document, `base` the mtime it was computed from, and `create` marks a new document;
-  - `also` lists the documents that change with it, each `{ kind, doc, next, base?, create? }` (a season's calendar with its episode). They are saved in the same save;
+  - `also` lists the documents that change with it, each `{ kind, doc, next, base?, create?, paths? }` (a season's calendar with its episode). They are saved in the same save. A carried document's `paths` are its own changed places (`["calendar", "s1e04"]`; a story's `releaseDate`, `kind` and `arc`): accepting sets only those, so neither a person's unsaved edits nor an earlier accepted proposal on it are undone;
   - `paths` are the changed places, and `by` is `assistant` or the MCP client's name;
   - `problems` is the check of `next` and `also`.
 - **They compose simply.** An agent's proposal is computed from the file plus that agent's own latest pending proposal on the document. `after` names that proposal. So each proposal holds the ones before it:
   - accepting one also resolves those it was built on;
   - rejecting one also drops those built on it.
-  Different agents' proposals are independent, each against the file.
+  A document the agent's pending proposals only carry (the season a new episode's calendar row goes in) is read as the latest of those, so its next proposal builds on it instead of undoing it. Different agents' proposals are independent, each against the file.
 - **The browser applies an accepted proposal itself**, as an edit (Undo, the check, Save). Backstage never saves a proposal. An editor with unsaved edits of the same document applies only the proposal's `paths`, so nothing typed is lost.
 
-**In the editor** (`src/events.ts`, `src/ui/studio/proposals.ts`). The page listens to `/api/events`:
-- **A proposal** shows above its episode's script: who proposed it and what, each changed place with its words before and after (word by word), the errors it would bring, and *Accept* or *Reject*. The top bar counts the proposals waiting and links to the first.
+**In the editor** (`src/events.ts`, `src/ui/studio/proposals.ts`, `src/ui/proposed.ts`). The page listens to `/api/events`:
+- **A proposal** shows above its episode's script: who proposed it and what, each changed place with its words before and after (word by word), the errors it would bring, and *Accept* or *Reject*. One of a season or the series shows on the board, one of a place on its page, one of a character on theirs (`ProposalsStrip`: each changed place, before and after, in words where it is words). A proposed new place or character opens as a preview, with *Accept and open* and *Reject* (`ProposedDoc`). The top bar counts the proposals waiting and links to the first; links to a proposal (the top bar, the Agents inbox, the assistant's note) go to the page it is answered on (`hrefOf`).
 - **A direct write** reloads a document that has no unsaved edits here; one that has them gets a banner instead, to take theirs or keep yours.
 - **`show`** opens the episode at the step.
 - **`activity`** is an agent's tool call, or null when an agent connects or goes, or the mode changes: the Agents page and the side panel read `GET /api/agents` again.

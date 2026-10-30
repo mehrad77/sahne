@@ -6,7 +6,8 @@
 import { html } from "htm/preact";
 import { useEffect, useState } from "preact/hooks";
 import { api } from "../api.ts";
-import { go, say, world } from "../store.ts";
+import { say, world } from "../store.ts";
+import { openProposal } from "./proposed.ts";
 import { accept, activity, agentsTick, proposals, reject, type Call, type Proposal } from "../events.ts";
 import { Chip, Icon } from "./kit/index.ts";
 
@@ -95,7 +96,7 @@ export function Inbox(p: { limit?: number }) {
     return html`<div class="inbox-row">
       <div class="grow"><b>${x.doc}</b> <span class="note">${who(x.by)} · ${ago(x.at)}</span><div>${x.summary}</div></div>
       ${errs > 0 && html`<${Chip} tone="bad">${errs} new error${errs > 1 ? "s" : ""}</${Chip}>`}
-      <button class="small" onClick=${() => go(x.kind === "story" ? "episode" : x.kind === "character" ? "character" : x.kind === "place" ? "place" : "", x.doc)}>Open</button>
+      <button class="small" onClick=${() => openProposal(x)}>Open</button>
       <button class="small" onClick=${() => void reject(x)}>Reject</button>
       <button class="small primary" onClick=${() => void accept(x)}>Accept</button></div>`;
   })}${p.limit && list.length > p.limit ? html`<p class="note">and ${list.length - p.limit} more on <a href="#/agents">the Agents page</a></p>` : ""}</div>`;

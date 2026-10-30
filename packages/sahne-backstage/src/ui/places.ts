@@ -19,6 +19,7 @@ import { duplicate, move, nextId, nudge, posOf, remove, type Sel } from "../mode
 import { KIT } from "../stage.ts";
 import { change, checkDocs, checked, createDoc, draftOf, go, history, keyOf, openDoc, saveDocs, world } from "../store.ts";
 import { Problems } from "./fields.ts";
+import { ProposalsStrip, ProposedDoc, proposedNew } from "./proposed.ts";
 import type { Problem } from "../api.ts";
 import { Gallery } from "./kit/gallery.ts";
 import { placeItems } from "./galleries.ts";
@@ -62,7 +63,9 @@ export function PlacesPage() {
 export function PlacePage(p: { id?: string }) {
   const id = p.id ?? "";
   const [ready, setReady] = useState(!!draftOf("place", id));
-  useEffect(() => { if (!draftOf("place", id)) void openDoc("place", id).then(d => setReady(!!d)); }, [id]);
+  useEffect(() => { if (!draftOf("place", id) && !proposedNew("place", id)) void openDoc("place", id).then(d => setReady(!!d)); }, [id]);
+  const proposed = proposedNew("place", id);
+  if (!draftOf("place", id) && proposed) return html`<${ProposedDoc} x=${proposed} />`;
   if (!ready || !draftOf("place", id)) return html`<p>Opening ${id}…</p>`;
   return html`<${Place} key=${id} id=${id} />`;
 }
@@ -138,6 +141,7 @@ function Place(p: { id: string }) {
       <button onClick=${() => history("place", p.id, "redo")} disabled=${!d.future.length} title="Redo (⇧⌘Z)">↷ Redo</button>
       <${SaveButton} onSave=${() => void saveDocs([key])} disabled=${!dirty(d)} />
     </div>
+    <${ProposalsStrip} kind="place" id=${p.id} />
     <div class="pl">
       <div class="pl-main">
         <div style=${tab === "stage" ? "" : "display:none"}>

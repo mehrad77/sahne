@@ -34,6 +34,9 @@ const words = (v: unknown, lang: string): string => {
   return j.length > 240 ? `${j.slice(0, 240)}…` : j;
 };
 
+/** A text in languages: an object of strings only. */
+const isTexts = (v: unknown) => !!v && typeof v === "object" && !Array.isArray(v) && Object.values(v).every(x => typeof x === "string");
+
 /** One proposal of a season, the series, a place or a character: what it changes, place by place, with Accept and Reject. */
 export function ProposalCard(p: { x: Proposal }) {
   const { main } = useLangs();
@@ -45,10 +48,15 @@ export function ProposalCard(p: { x: Proposal }) {
   return html`<div class="proposal">
     <div class="row"><b class="grow">${x.by === "assistant" ? "The assistant" : x.by} proposes: ${x.summary}</b>
       ${fresh.length > 0 && html`<span class="chip bad" title=${fresh.map(q => q.message).join("\n")}>${fresh.length} new error${fresh.length > 1 ? "s" : ""}</span>`}</div>
-    ${x.paths.slice(0, 8).map(path => {
-      const before = words(get(was, path as Path), main), after = words(get(x.next, path as Path), main);
-      return html`<div class="diff" ...${inLang(main)}><span class="chip">${pathWords(path)}</span>
-        ${before.length + after.length < 400 ? diffWords(before, after).map(c => (c.op === "=" ? c.text : c.op === "-" ? html`<del>${c.text}</del>` : html`<ins>${c.text}</ins>`)) : html`<del>${before}</del> <ins>${after}</ins>`}</div>`;
+    ${x.paths.slice(0, 8).flatMap(path => {
+      const b0 = get(was, path as Path), a0 = get(x.next, path as Path);
+      // a text in several languages: each language that changed, on its own line
+      const langs = isTexts(b0) || isTexts(a0) ? [...new Set([...Object.keys((b0 ?? {}) as object), ...Object.keys((a0 ?? {}) as object)])].filter(l => (b0 as any)?.[l] !== (a0 as any)?.[l]) : [null];
+      return langs.map(l => {
+        const before = l ? String((b0 as any)?.[l] ?? "") : words(b0, main), after = l ? String((a0 as any)?.[l] ?? "") : words(a0, main);
+        return html`<div class="diff" ...${inLang(l ?? main)}><span class="chip">${pathWords(path)}${l ? ` · ${l}` : ""}</span>
+          ${before.length + after.length < 400 ? diffWords(before, after).map(c => (c.op === "=" ? c.text : c.op === "-" ? html`<del>${c.text}</del>` : html`<ins>${c.text}</ins>`)) : html`<del>${before}</del> <ins>${after}</ins>`}</div>`;
+      });
     })}
     ${x.paths.length > 8 && html`<p class="note">and ${x.paths.length - 8} more places</p>`}
     ${(x.also ?? []).length > 0 && html`<p class="note">With it: ${x.also!.map(a => `${a.kind} ${a.doc}`).join(", ")}</p>`}

@@ -21,6 +21,7 @@ import { Empty, Icon, Modal, Popover } from "./kit/index.ts";
 import { Picture } from "./kit/gallery.ts";
 import { inLang, Texts, useLangs } from "./lang.ts";
 import { NewSeason, SeasonSettings, SeriesSettings } from "./seasons.ts";
+import { ProposalsStrip } from "./proposed.ts";
 import { SaveButton } from "./readonly.ts";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -119,6 +120,7 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
       <button onClick=${() => p.setSettings("series")} title="The series' titles, languages, narrator and stand-in"><${Icon} name="settings" size=${16} /> Series settings</button>
       <a href=${`#/new/${p.id}`}><button class="primary"><${Icon} name="plus" size=${16} /> New episode</button></a>
     </div>
+    <${ProposalsStrip} kind="season" id=${p.id} /><${ProposalsStrip} kind="series" />
     ${!se.calendar && w.writable && html`<p class="note">The days come from each episode's own date. Drag an episode to another day to start the season's calendar.</p>`}
     <div class="board" role="grid" aria-label=${`Season ${se.n}: weeks and days`}>
       <div class="board-head" role="row"><span role="columnheader">Week · theme</span>${DAYS.map((d, k) => html`<span role="columnheader" class=${k === 5 ? "special" : ""}>${d}${k === 5 ? html` <small>special</small>` : ""}</span>`)}</div>

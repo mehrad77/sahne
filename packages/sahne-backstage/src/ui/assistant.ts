@@ -22,6 +22,7 @@ import { proposals, selection, usage } from "../events.ts";
 import { abilities } from "../model/abilities.ts";
 import { Icon } from "./kit/index.ts";
 import { Markdown } from "./md.ts";
+import { hrefOf } from "./proposed.ts";
 import { liveLine, ThinkingBlock, tick, ToolGroup, type Thinking, type ToolPart } from "./chat/parts.ts";
 
 type Part = { type: "text"; text: string } | Thinking | ToolPart | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number } | { type: "stopped" };
@@ -236,14 +237,14 @@ function Abilities() {
     <div><b>It cannot</b><ul>${a.cannot.map(x => html`<li>${x}</li>`)}</ul></div></div>`;
 }
 
-const PAGE: Record<string, string> = { story: "episode", character: "character", place: "place" };
+const KIND_WORD: Record<string, string> = { story: "episode", season: "season", series: "series", place: "place", character: "character" };
 /** A proposal the assistant made, with where to answer it; once answered, only that it was. */
 function Proposed(p: { id: string }) {
   const x = proposals.value.find(y => y.id === p.id);
   if (!x) return html`<div class="tool ok">Proposed an edit (${p.id}): answered, no longer waiting.</div>`;
-  const href = `#/${PAGE[x.kind] ?? "agents"}/${x.doc}`;
-  if (x.create) return html`<div class="tool ok">${x.after ? "Updated the proposed new episode" : "Proposed a new episode,"} <b>${x.doc}</b>. <a href=${href}>Open it</a> to accept or reject it; nothing is saved until you do.</div>`;
-  return html`<div class="tool ok">Proposed an edit to <b>${x.doc}</b>: <a href=${href}>accept or reject it</a> above the ${x.kind === "story" ? "script" : "page"}.</div>`;
+  const href = hrefOf(x.kind, x.doc), what = KIND_WORD[x.kind] ?? x.kind;
+  if (x.create) return html`<div class="tool ok">${x.after ? `Updated the proposed new ${what}` : `Proposed a new ${what},`} <b>${x.doc}</b>. <a href=${href}>Open it</a> to accept or reject it; nothing is saved until you do.</div>`;
+  return html`<div class="tool ok">Proposed an edit to the ${what} <b>${x.doc}</b>: <a href=${href}>accept or reject it</a> ${x.kind === "story" ? "above the script" : "on its page"}.</div>`;
 }
 
 /** An answer, its parts in order: thinking, runs of tool calls (one group each), words, cards. */
