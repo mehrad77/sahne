@@ -6,7 +6,7 @@
 
 import { signal } from "@preact/signals";
 import { html } from "htm/preact";
-import { AudioEngine, portrait, type AvatarDoc } from "sahne";
+import { AudioEngine, hashString, portrait, type AvatarDoc } from "sahne";
 import { pieceSvg } from "sahne-kit/set-svg";
 import { textOf, type CharacterDoc, type StoryPlace } from "sahne-story";
 import { EMOTION_SHELVES, PROP_SHELVES, SET_SHELVES, gestureShelf, shelfOf } from "../model/kitgroups.ts";
@@ -67,11 +67,31 @@ const audio = () => engine ??= new AudioEngine(KIT, { sounds: SOUNDS });
 export const soundPlaying = signal<string | null>(null);
 let ends: ReturnType<typeof setTimeout> | undefined;
 
+/**
+ * Where the playing sound is: it started at `t0` (the audio context's time) from `from` s into its `dur`; a loop goes
+ * round between `a` and `b` (the engine starts a loop at a point of its own, and a recording may loop a span of itself).
+ */
+export interface SoundClock { id: string; t0: number; from: number; dur: number; loop: boolean; a: number; b: number }
+export const soundClock = signal<SoundClock | null>(null);
+
+/** Seconds into the playing sound, now. */
+export function soundAt(c: SoundClock): number {
+  const t = c.from + Math.max(0, (engine?.ctx?.currentTime ?? c.t0) - c.t0);
+  return c.loop ? c.a + (t - c.a) % Math.max(1e-3, c.b - c.a) : Math.min(t, c.dur);
+}
+
+/** How long a sound lasts, s: its recording where it loads, else its patch. */
+export async function soundLength(id: string): Promise<number> {
+  const rec = await audio().recording(id);
+  return rec ? rec.duration : audio().length(id) / 1000;
+}
+
 /** Stop whatever sound is playing. */
 export function stopSounds() {
   clearTimeout(ends);
   engine?.ambience([]); engine?.stopAll();
   soundPlaying.value = null;
+  soundClock.value = null;
 }
 
 /** Play a kit sound, its recording where it has one, else its patch; a click on the loop that is playing stops it. */
@@ -83,9 +103,21 @@ export function playSound(id: string) {
   if (again) return;
   const e = audio();
   e.setEnabled(true);
-  const go = () => {
-    if (def.loop) e.ambience([id], true);
-    else { e.play(id); ends = setTimeout(() => { if (soundPlaying.value === id) soundPlaying.value = null; }, Math.max(400, e.length(id))); }
+  const go = async () => {
+    // the recording first (or knowing there is none), and a loop's patch rendered, so it starts now and the clock is true
+    const rec = await e.recording(id);
+    if (soundPlaying.value !== id || !e.ctx) return;
+    const dur = rec ? rec.duration : e.length(id) / 1000, t0 = e.ctx.currentTime;
+    if (def.loop) {
+      if (!rec) e.render(id);
+      e.ambience([id], true);
+      const [a, b] = (rec && def.recording?.loop) || [0, dur];
+      soundClock.value = { id, t0, from: a + (hashString(id) % 1000) / 1000 * (b - a), dur, loop: true, a, b };
+    } else {
+      e.play(id);
+      soundClock.value = { id, t0, from: 0, dur, loop: false, a: 0, b: dur };
+      ends = setTimeout(() => { if (soundPlaying.value === id) { soundPlaying.value = null; soundClock.value = null; } }, Math.max(400, dur * 1000));
+    }
   };
   soundPlaying.value = id;
   if (e.running) go(); else void e.ctx?.resume().then(go, go);
@@ -94,17 +126,18 @@ export function playSound(id: string) {
 /** Load a sound's recording ahead of a click (the pointer is on its card), so the first click plays it. */
 export const warmSound = (id: string) => { void audio().recording(id); };
 
-/** A sound's waveform as SVG (its patch: what plays where the recording does not load), drawn when the page is idle. */
+/** A sound's waveform as SVG (what plays: its recording where it loads, else its patch), drawn when the page is idle. */
 const waveQueue: (() => void)[] = [];
 let waving = false;
-function waveform(id: string): Promise<string | null> {
+async function waveform(id: string): Promise<string | null> {
+  const rec = await audio().recording(id);
   return new Promise(res => {
     waveQueue.push(() => {
-      const r = audio().render(id);
-      if (!r) return res(null);
-      const N = 48, step = Math.max(1, Math.floor(r.data.length / N));
+      const data = rec ? rec.getChannelData(0) : audio().render(id)?.data;
+      if (!data) return res(null);
+      const N = 48, step = Math.max(1, Math.floor(data.length / N));
       let peak = 1e-6;
-      const amp = Array.from({ length: N }, (_, k) => { let m = 0; for (let i = k * step; i < Math.min(r.data.length, (k + 1) * step); i += 4) m = Math.max(m, Math.abs(r.data[i])); peak = Math.max(peak, m); return m; });
+      const amp = Array.from({ length: N }, (_, k) => { let m = 0; for (let i = k * step; i < Math.min(data.length, (k + 1) * step); i += 4) m = Math.max(m, Math.abs(data[i])); peak = Math.max(peak, m); return m; });
       const bars = amp.map((a, k) => { const h = Math.max(1.5, a / peak * 34); return `<rect x="${k * 4 + 1}" y="${(40 - h) / 2}" width="2.4" height="${h.toFixed(1)}" rx="1.2"/>`; }).join("");
       res(`<svg class="wave" viewBox="0 0 194 40" preserveAspectRatio="none" fill="currentColor">${bars}</svg>`);
     });

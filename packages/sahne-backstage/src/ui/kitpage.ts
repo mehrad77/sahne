@@ -14,17 +14,17 @@ import { KIT } from "../stage.ts";
 import { route, say } from "../store.ts";
 import { Icon } from "./kit/index.ts";
 import { Picture, Tile, type Item } from "./kit/gallery.ts";
-import { emotionItems, gestureItems, liveScene, pieceItems, playSound, soundItems, soundPlaying, stopSounds, warmSound } from "./galleries.ts";
+import { emotionItems, gestureItems, liveScene, pieceItems, playSound, soundAt, soundClock, soundItems, soundLength, soundPlaying, stopSounds, warmSound } from "./galleries.ts";
 import { useLangs } from "./lang.ts";
 
 type Section = "props" | "set" | "gestures" | "emotions" | "sounds";
-const SECTIONS: [Section, string, string, readonly Shelf[]][] = [
-  ["props", "Props", "prop", PROP_SHELVES], ["set", "Set pieces", "set piece", SET_SHELVES], ["gestures", "Gestures", "gesture", GESTURE_SHELVES],
-  ["emotions", "Emotions", "emotion", EMOTION_SHELVES], ["sounds", "Sounds", "sound", SOUND_SHELVES],
+const SECTIONS: [Section, string, string, readonly Shelf[], string][] = [
+  ["props", "Props", "prop", PROP_SHELVES, "box"], ["set", "Set pieces", "set piece", SET_SHELVES, "stage"], ["gestures", "Gestures", "gesture", GESTURE_SHELVES, "hand"],
+  ["emotions", "Emotions", "emotion", EMOTION_SHELVES, "face"], ["sounds", "Sounds", "sound", SOUND_SHELVES, "sound"],
 ];
 /** Cards a shelf shows in the overview, and cards per page when listing. */
 const ROW = 12, PAGE = 96;
-const SIZE_KEY = "backstage-kit-size";
+const SIZE_KEY = "backstage-kit-size", OPEN_KEY = "backstage-kit-open";
 
 export function KitPage() {
   const r = route.value;
@@ -36,6 +36,16 @@ export function KitPage() {
   const [q, setQ] = useState(""), [tag, setTag] = useState<string | null>(null), [open, setOpen] = useState<string | null>(null);
   const [size, setSize] = useState<"s" | "m" | "l">(() => { try { return (localStorage.getItem(SIZE_KEY) as "s" | "m" | "l") || "m"; } catch { return "m"; } });
   const [limit, setLimit] = useState(PAGE);
+  // the sections whose shelves show on the side (remembered); the one on screen opens when it is chosen
+  const [unfolded, setUnfolded] = useState<Set<Section>>(() => { try { return new Set(JSON.parse(localStorage.getItem(OPEN_KEY) ?? "null") ?? [section]); } catch { return new Set([section]); } });
+  const fold = (s: Section, open = !unfolded.has(s)) => {
+    if (open === unfolded.has(s)) return;
+    const next = new Set(unfolded);
+    if (open) next.add(s); else next.delete(s);
+    setUnfolded(next);
+    try { localStorage.setItem(OPEN_KEY, JSON.stringify([...next])); } catch { /* a private window */ }
+  };
+  useEffect(() => { fold(section, true); }, [section]);
   // a new section or shelf starts afresh; leaving the page stops what plays
   useEffect(() => { setTag(null); setOpen(null); setLimit(PAGE); liveOff(); }, [section, shelfId]);
   useEffect(() => { setQ(""); stopSounds(); }, [section]);
@@ -74,10 +84,16 @@ export function KitPage() {
     <div class="pagehead"><h2 class="grow">The kit</h2><span class="note">What a scene is staged with: ${SECTIONS.map(([s, l]) => `${all[s].length} ${l.toLowerCase()}`).join(", ")}.</span></div>
     <div class="kitlib-body">
       <nav class="kitlib-side" aria-label="Kit sections">
-        ${SECTIONS.map(([s, l]) => html`<div class="kitlib-sec">
-          <a href=${`#/kit/${s}`} aria-current=${section === s && !shelfId ? "page" : undefined} class=${section === s ? "open" : ""}><span>${l}</span><small>${all[s].length}</small></a>
-          ${section === s && counts.length > 1 && html`<ul>${counts.map(({ shelf, n }) => html`<li><a href=${`#/kit/${s}/${shelf.id}`} aria-current=${shelfId === shelf.id ? "page" : undefined}><span>${shelf.label}</span><small>${n}</small></a></li>`)}</ul>`}
-        </div>`)}
+        ${SECTIONS.map(([s, l, , sh, icon]) => {
+          const list = shelvesWith(sh, all[s], i => i.shelf ?? "other"), open = unfolded.has(s) && list.length > 1;
+          return html`<div class=${`kitlib-sec${section === s ? " here" : ""}`}>
+            <div class="kitlib-head">
+              <button class="fold" aria-expanded=${open} aria-controls=${`kit-shelves-${s}`} aria-label=${`${open ? "Fold" : "Unfold"} ${l}`} onClick=${() => fold(s)} disabled=${list.length < 2}><${Icon} name="chevron" size=${14} /></button>
+              <a href=${`#/kit/${s}`} aria-current=${section === s && !shelfId ? "page" : undefined}><${Icon} name=${icon} size=${17} /><span>${l}</span><small>${all[s].length}</small></a>
+            </div>
+            ${open && html`<ul id=${`kit-shelves-${s}`}>${list.map(({ shelf, n }) => html`<li><a href=${`#/kit/${s}/${shelf.id}`} aria-current=${section === s && shelfId === shelf.id ? "page" : undefined}><span>${shelf.label}</span><small>${n}</small></a></li>`)}</ul>`}
+          </div>`;
+        })}
       </nav>
       <div class="kitlib-main">
         <div class="kitlib-bar">
@@ -120,8 +136,8 @@ function Detail(p: { section: Section; item: Item; playing: boolean; onTag(t: st
     : [];
   return html`<aside class="kitlib-detail" aria-label=${`${i.label}: details`}>
     <header><b>${i.label}</b><button class="iconbtn" onClick=${p.onClose} aria-label="Close"><${Icon} name="close" /></button></header>
-    <div class="tile big"><${Picture} art=${i.art} label=${i.label} /></div>
-    ${section === "sounds" && html`<button class="primary" onClick=${() => playSound(i.id)}><${Icon} name=${p.playing ? "pause" : "play"} size=${16} /> ${p.playing ? "Stop" : "Play"}</button>`}
+    <div class="tile big"><${Picture} art=${i.art} label=${i.label} />${section === "sounds" && html`<${Playhead} id=${i.id} />`}</div>
+    ${section === "sounds" && html`<div class="kitlib-play"><button class="primary" onClick=${() => playSound(i.id)}><${Icon} name=${p.playing ? "pause" : "play"} size=${16} /> ${p.playing ? "Stop" : "Play"}</button><${Elapsed} id=${i.id} /></div>`}
     <div class="kitlib-id"><code>${i.id}</code><button class="iconbtn" onClick=${copy} title="Copy the id" aria-label="Copy the id"><${Icon} name="copy" size=${16} /></button></div>
     ${def?.meta?.about && html`<p>${def.meta.about}</p>`}
     ${i.tags?.length && section !== "sounds" ? html`<div class="tags">${i.tags.map(t => html`<button class="chip" onClick=${() => p.onTag(t)}>${t}</button>`)}</div>` : ""}
@@ -131,4 +147,37 @@ function Detail(p: { section: Section; item: Item; playing: boolean; onTag(t: st
       <td><code>${k}</code></td><td><span class="note">${d.type}${d.values ? `: ${d.values.join(" | ")}` : ""}${d.default !== undefined ? ` = ${JSON.stringify(d.default)}` : ""}</span>${d.about && html`<div>${d.about}</div>`}</td>
     </tr>`)}</tbody></table>`}
   </aside>`;
+}
+
+const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}.${Math.floor(s * 10 % 10)}`;
+
+/** Each frame while `id` plays: where it is (s) and how long it lasts; null when it is not playing. */
+function usePlayhead(id: string): { at: number; dur: number } | null {
+  const c = soundClock.value?.id === id ? soundClock.value : null;
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!c) return;
+    let raf = 0;
+    const step = () => { tick(n => n + 1); raf = requestAnimationFrame(step); };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [c]);
+  return c ? { at: soundAt(c), dur: c.dur } : null;
+}
+
+/** The playhead over a sound's waveform, and what of it has played. */
+function Playhead(p: { id: string }) {
+  const h = usePlayhead(p.id);
+  if (!h) return null;
+  const pct = `${Math.min(100, h.at / Math.max(1e-3, h.dur) * 100)}%`;
+  return html`<div class="playhead" aria-hidden="true"><div class="played" style=${{ width: pct }}></div><div class="head" style=${{ left: pct }}></div></div>`;
+}
+
+/** The time into a sound and its length ("0:01.2 / 0:04.0"). */
+function Elapsed(p: { id: string }) {
+  const h = usePlayhead(p.id);
+  const [dur, setDur] = useState<number | null>(null);
+  useEffect(() => { let live = true; void soundLength(p.id).then(d => { if (live) setDur(d); }); return () => { live = false; }; }, [p.id]);
+  const total = h?.dur ?? dur;
+  return html`<span class="elapsed">${clock(h?.at ?? 0)}${total != null ? ` / ${clock(total)}` : ""}${KIT.sounds?.[p.id]?.loop ? " ⟳" : ""}</span>`;
 }

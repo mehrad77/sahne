@@ -170,12 +170,21 @@ kbd { font: 11.5px ui-monospace, monospace; border: 1px solid var(--line); borde
 /* the kit page: sections and shelves on the left, cards, a card's details on the right */
 .kitlib-body { display: grid; grid-template-columns: 200px minmax(0, 1fr) auto; gap: 18px; align-items: start; }
 .kitlib-side { position: sticky; top: 0; display: grid; gap: 2px; max-height: calc(100vh - 120px); overflow: auto; }
-.kitlib-side a { display: flex; justify-content: space-between; gap: 8px; padding: 5px 10px; border-radius: 8px; color: var(--ink); text-decoration: none; font-size: 14px; }
+.kitlib-head { display: flex; align-items: center; gap: 2px; }
+.kitlib-head a { flex: 1; min-width: 0; }
+.kitlib-head a svg { flex: none; color: var(--mute); }
+.kitlib-head a span { flex: 1; }
+.kitlib-sec.here .kitlib-head a { font-weight: 600; } .kitlib-sec.here .kitlib-head a svg { color: var(--accent); }
+.kitlib-side .fold { display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; background: none; color: var(--faint); border-radius: 6px; }
+.kitlib-side .fold:hover:not(:disabled) { background: var(--chip); color: var(--ink); }
+.kitlib-side .fold:disabled { visibility: hidden; }
+.kitlib-side .fold svg { transition: transform .15s; } .kitlib-side .fold[aria-expanded="true"] svg { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .kitlib-side .fold svg { transition: none; } }
+.kitlib-side a { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 8px; color: var(--ink); text-decoration: none; font-size: 14px; }
 .kitlib-side a:hover { background: var(--chip); }
 .kitlib-side a small { color: var(--faint); font-variant-numeric: tabular-nums; }
-.kitlib-side a.open { font-weight: 600; }
 .kitlib-side a[aria-current] { background: var(--accent-soft); color: var(--accent); }
-.kitlib-side ul { list-style: none; margin: 2px 0 8px; padding: 0 0 0 10px; border-left: 1px solid var(--line); margin-left: 12px; }
+.kitlib-side ul { list-style: none; margin: 2px 0 8px 33px; padding: 0 0 0 6px; border-left: 1px solid var(--line); }
 .kitlib-side li a { font-size: 13.5px; padding: 3px 10px; color: var(--mute); }
 .kitlib-bar { position: sticky; top: 0; z-index: 4; background: var(--bg); display: grid; gap: 8px; padding-bottom: 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line); }
 .kitlib-crumbs { display: flex; align-items: center; gap: 6px; font-size: 14px; flex-wrap: wrap; }
@@ -208,6 +217,13 @@ kbd { font: 11.5px ui-monospace, monospace; border: 1px solid var(--line); borde
 .kitlib-detail h4 { margin: 4px 0 0; font-size: 13px; color: var(--mute); text-transform: uppercase; letter-spacing: .05em; }
 .kitlib-detail table.params { font-size: 13px; }
 .kitlib-detail button.primary { display: inline-flex; align-items: center; gap: 6px; justify-self: start; }
+.kitlib-detail .tile.big { position: relative; }
+.kitlib-detail .tile.big .art svg.wave { width: 100%; }
+.playhead { position: absolute; inset: 6px; pointer-events: none; border-radius: 7px; overflow: hidden; }
+.playhead .played { position: absolute; inset: 0 auto 0 0; background: var(--accent-soft); }
+.playhead .head { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--accent); }
+.kitlib-play { display: flex; align-items: center; gap: 10px; }
+.kitlib-play .elapsed { font: 12.5px ui-monospace, monospace; color: var(--mute); font-variant-numeric: tabular-nums; }
 .kitlib-id { display: flex; align-items: center; gap: 4px; }
 .kitlib-id code { background: var(--chip); padding: 2px 8px; border-radius: 6px; font-size: 13px; }
 .tile.playing { border-color: var(--accent); background: var(--accent-soft); }
