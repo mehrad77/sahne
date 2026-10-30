@@ -5,29 +5,12 @@
 // bus's next stop) are text boxes the page draws, never letters in the art. Riders in windows are faceless.
 
 import { ellipse, groupBounds, rect, rrect, poly, smooth, tone, mix, type FlatMotion, type FlatSpec, type LightSpec, type Path, type PieceDef, type PieceOut, type Rng, type Shape, type TextSpec, type Vec2 } from "sahne";
-import { hex, S, P, L, num, str, holed, goes, copies, glowOnly, timetable, doorTimes, stopsParam, type Pt } from "./draw.ts";
+import { hex, S, P, L, num, str, holed, goes, copies, glowOnly, timetable, doorTimes, stopsParam, fit, fitText, rider, type Pt } from "./draw.ts";
 
 const DARK = "#2B2F33", CHROME = "#C3C9CE", TYRE = "#232629", GLASS = "#4E6072", POLE = "#E2A72E";
 /** Car colours as Istanbul's streets have them: mostly white, silver, grey and black. */
 const CAR_COLORS = ["#F4F2EE", "#F4F2EE", "#C9CDD1", "#8E979E", "#3B3F45", "#2E3A59", "#9E2B25", "#5B7A8C", "#E9E1D2"];
 const TAXI = "#F2C230", PLATE_L = ["AB", "KM", "FT", "DR", "ZN", "HY", "BC", "TL"];
-
-/** Shapes scaled by `k` about the origin and mirrored when `dir` is -1, their clips and strokes too. */
-function fit(ss: Shape[], k: number, dir: number, dx = 0, dy = 0): Shape[] {
-  const m: [number, number, number, number, number, number] = [dir * k, 0, 0, k, dx, dy], f = (q: Path) => q.transform(m);
-  return ss.map(s => ({ ...s, path: f(s.path), ...(s.clip ? { clip: f(s.clip as Path) } : {}), ...(s.stroke ? { stroke: { ...s.stroke, width: s.stroke.width * k } } : {}) }));
-}
-/** Text boxes the same way (the words themselves are never mirrored). */
-const fitText = (t: TextSpec[], k: number, dir: number, dx = 0): TextSpec[] => t.map(s => ({ ...s, x: (dir < 0 ? -s.x - s.w : s.x) * k + dx, y: s.y * k, w: s.w * k, h: s.h * k, ...(s.size ? { size: s.size * k } : {}) }));
-
-/** A faceless rider in a window, head and shoulders, standing on `y` at `x`, `k` times the size; some in a headscarf. */
-function rider(r: Rng, x: number, y: number, k = 1): Shape[] {
-  const sk = r.pick(["#E8B98F", "#C98E62", "#8D5A3B", "#F1CBA5", "#B4936A"]), cl = r.pick(["#2E5E8C", "#7A3E6E", "#3E7A3A", "#B3261E", "#4A4A4A", "#C9A227"]), o = { flat: true, opacity: 0.85 };
-  const out = [S(rrect(x - 17 * k, y - 26 * k, 34 * k, 26 * k, [12 * k, 12 * k, 0, 0]), cl, o)];
-  if (r.chance(0.3)) out.push(S(ellipse(x, y - 36 * k, 12.5 * k, 14 * k), r.pick(["#7A3E6E", "#2E5E8C", "#C4553A", "#E0D6C2"]), o), S(ellipse(x + k, y - 35 * k, 7 * k, 8.5 * k), sk, o));
-  else out.push(S(ellipse(x, y - 36 * k, 10 * k, 11 * k), sk, o), S(ellipse(x, y - 43 * k, 10.5 * k, 6 * k), r.pick(["#2B2420", "#5B3A29", "#A0522D", "#8E8E8E"]), o));
-  return out;
-}
 
 /** The Turkish flag `w` wide with its hoist at (x, y), flying to the left (`dir` -1) or right. */
 function flag(x: number, y: number, w: number, dir: number): Shape[] {
