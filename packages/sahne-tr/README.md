@@ -1,3 +1,7 @@
+<!-- sahne:brand: written by packages/sahne-gallery/brand/build.mjs, edit that and run it -->
+<p><picture><source media="(prefers-color-scheme: dark)" srcset="../../assets/brand/sahne-tr-header-dark.svg"><img src="../../assets/brand/sahne-tr-header.svg" alt="sahne TR" height="64"></picture></p>
+<!-- /sahne:brand -->
+
 # sahne-tr
 
 The Turkish plugin of [Sahne](../sahne/README.md) ([DESIGN.md](../sahne/DESIGN.md) §4.1, §7, §9). Sahne knows no language: mouth timing and word matching come from a `LangPlugin`, and this is the Turkish one.

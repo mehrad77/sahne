@@ -15,7 +15,7 @@ packages/
 .github/workflows/ci.yml       pnpm sahne check on every push and pull request, and the scan
 .github/workflows/deploy.yml   the gallery as the live demo, https://sahne.shab.boo (Cloudflare), deployed after ci passes on main; off until DEPLOY_ENABLED is set
 .github/workflows/release.yml  a GitHub release and npm publishing on a v* tag; off until RELEASE_ENABLED / PUBLISH_ENABLED are set
-assets/                        the README's poster and scene pictures (assets/README.md says how they were made)
+assets/                        the README's poster and scene pictures, and brand/: the logo of every package (assets/README.md says how they were made)
 .claude/skills/                visual-check, new-kit-part, new-place: the repo's own workflows for agents
 ```
 
@@ -60,7 +60,7 @@ assets/                        the README's poster and scene pictures (assets/RE
 
 ## Rules for every change
 
-- **Every generator has `--check`.** Generated files have exactly one script that writes them, and a `--check` that fails when they are stale. That covers `CATALOGUE.md` (`catalogue/build.ts`), `SET.md` and `src/set/families.gen.ts` (`set/build.ts`), `src/kerim/art.gen.ts` (`kerim/build.ts`), the sounds (`sounds/build.ts`), the extras (`sahne-story/cast/extras.ts`) and the thumbnails (`sahne-gallery/thumbs.mjs`). A new generator gets one too.
+- **Every generator has `--check`.** Generated files have exactly one script that writes them, and a `--check` that fails when they are stale. That covers `CATALOGUE.md` (`catalogue/build.ts`), `SET.md` and `src/set/families.gen.ts` (`set/build.ts`), `src/kerim/art.gen.ts` (`kerim/build.ts`), the sounds (`sounds/build.ts`), the extras (`sahne-story/cast/extras.ts`), the thumbnails (`sahne-gallery/thumbs.mjs`) and the brand files (`sahne-gallery/brand/build.mjs`: `assets/brand/`, each package's favicon and the brand block atop its README). A new generator gets one too.
 - **Ids are permanent.** Never rename a part, set piece, prop, sound, gesture or place id that a document may use. Add the new id, and map the old one through the kit's `aliases`.
 - **Docs follow the code.** One fact lives in one place and is linked from elsewhere. Update the area's doc in the same commit as the change. Never renumber a section that code or other docs cite (`DESIGN.md §12`).
 - **The size budgets bind** (README, `size.mjs`). A bundle over budget fails the gate.

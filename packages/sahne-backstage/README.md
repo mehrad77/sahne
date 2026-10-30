@@ -1,3 +1,7 @@
+<!-- sahne:brand: written by packages/sahne-gallery/brand/build.mjs, edit that and run it -->
+<p><picture><source media="(prefers-color-scheme: dark)" srcset="../../assets/brand/sahne-backstage-header-dark.svg"><img src="../../assets/brand/sahne-backstage-header.svg" alt="sahne BACKSTAGE" height="64"></picture></p>
+<!-- /sahne:brand -->
+
 # sahne-backstage
 
 A local editor for a Sahne content root, in the browser. The people who review a story, who are often not programmers, play the episodes AI wrote, fix their words and staging, and save. A save writes the story files themselves and keeps everything else in them as it was. Each save passes the same story check as `pnpm check`. Backstage runs on the machine that holds the content. A web page from anywhere else cannot reach it, and it writes nothing unless it was started to write.

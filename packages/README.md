@@ -50,6 +50,8 @@ Every package here follows the same pattern (check `package.json` when adding on
 
 A new package's tests also join `pnpm sahne check` (the gallery's `check` script), which CI runs.
 
+Every package has its logo: run `node packages/sahne-gallery/brand/build.mjs` after adding one. It writes the package's mark, lockup and favicon to `assets/brand/` ([assets/README.md](../assets/README.md)), puts the lockup at the top of its README (writing a README from `package.json`'s `description` if it has none), and gives a package with a web app (an `index.html`) its `favicon.svg`, which the page must link. `pnpm check` fails until it has. A package's colour is set in `PACKAGES` in that script.
+
 ## Kerim
 
 Kerim, the kumru (a collared dove) who narrates Kumru's stories, lives in the kit:

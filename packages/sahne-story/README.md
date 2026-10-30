@@ -1,3 +1,7 @@
+<!-- sahne:brand: written by packages/sahne-gallery/brand/build.mjs, edit that and run it -->
+<p><picture><source media="(prefers-color-scheme: dark)" srcset="../../assets/brand/sahne-story-header-dark.svg"><img src="../../assets/brand/sahne-story-header.svg" alt="sahne STORY" height="64"></picture></p>
+<!-- /sahne:brand -->
+
 # sahne-story
 
 A story format for the [Sahne](../sahne/README.md) stage: story documents (the format [Kumru](https://github.com/mehrad77/kumru) plays), the adapter that turns one into a Sahne script, the player, the lints and the story check. Story-specific, so it lives beside the engine, not in it. It depends on `sahne` and `sahne-tr`. The story format itself is described in the Kumru repo (`docs/stories/STORIES_SCHEMA.md`, `STORIES_STAGE.md`); the schemas are here, in `schema/`.

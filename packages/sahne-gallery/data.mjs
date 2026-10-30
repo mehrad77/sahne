@@ -176,9 +176,9 @@ export function doc(slug) {
       return `<pre><code${lang ? ` class="language-${escape(lang)}"` : ""}>${escape(text)}</code></pre>\n`;
     },
   } });
-  // inline HTML in the docs (the README's centred poster) has repo-relative src/href too
+  // inline HTML in the docs (the README's centred poster, a package's brand block) has repo-relative src/srcset/href too
   const html = md.parse(readFileSync(at(`../../${d.file}`), "utf8"))
-    .replace(/(<(?:img|a)\b[^>]*?\s(?:src|href)=")([^"#][^"]*)"/g, (m, pre, url) => /^[a-z]+:|^\/\/|^#/i.test(url) ? m : `${pre}${escape(href(url, pre.startsWith("<img")))}"`);
+    .replace(/(<(?:img|a|source)\b[^>]*?\s(?:src|srcset|href)=")([^"#][^"]*)"/g, (m, pre, url) => /^[a-z]+:|^\/\/|^#/i.test(url) ? m : `${pre}${escape(href(url, !pre.startsWith("<a")))}"`);
   return { ...d, html, toc, source: `${REPO_URL}/blob/main/${d.file}` };
 }
 

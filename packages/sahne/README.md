@@ -1,3 +1,7 @@
+<!-- sahne:brand: written by packages/sahne-gallery/brand/build.mjs, edit that and run it -->
+<p><picture><source media="(prefers-color-scheme: dark)" srcset="../../assets/brand/sahne-header-dark.svg"><img src="../../assets/brand/sahne-header.svg" alt="sahne" height="64"></picture></p>
+<!-- /sahne:brand -->
+
 # Sahne
 
 A paper-theatre stage engine for illustrated, interactive dialogue scenes on the web. The design, the decisions and the milestones are in [DESIGN.md](DESIGN.md).
