@@ -322,7 +322,8 @@ a.button.primary { background: var(--accent); color: var(--accent-ink); border-c
 .board-row.break { opacity: .55; } .board-row.break .day { background: repeating-linear-gradient(135deg, transparent 0 6px, var(--chip) 6px 7px); }
 .board-row.now .week { box-shadow: inset 3px 0 var(--curtain); }
 .day { position: relative; min-height: 132px; border: 1px dashed var(--line); border-radius: var(--radius); padding: 18px 4px 4px; display: grid; align-content: stretch; }
-.day.special { background: var(--curtain-soft); }
+/* a day's kind is `kind-…`: a bare `episode` class would take the episode page's two-column grid */
+.day.kind-special { background: var(--curtain-soft); }
 .day.over { border: 2px solid var(--accent); background: var(--accent-soft); }
 /* a past day is quieter, never struck through (a strike reads as deleted); today is marked */
 .day.past .date { opacity: .55; }

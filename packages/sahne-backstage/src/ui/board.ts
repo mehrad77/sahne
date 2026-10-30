@@ -124,7 +124,7 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
           ${wk.days.map((day, k) => {
             const ep = day.episode ? eps.find(e => e.id === day.episode) : undefined;
             const can = wk.week !== null && !ep && w.writable;
-            return html`<div role="gridcell" aria-label=${short(day.date)} class=${`day ${day.kind}${over === day.date ? " over" : ""}${day.date < today ? " past" : ""}${day.date === today ? " today" : ""}`}
+            return html`<div role="gridcell" aria-label=${short(day.date)} class=${`day kind-${day.kind}${over === day.date ? " over" : ""}${day.date < today ? " past" : ""}${day.date === today ? " today" : ""}`}
               onDragOver=${(e: DragEvent) => { if (drag && wk.week !== null) { e.preventDefault(); setOver(day.date); } }}
               onDragLeave=${() => setOver(o => (o === day.date ? null : o))}
               onDrop=${(e: DragEvent) => { e.preventDefault(); setOver(null); const id = e.dataTransfer?.getData("text/plain") || drag; if (id) move(id, day); setDrag(null); }}>
