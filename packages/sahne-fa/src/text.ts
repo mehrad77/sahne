@@ -33,7 +33,7 @@ export const foldLetters = (s: string): string =>
 export const lowerFa = (s: string): string => foldLetters(s).replace(MARKS, "");
 
 /** Abbreviations read in full. */
-const ABBR: Record<string, string> = { "ok": "اوکی", "tv": "تی وی", "pm": "پی ام" };
+const ABBR: Record<string, string> = Object.assign(Object.create(null), { "ok": "اوکی", "tv": "تی وی", "pm": "پی ام" });
 
 /**
  * A written word as it is said: letters folded, numerals in words, hyphens as spaces. "۵ تا" → "پنج تا", "3م" → "سوم".
@@ -43,9 +43,10 @@ export function sayWord(word: string): string {
   const s = foldLetters(word);
   if (ABBR[s]) return ABBR[s];
   let m: RegExpExecArray | null;
-  // 3م, 21ام: an ordinal
+  // 3م, 21ام: an ordinal; 3مین, 10امین: the same with مین (سومین, دهمین, اولین)
   if ((m = /^(\d+)(?:ام|م)$/.exec(s))) return sayNumeral(m[1], true);
-  const read = s.replace(/\d+(?:[.,:]\d+)*%?/g, (n: string, at: number) =>
+  if ((m = /^(\d+)(?:ام|م)ین$/.exec(s))) return sayNumeral(m[1], true) + "ین";
+  const read = s.replace(/\d+(?:[.,:/]\d+)*%?/g, (n: string, at: number) =>
     (at > 0 && /\p{L}/u.test(s[at - 1]) ? " " : "") + sayNumeral(n) + " ");
   return read.replace(/-/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -61,7 +62,7 @@ export type Token =
 // A word: letters and digits with their marks and ZWNJ (می‌روم), joined by a hyphen or by a separator between
 // digits (10:30, 1,000, 3.5, ۳٫۵); % or ٪ after. A pause: … or .. or more dots, . , ; : ! ? and the Arabic ، ؛ ؟ ۔,
 // — – and a hyphen standing alone between spaces. Quotes («»), brackets and other symbols are skipped.
-const TOKEN = /([\p{L}\p{N}][\p{L}\p{M}\p{N}‌‍]*(?:(?:-|(?<=\p{N})[.:,٫٬])[\p{L}\p{M}\p{N}‌‍]+)*[%٪]?)|(\.{2,}|…|[.,;:!?،؛؟۔—–]|(?<=^|\s)-(?=\s|$))/gu;
+const TOKEN = /([\p{L}\p{N}][\p{L}\p{M}\p{N}‌‍]*(?:(?:-|(?<=\p{N})[.:,/٫٬])[\p{L}\p{M}\p{N}‌‍]+)*[%٪]?)|(\.{2,}|…|[.,;:!?،؛؟۔—–]|(?<=^|\s)-(?=\s|$))/gu;
 
 /** The words and pauses of a line, in order, each with its character index in `text`. */
 export function tokens(text: string): Token[] {

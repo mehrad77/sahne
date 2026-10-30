@@ -1,31 +1,41 @@
 // Whether a word of a line is a form of a `link` token given in its dictionary form: نان, نان‌ها, نانی, نان‌هایم,
 // نانم, نانمان, نانه. A Persian noun takes its endings one after the other, in this order, each optional:
 //
-//   plural        ها  ان  ات  (and the colloquial ا)     the ezafe or indefinite ی (ای, یی after a vowel)
-//   possessive    م ت ش مان تان شان  (ام ات اش after a vowel or silent ه)
+//   plural        ها  ان  ین  ات  (and the colloquial ا)     the ezafe or indefinite ی (ای, یی after a vowel)
+//   possessive    م ت ش مان تان شان  (spoken: مون تون شون; ام ات اش after a vowel or silent ه)
 //   copula        است  ست  ه  ام  ایم  اید  اند  یم  ید  ند
+//   object        را spoken as رو or و run on to the word (کتابارو, کتابمو)
 //
 // ZWNJ and the spaces a writer leaves out or adds are no matter (`lowerFa` drops ZWNJ; a heard "نان ها" is two
 // words, which the line matcher joins). Stems change in a few places: a silent ه becomes گ before ان (بچه → بچگان)
 // or goes before ات (کلمه → کلمات), and a vowel takes ی before ان (آقا → آقایان).
 //
-// Known misses: verbs (می‌خرم is not a form of خریدن), the Arabic broken plurals (کتب of کتاب), the colloquial
-// object marker run on to the noun (نونو for نان را), را as a separate word (it is a word, not a form), and
-// a token of two words where the first takes the ending (the head noun of an ezafe).
+// Written colloquial speech is matched too: the stem ان goes to ون before the end or a final ه (نون, نونا, خونه,
+// تهرون, دونه) and the plural of a vowel is یون (آقایون).
+//
+// Known misses: verbs (می‌خرم is not a form of خریدن), the Arabic broken plurals (کتب of کتاب), را as a separate
+// word (it is a word, not a form), and a token of two words where the first takes the ending (the head noun of an
+// ezafe).
 
 import { lowerFa } from "./text.ts";
 
 /** What may follow a stem, in order. */
-const CHAIN = /^(?:ها|ان|ات|ا)?(?:ای|یی|ی)?(?:[یا]?(?:مان|تان|شان|م|ت|ش))?(?:است|ست|ه|ام|ایم|اید|اند|یم|ید|ند)?$/;
+const CHAIN = /^(?:ها|ان|ین|ات|ا)?(?:ای|یی|ی)?(?:[یا]?(?:مان|تان|شان|مون|تون|شون|م|ت|ش))?(?:است|ست|ه|ام|ایم|اید|اند|یم|ید|ند)?(?:رو|و)?$/;
 
 const clean = (s: string): string => lowerFa(s).replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
 
-/** Whether `w` is `t` with endings. */
+/** Whether `w` is `t` with endings, in the written stem or the spoken one (ان → ون: نان → نون, خانه → خونه, تهران → تهرون). */
 function ends(w: string, t: string): boolean {
+  if (endsAs(w, t)) return true;
+  return /ان(?=ه?$)/.test(t) && t.length > 2 && endsAs(w, t.replace(/ان(?=ه?$)/, "ون"));
+}
+
+function endsAs(w: string, t: string): boolean {
   if (w === t) return true;
   if (w.startsWith(t) && CHAIN.test(w.slice(t.length))) return true;
   // a vowel takes ی before ان: آقا → آقایان
   if (/[او]$/.test(t) && w.startsWith(`${t}یان`) && CHAIN.test(w.slice(t.length + 1))) return true;
+  if (/[او]$/.test(t) && w.startsWith(`${t}یون`) && CHAIN.test(w.slice(t.length + 3))) return true; // آقایون
   if (t.endsWith("ه")) {
     const stem = t.slice(0, -1);
     // بچه → بچگان, بچگانم; کلمه → کلمات
@@ -34,6 +44,12 @@ function ends(w: string, t: string): boolean {
   }
   return false;
 }
+
+/** Whether `part` is nothing but endings (ها, هایم, هایی, هاست, مون): what follows a ZWNJ after a noun (نان‌هایم). */
+export const isEnding = (part: string): boolean => {
+  const p = clean(part);
+  return p.length > 0 && CHAIN.test(p);
+};
 
 /**
  * Whether `word`, as written in a line, is a form of `token`: its endings (above), with or without ZWNJ.

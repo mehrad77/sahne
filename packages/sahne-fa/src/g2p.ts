@@ -22,9 +22,10 @@ const CONS: Record<string, string> = {
 export const CONSONANT_LETTERS = Object.keys(CONS).join("");
 
 /** Words whose sounds the rules do not give: the few ones that matter most to the timing. */
-const EXCEPTIONS: Record<string, string> = {
+const EXCEPTIONS: Record<string, string> = Object.assign(Object.create(null), {
   تو: "tO", دو: "dO", رو: "rO", نه: "na", ده: "dah", یک: "yek", خود: "xod", خواهر: "xAhar", خواهش: "xAhaS", چند: "cand",
-};
+  استکان: "astekAn", زندگی: "zendegI", بدهید: "badehId", بیاورید: "bIyAvarId", متشکرم: "moteSkeram", متشکر: "moteSker",
+});
 
 const MARK_SOUND: Record<string, string> = { "َ": "a", "ِ": "e", "ُ": "o", "ً": "an", "ٌ": "on", "ٍ": "en", "ٰ": "A" };
 const isMark = (c: string | undefined): boolean => c !== undefined && /[ً-ٰٟ]/.test(c);
@@ -86,12 +87,24 @@ function raw(w: string): string {
  */
 function fill(r: string): string {
   const vs: string[] = [], runs: string[] = [""];
+  let synth = false;
   for (const c of r) { if (isVowel(c)) { vs.push(c); runs.push(""); } else runs[runs.length - 1] += c; }
   if (!vs.length) {
     if (r.length <= 1) return r + "e";
-    runs.splice(0, runs.length, r[0], r.slice(1)); vs.push("a");
+    runs.splice(0, runs.length, r[0], r.slice(1)); vs.push("a"); synth = true;
   }
-  const between = (run: string) => (run.length === 3 && "rl".includes(run[1]) ? `${run[0]}${run[1]}e${run[2]}` : run);
+  // three consonants between vowels: a short vowel after the middle one when it is a liquid (مدرسه), a fricative,
+  // an affricate or a nasal (دانشگاه, پنجره, دوشنبه); a stop in the middle stays (دستگاه dast-gāh)
+  const between = (run: string) => (run.length === 3 && "rlSjczsxfmnh".includes(run[1]) ? `${run[0]}${run[1]}e${run[2]}` : run);
+  // two consonants at the end of a word that ends on a long vowel's syllable (or has none written): the endings
+  // -م -ت -ش and the like get a short vowel (کتابم kitā-bam, کنم ka-nam, قیمت qi-mat, باشد bā-shad); a short-vowel
+  // stem (اسم esm, علم elm) and a stop or س/خ/گ/ق/ک/ر last stay one syllable (and so do panj, sobh) (دست, هست, رنگ, فکر)
+  const lastTwo = (run: string, long: boolean, synth: boolean) => {
+    if (run.length !== 2 || !(long || synth)) return run;
+    // a nasal + affricate or ب + ح stays one syllable (پنج panj, صبح sobh)
+    const ending = "mnSbfzjcvhp".includes(run[1]) && !/^(?:n[jc]|bh)$/.test(run) || (long && "bmSj".includes(run[0]) && "td".includes(run[1]));
+    return ending ? `${run[0]}a${run[1]}` : run;
+  };
   let out = "";
   const head = runs[0];
   out += head.length >= 2 ? `${head[0]}a${between(head.slice(1))}` : head;
@@ -100,7 +113,8 @@ function fill(r: string): string {
     const run = runs[k + 1];
     if (k < vs.length - 1) out += between(run);
     else if (run.length >= 3) out += `${run[0]}${run[1]}a${run.slice(2)}`;
-    else out += run.length === 2 && run[1] === "r" && "bdptfzjs".includes(run[0]) ? `${run[0]}ar` : run; // پدر pe-dar, مادر mā-dar
+    else if (run.length === 2 && run[1] === "r" && "bdptfzjs".includes(run[0])) out += `${run[0]}ar`; // پدر pe-dar, مادر mā-dar
+    else out += lastTwo(run, "AIUO".includes(vs[k]), synth);
   }
   return out;
 }

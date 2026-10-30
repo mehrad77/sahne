@@ -62,14 +62,15 @@ Keys are sorted, start at 0, never repeat a shape twice in a row, and end on `re
 
 | Ending | Forms |
 |---|---|
-| plural | ها (نان‌ها), ان (دوستان), ات (کلمات), the colloquial ا (نونا) |
+| plural | ها (نان‌ها), ان (دوستان), ین (معلمین), ات (کلمات), the colloquial ا (نونا) |
 | the indefinite or ezafe ی | ی, ای (خانه‌ای), یی after a vowel (جایی), as in نان‌هایی |
-| possessive | م ت ش مان تان شان, with ا or ی before after a vowel or silent ه (خانه‌ام, جایم, بابام) |
+| possessive | م ت ش مان تان شان (spoken مون تون شون: دوستامون), with ا or ی before after a vowel or silent ه (خانه‌ام, جایم, بابام) |
 | copula | است ست ه ام ایم اید اند یم ید ند (نان‌هاست, نانه) |
+| object | را spoken as رو or و, run on to the word (کتابارو, کتابمو) |
 
-With or without ZWNJ (نان‌ها and نانها). Stems change in three places: a silent ه becomes گ before ان (بچه → بچگان) or goes before ات (کلمه → کلمات), and a vowel takes ی before ان (آقا → آقایان). A token of several words ("نان بربری") is matched on its last word, or run together (نانبربری). را is a separate word, not a form.
+With or without ZWNJ (نان‌ها and نانها). Stems change in three places: a silent ه becomes گ before ان (بچه → بچگان) or goes before ات (کلمه → کلمات), and a vowel takes ی before ان (آقا → آقایان). Written colloquial speech is matched as well: the stem ان goes to ون before the end or a final ه (نون, خونه, تهرون, دونه), and a vowel takes یون (آقایون). `isEnding` says whether a part after a ZWNJ is only endings (هایم, هاست). A token of several words ("نان بربری") is matched on its last word, or run together (نانبربری). را is a separate word, not a form.
 
-**Known misses.** Verbs (می‌خرم is not a form of خریدن), the Arabic broken plurals (کتب of کتاب), the colloquial object marker run on to the noun (نونو for نان را), and a token of two words where the first takes the ending (the head noun of an ezafe: نان‌های بربری matches only through بربری). The endings are generous: a few words that are not forms (تواند for تو + اند) match.
+**Known misses.** Verbs (می‌خرم is not a form of خریدن), the Arabic broken plurals (کتب of کتاب), را as a separate word, and a token of two words where the first takes the ending (the head noun of an ezafe: نان‌های بربری matches only through بربری). The endings are generous: a few words that are not forms (تواند for تو + اند) match.
 
 `deixis(word)` says whether a word is *این* (this, with همین), *اینها / اینا* (these), *آن / اون* (that, with همان / همون) or *آنها / اونا* (those); `placeDeixis` whether it is *اینجا* (here) or *آنجا / اونجا* (there); `isNear` whether it is near.
 
@@ -77,7 +78,7 @@ With or without ZWNJ (نان‌ها and نانها). Stems change in three place
 
 `sayNumber` writes Persian numbers joined by و: ۲۱ *بیست و یک*, ۱۰۵ *صد و پنج*, ۱۹۹۰ *هزار و نهصد و نود*, ۲۰۰۰ *دو هزار*, ۲۱۰۰۰ *بیست و یک هزار*, ۱٬۰۰۰٬۰۰۰ *یک میلیون* (a thousand is just *هزار*). `sayNumeral` reads a numeral as written: thousands, a decimal (*سه ممیز پنج*), a clock time, a percent, an ordinal (*اول, دوم, سوم, چهارم, بیست و یکم, سی‌ام*). `readNumber(words, i)` reads one back from lower-case words or digits: *بیست و یک* → 21 over three words, *دو هزار و پانصد* → 2500, *دوتا* (the counter joined on) → 2, colloquial *یه*, *شیش*, *پونزده* too. Two number words with no و between are two numbers (*دو سه*).
 
-**نه is nine and "no".** A lone *نه* is *no*; it reads as nine only before the counter *تا*, before *و*, before a scale (*نه هزار*), or inside a number (*بیست و نه*). "نه شیر" is not nine milks; write ۹ or *نه تا*.
+**نه is nine and "no".** A lone *نه* is *no*; it reads as nine only before the counter *تا*, before *و*, before a scale (*نه هزار*), before a counted noun or unit (*نه عدد*, *نه نفر*, *نه روز*), or inside a number (*بیست و نه*). "نه شیر" is not nine milks; write ۹ or *نه تا*.
 
 `readClock(text)` finds the times said in a line:
 

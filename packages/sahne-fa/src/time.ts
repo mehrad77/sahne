@@ -13,6 +13,9 @@ HOUR.set("یه", 1); HOUR.set("شیش", 6);
 /** After "H و نیم" these make it a time; anything else (a unit, a thing) makes it a quantity. */
 const TIME_FOLLOWS = new Set(["است", "هست", "بود", "شد", "میشود", "میشه", "صبح", "ظهر", "عصر", "شب", "بامداد", "بعدازظهر", "الان", "الآن"]);
 
+/** After "X دقیقه به <hour>" these make the hour a count ("ده دقیقه به یک نفر گفتم"), not a clock hour. */
+const COUNTED = new Set(["نفر", "تا", "عدد", "دانه", "بار", "کیلو", "متر", "کیلوگرم", "لیتر", "بسته", "نفره"]);
+
 /** The hour at `words[i]`: a word یک…دوازده, or digits 0–24. */
 function hourAt(words: string[], i: number): number | null {
   const w = words[i];
@@ -61,7 +64,7 @@ export function readClock(text: string): ClockTime[] {
           let hj = d + 1;
           if (words[hj] === "ساعت") hj++;
           const h = hourAt(words, hj);
-          if (h !== null && (h >= 1 || words[hj] === "0")) { out.push(before(h, mm.m)); i = hj; continue; }
+          if (h !== null && (h >= 1 || words[hj] === "0") && !COUNTED.has(words[hj + 1])) { out.push(before(h, mm.m)); i = hj; continue; }
         } else if (words[d] === "از") {
           let hj = d + 1;
           if (words[hj] === "ساعت") hj++;

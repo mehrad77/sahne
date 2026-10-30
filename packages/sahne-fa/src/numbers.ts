@@ -21,7 +21,8 @@ export function sayNumber(n: number): string {
   if (n < 0) return `منفی ${sayNumber(-n)}`;
   n = Math.floor(n);
   if (n === 0) return "صفر";
-  if (n >= 1e12) return sayDigits(n.toFixed(0));
+  if (n >= 1e21) return "";
+  if (n >= 1e12) return sayDigits(BigInt(n).toString());
   const terms: string[] = [];
   let rest = n;
   for (const [v, w] of SCALES) {
@@ -56,7 +57,7 @@ export function sayNumeral(s: string, ord = false): string {
   let out: string, m: RegExpExecArray | null;
   if ((m = /^(\d{1,2}):(\d{2})$/.exec(s)) && +m[1] <= 24 && +m[2] < 60) out = +m[2] ? `${sayNumber(+m[1])} و ${sayNumber(+m[2])}` : sayNumber(+m[1]);
   else if (/^\d{1,3}(,\d{3})+$/.test(s)) out = sayNumber(+s.replace(/,/g, ""));
-  else if ((m = /^(\d+)\.(\d+)$/.exec(s))) out = `${whole(m[1])} ممیز ${sayDigits(m[2])}`;
+  else if ((m = /^(\d+)[./](\d+)$/.exec(s))) out = `${whole(m[1])} ممیز ${sayDigits(m[2])}`;
   else if (/^\d+$/.test(s)) out = whole(s);
   else out = s.replace(/\d+/g, d => ` ${whole(d)} `).replace(/[^\p{L}]+/gu, " ").trim();
   return (ord ? ordinal(out) : out) + post;
@@ -68,9 +69,10 @@ TENS.forEach((w, i) => { if (w) WORD.set(w, i * 10); });
 HUNDREDS.forEach((w, i) => { if (w) WORD.set(w, i * 100); });
 // as people say them: یه (یک), شیش (شش), پونزده, شونزده, هیجده, پونصد
 for (const [w, n] of [["یه", 1], ["شیش", 6], ["پونزده", 15], ["شونزده", 16], ["هیجده", 18], ["پونصد", 500], ["پونسد", 500]] as const) WORD.set(w, n);
-const MULT: Record<string, number> = { هزار: 1e3, میلیون: 1e6, میلیارد: 1e9 };
+const MULT: Record<string, number> = Object.assign(Object.create(null), { هزار: 1e3, میلیون: 1e6, میلیارد: 1e9 });
 /** After a lone نه: it is nine only before these (a classifier, "and" or a scale); a bare نه is "no". */
-const NINE_BEFORE = new Set(["تا", "و", ...Object.keys(MULT)]);
+// (a counted noun or unit cannot follow the interjection: نه عدد نان, نه نفر, نه روز)
+const NINE_BEFORE = new Set(["تا", "و", ...Object.keys(MULT), "عدد", "دانه", "بسته", "نفر", "بار", "تومان", "ریال", "روز", "ساعت", "دقیقه", "کیلو"]);
 
 /** One group of 1–999 from `words[j]`: hundreds, tens and ones joined by "و". */
 function group(words: string[], j: number): { v: number; end: number } | null {

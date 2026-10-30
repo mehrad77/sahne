@@ -10,7 +10,7 @@ import { normalise, matchLine } from "./listen.ts";
 
 export { speech, phonemes, syllables, TIMING, VISEME, type Syllable } from "./speech.ts";
 export { respell } from "./g2p.ts";
-export { match, deixis, placeDeixis, isNear } from "./match.ts";
+export { match, isEnding, deixis, placeDeixis, isNear } from "./match.ts";
 export { lowerFa, foldLetters, sayWord, tokens, ZWNJ, type Token, type Mark } from "./text.ts";
 export { sayNumber, sayNumeral, sayDigits, ordinal, readNumber } from "./numbers.ts";
 export { normalise, matchLine, sayWords, letters, allowance } from "./listen.ts";

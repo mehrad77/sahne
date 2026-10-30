@@ -2,7 +2,7 @@
 // rule here wants a native speaker's check; the known misses are tests too, so a change to them is on purpose.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import fa, { match, deixis, placeDeixis, isNear, sayNumber, sayNumeral, sayDigits, ordinal, readNumber, readClock, clockMinutes, normalise, matchLine, sayWords, letters, allowance } from "../src/index.ts";
+import fa, { match, deixis, placeDeixis, isNear, sayNumber, sayNumeral, sayDigits, ordinal, readNumber, readClock, clockMinutes, normalise, matchLine, sayWords, letters, allowance, sayWord, respell } from "../src/index.ts";
 
 test("match: the plural, the indefinite and ezafe ی, the possessives and the copula, with or without ZWNJ", () => {
   const yes = (w: string, t: string) => assert.ok(match(w, t), `${w} ← ${t}`);
@@ -27,7 +27,7 @@ test("match: the plural, the indefinite and ezafe ی, the possessives and the co
 test("match: known misses are documented (verbs, broken plurals, the object marker, را)", () => {
   assert.ok(!match("می‌خرم", "خریدن"), "verbs are not forms of the infinitive");
   assert.ok(!match("کتب", "کتاب"), "the Arabic broken plural");
-  assert.ok(!match("نونو", "نان"), "the colloquial object marker run on to the noun");
+  assert.ok(match("نونو", "نان"), "the colloquial object marker run on to the noun (now a form)");
   assert.ok(!match("را", "نان"), "را is a separate word, not a form");
 });
 
@@ -225,4 +225,53 @@ test("matchLine: the bound of the shared matcher holds (a long transcript is no 
   assert.ok(performance.now() - t0 < 500);
   assert.equal(fa.matchLine?.("دو تا نان", ["دو تا نان"]).matched, true);
   assert.equal(fa.normalise?.("۲ تا نان"), "دو تا نان");
+});
+
+test("match: the spoken possessives, the object marker, the stem ان → ون and the plural ین/یون", () => {
+  const yes = (w: string, t: string) => assert.ok(match(w, t), `${w} ← ${t}`);
+  for (const [w, t] of [["نون", "نان"], ["نونا", "نان"], ["نونم", "نان"], ["خونه", "خانه"], ["تهرون", "تهران"], ["دونه", "دانه"], ["آقایون", "آقا"],
+    ["دوستامون", "دوست"], ["دوستمون", "دوست"], ["دوستاتون", "دوست"], ["کتابارو", "کتاب"], ["کتابمو", "کتاب"], ["معلمین", "معلم"]]) yes(w, t);
+  assert.ok(!match("نونوایی", "نان") && !match("شیر", "نان"));
+});
+
+test("matchLine: a negated line is no match for the positive one (past, subjunctive, بی)", () => {
+  for (const [heard, card] of [["نرفتم", "رفتم"], ["نداشتم", "داشتم"], ["نخریدم", "خریدم"], ["نخوام", "بخوام"], ["نخورید", "بخورید"], ["نشنیدم", "شنیدم"],
+    ["نبین", "ببین"], ["نخواهم", "خواهم"], ["بی شکر", "با شکر"]]) {
+    assert.equal(matchLine(heard, [card]).matched, false, `${heard} vs ${card}`);
+    assert.equal(matchLine(heard, [heard]).matched, true, `${heard} itself`);
+  }
+  // words that start with ن are no negation
+  assert.equal(matchLine("نروژ", ["نروژ"]).matched, true);
+  assert.equal(matchLine("نمک بده", ["نمک بده"]).matched, true);
+});
+
+test("matchLine: contracted copula and spoken negatives match the written forms", () => {
+  for (const [heard, card] of [["خوبه", "خوب است"], ["اینه", "این است"], ["چنده", "چند است"], ["نمیشه", "نمی‌شود"], ["میشه", "می‌شود"], ["نمیتونم", "نمی‌توانم"], ["نمیدم", "نمی‌دهم"]]) {
+    assert.equal(matchLine(heard, [card]).matched, true, `${heard} vs ${card}`);
+    assert.equal(matchLine(card, [heard]).matched, true, `${card} vs ${heard}`);
+  }
+});
+
+test("names of Object.prototype are ordinary Latin words", () => {
+  for (const w of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+    assert.deepEqual(typeof sayWord(w), "string", w);
+    assert.equal(typeof normalise(w), "string", w);
+    assert.equal(matchLine(w, ["نان"]).matched, false, w);
+    assert.ok(fa.speech(w).keys.length > 0, w);
+    assert.equal(typeof respell(w), "string", w);
+  }
+});
+
+test("numbers: نه before a counted noun is nine; ordinals with مین; the slash in a decimal; huge numbers", () => {
+  for (const [w, n] of [["نه عدد نان", 9], ["نه دانه", 9], ["نه بسته", 9], ["نه نفر", 9], ["نه روز", 9]] as const) assert.equal(readNumber(w.split(" "), 0)?.n, n, w);
+  assert.equal(readNumber(["نه", "من", "نمیخوام"], 0), null, "a bare نه is no");
+  assert.equal(sayWord("۳مین"), "سومین"); assert.equal(sayWord("۱۰مین"), "دهمین"); assert.equal(sayWord("1مین"), "اولین"); assert.equal(sayWord("21امین"), "بیست و یکمین");
+  assert.equal(sayWord("۳/۵"), "سه ممیز پنج");
+  assert.equal(sayNumber(1e21), ""); assert.equal(sayNumber(1e12), sayDigits("1000000000000"));
+});
+
+test("readClock: دقیقه به + a counted noun is no time", () => {
+  assert.deepEqual(readClock("ده دقیقه به یک نفر گفتم"), []);
+  assert.deepEqual(readClock("دو دقیقه به سه نفر"), []);
+  assert.deepEqual(readClock("ده دقیقه به یک"), [{ h: 12, m: 50 }]);
 });

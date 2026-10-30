@@ -3,7 +3,7 @@
 // the apple", "shrugs"), an emotion (by id, or an English word for it: "smiling", "angry"), "to <someone>" (who the line is
 // said to), "at <someone or something>" (where it is pointed or looked), "walks to <mark>" (a move), a voice ("whispers")
 // or a shot ("close", "wide", "two shot"); the series' language may add its own words (`StoryLang.parenthetical`). What it
-// does not understand is handed back, never written.
+// does not understand is handed back, never written. Phrases split at , ; and the Arabic ، ؛; ZWNJ is no matter.
 
 import type { Staging } from "sahne";
 
@@ -37,7 +37,7 @@ const EMOTION_WORDS: Record<string, string> = {
 const VOICE_WORDS: Record<string, Staging["voice"]> = { whispers: "whisper", whispering: "whisper", whisper: "whisper", silent: "silent", silently: "silent", mouths: "mouthing", mouthing: "mouthing" };
 const CAM_WORDS: Record<string, Staging["cam"]> = { close: "close", "close up": "close", "close-up": "close", wide: "wide", "wide shot": "wide", "two shot": "two", "two-shot": "two", single: "single", follow: "follow" };
 
-const norm = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("en").replace(/ı/g, "i").replace(/\s+/g, " ").trim();
+const norm = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").replace(/\u200c/g, "").toLocaleLowerCase("en").replace(/ı/g, "i").replace(/\s+/g, " ").trim();
 const strip = (s: string) => s.replace(/^(the|a|an|his|her|their)\s+/, "");
 
 export interface Parsed { staging: Partial<Staging>; rest: string[] }
@@ -51,7 +51,7 @@ export function parseParenthetical(text: string, v: Vocab, speaker = ""): Parsed
   const mark = (s: string) => v.marks.find(m => norm(m) === s || norm(m.replace(/_/g, " ")) === s);
   const target = (s: string) => { const w = who(s); if (w) return `ch:${w}`; const p = prop(s); if (p) return `obj:${p}`; const m = mark(s); if (m) return `mark:${m}`; return s === "camera" || s === "viewer" || s === "us" ? "viewer" : undefined; };
   const own = Object.fromEntries(Object.entries(v.words ?? {}).map(([k, x]) => [norm(k), x]));
-  for (const raw of text.replace(/^\(|\)$/g, "").split(/[,;]/)) {
+  for (const raw of text.replace(/^\(|\)$/g, "").split(/[,;،؛]/)) {
     const ph = norm(raw);
     if (!ph) continue;
     if (own[ph]) { Object.assign(staging, own[ph]); continue; }

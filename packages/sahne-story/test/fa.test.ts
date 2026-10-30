@@ -38,7 +38,8 @@ test("langFor('fa') is the Persian plugin; its words and pauses keep their offse
 
 test("every word in the language's tables is already in its folded form", () => {
   for (const [g, ms] of Object.entries(faLang.motive)) for (const m of ms) assert.equal(lowerFa(m.replace(/\$$/, "")), m.replace(/\$$/, ""), `${g}: ${m}`);
-  for (const k of Object.keys(faLang.parenthetical ?? {})) assert.equal(lowerFa(k).length <= k.length, true, k);
+  // the parenthetical keys keep their ZWNJ (the editor's `norm` drops it on both sides); apart from that they are folded
+  for (const k of Object.keys(faLang.parenthetical ?? {})) assert.equal(lowerFa(k), k.replace(/\u200c/g, ""), k);
 });
 
 test("the check's resolver: forms of a card, names, particles and numbers", () => {
@@ -47,6 +48,10 @@ test("the check's resolver: forms of a card, names, particles and numbers", () =
   assert.ok(!r("نانوایی") && !r("تراکتور"));
   assert.deepEqual(faLang.checkWords("نان‌ها را ۲ تا بخر، می‌خواهم! ساعت ۱۰:۳۰."), ["نان", "ها", "را", "تا", "بخر", "می", "خواهم", "ساعت"]);
   assert.ok(!faLang.resolver(["نان"], { particles: false })("را"));
+  // the endings after a ZWNJ are parts of their own: نان‌هایم, بچه‌هایی, نان‌هاست
+  const rc = faLang.resolver(["نان", "بچه"]);
+  for (const w of faLang.checkWords("نان‌هایم نان‌هایش بچه‌هایی نان‌ها نان‌هاست نان‌مان")) assert.ok(rc(w), w);
+  assert.ok(!rc("تراکتورهایم") && !rc("هایتراکتور"));
 });
 
 test("lints: the bakkal scene in Persian is clean, with این at the loaf", () => {
@@ -111,6 +116,28 @@ test("lint number: a number before a linked prop matches n, through the counter 
   s = story(); const ch = (s.steps[8] as unknown as { choice: { options: { n?: number }[] } }).choice;
   ch.options[1].n = 3;
   assert.deepEqual(rules(lint(s)), ["number@8.1"], "give three loaves, n 3, but the text says two");
+});
+
+test("lint number: a number of several words is read once (بیست و یک), not again from its tail", () => {
+  for (const [text, n] of [["بیست و یک تا نان هست.", 21], ["بیست و دو نان هست.", 22], ["صد و دو نان هست.", 102]] as const) {
+    const s = story(); line(s, 4).fa = `${text} این نان خیلی تازه است.`; line(s, 4).link = { نان: "obj:ekmek" };
+    (s.steps[4] as unknown as { obj: { id: string; op: string; n?: number }[] }).obj = [{ id: "ekmek", op: "show", n }];
+    assert.deepEqual(rules(lint(s)).filter(r => r.startsWith("number")), [], text);
+    (s.steps[4] as unknown as { obj: { n?: number }[] }).obj[0].n = n + 1;
+    assert.deepEqual(rules(lint(s)).filter(r => r.startsWith("number")), ["number@4"], `${text} against ${n + 1}`);
+  }
+});
+
+test("lint var_yok: ZWNJ words between (هیچ‌جا), and the singular and third-person verbs", () => {
+  for (const fa of ["شیر هیچ‌جا نیست.", "شیر هیچ‌وقت نیست.", "شیر ندارم.", "شیر نداره.", "شیر ندارد.", "شیر ندارن."]) {
+    const s = story(); line(s, 6).fa = fa; line(s, 6).link = { شیر: "obj:sut" }; delete line(s, 6).do;
+    (s.steps[3] as LineStep).obj = [{ id: "sut", op: "show" }]; line(s, 6).obj = [];
+    assert.deepEqual(rules(lint(s)).filter(r => r.startsWith("var_yok")), ["var_yok@6"], fa);
+  }
+  for (const fa of ["شیر دارم.", "شیر داره.", "شیر دارد."]) {
+    const s = story(); line(s, 9).fa = fa; line(s, 9).link = { شیر: "obj:sut" }; delete line(s, 9).do;
+    assert.deepEqual(rules(lint(s)), ["var_yok@9"], fa);
+  }
 });
 
 test("lint time: a clock time said aloud matches the linked clock; a price and سه و نیم کیلو are no time", () => {

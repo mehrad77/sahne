@@ -1,9 +1,9 @@
 // Persian word resolving for the story check: whether a token of a story's text is a form of a card, a name, a
 // particle or a number. sahne-fa's `match` handles a noun's endings; verbs are not matched (a verb a story uses
 // must be a card's entry or one of the particles below). A word is split at its ZWNJ first: می‌خواهم is می and
-// خواهم, کتاب‌ها is کتاب and ها, so the parts of a verb and the endings are particles.
+// خواهم, کتاب‌ها is کتاب and ها, so the parts of a verb are particles, and a part that is only endings (هایم, هاست) resolves.
 
-import { lowerFa, match, readNumber, tokens } from "sahne-fa";
+import { isEnding, lowerFa, match, readNumber, tokens } from "sahne-fa";
 
 export const PARTICLES = new Set((
   "و یا اما ولی ولیکن اگر که را به از در با برای تا بر هم نیز همین همان این آن اون اینها آنها اونا اینجا آنجا اونجا اینکه آنکه چون زیرا پس سپس بعد قبل " +
@@ -40,6 +40,8 @@ export function resolver(entries: Iterable<string>, opts: { particles?: boolean 
   }
   return token => {
     if (exact.has(token) || NUMBERS.has(token) || readNumber([token], 0) || (opts.particles !== false && PARTICLES.has(token))) return true;
+    // a part after a ZWNJ may be only endings: نان‌هایم, بچه‌هایی, نان‌هاست
+    if (opts.particles !== false && isEnding(token)) return true;
     for (const w of buckets.get(token[0]) ?? []) if (match(token, w)) return true;
     return false;
   };

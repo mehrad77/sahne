@@ -18,19 +18,26 @@ import { lowerFa, tokens } from "./text.ts";
 const FILLER = /^(?:ام+|ا?م{2,}|اوم+|هوم+|ا{2,})$/;
 
 /** Letters that sound alike, each folded to one. */
-const NEAR: Record<string, string> = {
+const NEAR: Record<string, string> = Object.assign(Object.create(null), {
   "ص": "س", "ث": "س", "ذ": "ز", "ض": "ز", "ظ": "ز", "ط": "ت", "ح": "ه", "غ": "ق", "ع": "ا", "ء": "ا", "آ": "ا",
-};
+});
 
 /** Spellings a recogniser may choose for the same words: the colloquial to the written, and the run-together. */
-const VARIANTS: Record<string, string> = {
+const VARIANTS: Record<string, string> = Object.assign(Object.create(null), {
   نون: "نان", اون: "آن", اونجا: "آنجا", همون: "همان", یه: "یک", اره: "آره", اکی: "اوکی", ok: "اوکی", okay: "اوکی",
   بدین: "بدهید", بدید: "بدهید", بیارین: "بیاورید", بیارید: "بیاورید", میخوام: "میخواهم", میخوای: "میخواهی", میخوایم: "میخواهیم",
   نمیدونم: "نمیدانم", میشه: "میشود", چیه: "چیست", خونه: "خانه", ببخشین: "ببخشید", خدافظ: "خداحافظ",
-};
+  // the contracted copula and the spoken negative progressive (a value of several words is split)
+  نمیشه: "نمیشود", نمیتونم: "نمیتوانم", نمیتونی: "نمیتوانی", نمیتونه: "نمیتواند", نمیدم: "نمیدهم", نمیخوام: "نمیخواهم", نمیخوای: "نمیخواهی",
+  نمیدونی: "نمیدانی", خوبه: "خوب است", چنده: "چند است", اینه: "این است", اونه: "آن است", کجاست: "کجا است", کیه: "کی است", کجاس: "کجا است",
+});
 
-/** Words that make a line negative: نه، نخیر، نیست*، ندار*، نمی*، نبود*، هیچ*، هرگز، بدون. (Not a bare ن: نان starts with it.) */
-const NOT = /^(?:نه|نخیر|نیست.*|نیس|ندار.*|نمی.+|نبود.*|نشد.*|نکن.*|نباید|نباش.*|هیچ.*|هرگز|بدون)$/;
+/** Words that make a line negative: نه، نخیر، نیست*، ندار*، نمی*، نبود*، بی، ن+verb (نرفتم، نخوام), هیچ*، هرگز، بدون. (Not a bare ن: نان starts with it.) */
+const NOT = new RegExp(
+  "^(?:نه|نخیر|نیست.*|نیس|ندار.*|نداشت.*|نمی.+|نبود.*|نشد.*|نکن.*|نباید|نباش.*|هیچ.*|هرگز|بدون|بی" +
+  // ن before a verb stem: the negative past and subjunctive (نرفتم, نخریدم, نخوام, نبین, نشنیدم); not نان, نمک, نخود, نشان
+  "|ن(?:رفت|رو$|رف|خرید|خر[مدی]|خور|خوا|شنید|دید|گفت|گو|ده|ذار|ذاشت|گذار|گذاشت|یاور|یامد|یا[مدی]|بین|شو|شد|توان|تونست|دان|فهمید|آمد|اومد|اوم)" +
+  ".*)$");
 
 /** A written or heard line as Persian spoken words: folded, numerals in words, no punctuation. */
 function spoken(said: string): string[] {

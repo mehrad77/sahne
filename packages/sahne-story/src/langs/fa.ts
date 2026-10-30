@@ -45,16 +45,19 @@ const MOTIVE: Record<string, string[]> = {
 const words = (text: string): LineWord[] => tokens(text).map(t => (t.kind === "word" ? { w: lowerFa(t.text), i: t.i } : { w: t.mark === "comma" ? "," : ".", i: t.i, pause: true, q: t.text === "?" || t.text === "؟" }));
 
 /** هست and نیست say a thing is or is not there; داریم and نداریم that we have it or do not (the subject comes before). */
-const POS = new Set(["هست", "هستش", "هستن", "هستند", "داریم"]);
-const NEG = new Set(["نیست", "نیس", "نیستش", "نیستن", "نیستند", "نداریم"]);
+const POS = new Set(["هست", "هستش", "هستن", "هستند", "داریم", "دارم", "دارد", "داره", "دارن", "دارند"]);
+const NEG = new Set(["نیست", "نیس", "نیستش", "نیستن", "نیستند", "نداریم", "ندارم", "ندارد", "نداره", "ندارن", "ندارند", "نمونده", "تمومشد", "تمامشد"]);
 /** Between the thing and the verb a quantifier or adverb may stand: "شیر هیچ‌جا نیست", "نان دیگر نداریم". */
-const BETWEEN = new Set(["هیچ", "هیچی", "اصلا", "دیگه", "دیگر", "هم", "خیلی", "کمی", "چند", "هنوز", "الان", "اینجا", "آنجا", "اونجا", "همیشه", "فعلا", "امروز"]);
+const BETWEEN = new Set(["هیچ", "هیچی", "اصلا", "دیگه", "دیگر", "هم", "خیلی", "کمی", "چند", "هنوز", "الان", "اینجا", "آنجا", "اونجا", "همیشه", "فعلا", "امروز", "دیگهی", "هیچجا", "هیچوقت", "هیچکس", "هیچکجا"]);
+/** Words are folded without ZWNJ, so هیچ‌جا is هیچجا: any word that starts with هیچ stands between too. */
+const between = (w: string): boolean => BETWEEN.has(w) || w.startsWith("هیچ");
 /** A classifier between a number and its noun: دو تا نان, سه عدد نان, یک بسته نان. */
 const CLASSIFIER = new Set(["تا", "عدد", "دانه", "بسته"]);
 
 /** The Persian lints of a line: deixis, هست / نیست, numbers, clock times. */
 function lintLine(c: LineContext) {
   const { st, words: ws, plain, add } = c;
+  let skipTo = 0; // the plain words a number already read cover (بیست و یک is one number, not 20 then 1)
   ws.forEach((t, i) => {
     if (t.pause) return;
     // deixis: این/آن + a linked noun, with at most one word (a number) between
@@ -82,7 +85,7 @@ function lintLine(c: LineContext) {
       if (ws[e]?.q || ws.slice(0, i).some(w => w.w === "آیا" || w.w === "مگه" || w.w === "مگر")) return;
       let subj: Target | null = null;
       for (let k = i - 1; k >= 0 && !ws[k].pause; k--) {
-        if (BETWEEN.has(ws[k].w)) continue;
+        if (between(ws[k].w)) continue;
         subj = c.linkOf(ws[k].w);
         break;
       }
@@ -92,8 +95,9 @@ function lintLine(c: LineContext) {
     }
     // numbers: دو تا نان → n = 2
     const plainIdx = plain.indexOf(t.w, ws.slice(0, i).filter(w => !w.pause).length);
-    const num = plainIdx > 0 && readNumber(plain, plainIdx - 1) ? null : readNumber(plain, plainIdx);
+    const num = plainIdx >= skipTo ? readNumber(plain, plainIdx) : null;
     if (num && plainIdx >= 0) {
+      skipTo = plainIdx + num.len;
       let ni = plainIdx + num.len;
       while (CLASSIFIER.has(plain[ni])) ni++;
       const noun = plain[ni];
