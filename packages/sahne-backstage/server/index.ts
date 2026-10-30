@@ -34,8 +34,9 @@ function useRoot(content: string | undefined) {
   if (want) process.env.SAHNE_CONTENT = want; else delete process.env.SAHNE_CONTENT;
 }
 
-const agentEditsOf = (v: unknown): AgentEdits => {
-  if (v === undefined || v === "proposals" || v === "direct") return (v ?? "proposals") as AgentEdits;
+/** The --agent-edits flag, checked; undefined leaves it to the person's settings (else proposals). */
+const agentEditsOf = (v: unknown): AgentEdits | undefined => {
+  if (v === undefined || v === "proposals" || v === "direct") return v as AgentEdits | undefined;
   throw new Error(`agentEdits is "proposals" or "direct", not ${String(v)}`);
 };
 
@@ -59,16 +60,17 @@ export async function startMcpStdio(o: McpStdioOptions = {}): Promise<void> {
   console.log = console.error;
   console.info = console.error;
   useRoot(o.content);
-  const [{ StdioServerTransport }, { createMcp }, { Events }, { remoteQueue }] = await Promise.all([
-    import("@modelcontextprotocol/sdk/server/stdio.js"), import("./mcp.ts"), import("./events.ts"), import("./proposals.ts"),
+  const [{ StdioServerTransport }, { createMcp }, { Events }, { remoteQueue }, { readSettings }] = await Promise.all([
+    import("@modelcontextprotocol/sdk/server/stdio.js"), import("./mcp.ts"), import("./events.ts"), import("./proposals.ts"), import("./settings.ts"),
   ]);
+  const agentEdits = agentEditsOf(o.agentEdits) ?? readSettings().agentEdits ?? "proposals";
   const events = new Events();
   const remote = o.backstage ? new URL(o.backstage.endsWith("/") ? o.backstage : `${o.backstage}/`) : null;
   const queue = remote ? remoteQueue(remote.href) : undefined;
   if (remote) {
-    // the running backstage's editors see what this process does: `show`, and the documents it writes in direct mode
+    // the running backstage's editors see what this process does: `show`, the documents it writes in direct mode, and its tool calls
     events.on((name, data) => {
-      if (name !== "show" && name !== "doc") return;
+      if (name !== "show" && name !== "doc" && name !== "activity") return;
       fetch(new URL("api/events", remote), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event: name, data }) })
         .catch(e => console.error(`sahne-backstage mcp: could not reach ${remote.href}: ${(e as Error).message}`));
     });
@@ -76,10 +78,10 @@ export async function startMcpStdio(o: McpStdioOptions = {}): Promise<void> {
   const selection = remote ? async () => {
     try { return ((await (await fetch(new URL("api/selection", remote))).json()) as { selection: null }).selection; } catch { return null; }
   } : undefined;
-  const server = createMcp({ write: o.write === true, agentEdits: agentEditsOf(o.agentEdits), shareCards: o.shareCards === true, events, queue, fresh: true, selection });
+  const server = createMcp({ write: o.write === true, agentEdits, shareCards: o.shareCards === true, events, queue, fresh: true, selection, onCall: c => events.emit("activity", c) });
   const transport = new StdioServerTransport();
   const done = new Promise<void>(r => { transport.onclose = () => r(); process.stdin.on("end", () => r()); });
   await server.connect(transport);
-  console.error(`sahne-backstage mcp on stdio${o.write ? "" : " (read-only: --write to edit)"}, agent edits: ${agentEditsOf(o.agentEdits)}${remote ? `, editors at ${remote.href}` : ""}`);
+  console.error(`sahne-backstage mcp on stdio${o.write ? "" : " (read-only: --write to edit)"}, agent edits: ${agentEdits}${remote ? `, editors at ${remote.href}` : ""}`);
   await done;
 }

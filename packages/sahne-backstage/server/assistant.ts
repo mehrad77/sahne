@@ -15,7 +15,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { allLanguages, dirOf, languagesOf, seasonOf, textOf, type SeriesDoc } from "../../sahne-story/src/index.ts";
 import { listing } from "./content.ts";
-import { createMcp, type AgentEdits } from "./mcp.ts";
+import { createMcp, type AgentEdits, type McpOptions } from "./mcp.ts";
 import type { Events } from "./events.ts";
 import { readiness, readSettings, type Caps, type Settings } from "./settings.ts";
 import { BudgetError, costOf, guard, record, totals, type Usage } from "./ai/budget.ts";
@@ -44,6 +44,8 @@ export interface AssistantOptions {
   /** Default: the settings' provider. */
   provider?: Provider;
   signal?: AbortSignal;
+  /** Told of every tool call (agents.ts). */
+  onCall?: McpOptions["onCall"];
 }
 
 /** The longest tool loop of one ask. */
@@ -129,7 +131,7 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
     }
     guard(s.caps);
     const agentEdits = s.agentEdits ?? o.agentEdits;
-    const server = createMcp({ write: o.write, agentEdits, shareCards: o.shareCards, events: o.events, by: "assistant" });
+    const server = createMcp({ write: o.write, agentEdits, shareCards: o.shareCards, events: o.events, by: "assistant", onCall: o.onCall });
     const [a, b] = InMemoryTransport.createLinkedPair();
     client = new Client({ name: "assistant", version: "0.1.0" });
     await Promise.all([server.connect(a), client.connect(b)]);

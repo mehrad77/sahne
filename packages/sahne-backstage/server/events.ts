@@ -5,12 +5,13 @@
 //   doc       { kind, id, mtime }                                       a document an agent wrote itself (direct mode)
 //   show      { id, step }                                              an agent asks the open editors to go there
 //   usage     { today, month, caps }                                    after each AI call (ai/budget.ts)
+//   activity  { at, by, tool, ok, ms, summary } | null                  an agent's tool call, or null when one connects or goes (agents.ts)
 // The editor also tells backstage what it has open (`POST /api/selection`), for an agent to read as a resource.
 
 import type http from "node:http";
 
-export type EventName = "proposal" | "doc" | "show" | "usage";
-export const EVENT_NAMES: EventName[] = ["proposal", "doc", "show", "usage"];
+export type EventName = "proposal" | "doc" | "show" | "usage" | "activity";
+export const EVENT_NAMES: EventName[] = ["proposal", "doc", "show", "usage", "activity"];
 
 /** What the open editor shows: its page, and the document and step selected there. */
 export interface Selection { page: string; kind?: string; id?: string; path?: (string | number)[]; at: number }

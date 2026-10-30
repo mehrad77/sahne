@@ -24,6 +24,7 @@ import { arcId } from "../../sahne-story/check/rules.ts";
 import { allLanguages, languagesOf, seasonOf, textOf, type Languages, type SeasonDoc, type SeriesDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
 import { check, exists, forget, idsOf, listing, oldShape, readDoc, save, searchCards, type Edit, type Kind, type Problem } from "./content.ts";
 import { readReview, STATUSES, writeReview, type EpisodeReview } from "./review.ts";
+import type { Call } from "./agents.ts";
 import type { Events, Selection } from "./events.ts";
 import { latestOf, proposalsOf, type ProposalEdit, type Queue } from "./proposals.ts";
 import { get, insert, move, set, type Key } from "../src/model/path.ts";
@@ -47,6 +48,8 @@ export interface McpOptions {
   fresh?: boolean;
   /** The open editor's selection (default: the one posted to this process). */
   selection?: () => Promise<Selection | null> | Selection | null;
+  /** Told of every tool call, for the editor's Agents page (agents.ts). */
+  onCall?(c: Call): void;
 }
 
 const FORMAT = new URL("../../sahne-story/README.md", import.meta.url);
@@ -195,10 +198,14 @@ export function createMcp(o: McpOptions): McpServer {
   });
   const by = () => o.by ?? server.server.getClientVersion()?.name ?? "agent";
 
-  /** A tool's body, with the content root read again when asked, and a refusal or error as the agent's answer. */
-  const run = <A>(fn: (a: A) => Promise<Result> | Result) => async (a: A): Promise<Result> => {
+  /** A tool's body, with the content root read again when asked, a refusal or error as the agent's answer, and the call told to `onCall`. */
+  const run = <A>(tool: string, fn: (a: A) => Promise<Result> | Result) => async (a: A): Promise<Result> => {
     if (o.fresh) forget();
-    try { return await fn(a); } catch (e) { return fail(e instanceof Refusal ? e.message : `failed: ${(e as Error).message}`); }
+    const t0 = Date.now();
+    let r: Result;
+    try { r = await fn(a); } catch (e) { r = fail(e instanceof Refusal ? e.message : `failed: ${(e as Error).message}`); }
+    o.onCall?.({ at: t0, by: by(), tool, ok: !r.isError, ms: Date.now() - t0, summary: (r.content[0]?.text ?? "").split("\n")[0].slice(0, 300) });
+    return r;
   };
 
   const readOnly = (): string | null => {
@@ -279,7 +286,7 @@ export function createMcp(o: McpOptions): McpServer {
     title: "The series",
     description: "Start here. The series: its titles, its languages (the main one the stage plays and the learner learns, and the translations), the narrator and the stand-in (the learner's own character), and every season with its episodes (id, title, kind, release date, draft). Also whether backstage can edit, and how edits are made.",
     annotations: { readOnlyHint: true },
-  }, run(() => {
+  }, run("series_overview", () => {
     const w = listing(), c = ctx();
     const seasons = new Map<string, { id: string; title?: string; launch?: string; episodes: unknown[] }>();
     for (const [id, se] of Object.entries(w.seasons as Record<string, SeasonDoc>)) seasons.set(id, { id, title: textOf(se.title, c.langs.main), launch: se.launch, episodes: [] });
@@ -302,7 +309,7 @@ export function createMcp(o: McpOptions): McpServer {
     description: "The episodes (story documents), in order, with their title in the main language, kind (episode or special), release date, place, cast and whether they are a draft. Give a season (1, or \"s1\") to list only its episodes.",
     inputSchema: { season: z.union([z.number().int().positive(), z.string()]).optional().describe("A season number or id") },
     annotations: { readOnlyHint: true },
-  }, run(({ season }) => {
+  }, run("list_episodes", ({ season }) => {
     const n = season === undefined ? 0 : Number(String(season).replace(/^s/, ""));
     const c = ctx();
     const list = listing().episodes.filter(e => !n || seasonOf(e.id) === n).map(e => ({ id: e.id, title: textOf(e.title, c.langs.main), kind: e.kind, releaseDate: e.releaseDate, place: e.place, cast: e.cast, draft: e.draft }));
@@ -314,7 +321,7 @@ export function createMcp(o: McpOptions): McpServer {
     description: "An episode as a script: its header (title, kind, date, level, place, cast, target words as card ids, lessons), then one line per step with its path (steps/3), the speaker, whom it is said to, the main-language text, the translations and a staging summary; a choice's options and replies on their own lines; then the quiz. Also its mtime, to pass to an edit. raw: true adds the whole JSON document.",
     inputSchema: { id: ID, raw: z.boolean().optional().describe("Also return the JSON document") },
     annotations: { readOnlyHint: true },
-  }, run(({ id, raw }) => {
+  }, run("read_episode", ({ id, raw }) => {
     const d = docOf("story", id);
     const text = `${script(d.doc, ctx())}\n\nmtime ${d.mtime}`;
     return raw ? ok(text, d.doc) : ok(text);
@@ -325,7 +332,7 @@ export function createMcp(o: McpOptions): McpServer {
     description: "The JSON at a path of an episode: a step, a choice option, a reply, a quiz item or any field. Use it before edit_step to see exactly what is there.",
     inputSchema: { id: ID, path: PATH },
     annotations: { readOnlyHint: true },
-  }, run(({ id, path }) => {
+  }, run("read_step", ({ id, path }) => {
     const p = pathOf(path), d = docOf("story", id), v = get(d.doc, p);
     if (v === undefined) return fail(`${pathText(p)} is not in ${id}`);
     return ok(`${id} ${pathText(p)} (mtime ${d.mtime})`, v);
@@ -337,7 +344,7 @@ export function createMcp(o: McpOptions): McpServer {
     description: "What a step may name: characters (ids, names, roles), places (with their marks, where people stand and move to, and their props), the kit's props, gestures (a line's `do`), emotions (`emo`) and sounds (`sfx`). Use it before staging a step so every id exists. An empty query lists everything of that kind.",
     inputSchema: { kind: z.enum(KIT_KINDS), query: z.string().optional().describe("Part of an id or description"), limit: z.number().int().positive().max(200).optional() },
     annotations: { readOnlyHint: true },
-  }, run(({ kind, query, limit }) => {
+  }, run("kit_search", ({ kind, query, limit }) => {
     const c = ctx(), w = listing();
     let rows: { id: string; about: string }[] = [];
     if (kind === "characters") rows = Object.entries(w.characters).map(([id, ch]) => ({ id, about: `${textOf(ch.name, c.langs.main) ?? id}${ch.kind ? ` (${ch.kind})` : ""}${ch.role ? `: ${textOf(ch.role, ...c.langs.translations, c.langs.main)}` : ""}` }));
@@ -361,7 +368,7 @@ export function createMcp(o: McpOptions): McpServer {
     description: `The word cards a story's \`words\` name, by part of an id or a word: their ids and levels${o.shareCards ? ", and each card's word in the main language" : ""}. Use the ids in an episode's \`words\`. ${o.shareCards ? "" : "The cards' words are not shared with agents on this backstage (no --share-cards): pick by id. "}A card's translations and notes are never shared.`,
     inputSchema: { query: z.string().describe("Part of a card id or a word"), limit: z.number().int().positive().max(100).optional() },
     annotations: { readOnlyHint: true },
-  }, run(({ query, limit }) => {
+  }, run("search_words", ({ query, limit }) => {
     if (!listing().cards) return ok("this content root has no word cards: a story's words are not checked against any", []);
     const hits = searchCards(query, limit ?? 40).map(c => (o.shareCards ? { id: c.id, ...(c.level ? { level: c.level } : {}), word: c.tr } : { id: c.id, ...(c.level ? { level: c.level } : {}) }));
     return ok(`${hits.length} card${hits.length === 1 ? "" : "s"}`, hits);
@@ -372,7 +379,7 @@ export function createMcp(o: McpOptions): McpServer {
     description: "The story check on an episode as it is on disk (the same check a save passes): its errors, warnings and notes, each with its rule and step.",
     inputSchema: { id: ID },
     annotations: { readOnlyHint: true },
-  }, run(({ id }) => {
+  }, run("check_episode", ({ id }) => {
     const d = docOf("story", id);
     const problems = check([{ kind: "story", id, doc: d.doc }]).map(p => ({ ...p, new: undefined }));
     const n = (l: string) => problems.filter(p => p.level === l).length;
@@ -384,7 +391,7 @@ export function createMcp(o: McpOptions): McpServer {
     description: "An episode's review notes: where it stands (draft, reviewed, approved), whether AI wrote it, the steps reviewed and whose Persian was checked, and the comments on it and its steps (a step key is \"12\", or \"12.0.1\" for a choice's option and reply).",
     inputSchema: { id: ID },
     annotations: { readOnlyHint: true },
-  }, run(({ id }) => {
+  }, run("read_notes", ({ id }) => {
     if (!exists("story", id)) return fail(`there is no story ${id}`);
     return ok(`${id}'s review notes`, readReview().episodes[id] ?? {});
   }));
@@ -398,7 +405,7 @@ export function createMcp(o: McpOptions): McpServer {
     description: `Change a step (or any object in the episode: a choice option, a reply, a quiz item, the title; the path "" is the episode itself, for its level, ref, words, lessons, place, cast or draft) by a merge patch: each key of the patch replaces the one there, an object merges into the one there, and null removes a key. ${writeNote} Use set_texts for the words and set_staging for the staging when that is all you change.`,
     inputSchema: { id: ID, path: z.union([z.string(), z.number().int().nonnegative()]).describe('A path in the episode ("steps/3", "steps/12/choice/options/0", "quiz/0", "title"), or "" for the episode itself'), patch: z.record(z.string(), z.unknown()).describe("The keys to change, e.g. { \"tr\": \"…\", \"emo\": \"happy\", \"do\": null }"), mtime: MTIME },
     annotations: { destructiveHint: false },
-  }, run(({ id, path, patch, mtime }) => {
+  }, run("edit_step", ({ id, path, patch, mtime }) => {
     const p = path === "" || path === "/" ? [] : pathOf(path);
     if (!p.length && "id" in patch) throw new Refusal("ids are permanent: an episode's id never changes");
     const changed = p.length ? [p] : Object.keys(patch).map(k => [k]);
@@ -409,7 +416,7 @@ export function createMcp(o: McpOptions): McpServer {
     title: "Insert a step",
     description: `Insert a step before the one at a place in a list ("steps/4" puts it fourth; past the end appends), or an option or reply in theirs ("steps/12/choice/options/2"). A line is { "who", "<lang>": text for every language, staging… }; a scene { "scene": place, "at": { who: mark } }; a choice { "choice": { "id", "kind", "to", "options": [...] } }; a spot { "spot": { "lesson", "ex" } }. ${writeNote}`,
     inputSchema: { id: ID, at: PATH, step: z.record(z.string(), z.unknown()).describe("The new step"), mtime: MTIME },
-  }, run(({ id, at, step, mtime }) => {
+  }, run("insert_step", ({ id, at, step, mtime }) => {
     const p = pathOf(at);
     return editStory(id, mtime, `insert at ${pathText(p)} of ${id}`, [p], doc => {
       const { parent, i, list } = arrayParent(doc, p);
@@ -422,7 +429,7 @@ export function createMcp(o: McpOptions): McpServer {
     description: `Delete the step (or option, or reply) at a path; the ones after it move up. ${writeNote}`,
     inputSchema: { id: ID, path: PATH, mtime: MTIME },
     annotations: { destructiveHint: true },
-  }, run(({ id, path, mtime }) => {
+  }, run("delete_step", ({ id, path, mtime }) => {
     const p = pathOf(path);
     return editStory(id, mtime, `delete ${pathText(p)} of ${id}`, [p], doc => {
       const { i, list } = arrayParent(doc, p);
@@ -435,7 +442,7 @@ export function createMcp(o: McpOptions): McpServer {
     title: "Move a step",
     description: `Move a step (or option, or reply) to another place in the same list: from "steps/5" to "steps/2". ${writeNote}`,
     inputSchema: { id: ID, from: PATH, to: PATH, mtime: MTIME },
-  }, run(({ id, from, to, mtime }) => {
+  }, run("move_step", ({ id, from, to, mtime }) => {
     const a = pathOf(from), b = pathOf(to);
     if (pathText(a.slice(0, -1)) !== pathText(b.slice(0, -1))) throw new Refusal("a step moves within its own list: from and to must differ only in the last number");
     return editStory(id, mtime, `move ${pathText(a)} to ${pathText(b)} of ${id}`, [a, b], doc => {
@@ -449,7 +456,7 @@ export function createMcp(o: McpOptions): McpServer {
     title: "Set a step's staging",
     description: `Set the staging of a line, an option, a reply, a beat or a scene: to (whom it is said to), emo (an emotion), do (a gesture), at (what is looked or pointed at, or for a scene who stands on which mark), cam, voice, tempo, move, obj, react, link, sfx, env, via, on, wait, frame, looks. Each key replaces the one there; null removes it. Names must exist: kit_search lists them. Texts go through set_texts. ${writeNote}`,
     inputSchema: { id: ID, path: PATH, staging: z.record(z.string(), z.unknown()).describe("e.g. { \"emo\": \"happy\", \"do\": \"wave\", \"to\": \"ismail\" }"), mtime: MTIME },
-  }, run(({ id, path, staging: st, mtime }) => {
+  }, run("set_staging", ({ id, path, staging: st, mtime }) => {
     const p = pathOf(path), c = ctx();
     const langKeys = Object.keys(st).filter(k => c.all.includes(k));
     if (langKeys.length) throw new Refusal(`${langKeys.join(", ")} ${langKeys.length > 1 ? "are languages" : "is a language"}: set texts with set_texts`);
@@ -461,7 +468,7 @@ export function createMcp(o: McpOptions): McpServer {
     title: "Set texts",
     description: "Set the words of a line, an option, a reply, an arc, a title, a summary or a quiz question, by language: { \"<main>\": \"…\", \"<translation>\": \"…\" }. The languages are the series' (series_overview): the main one the stage plays, then the translations, which should say the same thing naturally. " + writeNote,
     inputSchema: { id: ID, path: PATH, texts: z.record(z.string(), z.string()).describe("Language code → text"), mtime: MTIME },
-  }, run(({ id, path, texts: t, mtime }) => {
+  }, run("set_texts", ({ id, path, texts: t, mtime }) => {
     const p = pathOf(path), c = ctx();
     const bad = Object.keys(t).filter(l => !c.all.includes(l));
     if (bad.length) throw new Refusal(`${bad.join(", ")}: not a language of this series (${c.all.join(", ")})`);
@@ -484,7 +491,7 @@ export function createMcp(o: McpOptions): McpServer {
       place: z.string(), cast: z.array(z.string()).describe("Who speaks: 2 to 6 character ids, the stand-in among them"), words: z.array(z.string()).describe("Target word card ids (search_words)"),
       lessons: z.array(z.string()).describe("Grammar lesson ids"), title: TEXT, summary: TEXT.optional(), level: z.string().optional(),
     },
-  }, run(async b => {
+  }, run("create_episode", async b => {
     const why = readOnly();
     if (why) return fail(why);
     const w = listing(), sid = `s${b.season}`, se = (w.seasons as Record<string, SeasonDoc>)[sid];
@@ -516,7 +523,7 @@ export function createMcp(o: McpOptions): McpServer {
     title: "Set an episode's date",
     description: `Set an episode's row in its season's calendar (date, kind, week), and with it the episode's own releaseDate and kind, and its arc when the week changes: the two documents change together. ${writeNote}`,
     inputSchema: { season: z.union([z.number().int().positive(), z.string()]), story: ID, row: z.object({ date: z.string().describe("YYYY-MM-DD"), kind: z.enum(["episode", "special"]), week: z.number().int().nonnegative() }), mtime: MTIME },
-  }, run(async ({ season, story, row, mtime }) => {
+  }, run("set_calendar", async ({ season, story, row, mtime }) => {
     const why = readOnly();
     if (why) return fail(why);
     const n = Number(String(season).replace(/^s/, "")), sid = `s${n}`;
@@ -537,7 +544,7 @@ export function createMcp(o: McpOptions): McpServer {
     title: "Comment",
     description: "Leave a review comment on an episode, or on one of its steps (a path like steps/4, or steps/12/choice/options/0): a note for the people who review it, kept in the review notes beside the content, never in the story. It is written at once (with --write) in either edit mode.",
     inputSchema: { id: ID, step: PATH.optional(), text: z.string().min(1).max(4000) },
-  }, run(({ id, step, text }) => {
+  }, run("comment", ({ id, step, text }) => {
     if (!o.write) return fail(readOnly() ?? "read-only");
     if (!exists("story", id)) return fail(`there is no story ${id}`);
     const at = step === undefined ? undefined : stepKey(pathOf(step));
@@ -554,7 +561,7 @@ export function createMcp(o: McpOptions): McpServer {
       ? "Not available in proposals mode: a person decides whether an episode is reviewed or approved. Leave a comment instead."
       : `Set an episode's review status: ${STATUSES.join(", ")}.`,
     inputSchema: { id: ID, status: z.enum(STATUSES as [string, ...string[]]) },
-  }, run(({ id, status }) => {
+  }, run("set_review", ({ id, status }) => {
     if (o.agentEdits === "proposals") return fail("in proposals mode a person sets where an episode stands: leave a comment instead");
     if (!o.write) return fail(readOnly() ?? "read-only");
     if (!exists("story", id)) return fail(`there is no story ${id}`);
@@ -570,7 +577,7 @@ export function createMcp(o: McpOptions): McpServer {
     description: "Open an episode, at a step, in the open backstage editors: to point a person at what you mean.",
     inputSchema: { id: ID, step: PATH.optional() },
     annotations: { readOnlyHint: true },
-  }, run(({ id, step }) => {
+  }, run("show", ({ id, step }) => {
     if (!exists("story", id)) return fail(`there is no story ${id}`);
     const path = step === undefined ? undefined : pathOf(step);
     if (!o.events.size) return ok(`no editor is listening: open backstage in a browser to see ${id} (an MCP server on stdio reaches one only with --backstage)`);

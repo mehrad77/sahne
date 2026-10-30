@@ -3,6 +3,7 @@
 // the check, Save): its whole document where the editor has no unsaved edits of it, else only the places it changes, so
 // nothing typed is lost. A direct write reloads a document that has no unsaved edits; one that has them is marked in
 // conflict instead of being overwritten. The editor's selection goes back to the server for the agents' `selection`.
+// Each agent's tool call (`activity`) is kept for the Agents page, newest first.
 
 import { signal } from "@preact/signals";
 import { api, type Kind } from "./api.ts";
@@ -17,7 +18,13 @@ export interface Proposal extends ProposalEdit {
 }
 export interface Usage { today: { usd: number; tokens: number }; month: { usd: number; tokens: number }; caps: { dayUsd?: number; monthUsd?: number; dayTokens?: number; monthTokens?: number } }
 
+export interface Call { at: number; by: string; tool: string; ok: boolean; ms: number; summary: string }
+
 export const proposals = signal<Proposal[]>([]);
+/** Agents' tool calls heard since the page opened, newest first (the Agents page starts it from the server's). */
+export const activity = signal<Call[]>([]);
+/** Counts what changed among the agents (a call, a connection, the mode), for the Agents page to read them again. */
+export const agentsTick = signal(0);
 export const usage = signal<Usage | null>(null);
 /** Documents written by an agent while they had unsaved edits here. */
 export const conflicts = signal<Set<string>>(new Set());
@@ -47,6 +54,11 @@ export function connectEvents() {
     const d = JSON.parse((e as MessageEvent).data) as { id: string; step: Path | null };
     go("episode", d.id);
     shown.value = { ...d, n: (shown.value?.n ?? 0) + 1 };
+  });
+  source.addEventListener("activity", e => {
+    const c = JSON.parse((e as MessageEvent).data) as Call | null;
+    if (c) activity.value = [c, ...activity.value].slice(0, 200);
+    agentsTick.value++;
   });
   source.addEventListener("usage", e => { usage.value = JSON.parse((e as MessageEvent).data) as Usage; });
 }

@@ -11,12 +11,16 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import type { Path } from "../model/path.ts";
 import { route, say, world } from "../store.ts";
 import { selection, usage } from "../events.ts";
-import { Drawer, Icon } from "./kit/index.ts";
+import { Icon } from "./kit/index.ts";
 
 type Part = { type: "text"; text: string } | { type: "tool"; name: string; input?: unknown; ok?: boolean; summary?: string } | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number };
 interface Turn { role: "user" | "assistant"; content: string; parts?: Part[]; fresh?: boolean }
 
+/** The side panel is open (side.ts), and the tab it shows; an ask turns it to the assistant. */
 export const assistantOpen = signal(false);
+export type SideTab = "assistant" | "agents" | "docs";
+const saved = (() => { try { return localStorage.getItem("backstage:side"); } catch { return null; } })();
+export const sideTab = signal<SideTab>(saved === "agents" || saved === "docs" ? saved : "assistant");
 const turns = signal<Turn[]>([]);
 const busy = signal(false);
 
@@ -38,6 +42,7 @@ const contextNow = () => { const s = selection.value, r = route.value; return { 
 export async function send(content: string, o: { fresh?: boolean; confirm?: boolean } = {}) {
   if (busy.value || !content.trim()) return;
   assistantOpen.value = true;
+  sideTab.value = "assistant";
   const history = o.fresh ? [] : turns.value.filter(t => !t.fresh || t.role === "user").map(t => ({ role: t.role, content: t.content }));
   if (!o.confirm) turns.value = [...turns.value, { role: "user", content, fresh: o.fresh }];
   const reply: Turn = { role: "assistant", content: "", parts: [], fresh: o.fresh };
@@ -100,16 +105,15 @@ export function Meter() {
     <span class="bar"><span style=${`width:${Math.round(share * 100)}%`} class=${share > 0.85 ? "hot" : ""}></span></span>${fmtUsd(u.today.usd)}</a>`;
 }
 
-/** The conversation drawer. */
-export function AssistantDrawer() {
+/** The conversation, in the side panel's Assistant tab. */
+export function AssistantChat() {
   const w = world.value!;
   const [text, setText] = useState("");
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [turns.value]);
-  if (!assistantOpen.value) return null;
   const ai = typeof w.ai === "object" ? w.ai : null;
   const ctx = contextNow();
-  return html`<${Drawer} title=${html`<${Icon} name="spark" size=${16} /> Assistant ${ai ? html`<small class="note">${ai.provider} · ${ai.model ?? ""}</small>` : ""}`} label="Assistant" onClose=${() => { assistantOpen.value = false; }}>
+  return html`${ai ? html`<p class="note model">${ai.provider === "anthropic" ? "Claude" : "A local model"} · ${ai.model ?? ""} · <a href="#/settings">change</a></p>` : ""}
     ${!w.ai ? html`<p>The assistant is off. Set up Claude (an API key) or a local model (LM Studio, Ollama) in <a href="#/settings">Settings</a>.</p>` : html`
     <div class="chat">
       ${!turns.value.length && html`<div class="note">Ask anything about the series, or pick an ask. It sees ${ctx.id ? html`<b>${ctx.id}</b>${(ctx as { path?: Path }).path ? html` at <b>${(ctx as { path: Path }).path.slice(1).join(".")}</b>` : ""}` : `the ${ctx.page}`}, and its edits arrive as proposals to accept.<${AskMenu} /></div>`}
@@ -128,6 +132,5 @@ export function AssistantDrawer() {
       <textarea rows=${2} value=${text} placeholder="Ask the assistant…" aria-label="Message" onInput=${(e: Event) => setText((e.target as HTMLTextAreaElement).value)}
         onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(text); setText(""); } }} />
       <div class="row"><button type="button" class="small" onClick=${() => { turns.value = []; }}>New conversation</button><span class="grow"></span><button class="primary" disabled=${busy.value || !text.trim()}>Send</button></div>
-    </form>`}
-  </${Drawer}>`;
+    </form>`}`;
 }

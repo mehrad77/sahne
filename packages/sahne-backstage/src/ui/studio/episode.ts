@@ -17,7 +17,7 @@ import { KIT, Preview, solidsOf } from "../../stage.ts";
 import { ReviewGutter, ReviewPanel } from "../review.ts";
 import { NotesPanel } from "./notes.ts";
 import { ChangesPanel } from "../changes.ts";
-import { AskMenu, assistantOpen } from "../assistant.ts";
+import { AskMenu } from "../assistant.ts";
 import { settingsNow } from "../settings.ts";
 import { Popover } from "../kit/index.ts";
 import { Drawer, Icon, MOD } from "../kit/index.ts";
@@ -193,7 +193,7 @@ function Studio(p: { id: string }) {
         ${tab === "changes" && html`<${ChangesPanel} id=${p.id} story=${story} savedAt=${d.mtime} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} select=${(x: Path) => select(x, true)} />`}
       </div>
     </div>
-    ${asks && html`<${Popover} x=${asks.x} y=${asks.y} onClose=${() => setAsks(null)} label="Ask the assistant"><${AskMenu} onDone=${() => { setAsks(null); assistantOpen.value = true; }} /></${Popover}>`}
+    ${asks && html`<${Popover} x=${asks.x} y=${asks.y} onClose=${() => setAsks(null)} label="Ask the assistant"><${AskMenu} onDone=${() => setAsks(null)} /></${Popover}>`}
     ${details && html`<${Drawer} title="Details" onClose=${() => setDetails(false)}><${Details} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} /></${Drawer}>`}
   </section>`;
 }

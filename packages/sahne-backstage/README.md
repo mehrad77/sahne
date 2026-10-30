@@ -36,7 +36,13 @@ console.log(b.url);
 The page is a studio: a top bar, a rail on the left, and the page.
 - **The top bar.** The series, a tab per season (`S1`, `S2`), the search box, whether everything is saved (or why nothing can be: read-only, the samples, a root in the old language shape), and the theme (as the system is, light or dark, kept in this browser).
 - **Search and commands** (`⌘ K`, or Ctrl K, or the search box): type a few letters of an episode, a season, a character, an extra or a place to go there, or of a command (a new episode in a season, the theme). Words match anywhere in a name or its keywords, accents ignored (`src/model/search.ts`).
-- **The rail:** the board, the cast, the places, review.
+- **The rail:** the board, the cast, the places, the kit, review; at its foot the agents (with how many proposals wait), the guides and settings.
+- **The side panel** (`src/ui/side.ts`), beside any page: ✦ in the top bar opens it on the assistant, ? on the guide's part about the page you are on. Its tabs:
+  - **Assistant**: the conversation (below).
+  - **Agents**: the proposals waiting, with *Open*, *Accept* and *Reject*; how agents' edits land; the command that connects Claude Code; and the latest tool calls.
+  - **Docs**: the part of the guides about this page (beside an episode, the episode studio's, with its keys), and a search over both guides.
+- **Agents** (`#/agents`, `src/ui/agents.ts`): how to connect an agent (the `claude mcp add` command over HTTP, the one that starts its own backstage on stdio with `--backstage` here, and the `mcpServers` entry other clients read, each to copy), how their edits land (switched here, below), who is connected over HTTP (the client's name, since when, how many calls), every proposal waiting across the documents, what agents did lately (each tool call: who, which, whether it worked, how long, its answer's first line; the assistant's too), and the tools, read and edit, with what each does.
+- **The guides** (`#/docs/<guide>[/<anchor>]`, `src/ui/docs.ts`): this README and the story format's (sahne-story's), as they are in the checkout, drawn by `src/model/markdown.ts`. The contents list the headings and the parts this README names in bold; a link to the other guide stays in backstage, a link to any other file opens it on GitHub.
 - **Languages.** Every text is edited in the series' languages (`series.json` `languages`, sahne-story's Languages section): the main language as the large field, each translation a smaller row under it with its code, in its own direction (Persian, Arabic, Hebrew, Urdu right to left), and a dot where a translation is missing (`src/ui/lang.ts`, `<Texts>`).
 - **A root in the old language shape** opens read-only, with a banner naming the converter: a root is converted whole, never a file at a time.
 
@@ -194,7 +200,7 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 - **Asks where you work** (*Ask* in the episode's toolbar): fill the missing translations, simplify this line, suggest staging for this line, propose choice options, check this scene, draft this episode from its brief, and *Second reader*, which reviews in a fresh conversation that never saw the drafting.
 - **A big ask waits for a yes:** the server says what it would cost (`confirm`), and *Go ahead* sends it again.
 - **The meter** in the top bar is today's spending against the day's cap (its title: the month's, and the tokens); it follows the `usage` events.
-- **Settings** (`#/settings`): Claude (its key from the environment) or a local model by its base URL (LM Studio, Ollama), the model, the caps per day and month in dollars and in tokens, the cost above which an ask waits for a yes, how agents' edits land, and whether the rules' staging suggestions are taken as you leave each line. They are kept in the person's config folder, never in the content root.
+- **Settings** (`#/settings`): Claude (its key from the environment) or a local model by its base URL (LM Studio, Ollama), the model, the caps per day and month in dollars and in tokens, the cost above which an ask waits for a yes, and whether the rules' staging suggestions are taken as you leave each line. How agents' edits land is on the Agents page. They are kept in the person's config folder, never in the content root.
 
 ## Review notes (`server/review.ts`)
 
@@ -235,7 +241,7 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 
 **The flags** (of `cli.ts` and `cli.ts mcp`; `startBackstage()` takes them as `agentEdits` and `shareCards`; `GET /api/world` answers both):
 - `--write`: without it every write tool refuses, and so it does on a root in the old language shape. The refusal says why.
-- `--agent-edits proposals|direct` (default `proposals`):
+- `--agent-edits proposals|direct` (default: the person's settings, else `proposals`). The Agents page switches it while backstage runs, and keeps the choice in the settings: an agent that connects after the switch gets the new mode, one already connected keeps its own until it connects again (what it was told it does stays true).
   - **proposals.** A write tool computes the whole new document, checks it, and queues it. A person accepts or rejects it in the editor. Nothing is written.
   - **direct.** A write tool saves (`save()`: 403, 400, 409 and 422 are the agent's answer) and sends a `doc` event to the open editors.
   - In both modes, an edit that brings a new error is refused, with the problems, so the agent can fix it. A write tool takes the `mtime` that `read_episode` gave: an edit of a file changed since is refused.
@@ -286,18 +292,21 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 - **A proposal** shows above its episode's script: who proposed it and what, each changed place with its words before and after (word by word), the errors it would bring, and *Accept* or *Reject*. The top bar counts the proposals waiting and links to the first.
 - **A direct write** reloads a document that has no unsaved edits here; one that has them gets a banner instead, to take theirs or keep yours.
 - **`show`** opens the episode at the step.
+- **`activity`** is an agent's tool call, or null when an agent connects or goes, or the mode changes: the Agents page and the side panel read `GET /api/agents` again.
 - **The selection** is posted to `/api/selection` a moment after it settles, for the agents' `sahne://selection`.
 
 **The routes** (localhost only, as the rest of the API):
 
 | Request | Answer |
 |---|---|
-| `GET /api/events` | `text/event-stream`, a keep-alive comment every 20 s. Events: `proposal` `{ action: "added" \| "resolved", proposal, accepted?, with? }`, `doc` `{ kind, id, mtime, by? }`, `show` `{ id, step }` (a path, or null), `usage` |
+| `GET /api/events` | `text/event-stream`, a keep-alive comment every 20 s. Events: `proposal` `{ action: "added" \| "resolved", proposal, accepted?, with? }`, `doc` `{ kind, id, mtime, by? }`, `show` `{ id, step }` (a path, or null), `usage`, `activity` `{ at, by, tool, ok, ms, summary }` or null |
 | `GET /api/proposals` | `{ proposals }` |
 | `POST /api/proposals` `{ kind, doc, next, base?, create?, also?, paths, summary, by, after? }` | `{ proposal }`: one queued from another process (`cli.ts mcp --backstage`), checked here; 403 when read-only |
 | `POST /api/proposals/<id>` `{ accepted }` | `{ resolved: [ids] }`: the person's answer (the browser applies an accepted one itself); 404 for an unknown id |
 | `POST /api/selection` `{ page, kind?, id?, path? }`, `GET /api/selection` | The editor's selection, for the `selection` resource |
-| `POST /api/events` `{ event: "show" \| "doc", data }` | Another process tells the open editors what it did. A `doc` event also makes this server read the root again |
+| `POST /api/events` `{ event: "show" \| "doc" \| "activity", data }` | Another process tells the open editors what it did (`cli.ts mcp --backstage` sends its tool calls as `activity`). A `doc` event also makes this server read the root again |
+| `GET /api/agents` | `{ mcpUrl, cli, content, write, writable, agentEdits, shareCards, sessions, editors, activity, pending, tools }`: the Agents page (`server/agents.ts`: the HTTP sessions and the last 200 calls, in memory) |
+| `POST /api/agents` `{ agentEdits }` | The mode for agents that connect next, kept in the settings; answers as the GET |
 | `/mcp` | The MCP server (Streamable HTTP) |
 
 ## The assistant, providers and the budget (`server/assistant.ts`, `server/ai/`, `server/settings.ts`)
@@ -368,6 +377,7 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
 | `GET /api/problems` | `{ problems }`: every problem of the content root, as `stories.ts --check` finds them (the review page) |
 | `GET /api/review`, `POST /api/review` `{ id, review }` | The review notes; a POST replaces one episode's (cleaned: unknown keys dropped) and answers all of them |
 | `POST /api/reload` | The server forgets the world it has read (after a change made elsewhere) |
+| `GET /api/docs`, `GET /api/docs/<id>` | The guides: `{ docs: [{ id, title, path }] }`, then one as `{ id, title, path, markdown }`. Only `backstage` and `format`; any other id is 404 |
 
 ## Layout
 
@@ -377,7 +387,7 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `content.ts` (kinds, files, checks, saves);
   - `git.ts`;
   - `review.ts`;
-  - `mcp.ts` (the MCP server: its tools and resources), `proposals.ts` (agents' edits waiting for a person) and `events.ts` (the editors' event stream and selection);
+  - `mcp.ts` (the MCP server: its tools and resources), `proposals.ts` (agents' edits waiting for a person), `events.ts` (the editors' event stream and selection) and `agents.ts` (the connected agents and their calls);
   - `assistant.ts` (the assistant's loop and its system prompt), `settings.ts` (the person's AI settings), and `ai/`: `provider.ts` (what a provider does, and the stream reader), `providers/anthropic.ts`, `providers/openai.ts` and `budget.ts` (the prices, the caps and the usage log).
 - The server reads sahne-story's Node-only files (`paths.ts`, `check/`, `load.ts`) by path. The package exports only `"."`.
 - **`src/`** is the browser side (the studio's shared parts in `src/ui/kit/`: icons, chips, drawers, popovers, the palette; the theme in `src/ui/theme.ts`), built with Preact and htm tagged templates (no JSX, so the source stays erasable TypeScript). It contains:
@@ -387,8 +397,8 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `stage.ts` (`Preview`: the stage and a story player that follow the document);
   - `events.ts` (the server's events: proposals, direct writes, `show`, usage; the selection);
   - `thumbs.ts` (pictures the stage draws once and keeps); `live.ts` (the kit page's hover previews on one shared stage);
-  - `model/` (paths into a document, undo and redo, the step list, what changed, the board's weeks, the script's blocks and keys, parentheticals, ghosts and suggestions, notes, a new episode's skeleton, the palette's search, the kit page's shelves; pure and tested in Node);
-  - `ui/` (the pages: `app` (the shell), `board`, `new`, `studio/` (the episode: `episode`, `script`, `sections`, `details`, `direct`, `strip`, `notes`), `cast`, `places`, `kitpage`, `review`, `seasons` (settings), `settings` (the assistant and the budget); and their parts: `assistant`, `galleries`, `lang`, `staging`, `changes`, `fields`, `theme`, `kit/`).
+  - `model/` (paths into a document, undo and redo, the step list, what changed, the board's weeks, the script's blocks and keys, parentheticals, ghosts and suggestions, notes, a new episode's skeleton, the palette's search, the kit page's shelves, the guides' Markdown; pure and tested in Node);
+  - `ui/` (the pages: `app` (the shell), `board`, `new`, `studio/` (the episode: `episode`, `script`, `sections`, `details`, `direct`, `strip`, `notes`), `cast`, `places`, `kitpage`, `review`, `seasons` (settings), `settings` (the assistant and the budget), `agents`, `docs`; and their parts: `side` (the side panel), `assistant`, `galleries`, `lang`, `staging`, `changes`, `fields`, `theme`, `kit/`).
 - **`index.html`** is the page.
 - **`test/`**: `node --test` covers the save round trip, the model, the server on a temp copy of the samples, and the rest of the API. `mcp.test.ts` covers the MCP server in memory, over HTTP and over stdio. `assistant.test.ts` covers the assistant's loops, the budget and the settings with the network stubbed, in a temp config folder. `pnpm check` runs it.
 

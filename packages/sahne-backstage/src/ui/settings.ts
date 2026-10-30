@@ -1,7 +1,6 @@
 // Settings (#/settings): the assistant's model (Claude, or any OpenAI-compatible server such as LM Studio or Ollama, by
 // its base URL), the budget (caps per day and month, in dollars and in tokens, which hold for local models too, and the
-// cost above which an ask waits for a yes), how agents' edits land (as proposals, or written), and whether the rules'
-// staging suggestions are taken as you leave a line. They are kept in this person's config folder
+// cost above which an ask waits for a yes), and whether the rules' staging suggestions are taken as you leave a line. They are kept in this person's config folder
 // (`~/.config/sahne-backstage/settings.json`), never in the content root; API keys stay in the environment.
 
 import { html } from "htm/preact";
@@ -61,11 +60,8 @@ export function SettingsPage() {
       <div class="field"><label>Ask first when an ask would cost more than (dollars)</label><input type="number" min="0" step="0.1" style="max-width:160px" value=${s.confirmOverUsd ?? ""} onInput=${(e: Event) => put("confirmOverUsd", (e.target as HTMLInputElement).value === "" ? undefined : Number((e.target as HTMLInputElement).value))} /></div>
       <p class="note">At a cap the assistant stops and says so. A local model costs nothing, but its tokens count against the token caps.</p>
     </div>
-    <div class="step-card fields"><h3>Agents and suggestions</h3>
-      <div class="field"><label>When the assistant or an outside agent (over MCP) edits</label>
-        <div class="segmented" role="group"><button aria-pressed=${(s.agentEdits ?? "proposals") === "proposals"} onClick=${() => put("agentEdits", "proposals")}>it proposes; I accept</button>
-          <button aria-pressed=${s.agentEdits === "direct"} onClick=${() => put("agentEdits", "direct")}>it writes, checked</button></div>
-        <p class="note">Takes effect when backstage starts again (or with <code>--agent-edits</code>).</p></div>
+    <div class="step-card fields"><h3>Suggestions and agents</h3>
+      <p class="note">How the assistant's and other agents' edits land, and how to connect an agent over MCP, are on the <a href="#/agents">Agents</a> page.</p>
       <label class="row"><input type="checkbox" style="width:auto" checked=${!!s.applySuggestions} onChange=${(e: Event) => put("applySuggestions", (e.target as HTMLInputElement).checked)} /> Take the rules' staging suggestions as I leave each line</label>
     </div>
     <div class="row"><span class="grow"></span><button class="primary" onClick=${() => void save()}>Save the settings</button></div>

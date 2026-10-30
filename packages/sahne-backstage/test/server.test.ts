@@ -1,7 +1,8 @@
 // The server (server/http.ts) on a temp copy of the samples, as an app runs it: it lists the series, its seasons and
 // episodes; a save writes only what changed; an edit that brings an error is refused (422) and writes nothing; a file
 // changed on disk is not overwritten (409); new ids are checked and old ones never change; it answers this machine only;
-// a read-only backstage writes nothing; and a root still in the old language shape is shown upgraded but never saved.
+// a read-only backstage writes nothing; a root still in the old language shape is shown upgraded but never saved; the
+// guides are the two READMEs and nothing else; and the agents' page sees an MCP client's calls.
 
 import { test, after, before } from "node:test";
 import assert from "node:assert/strict";
@@ -15,6 +16,9 @@ const SAMPLES = fileURLToPath(new URL("../../sahne-story/samples/", import.meta.
 const CLI = fileURLToPath(new URL("../server/cli.ts", import.meta.url));
 const root = mkdtempSync(join(tmpdir(), "backstage-"));
 cpSync(SAMPLES, root, { recursive: true });
+// the person's settings, for the servers this file starts: a folder of its own, never the real one
+const config = mkdtempSync(join(tmpdir(), "backstage-config-"));
+process.env.SAHNE_BACKSTAGE_CONFIG = config;
 
 function start(args: string[]): Promise<{ url: string; p: ChildProcess }> {
   return new Promise((res, rej) => {
@@ -28,7 +32,7 @@ function start(args: string[]): Promise<{ url: string; p: ChildProcess }> {
 
 let rw: { url: string; p: ChildProcess }, ro: { url: string; p: ChildProcess };
 before(async () => { [rw, ro] = await Promise.all([start(["--content", root, "--write"]), start([])]); });
-after(() => { rw?.p.kill(); ro?.p.kill(); rmSync(root, { recursive: true, force: true }); });
+after(() => { rw?.p.kill(); ro?.p.kill(); rmSync(root, { recursive: true, force: true }); rmSync(config, { recursive: true, force: true }); });
 
 const call = async (base: string, method: string, path: string, body?: unknown, headers: Record<string, string> = {}) => {
   const r = await fetch(base + "api/" + path, { method, headers: { ...(body !== undefined ? { "content-type": "application/json" } : {}), ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -193,4 +197,46 @@ test("a root in the old language shape opens upgraded and read-only, even with -
     assert.equal(r.status, 403);
     assert.match(r.body.message, /old language shape/);
   } finally { b.p.kill(); rmSync(old, { recursive: true, force: true }); }
+});
+
+test("the guides: backstage's README and the story format's, and no other file", async () => {
+  const list = await call(ro.url, "GET", "docs");
+  assert.deepEqual(list.body.docs.map((d: { id: string }) => d.id), ["backstage", "format"]);
+  const f = await call(ro.url, "GET", "docs/format");
+  assert.equal(f.status, 200);
+  assert.equal(f.body.markdown, readFileSync(new URL("../../sahne-story/README.md", import.meta.url), "utf8"));
+  for (const bad of ["x", "..%2F..%2Fpackage.json", "toString", "__proto__"]) assert.equal((await call(ro.url, "GET", `docs/${bad}`)).status, 404, bad);
+});
+
+test("the agents: an MCP client's session and its calls, and how their edits land", async () => {
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { StreamableHTTPClientTransport } = await import("@modelcontextprotocol/sdk/client/streamableHttp.js");
+  const empty = await call(rw.url, "GET", "agents");
+  assert.equal(empty.status, 200);
+  assert.equal(empty.body.mcpUrl, `${rw.url}mcp`);
+  assert.equal(empty.body.agentEdits, "proposals");
+  assert.ok(empty.body.tools.some((t: { name: string; readOnly: boolean }) => t.name === "read_episode" && t.readOnly));
+  assert.ok(empty.body.tools.some((t: { name: string; readOnly: boolean }) => t.name === "edit_step" && !t.readOnly));
+  const c = new Client({ name: "test-agent", version: "9.9" });
+  await c.connect(new StreamableHTTPClientTransport(new URL(`${rw.url}mcp`)));
+  try {
+    await c.callTool({ name: "list_episodes", arguments: {} });
+    await c.callTool({ name: "read_step", arguments: { id: "s1e00", path: "steps/999" } });
+    const v = (await call(rw.url, "GET", "agents")).body;
+    const s = v.sessions.find((x: { client: string }) => x.client === "test-agent");
+    assert.ok(s, "the session, by the client's name");
+    assert.equal(s.calls, 2);
+    assert.deepEqual(v.activity.slice(0, 2).map((x: { tool: string; ok: boolean; by: string }) => [x.by, x.tool, x.ok]), [["test-agent", "read_step", false], ["test-agent", "list_episodes", true]]);
+  } finally { await c.close(); }
+  // a stdio agent's call, forwarded by its process
+  assert.equal((await call(rw.url, "POST", "events", { event: "activity", data: { by: "stdio-agent", tool: "show", ok: true, ms: 3, summary: "shown" } })).status, 200);
+  assert.equal((await call(rw.url, "GET", "agents")).body.activity[0].by, "stdio-agent");
+  assert.equal((await call(rw.url, "POST", "events", { event: "activity", data: { nope: 1 } })).status, 400);
+  assert.equal((await call(rw.url, "POST", "agents", { agentEdits: "sometimes" })).status, 400);
+  // switched for the agents that connect next, and kept in the person's settings
+  const d = await call(rw.url, "POST", "agents", { agentEdits: "direct" });
+  assert.equal(d.body.agentEdits, "direct");
+  assert.equal((await call(rw.url, "GET", "world")).body.agentEdits, "direct");
+  assert.equal(JSON.parse(readFileSync(join(config, "settings.json"), "utf8")).agentEdits, "direct");
+  await call(rw.url, "POST", "agents", { agentEdits: "proposals" });
 });

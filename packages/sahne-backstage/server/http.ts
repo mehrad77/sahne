@@ -2,7 +2,8 @@
 // built into dist/app, git-ignored, and rebuilt when a source changes), the bubbles' font and the kit's sounds. It answers only this machine: a request whose Host or Origin
 // is not localhost is refused, so a web page open in the same browser cannot reach it, and a write must be JSON. The same
 // guard covers the MCP server at /mcp (mcp.ts, Streamable HTTP, one session per client), the editors' event stream
-// (events.ts) and the agents' proposals (proposals.ts).
+// (events.ts), the agents' proposals (proposals.ts) and what agents did (agents.ts). The guides (`GET /api/docs`) are
+// the repo's own READMEs, served as they are.
 
 import * as esbuild from "esbuild";
 import http from "node:http";
@@ -21,10 +22,17 @@ import { requestOf, runAssistant, usageSummary } from "./assistant.ts";
 import { MODELS } from "./ai/providers/anthropic.ts";
 import { overrides, readiness, readSettings, settingsFile, writeSettings } from "./settings.ts";
 import { Events, selectionOf } from "./events.ts";
+import { Agents, callOf } from "./agents.ts";
 import { createMcp, type AgentEdits } from "./mcp.ts";
 import { proposalsOf, type NewProposal, type ProposalEdit } from "./proposals.ts";
 
 const HERE = new URL("../", import.meta.url);
+const CLI_PATH = fileURLToPath(new URL("cli.ts", import.meta.url));
+/** The guides the editor shows (#/docs), by id: each a README of the repo, with its path there for its links. */
+export const DOCS: Record<string, { title: string; file: URL; path: string }> = {
+  backstage: { title: "Backstage", file: new URL("README.md", HERE), path: "packages/sahne-backstage/README.md" },
+  format: { title: "The story format", file: new URL("../sahne-story/README.md", HERE), path: "packages/sahne-story/README.md" },
+};
 const SOUNDS = new URL("../../sahne-kit/sounds/", import.meta.url);
 const FONTS = new URL("node_modules/@fontsource/comic-neue/files/", HERE);
 
@@ -66,8 +74,10 @@ export async function serve(o: Options): Promise<Running> {
 
   const json = (res: http.ServerResponse, status: number, v: unknown) => res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" }).end(JSON.stringify(v));
 
-  const agentEdits: AgentEdits = o.agentEdits ?? "proposals", shareCards = o.shareCards === true;
-  const events = new Events(), proposals = proposalsOf(events);
+  // how agents' edits land: --agent-edits, else the person's settings; changed on the Agents page for agents that connect after
+  let agentEdits: AgentEdits = o.agentEdits ?? readSettings().agentEdits ?? "proposals";
+  const shareCards = o.shareCards === true;
+  const events = new Events(), proposals = proposalsOf(events), agents = new Agents(events);
   const writable = () => o.write && !oldShape().length;
   /** The assistant, as `GET /api/world` gives it: false when it cannot run, so a plain truthiness check still works. */
   const aiOf = () => {
@@ -89,16 +99,25 @@ export async function serve(o: Options): Promise<Running> {
     if (req.method !== "POST") return json(res, 400, { jsonrpc: "2.0", error: { code: -32000, message: "no MCP session: send an initialize request first" }, id: null });
     const first = await body(req);
     if (!isInitializeRequest(first)) return json(res, 400, { jsonrpc: "2.0", error: { code: -32000, message: "no MCP session: send an initialize request first" }, id: null });
-    const server = createMcp({ write: o.write, agentEdits, shareCards, events });
+    const mode = agentEdits;
+    let sessionId: string | undefined;
+    const server = createMcp({ write: o.write, agentEdits: mode, shareCards, events, onCall: c => agents.record(c, sessionId) });
     const transport: StreamableHTTPServerTransport = new StreamableHTTPServerTransport({
       sessionIdGenerator: randomUUID,
-      onsessioninitialized: id => { sessions.set(id, { server, transport }); },
-      onsessionclosed: id => { sessions.delete(id); },
+      onsessioninitialized: id => { sessionId = id; sessions.set(id, { server, transport }); agents.open(id, server, mode); },
+      onsessionclosed: id => { sessions.delete(id); agents.close(id); },
     });
-    transport.onclose = () => { if (transport.sessionId) sessions.delete(transport.sessionId); };
+    transport.onclose = () => { if (transport.sessionId) { sessions.delete(transport.sessionId); agents.close(transport.sessionId); } };
     await server.connect(transport);
     await transport.handleRequest(req, res, first);
   }
+
+  /** Everything the Agents page shows: how to connect, how edits land, who is connected, what they did, and the tools. */
+  const agentsView = async (req: http.IncomingMessage) => ({
+    mcpUrl: `http://${req.headers.host}/mcp`, cli: CLI_PATH, content: IS_SAMPLES ? null : fileURLToPath(CONTENT), write: o.write, writable: writable(), agentEdits, shareCards,
+    sessions: agents.sessions(), editors: events.size, activity: agents.recent(), pending: proposals.all().length,
+    tools: await agents.catalog(() => createMcp({ write: o.write, agentEdits, shareCards, events })),
+  });
 
   /** A proposal another backstage process sends (`cli.ts mcp --backstage`), checked here, against this root. */
   function proposalOf(v: unknown): NewProposal {
@@ -126,7 +145,8 @@ export async function serve(o: Options): Promise<Running> {
       const d = (e?.data ?? {}) as Record<string, unknown>;
       if (e?.event === "show" && typeof d.id === "string") { events.emit("show", { id: d.id, step: Array.isArray(d.step) ? d.step : null }); return json(res, 200, { ok: true }); }
       if (e?.event === "doc" && typeof d.kind === "string" && typeof d.id === "string") { forget(); events.emit("doc", { kind: d.kind, id: d.id, mtime: d.mtime, ...(typeof d.by === "string" ? { by: d.by } : {}) }); return json(res, 200, { ok: true }); }
-      throw new Fail(400, "expected { event: \"show\" | \"doc\", data }");
+      if (e?.event === "activity") { const c = callOf(d); if (!c) throw new Fail(400, "an activity is { by, tool, ok, ms, summary }"); agents.record(c); return json(res, 200, { ok: true }); }
+      throw new Fail(400, "expected { event: \"show\" | \"doc\" | \"activity\", data }");
     }
     if (route === "selection" && m === "GET") return json(res, 200, { selection: events.selection });
     if (route === "selection" && m === "POST") {
@@ -179,12 +199,27 @@ export async function serve(o: Options): Promise<Running> {
       // a closed tab stops the spending: the provider's request is aborted
       const stop = new AbortController();
       res.on("close", () => { if (!res.writableEnded) stop.abort(); });
-      await runAssistant(ask, e => { if (!res.writableEnded) res.write(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`); }, { write: o.write, agentEdits, shareCards, events, signal: stop.signal });
+      await runAssistant(ask, e => { if (!res.writableEnded) res.write(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`); }, { write: o.write, agentEdits, shareCards, events, signal: stop.signal, onCall: c => agents.record(c) });
       res.end();
       return;
     }
     if (route === "settings" && m === "GET") return json(res, 200, settingsView());
-    if (route === "settings" && m === "POST") { writeSettings(await body(req)); return json(res, 200, settingsView()); }
+    if (route === "settings" && m === "POST") { const s = writeSettings(await body(req)); if (s.agentEdits) agentEdits = s.agentEdits; return json(res, 200, settingsView()); }
+    if (route === "agents" && m === "GET") return json(res, 200, await agentsView(req));
+    if (route === "agents" && m === "POST") {
+      const v = await body(req) as { agentEdits?: unknown };
+      if (v?.agentEdits !== "proposals" && v?.agentEdits !== "direct") throw new Fail(400, "expected { agentEdits: \"proposals\" | \"direct\" }");
+      agentEdits = v.agentEdits;
+      writeSettings({ ...readSettings(), agentEdits });
+      events.emit("activity", null);
+      return json(res, 200, await agentsView(req));
+    }
+    if (route === "docs" && m === "GET" && !a) return json(res, 200, { docs: Object.entries(DOCS).map(([id, d]) => ({ id, title: d.title, path: d.path })) });
+    if (route === "docs" && m === "GET" && a) {
+      const d = Object.hasOwn(DOCS, a) ? DOCS[a] : undefined;
+      if (!d) throw new Fail(404, `no guide ${a}`);
+      return json(res, 200, { id: a, title: d.title, path: d.path, markdown: readFileSync(d.file, "utf8") });
+    }
     if (route === "usage" && m === "GET") return json(res, 200, usageSummary(readSettings().caps));
     if (route === "thumbs" && m === "GET") return json(res, 200, { stale: await staleThumbs(), command: "node packages/sahne-gallery/thumbs.mjs (in the Sahne repo, with SAHNE_CONTENT set)" });
     throw new Fail(404, `no route ${m} /api/${path.join("/")}`);
