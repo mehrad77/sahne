@@ -90,7 +90,7 @@ export function systemPrompt(o: { agentEdits: AgentEdits; writable: boolean; sha
     `Every line is written in ${language(l.main)}, at the episode's level: short, natural, everyday. Each line also carries its translations, in ${l.translations.map(x => `${language(x)} (${x})`).join(", ") || "no other language"}, which say the same thing as naturally as a person would${rtl.length ? `; ${rtl.join(", ")} ${rtl.length > 1 ? "are" : "is"} written right to left` : ""}.`,
     `The narrator is ${name(series?.narrator)} (id ${series?.narrator ?? "?"}). The stand-in, ${name(series?.standin)} (id ${series?.standin ?? "?"}), is the learner's own character on stage: give them no nationality, language or story the series does not.`,
     `The format: an episode is a story document. Its steps are scenes ({ scene: place, at: { who: mark }, time }), lines ({ who, the texts by language code, and staging: to, emo, do, at, move, obj, cam, sfx … }), choices (the stand-in's options, each a line, with replies), spots (a grammar note on one line), acts (the learner taps or drags something) and beats. An episode's words are word-card ids, its lessons grammar lesson ids. A path names a place in it: steps/3, steps/12/choice/options/0/reply/1, quiz/0, title.`,
-    `Work with the tools: read with read_episode and read_step, look names up with kit_search before you stage anything, and check with check_episode. Keep every id, character id and mark as it is; ids are permanent.`,
+    `Work with the tools: read with read_episode and read_step, look names up with kit_search before you stage anything, and check with check_episode. To draw a missing set piece or prop, read the sahne://kit-guide resource, kit_read a neighbour, draft it with draft_kit_item and look at its sheet before you save_kit_item. Keep every id, character id and mark as it is; ids are permanent.`,
     !o.writable ? "Backstage is read-only now: you can read, check and advise, not edit."
       : o.agentEdits === "proposals" ? "Your edits are proposals: each is checked and shown to the person in the editor, who accepts or rejects it, and nothing is saved until they do. Say briefly what you proposed and why."
         : "Your edits are saved at once, each after the same check a person's save passes. Say briefly what you changed.",
@@ -174,17 +174,18 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
           send({ type: "tool_result", id: c.id, name: c.name, ok: false, summary: "the call's input was not valid JSON", detail: c.bad.slice(0, DETAIL), ms: 0 });
           continue;
         }
-        let texts: string[], isError: boolean;
+        let texts: string[], isError: boolean, images: { data: string; mimeType: string }[] = [];
         try {
-          const out = await client.callTool({ name: c.name, arguments: c.input }) as { content?: { type: string; text?: string }[]; isError?: boolean };
+          const out = await client.callTool({ name: c.name, arguments: c.input }) as { content?: { type: string; text?: string; data?: string; mimeType?: string }[]; isError?: boolean };
           texts = (out.content ?? []).filter(x => x.type === "text").map(x => x.text ?? "");
+          images = (out.content ?? []).filter(x => x.type === "image" && x.data).map(x => ({ data: x.data!, mimeType: x.mimeType ?? "image/png" }));
           isError = !!out.isError;
         } catch (err) { texts = [`the tool failed: ${(err as Error).message}`]; isError = true; }
         send({ type: "tool_result", id: c.id, name: c.name, ok: !isError, summary: summaryOf(texts), detail: detailOf(texts), ms: Date.now() - t0 });
         if (!isError) {
           try { const id = JSON.parse(texts.at(-1) ?? "").proposal; if (typeof id === "string") send({ type: "proposal", id }); } catch { /* no proposal */ }
         }
-        results.push({ id: c.id, name: c.name, text: texts.join("\n\n"), isError });
+        results.push({ id: c.id, name: c.name, text: texts.join("\n\n"), isError, ...(images.length ? { images } : {}) });
       }
       messages.push(...p.results(results));
     }

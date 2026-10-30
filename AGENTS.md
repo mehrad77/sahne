@@ -9,6 +9,8 @@ packages/
   sahne/          the engine                                    → packages/sahne/README.md, DESIGN.md
   sahne-kit/      the first kit: people, set pieces, props, sounds, music, Kerim → STYLE.md, CATALOGUE.md, SET.md
   sahne-tr/       the Turkish plugin                            → packages/sahne-tr/README.md
+  sahne-en/       the English plugin                            → packages/sahne-en/README.md
+  sahne-de/       the German plugin                             → packages/sahne-de/README.md
   sahne-story/    the story format, its checks, paths.ts, samples/ → packages/sahne-story/README.md
   sahne-backstage/ the studio an app runs on its content root (:5181), and its MCP server → packages/sahne-backstage/README.md
   sahne-gallery/  the dev gallery and the checks (:5180)        → packages/sahne-gallery/README.md
@@ -37,7 +39,7 @@ assets/                        the README's poster and scene pictures, and brand
 - `pnpm check` (the same as `pnpm sahne check`, the gallery's `check` script) is the gate: types, sizes, bundle determinism, the story and extras checks, every package's Node tests and the golden frames. Run it after every change.
 - `pnpm sahne <script>` runs a gallery script (`pnpm sahne dev`, `pnpm sahne golden:update`).
 - Start the gallery with `preview_start sahne-gallery` (`.claude/launch.json`), or `pnpm dev`.
-- Start the editor with `preview_start sahne-backstage` (the samples, read-only), or `node packages/sahne-backstage/server/cli.ts --content <root> --write`. Agents reach it over MCP: `/mcp` on a running one (`claude mcp add --transport http sahne-backstage http://localhost:5181/mcp`), or on stdio with `node packages/sahne-backstage/server/cli.ts mcp --content <root> --write --backstage http://localhost:5181/` (without `--backstage`, proposals reach no editor).
+- Start the editor with `preview_start sahne-backstage` (the samples, read-only), or `node packages/sahne-backstage/server/cli.ts --content <root> --write`. Agents reach it over MCP: `/mcp` on a running one (`claude mcp add --transport http sahne-backstage http://localhost:5181/mcp`), or on stdio with `node packages/sahne-backstage/server/cli.ts mcp --content <root> --write --backstage http://localhost:5181/` (without `--backstage`, proposals reach no editor). With no MCP set up, `node packages/sahne-backstage/server/call.ts <tool> '<json>' --content <root> --session kit` calls any of the same tools and saves their pictures as PNGs to Read: TS kit work (a generator you are editing) also renders through it, `kit_render` with `items` for a whole family on one sheet.
 - **The content root.** Every story, character and place is read through `packages/sahne-story/paths.ts`: from `$SAHNE_CONTENT` (an absolute folder) or, without it, from `packages/sahne-story/samples/`. Never build such a path yourself. Never point a path outside the repo: `packages/sahne-gallery/test/boundary.test.ts` fails on one.
 - The tests in `packages/sahne-story/test/kumru/` check Kumru's own content. They run only with `SAHNE_CONTENT` set to Kumru's `data/`. On the samples they are skipped, which is expected.
 

@@ -307,6 +307,8 @@ function start(args: string[], env: Record<string, string>): Promise<{ url: stri
     const onData = (d: Buffer) => { out += d; const m = /sahne-backstage on (http:\/\/localhost:\d+\/)/.exec(out); if (m) res({ url: m[1], p }); };
     p.stdout!.on("data", onData); p.stderr!.on("data", onData);
     p.on("exit", c => rej(new Error(`exited ${c}: ${out}`)));
+    // a server that never says where it listens fails the file in a minute, rather than hanging the gate
+    setTimeout(() => { p.kill(); rej(new Error(`no "sahne-backstage on" line in 60 s: ${out}`)); }, 60_000).unref();
   });
 }
 

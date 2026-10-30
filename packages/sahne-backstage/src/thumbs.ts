@@ -4,7 +4,7 @@
 // again only when that changes. A browser without IndexedDB (or one that refuses it) still draws, every time.
 
 import { hashString, mountStage, type AvatarDoc, type Cue, type LoadOptions, type PlaceDoc, type PuppetRef, type Run, type Stage } from "sahne";
-import { KIT, LANG } from "./stage.ts";
+import { KIT, seriesLang } from "./stage.ts";
 
 const W = 360, H = 225, DB = "sahne-backstage-thumbs", STORE = "thumbs";
 
@@ -50,11 +50,12 @@ async function pump() {
   busy = true;
   while (queue.length) {
     const job = queue.shift()!;
+    if (stage && stage.lang.id !== (seriesLang()?.id ?? "und")) { stage.destroy(); host?.remove(); stage = null; }
     if (!stage) {
       host = Object.assign(document.createElement("div"), { ariaHidden: "true" });
       Object.assign(host.style, { position: "fixed", left: "0", bottom: "0", width: `${W}px`, height: `${H}px`, opacity: "0", pointerEvents: "none", zIndex: "-1" });
       document.body.append(host);
-      stage = mountStage(host, { kit: KIT, lang: LANG, bubbles: false, motion: "full", maxDpr: 1 });
+      stage = mountStage(host, { kit: KIT, lang: seriesLang(), bubbles: false, motion: "full", maxDpr: 1 });
     }
     // one picture at a time, when the page is idle: a long episode's strip never holds up typing
     await new Promise<void>(r => ("requestIdleCallback" in window ? requestIdleCallback(() => r(), { timeout: 1500 }) : setTimeout(r, 30)));

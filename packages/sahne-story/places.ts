@@ -8,12 +8,15 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import kit from "../sahne-kit/src/full.ts";
-import { loadCards, loadNeeds } from "./load.ts";
+import full from "../sahne-kit/src/full.ts";
+import { withDrawings } from "../sahne-kit/src/drawing.ts";
+import { loadCards, loadContentKit, loadNeeds } from "./load.ts";
 import { PLACES as DIR } from "./paths.ts";
 import { lintPlace, PLACE_RULES, type Needs, type StoryPlace } from "./src/index.ts";
 
 const { values: o, positionals } = parseArgs({ allowPositionals: true, options: { check: { type: "boolean", default: false }, file: { type: "string", multiple: true } } });
+const own = loadContentKit({ kit: full }); // the root's own kit items, so a place may use them
+const kit = withDrawings(full, own.docs);
 const needs: Needs | undefined = loadNeeds();
 const files = [...readdirSync(DIR).filter(f => f.endsWith(".json") && f !== "needs.json").map(f => new URL(f, DIR)), ...(o.file ?? [])];
 const docs: StoryPlace[] = files.map(f => JSON.parse(readFileSync(f, "utf8"))).filter(d => !positionals.length || positionals.includes(d.id));

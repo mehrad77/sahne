@@ -1,20 +1,28 @@
 // The stage an episode plays on in backstage: the whole kit (every set family), Kerim's puppet and the animals', the
-// Turkish plugin, the kit's sounds, the interaction layer (acts, explore, picking) and prop text; Kerim's round window for
+// language plugins (Turkish, English, German; a preview takes its series' main language's), the kit's sounds, the interaction layer (acts, explore, picking) and prop text; Kerim's round window for
 // the narrator. `Preview` keeps one stage and a story player over it, and follows the document as it is edited: a change
 // to words re-directs the cues (`player.replace`, no reload), anything else adapts and loads again; either way the stage
 // goes back to the cue that was showing.
 
-import { interact, mountStage, placeSolids, propText, type Interaction, type Kit, type Solid, type Stage } from "sahne";
+import { interact, mountStage, placeSolids, propText, type Interaction, type LangPlugin, type Kit, type Solid, type Stage } from "sahne";
 import full from "sahne-kit/full";
 import { puppets as kerimPuppets } from "sahne-kit/kerim";
 import { puppets as animals } from "sahne-kit/puppets";
 import { K_BUST, K_HEAD, K_HEAD_VB } from "sahne-kit/kerim/art";
 import { kerimOnTalk, kerimPortrait } from "sahne-kit/kerim/portrait";
+import de from "sahne-de";
+import en from "sahne-en";
 import tr from "sahne-tr";
-import { adaptStory, storyPlayer, type CharacterDoc, type Languages, type StoryDoc, type StoryPlace, type StoryPlayer, type StoryStage } from "sahne-story";
+import { world } from "./store.ts";
+import { adaptStory, languagesOf, storyPlayer, type CharacterDoc, type Languages, type StoryDoc, type StoryPlace, type StoryPlayer, type StoryStage } from "sahne-story";
 
 export const KIT: Kit = { ...full, puppets: { ...full.puppets, ...kerimPuppets, ...animals } };
-export const LANG = tr;
+/** The language plugins, by the code of a series' main language. */
+export const PLUGINS: Record<string, LangPlugin> = { tr, en, de };
+/** The plugin of a series' main language: Turkish when none is named (the samples' default); none for a language without a plugin. */
+export const langPlugin = (main?: string): LangPlugin | undefined => PLUGINS[main ?? "tr"];
+/** The plugin of the open series' main language, for the shared stages (live previews, thumbnails, the place stage). */
+export const seriesLang = (): LangPlugin | undefined => langPlugin(languagesOf(world.value?.series).main);
 /** Where the kit's recordings are served. */
 export const SOUNDS = new URL("/sounds/", location.href).href;
 
@@ -49,7 +57,7 @@ export class Preview {
 
   constructor(el: HTMLElement, story: StoryDoc, o: PreviewOptions) {
     this.o = o;
-    this.stage = mountStage(el, { kit: KIT, lang: LANG, sounds: SOUNDS, bubbles: true, motion: "full" });
+    this.stage = mountStage(el, { kit: KIT, lang: langPlugin(o.languages?.main), sounds: SOUNDS, bubbles: true, motion: "full" });
     this.ix = interact(this.stage, { explore: true });
     propText(this.stage);
     this.kerim = kerimPortrait({ vb: K_HEAD_VB, bust: K_BUST, head: K_HEAD });

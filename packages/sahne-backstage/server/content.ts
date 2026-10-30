@@ -1,23 +1,28 @@
-// The content root as backstage edits it (Node only; imported after SAHNE_CONTENT is set, server/index.ts). Five kinds of
-// document, each a file named by its id: the series, the seasons, the stories (the episodes), the characters and the places.
-// Where each lives is sahne-story's paths.ts, never a path built here. A save is a set of documents checked together (a
+// The content root as backstage edits it (Node only; imported after SAHNE_CONTENT is set, server/index.ts). Seven kinds of
+// document, each a file named by its id: the series, the seasons, the stories (the episodes), the characters, the places and
+// the root's own kit items (a drawn piece `x_<id>`, a drawn variant `<of>.x_<name>`; sahne-kit's DRAWING.md). The kit items are
+// added to the full kit (`kit()`), which the checks and the place lints use. Where each lives is sahne-story's paths.ts, never a path built here. A save is a set of documents checked together (a
 // season's calendar and its stories' dates change in one save): the edited documents are swapped into the world the story
 // check reads (check/world.ts) and checked with the gate's own options (stories.ts: the full kit, the places' solids, the
 // cards, the needs). The rules across documents (the season's dates and arcs, the cast's order) run over all of them, so an
 // edit that breaks another document is caught. A problem the files already had does not block a save; one the edit brings does.
 
 import { existsSync, readdirSync } from "node:fs";
-import { placeSolids, type Solid } from "sahne";
-import kit from "../../sahne-kit/src/full.ts";
-import { CHARACTERS, IS_SAMPLES, PLACES, SERIES, seasonFile, seasonIds, storyFile, storyIds } from "../../sahne-story/paths.ts";
-import { loadCards, loadNeeds } from "../../sahne-story/load.ts";
+import { placeSolids, type Kit, type Solid } from "sahne";
+import full from "../../sahne-kit/src/full.ts";
+import { withDrawings, type DrawingDoc, type VariantDoc } from "../../sahne-kit/src/drawing.ts";
+import { CHARACTERS, IS_SAMPLES, PLACES, SERIES, kitPieceFile, kitPieceIds, kitVariantFile, kitVariantIds, seasonFile, seasonIds, storyFile, storyIds } from "../../sahne-story/paths.ts";
+import { loadCards, loadContentKit, loadNeeds } from "../../sahne-story/load.ts";
+import { validateDoc } from "../../sahne-story/check/schema.ts";
 import { checkCast, checkPlaces, checkSeason, checkSeries, checkStory, RETIRED_CHARACTERS, type CheckOptions, type CheckProblem } from "../../sahne-story/check/rules.ts";
 import { calendarOf, charactersOf, loadWorld, type World } from "../../sahne-story/check/world.ts";
 import { languagesOf, lintPlace, seasonOf, upgrade, type CharacterDoc, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
 import { plain, readFile, textFor, writeAtomic } from "../../sahne-story/json.ts";
 
-export type Kind = "series" | "season" | "story" | "character" | "place";
-export const KINDS: Kind[] = ["series", "season", "story", "character", "place"];
+export type Kind = "series" | "season" | "story" | "character" | "place" | "kit_piece" | "kit_variant";
+export const KINDS: Kind[] = ["series", "season", "story", "character", "place", "kit_piece", "kit_variant"];
+type KitKind = "kit_piece" | "kit_variant";
+const isKitKind = (k: Kind): k is KitKind => k === "kit_piece" || k === "kit_variant";
 
 /** What each kind's ids look like. The series has one document, id `series`. */
 const ID: Record<Kind, RegExp> = {
@@ -26,6 +31,8 @@ const ID: Record<Kind, RegExp> = {
   story: /^s[1-9][0-9]?e[0-9]{2}$/,
   character: /^[a-z0-9_]+$/,
   place: /^[a-z0-9_]+$/,
+  kit_piece: /^x_[a-z0-9_]+$/,
+  kit_variant: /^[a-z][a-z0-9_]*\.x_[a-z0-9_]+$/,
 };
 
 const jsonIds = (dir: URL) => (existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith(".json") && f !== "needs.json").map(f => f.slice(0, -5)).sort() : []);
@@ -39,6 +46,8 @@ export function fileOf(kind: Kind, id: string): URL {
     case "story": return storyFile(id);
     case "character": return new URL(`${id}.json`, CHARACTERS);
     case "place": return new URL(`${id}.json`, PLACES);
+    case "kit_piece": return kitPieceFile(id);
+    case "kit_variant": return kitVariantFile(id.slice(0, id.lastIndexOf(".")), id.slice(id.lastIndexOf(".") + 1));
   }
 }
 
@@ -50,6 +59,8 @@ export function idsOf(kind: Kind): string[] {
     case "story": return storyIds();
     case "character": return jsonIds(CHARACTERS);
     case "place": return jsonIds(PLACES);
+    case "kit_piece": return kitPieceIds();
+    case "kit_variant": return kitVariantIds().map(v => `${v.of}.${v.name}`);
   }
 }
 
@@ -60,7 +71,7 @@ export const exists = (kind: Kind, id: string) => ID[kind].test(id) && idsOf(kin
 /** A document as the browser edits it: plain JSON, in the new language shape (sahne-story/src/upgrade.ts). */
 export function readDoc(kind: Kind, id: string): { doc: unknown; mtime: number } {
   const r = readFile(fileOf(kind, id));
-  return { doc: kind === "place" ? plain(r.doc) : upgrade(kind, plain(r.doc)), mtime: r.mtime };
+  return { doc: kind === "place" || isKitKind(kind) ? plain(r.doc) : upgrade(kind, plain(r.doc)), mtime: r.mtime };
 }
 
 // ---- checks ----------------------------------------------------------------------------------------------------------------
@@ -77,19 +88,51 @@ const world = (): World => (cached ??= loadWorld());
 export const oldShape = (): string[] => world().oldShape;
 
 /** Forget the world read from disk (after a save, or a change made elsewhere). */
-export const forget = () => { cached = null; every = null; };
+export const forget = () => { cached = null; every = null; gate = null; ownKit = null; solids.clear(); };
+
+// ---- the root's own kit items ------------------------------------------------------------------------------------------------
+
+interface Own { kit: Kit; docs: (DrawingDoc | VariantDoc)[]; problems: string[] }
+let ownKit: Own | null = null;
+const own = (): Own => (ownKit ??= (() => { const c = loadContentKit({ kit: full }); return { ...c, kit: withDrawings(full, c.docs) }; })());
+/** The full kit with the root's own kit items (the good ones) added. */
+export const kit = (): Kit => own().kit;
+/** The kit items as the browser's stage adds them (`GET /api/kit`): the good documents, and a line for each file that is not. */
+export const kitDocs = (): { docs: (DrawingDoc | VariantDoc)[]; problems: string[] } => ({ docs: own().docs, problems: own().problems });
+const docKey = (d: DrawingDoc | VariantDoc) => ("of" in d ? `kit_variant:${d.of}.${d.name}` : `kit_piece:${d.id}`);
+
+/**
+ * The kit with these edited kit items in place of their files, and what is wrong with each edit: its schema, then its place in
+ * the kit (a taken id, a generator or param the kit does not have). Pieces go in before variants, one at a time, so one
+ * bad item leaves out only itself.
+ */
+export function kitWithEdits(edits: Edit[]): { kit: Kit; problems: Problem[] } {
+  const mine = edits.filter(e => isKitKind(e.kind)), keys = new Set(mine.map(e => `${e.kind}:${e.id}`)), problems: Problem[] = [];
+  const bad = (e: Edit, message: string) => problems.push({ rule: "kit", level: "error", story: `${e.kind}:${e.id}`, message, doc: `${e.kind}:${e.id}` });
+  const docs: { doc: DrawingDoc | VariantDoc; edit?: Edit }[] = own().docs.filter(d => !keys.has(docKey(d))).map(doc => ({ doc }));
+  for (const e of mine) {
+    const schema = validateDoc(e.kind as KitKind, e.doc);
+    if (schema.length) { for (const x of schema.slice(0, 6)) bad(e, `${x.path} ${x.message}`); continue; }
+    docs.push({ doc: e.doc as DrawingDoc | VariantDoc, edit: e });
+  }
+  let k = full;
+  for (const { doc, edit } of [...docs.filter(d => !("of" in d.doc)), ...docs.filter(d => "of" in d.doc)]) {
+    try { k = withDrawings(k, [doc]); } catch (err) { if (edit) bad(edit, (err as Error).message); }
+  }
+  return { kit: k, problems };
+}
 
 const solids = new Map<string, Solid[]>();
 const solidsOf = (places: Record<string, StoryPlace>): Record<string, Solid[]> =>
   Object.fromEntries(Object.entries(places).map(([id, p]) => {
     const key = `${id}:${JSON.stringify(p.pieces ?? [])}`;
     let s = solids.get(key);
-    if (!s) { s = placeSolids(p, kit); solids.set(key, s); }
+    if (!s) { s = placeSolids(p, kit()); solids.set(key, s); }
     return [id, s];
   }));
 
 let gate: Omit<CheckOptions, "solids"> | null = null;
-const options = () => (gate ??= { kit, cards: loadCards(), needs: loadNeeds() });
+const options = (k?: Kit): Omit<CheckOptions, "solids"> => { gate ??= { kit: kit(), cards: loadCards(), needs: loadNeeds() }; return k ? { ...gate, kit: k } : gate; };
 
 /** The world with the edits in it: a story's characters read again from the edited cast, the calendar from the edited seasons. */
 function withEdits(w0: World, edits: Edit[]): World {
@@ -113,14 +156,15 @@ function withEdits(w0: World, edits: Edit[]): World {
 }
 
 /** The problems of the edited documents in a world: each story's own and season rules, each character's, each place's, the series'. */
-function problemsIn(w: World, edits: Edit[]): Problem[] {
+function problemsIn(w: World, edits: Edit[], k?: Kit): Problem[] {
   const out: Problem[] = [];
-  const o = options();
+  const o = options(k);
+  const sol = (places: Record<string, StoryPlace>) => (k ? Object.fromEntries(Object.entries(places).map(([id, p]) => [id, placeSolids(p, k)])) : solidsOf(places));
   const tag = (doc: string) => (p: CheckProblem): Problem => ({ ...p, doc });
   const stories = edits.filter(e => e.kind === "story").map(e => e.id);
   if (stories.length) {
-    const sol = solidsOf(w.places);
-    const opts: CheckOptions = { ...o, solids: Object.fromEntries(stories.map(id => [id, sol])) };
+    const placed = sol(w.places);
+    const opts: CheckOptions = { ...o, solids: Object.fromEntries(stories.map(id => [id, placed])) };
     for (const id of stories) {
       const d = w.drafts.find(x => x.id === id);
       if (d) out.push(...checkStory(d, w, opts).map(tag(`story:${id}`)));
@@ -134,7 +178,7 @@ function problemsIn(w: World, edits: Edit[]): Problem[] {
   for (const e of edits.filter(e => e.kind === "place")) {
     const doc = w.places[e.id];
     out.push(...checkPlaces({ ...w, places: { [e.id]: doc } }).map(tag(`place:${e.id}`)));
-    for (const p of lintPlace(doc, { kit, cards: o.cards, needs: o.needs, languages: languagesOf(w.series) })) out.push({ rule: p.rule, level: p.level, story: `place:${e.id}`, message: p.message, doc: `place:${e.id}` });
+    for (const p of lintPlace(doc, { kit: o.kit, cards: o.cards, needs: o.needs, languages: languagesOf(w.series) })) out.push({ rule: p.rule, level: p.level, story: `place:${e.id}`, message: p.message, doc: `place:${e.id}` });
   }
   if (edits.some(e => e.kind === "series" || e.kind === "season")) {
     for (const p of checkSeries(w)) {
@@ -150,9 +194,10 @@ const key = (p: CheckProblem) => `${p.rule}|${p.level}|${p.story}|${p.step ?? ""
 /** Check edited documents: every problem of theirs, the ones the edit brought marked `new`. */
 export function check(edits: Edit[]): Problem[] {
   const w0 = world();
-  const before = new Set(problemsIn(w0, edits.filter(e => !e.create && exists(e.kind, e.id)).map(e => ({ ...e, doc: currentDoc(w0, e) }))).map(key));
-  const after = problemsIn(withEdits(w0, edits), edits);
-  return after.map(p => (before.has(key(p)) ? p : { ...p, new: true }));
+  const before = new Set(problemsIn(w0, edits.filter(e => !e.create && exists(e.kind, e.id) && !isKitKind(e.kind)).map(e => ({ ...e, doc: currentDoc(w0, e) }))).map(key));
+  const withKit = edits.some(e => isKitKind(e.kind)) ? kitWithEdits(edits) : null;
+  const after = problemsIn(withEdits(w0, edits), edits, withKit?.kit);
+  return [...(withKit?.problems ?? []).map(p => ({ ...p, new: true })), ...after.map(p => (before.has(key(p)) ? p : { ...p, new: true }))];
 }
 
 /** The document a kind and id have in the world now (what an edit replaces). */
@@ -163,6 +208,7 @@ function currentDoc(w: World, e: Edit): unknown {
     case "story": return w.drafts.find(d => d.id === e.id)?.story;
     case "place": return w.places[e.id];
     case "character": return w.cast[e.id] ?? w.extras[e.id];
+    case "kit_piece": case "kit_variant": return readDoc(e.kind, e.id).doc;
   }
 }
 
@@ -179,7 +225,8 @@ function refuse(e: Edit): string | null {
     if (has) return `${e.kind} ${e.id} exists already: ids are permanent, pick a new one`;
     if (e.kind === "character" && RETIRED_CHARACTERS.has(e.id)) return `${e.id} is a retired character id`;
   } else if (!has) return `${e.kind} ${e.id} has no file`;
-  const docId = (e.doc as { id?: unknown }).id;
+  const d = e.doc as { id?: unknown; of?: unknown; name?: unknown };
+  const docId = e.kind === "kit_variant" ? `${String(d.of)}.${String(d.name)}` : d.id;
   if (e.kind !== "series" && docId !== e.id) return `${e.kind} ${e.id}: its id is ${String(docId)}; ids never change`;
   if (e.kind === "character" && !e.create && (e.doc as CharacterDoc).kind === "extra") return `${e.id} is an extra: extras are written by sahne-story/cast/extras.ts`;
   return null;
@@ -212,6 +259,10 @@ export function allProblems(): Problem[] {
     ...Object.keys(w.places).map(id => ({ kind: "place" as const, id, doc: w.places[id] })),
   ];
   every = problemsIn(w, edits);
+  for (const line of own().problems) {
+    const m = /^kit\/(pieces|variants)\/(.+?)\.json: (.*)$/s.exec(line), doc = m ? `${m[1] === "pieces" ? "kit_piece" : "kit_variant"}:${m[2]}` : "kit";
+    every.push({ rule: "kit", level: "error", story: doc, message: m ? m[3] : line, doc });
+  }
   if (!w.series) every.push(...checkSeries(w).map(p => ({ ...p, doc: "series:series" })));
   return every;
 }

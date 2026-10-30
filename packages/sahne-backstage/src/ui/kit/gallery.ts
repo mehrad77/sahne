@@ -26,6 +26,8 @@ export interface Item {
   faded?: boolean;
   /** Its category (the kit page's shelves, model/kitgroups.ts). */
   shelf?: string;
+  /** A small label on the card (the kit page: an item the content root drew). */
+  badge?: string;
 }
 
 /** Ask for lazy pictures only near the screen: one observer for every card. */
@@ -57,7 +59,7 @@ export function Picture(p: { art?: Art; label: string }) {
 /** One card: a link, or a button that picks. `onHover` hears the pointer come (with the card's picture) and go. */
 export function Tile(p: { item: Item; on?: boolean; playing?: boolean; onPick?(id: string): void; onHover?(id: string, art: HTMLElement | null): void }) {
   const i = p.item;
-  const body = html`<${Picture} art=${i.art} label=${i.label} /><b lang=${i.lang} dir=${i.dir}>${i.label}</b>${i.sub && html`<small>${i.sub}</small>`}`;
+  const body = html`<${Picture} art=${i.art} label=${i.label} /><b lang=${i.lang} dir=${i.dir}>${i.label}</b>${i.badge && html`<span class="tilebadge">${i.badge}</span>`}${i.sub && html`<small>${i.sub}</small>`}`;
   if (i.href) return html`<a class=${`tile${i.faded ? " faded" : ""}`} href=${i.href} role="listitem">${body}</a>`;
   const hover = p.onHover && {
     onPointerEnter: (e: PointerEvent) => p.onHover!(i.id, (e.currentTarget as HTMLElement).querySelector(".art")),

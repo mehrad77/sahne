@@ -9,11 +9,13 @@ export { dressing, dress, forLearner, LEARNER_FIELDS, type Dressing } from "./lo
 export { storyProps, placesOf, isAt } from "./props.ts";
 export { isCard, isA1, cardProblem, type CardIndex, type CardInfo } from "./cards.ts";
 export { needsOf, type Needs, type SiteNeeds, type PlaceNeeds, type NeedMark, type NeedProp, type NeedState } from "./needs.ts";
-export { lintPlace, PLACE_RULES, BANDS, BASIC, SURFACES, MAX_BYTES, type PlaceRule, type PlaceProblem, type PlaceLintOptions } from "./lint-place.ts";
+export { lintPlace, paramProblems, PLACE_RULES, BANDS, BASIC, SURFACES, MAX_BYTES, type PlaceRule, type PlaceProblem, type PlaceLintOptions } from "./lint-place.ts";
 export { storyPlayer, type StoryPlayer, type PlayerStage, type PlayerRun, type PlayerHooks, type Footer } from "./player.ts";
 export { flagsOf, warmthOf, albumBand, metIn, unlockedOf, type StoryPicks, type PicksByStory } from "./memory.ts";
 export * from "./types.ts";
 export * from "./texts.ts";
 export { upgrade, isOldShape, type UpgradeKind } from "./upgrade.ts";
-export { langFor, plainLang, LANGS, type StoryLang, type LineWord, type LineContext, type PropView, type Resolver } from "./lang.ts";
+export { langFor, plainLang, motivated, motiveText, LANGS, type StoryLang, type LineWord, type LineContext, type PropView, type Resolver } from "./lang.ts";
 export { trLang } from "./langs/tr.ts";
+export { enLang } from "./langs/en.ts";
+export { deLang } from "./langs/de.ts";

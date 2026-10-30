@@ -15,7 +15,7 @@ export function openai(o: { baseUrl?: string; model?: string } = {}): Provider {
     id: "openai",
     model: model || "local",
     message: (role, text) => ({ role, content: text }),
-    results: (r: ToolResult[]) => r.map(x => ({ role: "tool", tool_call_id: x.id, content: x.isError ? `Error: ${x.text}` : x.text })),
+    results: (r: ToolResult[]) => r.map(x => ({ role: "tool", tool_call_id: x.id, content: `${x.isError ? "Error: " : ""}${x.text}${x.images?.length ? `\n(${x.images.length} picture${x.images.length > 1 ? "s" : ""} not shown: this provider's tool results are text)` : ""}` })),
     async turn(t: TurnOptions): Promise<Turn> {
       const messages = [{ role: "system", content: t.system }, ...t.messages];
       const body = JSON.stringify({

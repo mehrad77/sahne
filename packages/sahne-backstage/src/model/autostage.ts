@@ -5,6 +5,7 @@
 // Node-tested (test/model.test.ts).
 
 import type { Staging } from "sahne";
+import { motivated, motiveText } from "sahne-story";
 import type { CueInfo, StoryDoc, StoryLang, Suggestion } from "sahne-story";
 import { cuePath, get, type Path } from "./path.ts";
 import { blocks } from "./script.ts";
@@ -45,11 +46,11 @@ export function suggestionsOf(story: StoryDoc, o: { lang: StoryLang; lints: Sugg
     if (!text) continue;
     if (!step.do) {
       // the first gesture one of the words motivates (a number's count is the lints')
-      const said = o.lang.words(text).filter(w => !w.pause).map(w => w.w), line = said.join(" ");
+      const said = o.lang.words(text).filter(w => !w.pause).map(w => w.w);
       for (const [g, words] of Object.entries(o.lang.motive)) {
         if (!gestures.has(g) || !words.length || g === "count" || g === "phone") continue;
-        const m = words.find(x => said.some(w => w.startsWith(x)) || line.includes(`${x} `));
-        if (m) { add(b.path, { fix: { do: g }, why: `“${m}…” motivates ${g.replace(/_/g, " ")}`, from: "words" }); break; }
+        const m = motivated(words, said);
+        if (m) { add(b.path, { fix: { do: g }, why: `“${motiveText(m)}…” motivates ${g.replace(/_/g, " ")}`, from: "words" }); break; }
       }
     }
     if (!step.emo) {
