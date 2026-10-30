@@ -67,8 +67,12 @@ async function pump() {
   busy = false;
 }
 
-function bake(st: Stage, s: Scene): Promise<string | null> {
+/** Load a scene on a stage (the hover previews, live.ts, load theirs the same way). */
+export const loadScene = (st: Stage, s: Scene) =>
   st.load({ v: 1, cues: s.cues }, { ...s.load, cast: s.cast, places: s.places ?? (s.place ? { [s.place.id]: s.place } : s.load?.places ?? {}), ...(s.names ? { names: s.names } : {}) });
+
+function bake(st: Stage, s: Scene): Promise<string | null> {
+  loadScene(st, s);
   if (s.play) {
     st.show(Math.max(0, s.play.cue - 1));
     const run = st.play(s.play.cue) as Run;
@@ -99,10 +103,19 @@ export const cueThumb = (cues: Cue[], i: number, load: Partial<LoadOptions>) => 
 /** An empty room a gesture is shown in. */
 const ROOM: PlaceDoc = { v: 1, id: "backstage_room", size: { w: 5, d: 3 }, pieces: [], marks: { a: { x: 0, z: 0 } } } as unknown as PlaceDoc;
 
+/** `doc` doing a gesture, the whole figure; the picture is caught at its stroke. */
+export const gestureScene = (gesture: string, doc: AvatarDoc): Scene & { play: { cue: number; at: number } } => ({
+  place: ROOM, cast: { a: doc },
+  cues: [{ scene: { place: ROOM.id, at: { a: "a" }, cam: "wide" } }, { line: { who: "a", text: "…", do: gesture, cam: "wide", voice: "mouthing" } }],
+  play: { cue: 1, at: Math.min(0.9, (KIT.gestures[gesture]?.stroke ?? 600) / Math.max(1, KIT.gestures[gesture]?.dur ?? 1200)) },
+});
+
+/** `doc`'s face going from neutral to an emotion, close. */
+export const emotionScene = (emotion: string, doc: AvatarDoc): Scene & { play: { cue: number; at: number } } => ({
+  place: ROOM, cast: { a: doc },
+  cues: [{ scene: { place: ROOM.id, at: { a: "a" }, cam: "close" } }, { line: { who: "a", text: "… … …", emo: emotion, cam: "close", voice: "silent" } }],
+  play: { cue: 1, at: 1 },
+});
+
 /** A gesture done by `doc`, at its stroke, the whole figure. */
-export const gestureThumb = (gesture: string, doc: AvatarDoc) =>
-  snapshot(`gesture2|${gesture}|${hashString(JSON.stringify(doc))}`, () => ({
-    place: ROOM, cast: { a: doc },
-    cues: [{ scene: { place: ROOM.id, at: { a: "a" }, cam: "wide" } }, { line: { who: "a", text: "…", do: gesture, cam: "wide", voice: "mouthing" } }],
-    play: { cue: 1, at: Math.min(0.9, (KIT.gestures[gesture]?.stroke ?? 600) / Math.max(1, KIT.gestures[gesture]?.dur ?? 1200)) },
-  }));
+export const gestureThumb = (gesture: string, doc: AvatarDoc) => snapshot(`gesture2|${gesture}|${hashString(JSON.stringify(doc))}`, () => gestureScene(gesture, doc));

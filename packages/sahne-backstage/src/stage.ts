@@ -15,7 +15,8 @@ import { adaptStory, storyPlayer, type CharacterDoc, type Languages, type StoryD
 
 export const KIT: Kit = { ...full, puppets: { ...full.puppets, ...kerimPuppets, ...animals } };
 export const LANG = tr;
-const SOUNDS = new URL("/sounds/", location.href).href;
+/** Where the kit's recordings are served. */
+export const SOUNDS = new URL("/sounds/", location.href).href;
 
 const solidCache = new Map<string, Solid[]>();
 /** Each place's solids (the walk routes the lints check), cached by its pieces. */

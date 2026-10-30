@@ -1,14 +1,17 @@
 // The kit as galleries (kit/gallery.ts): the items each picker shows. The cast as portraits (`portrait`), the places as
 // their wide shots (thumbs.ts), props and set pieces as sketches (`pieceSvg`, sahne-kit/set-svg), emotions as faces on
 // the stand-in, gestures as the stand-in caught at the stroke (drawn once, then kept), sounds with their word, played on
-// a click. A picker is a gallery in a popover.
+// a click (their pictures are their waveforms, drawn when idle). A picker is a gallery in a popover. Each item knows its
+// shelf (model/kitgroups.ts), the kit page's categories.
 
+import { signal } from "@preact/signals";
 import { html } from "htm/preact";
-import { portrait, type AvatarDoc } from "sahne";
+import { AudioEngine, portrait, type AvatarDoc } from "sahne";
 import { pieceSvg } from "sahne-kit/set-svg";
 import { textOf, type CharacterDoc, type StoryPlace } from "sahne-story";
-import { KIT } from "../stage.ts";
-import { gestureThumb, placeThumb } from "../thumbs.ts";
+import { EMOTION_SHELVES, PROP_SHELVES, SET_SHELVES, gestureShelf, shelfOf } from "../model/kitgroups.ts";
+import { KIT, SOUNDS } from "../stage.ts";
+import { emotionScene, gestureScene, gestureThumb, placeThumb } from "../thumbs.ts";
 import { world } from "../store.ts";
 import { Gallery, type Item } from "./kit/gallery.ts";
 import { Popover } from "./kit/index.ts";
@@ -20,7 +23,7 @@ export const portraitOf = (c: CharacterDoc | undefined, size = 120, framing: "he
   c?.avatar ? svgOf(() => portrait(c.avatar, KIT, { framing, size, trusted: true, ...(emotion ? { emotion } : {}) })) : "";
 
 /** The stand-in's look: who the gesture and emotion pictures show. */
-const model = (): AvatarDoc | undefined => {
+export const model = (): AvatarDoc | undefined => {
   const w = world.value;
   return (w?.characters[w.series?.standin ?? "nima"] ?? Object.values(w?.characters ?? {}).find(c => c.avatar))?.avatar;
 };
@@ -44,32 +47,88 @@ export function placeItems(o: { href?: boolean } = {}): Item[] {
 /** The kit's props (or set pieces) as sketches. */
 export function pieceItems(which: "props" | "set"): Item[] {
   return Object.entries(KIT[which]).sort(([a], [b]) => a.localeCompare(b)).map(([id, def]) => ({
-    id, label: id.replace(/_/g, " "), sub: def.meta?.about, tags: def.meta?.tags?.slice(0, 2), keywords: `${id} ${(def.meta?.terms ?? []).join(" ")}`,
-    art: svgOf(() => pieceSvg(KIT, def, {}, id, 96)) || null,
+    id, label: id.replace(/_/g, " "), sub: def.meta?.about, tags: def.meta?.tags, keywords: `${id} ${(def.meta?.terms ?? []).join(" ")} ${(def.meta?.tags ?? []).join(" ")}`,
+    shelf: shelfOf(which === "props" ? PROP_SHELVES : SET_SHELVES, def.meta?.tags).id,
+    art: async () => svgOf(() => pieceSvg(KIT, def, {}, id, 96)) || null,
   }));
 }
 
-export const emotionItems = (): Item[] => Object.keys(KIT.face.emotions).map(e => ({ id: e, label: e, art: svgOf(() => { const m = model(); return m ? portrait(m, KIT, { framing: "head", size: 88, emotion: e, trusted: true }) : ""; }) || null }));
+export const emotionItems = (): Item[] => Object.keys(KIT.face.emotions).map(e => ({ id: e, label: e, shelf: shelfOf(EMOTION_SHELVES, [e]).id, art: svgOf(() => { const m = model(); return m ? portrait(m, KIT, { framing: "head", size: 88, emotion: e, trusted: true }) : ""; }) || null }));
 
 export const gestureItems = (): Item[] => Object.entries(KIT.gestures).sort(([a], [b]) => a.localeCompare(b)).map(([g, def]) => {
   const m = model();
-  return { id: g, label: g.replace(/_/g, " "), sub: def.needs?.length ? `needs a ${def.needs.join(", ")}` : undefined, tags: def.needs?.includes("target") ? ["at something"] : ["on its own"], art: m ? () => gestureThumb(g, m) : null };
+  return { id: g, label: g.replace(/_/g, " "), sub: def.needs?.length ? `needs a ${def.needs.join(", ")}` : undefined, shelf: gestureShelf(def.needs).id, art: m ? () => gestureThumb(g, m) : null };
 });
 
-const SPEAKER = `<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 9v6h4l5 4V5L8 9zM16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/></svg>`;
+let engine: AudioEngine | null = null;
+const audio = () => engine ??= new AudioEngine(KIT, { sounds: SOUNDS });
+
+/** The sound playing now (a loop plays until it is clicked again or another starts). */
+export const soundPlaying = signal<string | null>(null);
+let ends: ReturnType<typeof setTimeout> | undefined;
+
+/** Stop whatever sound is playing. */
+export function stopSounds() {
+  clearTimeout(ends);
+  engine?.ambience([]); engine?.stopAll();
+  soundPlaying.value = null;
+}
+
+/** Play a kit sound, its recording where it has one, else its patch; a click on the loop that is playing stops it. */
+export function playSound(id: string) {
+  const def = KIT.sounds?.[id];
+  if (!def) return;
+  const again = soundPlaying.value === id && def.loop;
+  stopSounds();
+  if (again) return;
+  const e = audio();
+  e.setEnabled(true);
+  const go = () => {
+    if (def.loop) e.ambience([id], true);
+    else { e.play(id); ends = setTimeout(() => { if (soundPlaying.value === id) soundPlaying.value = null; }, Math.max(400, e.length(id))); }
+  };
+  soundPlaying.value = id;
+  if (e.running) go(); else void e.ctx?.resume().then(go, go);
+}
+
+/** Load a sound's recording ahead of a click (the pointer is on its card), so the first click plays it. */
+export const warmSound = (id: string) => { void audio().recording(id); };
+
+/** A sound's waveform as SVG (its patch: what plays where the recording does not load), drawn when the page is idle. */
+const waveQueue: (() => void)[] = [];
+let waving = false;
+function waveform(id: string): Promise<string | null> {
+  return new Promise(res => {
+    waveQueue.push(() => {
+      const r = audio().render(id);
+      if (!r) return res(null);
+      const N = 48, step = Math.max(1, Math.floor(r.data.length / N));
+      let peak = 1e-6;
+      const amp = Array.from({ length: N }, (_, k) => { let m = 0; for (let i = k * step; i < Math.min(r.data.length, (k + 1) * step); i += 4) m = Math.max(m, Math.abs(r.data[i])); peak = Math.max(peak, m); return m; });
+      const bars = amp.map((a, k) => { const h = Math.max(1.5, a / peak * 34); return `<rect x="${k * 4 + 1}" y="${(40 - h) / 2}" width="2.4" height="${h.toFixed(1)}" rx="1.2"/>`; }).join("");
+      res(`<svg class="wave" viewBox="0 0 194 40" preserveAspectRatio="none" fill="currentColor">${bars}</svg>`);
+    });
+    if (!waving) pumpWaves();
+  });
+}
+function pumpWaves() {
+  waving = waveQueue.length > 0;
+  if (!waving) return;
+  const next = () => { waveQueue.shift()?.(); pumpWaves(); };
+  if ("requestIdleCallback" in window) requestIdleCallback(next, { timeout: 600 }); else setTimeout(next, 16);
+}
+
 export function soundItems(main: string): Item[] {
   return Object.entries(KIT.sounds ?? {}).sort(([a], [b]) => a.localeCompare(b)).map(([id, s]) => {
-    const word = (s as { word?: Record<string, string> }).word;
-    return { id, label: id.replace(/_/g, " "), sub: word ? word[main] ?? word.en : undefined, tags: [(s as { bus?: string }).bus ?? "sfx"], art: SPEAKER };
+    const word = s.word;
+    return { id, label: id.replace(/_/g, " "), sub: word ? word[main] ?? word.en : undefined, shelf: s.bus, tags: [s.loop ? "loop" : "one-shot", ...(s.recording ? ["recorded"] : [])], keywords: `${id} ${Object.values(word ?? {}).join(" ")}`, art: () => waveform(id) };
   });
 }
 
-let playing: HTMLAudioElement | null = null;
-/** Play a kit sound (the server serves the recordings). */
-export function playSound(id: string) {
-  playing?.pause();
-  playing = new Audio(`/sounds/${id}.m4a`);
-  void playing.play().catch(() => { /* a synthesized sound has no recording */ });
+/** What a card plays while the pointer rests on it: a gesture or an emotion on the stand-in (live.ts). */
+export function liveScene(kind: "gestures" | "emotions", id: string) {
+  const m = model();
+  return m ? () => (kind === "gestures" ? gestureScene(id, m) : emotionScene(id, m)) : null;
 }
 
 export type PickKind = "character" | "place" | "prop" | "piece" | "gesture" | "emotion" | "sound";

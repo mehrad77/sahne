@@ -47,9 +47,16 @@ Everything a scene is made of is picked from a gallery of pictures, not a list o
 - **Places** as their wide shot.
 - **Props and set pieces** as sketches (`pieceSvg`, `sahne-kit/set-svg`).
 - **Emotions** as the stand-in's face, **gestures** as the stand-in caught at the gesture's stroke.
-- **Sounds** with their word; a click plays one.
+- **Sounds** as their waveform (the patch, drawn when idle) with their word. A click plays one through an `AudioEngine`: the recording where there is one, else the patch. A click on a playing loop stops it.
 
-A gallery has a search box and filters by tag; a picker is a gallery in a popover. The pictures the stage draws (a place's wide shot, a gesture, a step for the storyboard) come from one hidden stage, one at a time, and are kept in the browser's IndexedDB under a key that changes with what they show, so each is drawn once (`src/thumbs.ts`). `#/kit` shows the kit's galleries on their own.
+A gallery has a search box and filters by tag; a picker is a gallery in a popover. A card's picture is asked for only as the card nears the screen. The pictures the stage draws (a place's wide shot, a gesture, a step for the storyboard) come from one hidden stage, one at a time, and are kept in the browser's IndexedDB under a key that changes with what they show, so each is drawn once (`src/thumbs.ts`).
+
+**The kit page** (`#/kit/<section>/<shelf>`, `src/ui/kitpage.ts`) lays the kit out as a library:
+- **The side.** It lists the sections (props, set pieces, gestures, emotions, sounds) with their counts. The open section is split into shelves (`src/model/kitgroups.ts`). Each shelf gathers several of the kit's tags, and an item goes on the first shelf one of its tags belongs to, else on *Other*. Gestures are shelved by what they need, sounds by their bus. A test fails when a prop or set-piece tag is on no shelf.
+- **The bar.** It has a search of the section, the shelf's commonest tags as filters, and the card size (S, M or L, remembered).
+- **The cards.** With no shelf and no search, each shelf shows its first row and *See all*. Otherwise the cards come in pages as the list scrolls.
+- **Details.** A click opens a card's details: its id to copy, what it is, its tags, other names and parameters with their defaults. A sound also plays.
+- **Hover.** A gesture or an emotion plays on the stand-in while the pointer rests on its card. One shared stage is laid over the card (`src/live.ts`). With reduced motion, the pictures stay still.
 
 ## The pages
 
@@ -58,7 +65,7 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 | `#/`, `#/season/<id>` | The board of a season (the first, or the one named), described below |
 | `#/new/<season>[/<date>]` | A new episode (on that day), described below |
 | `#/episode/<id>` | An episode, described below |
-| `#/kit` | The kit as galleries: props, set pieces, gestures, emotions, sounds |
+| `#/kit/<section>/<shelf>` | The kit as a library: props, set pieces, gestures, emotions, sounds, by shelf |
 | `#/cast` | Everyone of the series as a portrait, the extras on their own tab. *New character* starts one with a new id: ids are permanent, and a retired one is refused |
 | `#/character/<id>` | A character, described below |
 | `#/places` | Every place as its wide shot, with how many episodes it opens; *New place* starts one |
@@ -379,8 +386,8 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `api.ts`;
   - `stage.ts` (`Preview`: the stage and a story player that follow the document);
   - `events.ts` (the server's events: proposals, direct writes, `show`, usage; the selection);
-  - `thumbs.ts` (pictures the stage draws once and keeps);
-  - `model/` (paths into a document, undo and redo, the step list, what changed, the board's weeks, the script's blocks and keys, parentheticals, ghosts and suggestions, notes, a new episode's skeleton, the palette's search; pure and tested in Node);
+  - `thumbs.ts` (pictures the stage draws once and keeps); `live.ts` (the kit page's hover previews on one shared stage);
+  - `model/` (paths into a document, undo and redo, the step list, what changed, the board's weeks, the script's blocks and keys, parentheticals, ghosts and suggestions, notes, a new episode's skeleton, the palette's search, the kit page's shelves; pure and tested in Node);
   - `ui/` (the pages: `app` (the shell), `board`, `new`, `studio/` (the episode: `episode`, `script`, `sections`, `details`, `direct`, `strip`, `notes`), `cast`, `places`, `kitpage`, `review`, `seasons` (settings), `settings` (the assistant and the budget); and their parts: `assistant`, `galleries`, `lang`, `staging`, `changes`, `fields`, `theme`, `kit/`).
 - **`index.html`** is the page.
 - **`test/`**: `node --test` covers the save round trip, the model, the server on a temp copy of the samples, and the rest of the API. `mcp.test.ts` covers the MCP server in memory, over HTTP and over stdio. `assistant.test.ts` covers the assistant's loops, the budget and the settings with the network stubbed, in a temp config folder. `pnpm check` runs it.
