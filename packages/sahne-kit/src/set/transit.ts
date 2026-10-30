@@ -84,7 +84,7 @@ const double_decker: PieceDef = { draw(p, r) {
     ...GO,
   },
   terms: ["a1-w-otobus"],
-  tags: ["vehicle", "bus", "city"],
+  tags: ["bus", "vehicle", "city"],
 } };
 
 // ---- city bus ------------------------------------------------------------------------------------
@@ -124,7 +124,7 @@ const city_bus: PieceDef = { draw(p, r) {
     ...GO,
   },
   terms: ["a1-w-otobus", "a1-w-durak"],
-  tags: ["vehicle", "bus", "city"],
+  tags: ["bus", "vehicle", "city"],
 } };
 
 // ---- train -------------------------------------------------------------------------------------
@@ -223,7 +223,7 @@ const black_cab: PieceDef = { draw(p, r) {
     ...GO,
   },
   terms: ["a1-w-taksi"],
-  tags: ["vehicle", "city", "taxi"],
+  tags: ["taxi", "vehicle", "city"],
 } };
 
 // ---- boats -------------------------------------------------------------------------------------
@@ -267,7 +267,7 @@ const gondola: PieceDef = { draw(p, r) {
     ...GO,
   },
   terms: ["a2-w-gondol", "a2-w-nehir"],
-  tags: ["vehicle", "boat", "water", "canal"],
+  tags: ["boat", "vehicle", "water", "canal"],
 } };
 
 /**
@@ -313,7 +313,7 @@ const canal_boat: PieceDef = { draw(p, r) {
       ...GO,
     },
     terms: ["a2-w-kanal", "a1-w-tekne"],
-    tags: ["vehicle", "boat", "water", "canal"],
+    tags: ["boat", "vehicle", "water", "canal"],
   } };
 
 // ---- bike --------------------------------------------------------------------------------------
@@ -388,7 +388,7 @@ const bike: PieceDef = { draw(p, r) {
       ...GO,
     },
     terms: ["a1-w-bisiklet"],
-    tags: ["vehicle", "bike", "street"],
+    tags: ["bike", "vehicle", "street"],
   } };
 
 // ---- vespa -------------------------------------------------------------------------------------
@@ -424,7 +424,7 @@ const vespa: PieceDef = { draw(p, r) {
     ...GO,
   },
   terms: ["a1-w-motosiklet"],
-  tags: ["vehicle", "street", "city"],
+  tags: ["scooter", "vehicle", "street", "city"],
 } };
 
 /** The family's set pieces and props (`index.ts`). The bike is a prop too, so a story can have someone push it. */

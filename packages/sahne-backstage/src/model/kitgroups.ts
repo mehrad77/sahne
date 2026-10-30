@@ -18,7 +18,7 @@ export const PROP_SHELVES: readonly Shelf[] = [
 ];
 
 export const SET_SHELVES: readonly Shelf[] = [
-  { id: "transport", label: "Transport", tags: ["bus", "train", "boat", "bike", "taxi", "canal"] },
+  { id: "transport", label: "Transport", tags: ["bus", "train", "boat", "bike", "taxi", "canal", "scooter"] },
   { id: "transit", label: "Airport & metro", tags: ["airport", "metro", "station", "vehicle", "rail", "gate"] },
   { id: "room", label: "Rooms & walls", tags: ["wall", "floor", "room", "window", "door", "barrier"] },
   { id: "outside", label: "Streets & buildings", tags: ["street", "building", "landmark", "city", "park", "market"] },
