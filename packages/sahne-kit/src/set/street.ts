@@ -726,6 +726,30 @@ const shutter: PieceDef = { draw(p, r) {
 
 // ---- Street furniture -------------------------------------------------------------------------------
 
+/** The lamp posts of an old city (`gas`: a fluted column on a stepped foot with a ladder bar and a square glass lantern under a pointed cap) and of a Dutch street (`dutch`: a slim steel pole curving over to a hanging bowl lamp). */
+function oldLamp(kind: string, p: Record<string, unknown>) {
+  const gas = kind === "gas", h = num(p.h, gas ? 360 : 520), c = hue(p.color, {}, gas ? "#2B332F" : "#3C4248"), gold = "#C9A24A";
+  const sh: Shape[] = [], glow: Shape[] = [], lights: LightSpec[] = [];
+  if (gas) {
+    const top = -h + 70;
+    sh.push(P([[-26, 0, 0], [26, 0, 0], [24, -10, 0], [16, -16, 0], [18, -26, 0], [12, -34, 0], [10, -70, 0], [-10, -70, 0], [-12, -34, 0], [-18, -26, 0], [-16, -16, 0], [-24, -10, 0]], c), R(-14, -80, 28, 10, c), R(-14, -80, 28, 2, gold, pr(0.8)));
+    sh.push(P([[-9, -80, 0], [9, -80, 0], [5, top, 0], [-5, top, 0]], c), L([[-3, -84], [-2, top + 6]], tone(c, "light"), 1.2, 0.5), L([[3, -84], [2, top + 6]], tone(c, "deep"), 1.2, 0.5), R(-9, -h * 0.5, 18, 6, c), R(-8, -h * 0.5, 16, 1.6, gold, pr(0.7)));
+    sh.push(R(-24, top + 20, 48, 4, c), R(-26, top + 18, 4, 8, c), R(24, top + 18, 4, 8, c), R(-8, top - 4, 16, 8, c));
+    const g = poly([[-11, top - 4], [11, top - 4], [14, top - 40], [-14, top - 40]]);
+    sh.push(P([[-14, top - 4, 0], [14, top - 4, 0], [18, top - 42, 0], [-18, top - 42, 0]], c), S(g, "#F3E6C4"), L([[0, top - 6], [0, top - 40]], c, 1.4, 1), P([[-20, top - 42, 0], [20, top - 42, 0], [6, top - 60], [-6, top - 60]], c), R(-20, top - 44, 40, 2.5, gold, pr(0.7)), L([[0, top - 60], [0, top - 72]], c, 2, 1), S(ellipse(0, top - 74, 3), gold));
+    glow.push(S(g, "#FFE6A8", pr()), S(ellipse(0, top - 22, 38, 34), "#FFD98A", pr(0.22)));
+    lights.push({ x: 0, y: -(top - 22), z: 20, color: "#FFD59A", radius: 4, intensity: 0.85, switch: false, at: ["dawn", "dusk", "night"] });
+  } else {
+    const hx = 56;
+    sh.push(R(-9, -10, 18, 10, c), R(-6, -h, 12, h - 10, c), L([[-3, -14], [-3, -h + 40]], tone(c, "light"), 1.4, 0.5), R(-8, -h * 0.35, 16, 5, tone(c, "deep")));
+    sh.push({ path: smooth([[0, -h + 30], [0, -h + 4], [hx * 0.4, -h - 10], [hx, -h - 8]], false), stroke: { color: c, width: 9, cap: "round" } }, R(hx - 4, -h - 14, 8, 8, c));
+    sh.push(P([[hx - 26, -h - 6, 0], [hx + 26, -h - 6, 0], [hx + 20, -h + 6], [hx - 20, -h + 6]], tone(c, "deep")), R(hx - 26, -h - 8, 52, 3, c));
+    glow.push(S(ellipse(hx, -h + 7, 17, 3), "#FFF1C4", pr()), P([[hx - 17, -h + 8, 0], [hx + 17, -h + 8, 0], [hx + 40, -h * 0.55, 0], [hx - 40, -h * 0.55, 0]], "#FFE9AE", pr(0.1)));
+    lights.push({ x: hx, y: h - 8, z: 20, color: "#FFE3A8", radius: 5, intensity: 0.8, switch: false, at: ["dawn", "dusk", "night"] });
+  }
+  return { flats: [{ group: { shapes: sh, edge: 0.6 }, emissive: { shapes: glow, edge: 0 }, switch: false, glowAt: 0.05, ppcm: Math.min(2.4, 1900 / (h + 140)) }], lights };
+}
+
 /**
  * A cast-iron lamp post `h` cm tall in `color` (dark green or black by seed), `kind` `street` (the classic Istanbul post: a
  * fluted shaft on a flared foot, a ladder bar, a four-sided lantern on a scrolled neck) or `pier` (a double lamp: two lanterns
@@ -733,6 +757,7 @@ const shutter: PieceDef = { draw(p, r) {
  * The ladder bar, the arm and the lantern caps are perches.
  */
 const lampPost: PieceDef = { draw(p, r) {
+  if (p.kind === "gas" || p.kind === "dutch") return oldLamp(p.kind, p);
   const pier = str(p.kind, "street") === "pier", h = num(p.h, pier ? 400 : 430), c = hue(p.color, {}, pier ? "#2E3B35" : r.pick(["#2F4038", "#2A2C2E", "#2E3A4A"])), gold = "#C9A24A";
   const sh: Shape[] = [], glow: Shape[] = [], lights: LightSpec[] = [], top = -h + (pier ? 74 : 96);
   sh.push(P([[-22, 0, 0], [22, 0, 0], [18, -12, 0], [12, -22], [10, -64, 0], [-10, -64, 0], [-12, -22], [-18, -12, 0]], c), R(-24, -6, 48, 6, tone(c, "light")), R(-13, -72, 26, 9, c), R(-13, -72, 26, 2, gold, pr(0.8)));
@@ -757,12 +782,12 @@ const lampPost: PieceDef = { draw(p, r) {
     lantern(-ax, top - 2, 1.1); lantern(ax, top - 2, 1.1);
   }
   return { flats: [{ group: { shapes: sh, edge: 0.6 }, emissive: { shapes: glow, edge: 0 }, switch: false, glowAt: 0.05, ppcm: Math.min(2.4, 1900 / (h + 80)) }], lights };
-}, variants: { street: { kind: "street" }, pier: { kind: "pier" } },
+}, variants: { street: { kind: "street" }, pier: { kind: "pier" }, gas: { kind: "gas" }, dutch: { kind: "dutch" } },
   meta: {
-    about: "A cast-iron lamp post, the classic Istanbul street lamp or a pier's double lamp, glowing in the evening.",
+    about: "A lamp post glowing in the evening: the classic Istanbul street lamp, a pier's double lamp, an old city gas lamp or a Dutch hanging bowl lamp.",
     params: {
-      kind: { type: "enum", values: ["street", "pier"], default: "street" },
-      h: { type: "num", min: 0, about: "height, cm (430 street, 400 pier)" },
+      kind: { type: "enum", values: ["street", "pier", "gas", "dutch"], default: "street" },
+      h: { type: "num", min: 0, about: "height, cm (430 street, 400 pier, 360 gas, 520 dutch)" },
       color: { type: "color", about: "a hex; dark green or black by seed" },
     },
     terms: ["lamba"],
