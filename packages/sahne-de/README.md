@@ -1,3 +1,7 @@
+<!-- sahne:brand: written by packages/sahne-gallery/brand/build.mjs, edit that and run it -->
+<p><picture><source media="(prefers-color-scheme: dark)" srcset="../../assets/brand/sahne-de-header-dark.svg"><img src="../../assets/brand/sahne-de-header.svg" alt="sahne DE" height="64"></picture></p>
+<!-- /sahne:brand -->
+
 # sahne-de
 
 The German plugin of [Sahne](../sahne/README.md) ([DESIGN.md](../sahne/DESIGN.md) §4.1, §7, §9). Sahne knows no language: mouth timing and word matching come from a `LangPlugin`, and this is the German one (`locale: "de-DE"`).
