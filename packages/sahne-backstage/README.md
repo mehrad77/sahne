@@ -137,19 +137,36 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 - Saving runs the cast check.
 - An extra is shown, never edited. Extras are written by `sahne-story/cast/extras.ts`.
 
-**A place's page** (`src/ui/places.ts`).
-- The place on a stage, at each of its times and states.
-- **Marks.**
-  - Each mark is a pin you drag on the floor (`Stage.floorAt`); *+ a mark* adds one where you click.
-  - The marks' table edits x, y, z, facing and seat.
-- **Props.** Each is edited as JSON. *+ a prop* adds one, picking from the kit.
-- **Set pieces.**
-  - A list. For the selected piece, its id and place, its variant, and a control for each param its generator declares (`PieceDef.meta`).
-  - A piece's art comes from its seed: its `seed`, else the site with its `id`, else the site with its kit and position (`pieceSeed`). Naming an unnamed piece, or moving one, would change its art, so the editor pins the seed it had first.
-- **Settings.** Name, size, Kerim's perch, the floor's sound, its times, ambience and camera.
+**A place's page** (`src/ui/places.ts`, its parts in `src/ui/place/`, its pure model in `src/model/place.ts`). Two tabs: *Stage*, where the place is edited by looking at it, and *Source*, every field as it is stored.
+- **The stage** (`place/stage.ts`) shows the place at the time and in the states picked under it.
+  - A click selects the piece or prop under it, with its outline, using the interaction layer's hit test. The stage draws a copy whose unnamed pieces are named `@<index>`, with their seeds pinned, so each hit names its piece (`shownDoc`).
+  - A drag moves the selection across at its own depth. Only a thing on the floor drags in depth too, because the stage's camera is low and a few pixels up or down are a metre. The plan and the arrow keys set the depth of a raised thing.
+  - Each mark is a spike pin with its facing arrow, and the perch has a dove. Drag a pin to move its mark.
+  - Keys: Esc lets go, Delete removes, the arrows nudge by 5 cm (Shift: 25 cm), ⌘D copies and ⌘Z undoes.
+- **Under it** (`place/mood.ts`):
+  - The times it is seen at. A click shows one, × drops it, + adds one.
+  - Its states as switches, one per group at a time.
+  - Its ambience as a sound board: a chip turns a sound on, ▶ plays it.
+- **The ground plan** (`place/plan.ts`) is the place from above, with across as x and depth as z toward the audience.
+  - Pieces are boxes; the floor, the walls and the street are lines. Props are dots, and marks are crosses with their facing.
+  - The wide shot is a red bracket at the depth it fits. What stands behind the room is drawn on a strip at the top.
+  - Drag anything to move it in x and z.
+- **The inspector** (`place/inspector.ts`) shows what is selected, in plain words.
+  - **Nothing selected:** the place, with its names, size, Kerim's perch, the floor's sound and what the wide shot spans.
+  - **A piece:** its sketch and look (variant), a control for each param its generator declares (`PieceDef.meta`), the states it is in, and its id.
+  - **A prop:**
+    - what it sits on: a mark, or free;
+    - its height, from the heights things sit at in this place, each named after its piece (`0.9 · counter`, `heights`);
+    - how many, whether it shows, and its JSON.
+  - **A mark:** its facing as six buttons, a seat and its height, in the air, the perch, and its states. A mark not yet saved can be renamed; a saved one keeps its id.
+- **Adding.** *+ Add* opens the catalogue (`place/catalogue.ts`): the kit's props and set pieces as sketches, and a new mark.
+  - A pick, then a click on the stage or the plan, puts it there.
+  - A prop dropped on a piece sits where it was hit, at the height things usually sit at on that kind of piece (`heightOn`). Dropped on a prop, it sits beside that prop.
+- A piece's art comes from its seed: its `seed`, else the site with its `id`, else the site with its kit and position (`pieceSeed`). Naming an unnamed piece, or moving or copying one, would change its art, so the editor pins the seed it had first.
 - **Checks.**
-  - The 5 KB budget (`MAX_BYTES`), and each of `PLACE_RULES` as ✓, ! or ✗, with `lintPlace`'s problems.
+  - The 5 KB budget (`MAX_BYTES`) as a bar, and each of `PLACE_RULES` as ✓, ! or ✗, with `lintPlace`'s problems.
   - Saving runs the place check. The gallery's camera check (`#/places/<id>`) stays in the gallery.
+- *New place* starts from an empty room or a copy of another place.
 
 **A new episode** (`src/ui/new.ts`, `src/model/skeleton.ts`), from an empty day on the board or *New episode*:
 - **Three picks:** where (a place from its picture, and the time of day), who (the cast from their portraits; the stand-in is always in, the narrator narrates), and what it teaches (the target words, searched live through `GET /api/cards?q=`, their text never stored; on a root without cards, ids typed in; and one to three lessons, `GET /api/lessons`). Then a title (the main language's at least) and a line of premise in the translations, which the narrator opens with.
