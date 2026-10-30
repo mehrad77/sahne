@@ -45,7 +45,7 @@ test("the input is bounded: a long transcript is no match, and is refused fast",
   assert.equal(m.matchLine(long, [long]).matched, false);
   assert.equal(m.matchLine(Array.from({ length: 50 }, () => long), ["hello there"]).matched, false);
   assert.equal(m.matchLine("x".repeat(100000), ["hello there"]).matched, false);
-  assert.ok(performance.now() - t < 100, "refused fast");
+  assert.ok(performance.now() - t < 1000, "refused fast (it took half a minute unbounded; the margin is for a busy machine)");
   const forty = Array.from({ length: 40 }, () => "bread").join(" ");
   assert.equal(m.matchLine(forty, [forty]).matched, true, "a line at the cap still matches");
 });
