@@ -80,7 +80,7 @@ export function systemPrompt(o: { agentEdits: AgentEdits; writable: boolean; sha
   const w = listing(), series = (w.series ?? null) as SeriesDoc | null, l = languagesOf(series);
   const name = (id?: string) => (id && w.characters[id] ? textOf(w.characters[id].name, l.main) ?? id : id ?? "?");
   const rtl = allLanguages(l).filter(x => dirOf(x) === "rtl");
-  const ab = abilities({ writable: o.writable, agentEdits: o.agentEdits, shareCards: o.shareCards, cards: !!w.cards });
+  const ab = abilities({ writable: o.writable, agentEdits: o.agentEdits, shareCards: o.shareCards, cards: !!w.cards, page: o.context?.page });
   const parts = [
     `You are the assistant in Backstage, the editor of ${series ? `the series "${textOf(series.title, l.main, ...l.translations) ?? series.id}"` : "a series"}: short language-learning scenes played on a paper-theatre stage, read by people who are learning ${language(l.main)} (${l.main}).`,
     `Every line is written in ${language(l.main)}, at the episode's level: short, natural, everyday. Each line also carries its translations, in ${l.translations.map(x => `${language(x)} (${x})`).join(", ") || "no other language"}, which say the same thing as naturally as a person would${rtl.length ? `; ${rtl.join(", ")} ${rtl.length > 1 ? "are" : "is"} written right to left` : ""}.`,

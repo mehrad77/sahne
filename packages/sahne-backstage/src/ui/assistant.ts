@@ -75,19 +75,42 @@ function forgetChat(id: string) {
 }
 const ago = (t: number) => { const m = Math.round((Date.now() - t) / 6e4); return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : new Date(t).toLocaleDateString(); };
 
-/** One-click asks, by what is selected. */
-export const ASKS: { id: string; label: string; prompt: string; on: "block" | "episode"; fresh?: boolean }[] = [
-  { id: "translate", label: "Fill the missing translations", prompt: "Fill in every missing translation in this episode (only the series' languages), natural and at the episode's level. Propose them.", on: "episode" },
-  { id: "simplify", label: "Simplify this line", prompt: "Make the selected line simpler and more natural at the episode's level, keeping its meaning and the words it teaches. Update its translations too. Propose it.", on: "block" },
-  { id: "stage", label: "Suggest staging for this line", prompt: "Suggest staging for the selected line: a gesture, a feeling, whom it is said to, what it points at, with a one-line reason each. Propose the best one.", on: "block" },
-  { id: "options", label: "Propose choice options", prompt: "Propose two or three options for the learner's choice at or after the selected block, one clearly fitting, in every language, with a reply each. Propose them.", on: "block" },
-  { id: "scene", label: "Check this scene", prompt: "Read the scene the selected block is in and tell me what does not work: words, translations, staging, who is spoken to. Be brief, and propose fixes only for clear mistakes.", on: "block" },
-  { id: "draft", label: "Draft this episode from its brief", prompt: "This episode is a draft. Write its steps and quiz from its title, premise, cast, place, target words and lessons, in the series' languages, using the place's marks. Propose the result.", on: "episode" },
-  { id: "second", label: "Second reader", prompt: "Review this episode as a careful second reader who did not write it: the main language, the translations against it, the quiz, the staging. List what must be fixed, most important first. Propose fixes for clear mistakes.", on: "episode", fresh: true },
+/** One-click asks, by the page open and what is selected on it: `block` needs a selected block of the script. */
+export const ASKS: { id: string; label: string; prompt: string; on: "block" | "episode" | "page"; pages: string[]; fresh?: boolean }[] = [
+  { id: "translate", label: "Fill the missing translations", prompt: "Fill in every missing translation in this episode (only the series' languages), natural and at the episode's level. Propose them.", on: "episode", pages: ["episode"] },
+  { id: "simplify", label: "Simplify this line", prompt: "Make the selected line simpler and more natural at the episode's level, keeping its meaning and the words it teaches. Update its translations too. Propose it.", on: "block", pages: ["episode"] },
+  { id: "stage", label: "Suggest staging for this line", prompt: "Suggest staging for the selected line: a gesture, a feeling, whom it is said to, what it points at, with a one-line reason each. Propose the best one.", on: "block", pages: ["episode"] },
+  { id: "options", label: "Propose choice options", prompt: "Propose two or three options for the learner's choice at or after the selected block, one clearly fitting, in every language, with a reply each. Propose them.", on: "block", pages: ["episode"] },
+  { id: "scene", label: "Check this scene", prompt: "Read the scene the selected block is in and tell me what does not work: words, translations, staging, who is spoken to. Be brief, and propose fixes only for clear mistakes.", on: "block", pages: ["episode"] },
+  { id: "draft", label: "Draft this episode from its brief", prompt: "This episode is a draft. Write its steps and quiz from its title, premise, cast, place, target words and lessons, in the series' languages, using the place's marks. Propose the result.", on: "episode", pages: ["episode"] },
+  { id: "second", label: "Second reader", prompt: "Review this episode as a careful second reader who did not write it: the main language, the translations against it, the quiz, the staging. List what must be fixed, most important first. Propose fixes for clear mistakes.", on: "episode", pages: ["episode"], fresh: true },
+  { id: "season-needs", label: "What needs work this season", prompt: "Look at this season: its weeks and their themes, its episodes, their check results and review notes. Tell me briefly what needs work first, most important first. Change nothing.", on: "page", pages: ["board", "season"] },
+  { id: "season-next", label: "Propose an episode for the next free day", prompt: "Propose one new episode for the first free weekday of this season, in a week that has an arc, fitting that week's theme and the episodes around it, with a place and cast that exist. Draft its steps and quiz, check it, and tell me what you proposed.", on: "page", pages: ["board", "season"] },
+  { id: "place-uses", label: "Which episodes are set here", prompt: "Which episodes are set in this place, and which of its marks and props do they use? Say which marks and props no episode uses yet. Change nothing.", on: "page", pages: ["place"] },
+  { id: "place-ideas", label: "Scene ideas for this place", prompt: "Suggest three short scene ideas for this place at the series' level, each naming the marks people stand on and the props they use. Change nothing.", on: "page", pages: ["place"] },
+  { id: "places-fit", label: "Which place suits a scene", prompt: "List the places briefly, with what kind of scene each suits and which marks it has. Change nothing.", on: "page", pages: ["places"] },
+  { id: "char-voice", label: "How this character speaks", prompt: "Read the episodes this character speaks in and describe how they speak: their words, tone and level, with two short examples. Change nothing.", on: "page", pages: ["character"] },
+  { id: "char-where", label: "Where this character appears", prompt: "List the episodes this character is in, with their place and a line each about what they do there. Change nothing.", on: "page", pages: ["character"] },
+  { id: "cast-fit", label: "Who suits a scene", prompt: "List the cast briefly: who each is, how they speak and which episodes they are in. Change nothing.", on: "page", pages: ["cast"] },
+  { id: "review-first", label: "What to review first", prompt: "From the review notes and the checks, which episodes should I review first, and why? Be brief. Change nothing.", on: "page", pages: ["review"] },
 ];
 
-/** The context the assistant gets: the page and what is selected on it. */
-const contextNow = () => { const s = selection.value, r = route.value; return { page: r[0] ?? "board", ...(s?.kind ? { kind: s.kind } : {}), ...(s?.id ?? (r[0] === "episode" ? r[1] : undefined) ? { id: s?.id ?? r[1] } : {}), ...(s?.path ? { path: s.path } : {}) }; };
+/** What a page's asks are about, under each. */
+const ABOUT: Record<string, string> = { board: "this season", season: "this season", place: "this place", places: "every place", character: "this character", cast: "the whole cast", review: "the review notes" };
+/** The page open, as the assistant names it: an episode's own page, the board for a season. */
+const pageNow = () => route.value[0] || "board";
+/** The asks of the page open. */
+const asksHere = () => ASKS.filter(a => a.pages.includes(pageNow()));
+
+/** The context the assistant gets: the page, what it shows (an episode, a season, a place, a character) and what is selected on it. */
+const contextNow = () => {
+  const r = route.value, page = pageNow(), w = world.value;
+  const s = selection.value?.page === page ? selection.value : null;
+  const firstSeason = w ? Object.values(w.seasons).sort((a, b) => a.n - b.n)[0]?.id : undefined;
+  const shown: { kind?: string; id?: string } = page === "episode" ? { kind: "story", id: r[1] } : page === "season" ? { kind: "season", id: r[1] } : page === "board" && firstSeason ? { kind: "season", id: firstSeason }
+    : page === "place" ? { kind: "place", id: r[1] } : page === "character" ? { kind: "character", id: r[1] } : {};
+  return { page, ...(s?.kind ?? shown.kind ? { kind: s?.kind ?? shown.kind } : {}), ...(s?.id ?? shown.id ? { id: s?.id ?? shown.id } : {}), ...(s?.path ? { path: s.path } : {}) };
+};
 
 /** Send a message (or an ask), streaming the answer into the conversation. */
 export async function send(content: string, o: { fresh?: boolean; confirm?: boolean } = {}) {
@@ -132,7 +155,7 @@ export async function send(content: string, o: { fresh?: boolean; confirm?: bool
 export function ask(id: string) {
   const a = ASKS.find(x => x.id === id);
   if (!a) return;
-  if (a.on === "block" && !selection.value?.path) { say("Select a block of the script first", true); return; }
+  if (a.on === "block" && !contextNow().path) { say("Select a block of the script first", true); return; }
   void send(a.prompt, { fresh: a.fresh });
 }
 
@@ -140,8 +163,9 @@ export function ask(id: string) {
 export function AskMenu(p: { onDone?(): void }) {
   const w = world.value!;
   if (!w.ai) return html`<p class="note">The assistant is off: set it up in <a href="#/settings">Settings</a>.</p>`;
-  const hasBlock = !!selection.value?.path;
-  return html`<div class="menu">${ASKS.map(a => html`<button disabled=${a.on === "block" && !hasBlock} onClick=${() => { ask(a.id); p.onDone?.(); }}><b>${a.label}</b><small>${a.on === "block" ? "the selected block" : "the whole episode"}${a.fresh ? ", in a new conversation" : ""}</small></button>`)}</div>`;
+  const hasBlock = !!contextNow().path, asks = asksHere();
+  if (!asks.length) return null;
+  return html`<div class="menu">${asks.map(a => html`<button disabled=${a.on === "block" && !hasBlock} onClick=${() => { ask(a.id); p.onDone?.(); }}><b>${a.label}</b><small>${a.on === "block" ? "the selected block" : a.on === "episode" ? "the whole episode" : ABOUT[pageNow()] ?? "this page"}${a.fresh ? ", in a new conversation" : ""}</small></button>`)}</div>`;
 }
 
 const fmtUsd = (n: number) => `$${n < 0.1 ? n.toFixed(3) : n.toFixed(2)}`;
@@ -159,7 +183,7 @@ export function Meter() {
 /** What the assistant can and cannot do here: the same list its instructions hold (model/abilities.ts). */
 function Abilities() {
   const w = world.value!;
-  const a = abilities({ writable: w.writable, agentEdits: w.agentEdits ?? "proposals", shareCards: w.shareCards, cards: w.cards });
+  const a = abilities({ writable: w.writable, agentEdits: w.agentEdits ?? "proposals", shareCards: w.shareCards, cards: w.cards, page: pageNow() });
   return html`<div class="abilities">
     <div><b>It can</b><ul>${a.can.map(x => html`<li>${x}</li>`)}</ul></div>
     <div><b>It cannot</b><ul>${a.cannot.map(x => html`<li>${x}</li>`)}</ul></div></div>`;
@@ -192,7 +216,7 @@ export function AssistantChat() {
     ${w.ai && about && !empty && html`<${Abilities} />`}
     ${!w.ai ? html`<p>The assistant is off. Set up Claude (an API key) or a local model (LM Studio, Ollama) in <a href="#/settings">Settings</a>.</p>` : html`
     <div class="chat">
-      ${empty && html`<div class="note">Ask anything about the series, or pick an ask. It sees ${ctx.id ? html`<b>${ctx.id}</b>${(ctx as { path?: Path }).path ? html` at <b>${(ctx as { path: Path }).path.slice(1).join(".")}</b>` : ""}` : `the ${ctx.page}`}.<${Abilities} /><${AskMenu} /></div>`}
+      ${empty && html`<div class="note">Ask anything about the series, or pick an ask. It sees ${ctx.id ? html`${ctx.kind === "season" ? "season " : ctx.kind === "place" ? "the place " : ctx.kind === "character" ? "the character " : ""}<b>${ctx.id}</b>${(ctx as { path?: Path }).path ? html` at <b>${(ctx as { path: Path }).path.slice(1).join(".")}</b>` : ""}` : `the ${ctx.page} page`}.<${Abilities} /><${AskMenu} /></div>`}
       ${turns.value.map(t => html`<div class=${`turn ${t.role}${t.fresh ? " fresh" : ""}`}>
         ${t.role === "user" ? t.content : (t.parts ?? []).map(p => p.type === "text" ? html`<${Markdown} class="said" text=${p.text} />`
           : p.type === "tool" ? html`<div class=${`tool${p.ok === false ? " bad" : ""}`} title=${p.input ? JSON.stringify(p.input) : undefined}><${Icon} name="plug" size=${12} /> ${p.name.replace(/_/g, " ")}${p.summary ? `: ${p.summary}` : p.ok === undefined ? " …" : ""}</div>`
