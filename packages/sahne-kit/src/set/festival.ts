@@ -85,7 +85,7 @@ const marketHut: PieceDef = { draw(p, r) {
   back.push(S(inner, "#3A2A22"), lines(Array.from({ length: Math.floor((w - 12) / 22) }, (_, i) => [[-a + 6 + (i + 1) * 22, -222], [-a + 6 + (i + 1) * 22, -96]] as Vec2[]), "#241915", 0.7, 0.8, inner));
   const g = goods(kind, a, r);
   back.push(...g.hi, S(rect(-a + 6, -152, w - 12, 5), tone(wood, "light")), F(rect(-a + 6, -147, w - 12, 2), "#000000", 0.25), ...g.shelf);
-  for (const x of [-a * 0.42, a * 0.42]) { back.push(R([[x, -222], [x, -203]], DARK, 0.7), ...O(poly([[x - 8, -190], [x + 8, -190], [x + 5, -203], [x - 5, -203]]), "#E8D8A8", 0.2)); inGlow.push(...halo(x, -194, 46), S(ellipse(x, -194, 8), "#FFE6A8", { opacity: 0.9 })); }
+  for (const x of [-a * 0.42, a * 0.42]) { back.push(R([[x, -222], [x, -203]], DARK, 0.7), ...O(poly([[x - 8, -190], [x + 8, -190], [x + 5, -203], [x - 5, -203]]), "#E8D8A8", 0.2)); inGlow.push(...halo(x, -194, 30, "#FFC66B", 0.16), S(ellipse(x, -194, 7), "#FFE6A8", { opacity: 0.9 })); }
   // the counter, its top and the goods on it
   front.push(...O(rect(-a, -96, w, 96), wood, 0.12), lines(Array.from({ length: Math.floor(w / 18) }, (_, i) => [[-a + (i + 1) * 18, -92], [-a + (i + 1) * 18, -2]] as Vec2[]), tone(wood, "deep"), 0.6, 0.55), F(rrect(-a + 10, -84, w - 20, 66, 2), tone(wood, "shade"), 0.18), { path: rrect(-a + 10, -84, w - 20, 66, 2), stroke: { color: tone(wood, "deep"), width: 0.7 }, flat: true, opacity: 0.7 });
   front.push(...g.top, ...O(rrect(-a - 5, -104, w + 10, 8, 1.2), tone(wood, "light"), 0.12));
@@ -149,7 +149,7 @@ const TREE_LIGHTS = ["#FFE6A6", "#FF8A5C", "#7FD0FF", "#9BE38A", "#FF7AA8"];
 const christmasTree: PieceDef = { draw(p, r) {
   const h = clamp(num(p.h, 340), 150, 600), tiers = Math.round(clamp(num(p.tiers, 5), 3, 6)), W = h * 0.34, k = h / 340, g = hex(p.color, PINE);
   const withLights = p.lights !== false, multi = !!p.multi, withStar = p.star !== false, snow = !!p.snow, gifts = Math.round(clamp(num(p.gifts, 3), 0, 5)), nb = Math.round(clamp(num(p.baubles, 0.7), 0, 1) * tiers * 5);
-  const sh: Shape[] = [], top: Shape[] = [], bulbs: Shape[] = [], glow: Shape[] = [], yBot = -h * 0.09, yTop = -h * 0.92, s = (yBot - yTop) / (0.8 * (tiers - 1) + 1.5);
+  const sh: Shape[] = [], top: Shape[] = [], bulbs: Shape[] = [], glow: Shape[] = [], yBot = -h * 0.09, yTop = -h * 0.88, s = (yBot - yTop) / (0.8 * (tiers - 1) + 1.5);
   const info: { ap: number; bs: number; hw: number }[] = Array.from({ length: tiers }, (_, i) => ({ ap: yTop + i * 0.8 * s, bs: yTop + i * 0.8 * s + 1.5 * s, hw: W * (i + 1) / tiers }));
   sh.push(...O(rect(-4 * k, yBot - 4, 8 * k, -yBot), "#6B4A35", 0.3));
   for (let i = tiers - 1; i >= 0; i--) {
@@ -184,7 +184,7 @@ const christmasTree: PieceDef = { draw(p, r) {
   const cols = [RED, "#3B7DC4", "#2F8F5B", GOLD, "#B65CA8"], gx = [-0.9, 0.95, -0.55, 0.55, 1.35];
   for (let i = 0; i < gifts; i++) { const gw = (24 + (i * 7) % 12) * Math.max(1, k), gh = gw * (0.7 + (i % 2) * 0.3), gx0 = gx[i] * W * 0.5 - gw / 2, c = cols[i % cols.length], rib = i % 2 ? CREAM : GOLD; top.push(...O(rrect(gx0, -gh, gw, gh, 1.2), c, 0.2), F(rect(gx0 + gw / 2 - 1.5, -gh, 3, gh), rib, 0.95), F(rect(gx0, -gh * 0.55, gw, 3), rib, 0.95), S(ellipse(gx0 + gw / 2 - 2.4, -gh - 1.8, 2.6, 2), rib), S(ellipse(gx0 + gw / 2 + 2.4, -gh - 1.8, 2.6, 2), rib)); }
   const ppcm = Math.min(2.4, 1900 / (h + 40)), lights: LightSpec[] = withLights ? [{ x: 0, y: h * 0.5, z: 60, color: "#FFD9A0", radius: 3.4, intensity: 0.7, switch: false, at: ["dawn", "dusk", "night"] }] : [];
-  const starGlow = withStar ? { emissive: { shapes: [...halo(0, sy, sr * 2.4, "#FFD27A", 0.34), S(starP, "#FFF1C4", { opacity: 0.95 })], edge: 0 }, glowAt: 0.05, switch: false as const } : {};
+  const starGlow = withStar ? { emissive: { shapes: [...halo(0, sy, sr * 1.7, "#FFD27A", 0.3), S(starP, "#FFF1C4", { opacity: 0.95 })], edge: 0 }, glowAt: 0.05, switch: false as const } : {};
   return { flats: [{ group: { shapes: [...sh, ...top, ...bulbs], edge: 0.6 }, ppcm, id: "christmas_tree", ...starGlow }, ...(withLights ? litByTurns(glow, { ppcm, z: 0.5 }, 6, 0.1, 0.7) : [])], lights };
 },
   variants: { lit: {}, multi: { multi: true }, snowy: { snow: true } },
