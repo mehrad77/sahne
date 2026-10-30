@@ -187,6 +187,23 @@ test("proposals mode: a checked proposal is queued, the file is untouched, and a
     assert.equal(pe.doc, "s1e01");
     assert.equal(pe.create, true);
     assert.equal((pe.next as any).draft, true);
+    // a week without an arc names the weeks there are
+    const nw = await call(client, "create_episode", { season: 1, releaseDate: "2026-09-16", kind: "episode", week: 1, place: "bakkal", cast: ["ismail", "nima"], words: [], lessons: [], title: { tr: "Yok" } });
+    assert.ok(nw.isError);
+    assert.match(nw.text, /has arcs for week 0: pick one of those, or ask the person/);
+    // the agent reads and goes on editing the episode it proposed; each edit is the new episode again, built on the last
+    const rp = await call(client, "read_episode", { id: "s1e01" });
+    assert.ok(!rp.isError, rp.text);
+    assert.match(rp.text, new RegExp(`s1e01 is your proposal ${pe.id}, a new episode`));
+    assert.match(rp.text, /mtime none/);
+    const ep = await call(client, "edit_step", { id: "s1e01", path: "", patch: { level: "A1" } });
+    assert.ok(!ep.isError, ep.text);
+    const pe2 = q.all().at(-1)!;
+    assert.equal(pe2.create, true);
+    assert.equal(pe2.after, pe.id);
+    assert.equal(pe2.base, undefined);
+    assert.match((await call(client, "comment", { id: "s1e01", text: "x" })).text, new RegExp(`s1e01 is only proposed \\(${pe.id}\\)`));
+    q.resolve(pe.id, false);
     // a calendar row and its episode are checked together: on the samples, week 0 has no unit for the episode's ref
     const sc = await call(client, "set_calendar", { season: 1, story: "s1e00", row: { date: "2026-09-14", kind: "episode", week: 0 } });
     assert.ok(sc.isError);

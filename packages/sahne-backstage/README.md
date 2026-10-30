@@ -216,7 +216,8 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 
 ## The assistant in the editor (`src/ui/assistant.ts`, `src/ui/settings.ts`)
 
-- **A drawer beside any page** (✦ in the top bar, or *Open the assistant* in the palette): a conversation whose context is what is open (the page, the episode, the selected block, from `POST /api/selection`). Its answer streams in, with each tool it uses and what came of it. Its edits arrive as proposals above the script (or are written, in direct mode), never as hidden changes. A proposed new episode (`create_episode`) opens as a preview of what it would be (titles, place, cast, date, the check's problems, its steps), with Accept, which opens it as a new unsaved episode, and Reject (`ProposedEpisode`). Answers are drawn as Markdown (`src/ui/md.ts`).
+- **A drawer beside any page** (✦ in the top bar, or *Open the assistant* in the palette): a conversation whose context is what is open (the page, the episode, the selected block, from `POST /api/selection`). Its answer streams in, with each tool it uses and what came of it. Its edits arrive as proposals above the script (or are written, in direct mode), never as hidden changes. A proposed new episode (`create_episode`) opens as a preview of what it would be (titles, place, cast, date, the check's problems, its steps), with Accept, which opens it as a new unsaved episode, and Reject, which drops it with every edit built on it (`ProposedEpisode`). A proposal in the conversation links to where it is answered. Answers are drawn as Markdown (`src/ui/md.ts`).
+- **What it can and cannot do** is said in the panel: a new conversation shows the two lists, and *What it can do* shows them during one. They come from `src/model/abilities.ts`, which the system prompt holds too, so the model and the person read the same lists, for the current mode (read-only, proposals, direct).
 - **Conversations are kept in this browser** (localStorage, per series; never on the server). The last one opens again after a reload; *New conversation* keeps the one before; *History* lists the newest 30, to open again or delete.
 - **Asks where you work** (*Ask* in the episode's toolbar): fill the missing translations, simplify this line, suggest staging for this line, propose choice options, check this scene, draft this episode from its brief, and *Second reader*, which reviews in a fresh conversation that never saw the drafting.
 - **A big ask waits for a yes:** the server says what it would cost (`confirm`), and *Go ahead* sends it again.
@@ -276,7 +277,7 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 |---|---|
 | `series_overview` | The series: titles, languages, narrator, stand-in, seasons with their episodes, and whether and how it can be edited |
 | `list_episodes` `{ season? }` | The episodes, with title, kind, date, place, cast and draft |
-| `read_episode` `{ id, raw? }` | The episode as a script: one line per step, option and reply, each with its path, speaker, main text, translations and staging; the quiz; the `mtime`. `raw` adds the JSON |
+| `read_episode` `{ id, raw? }` | The episode as a script: one line per step, option and reply, each with its path, speaker, main text, translations and staging; the quiz; the `mtime`. `raw` adds the JSON. In proposals mode it is the episode as the agent would edit it, its own pending proposal included, with a line saying so; `read_step` and `check_episode` read the same |
 | `read_step` `{ id, path }` | The JSON at a path |
 | `kit_search` `{ kind, query?, limit? }` | Characters, places (with marks and props), the kit's props, gestures, emotions and sounds (`sahne-kit` `full`) |
 | `search_words` `{ query, limit? }` | Card ids and levels, and the word with `--share-cards` |
@@ -286,7 +287,7 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 | `insert_step` `{ id, at, step, mtime? }`, `delete_step` `{ id, path, mtime? }`, `move_step` `{ id, from, to, mtime? }` | Steps, options and replies in their lists |
 | `set_staging` `{ id, path, staging, mtime? }` | Staging keys; refuses a language code (texts go through `set_texts`) |
 | `set_texts` `{ id, path, texts, mtime? }` | Texts by language; only the series' languages |
-| `create_episode` `{ season, id?, releaseDate, kind, week, place, cast, words, lessons, title, summary?, level? }` | A new episode from `src/model/skeleton.ts`, with its calendar row when the season has a calendar |
+| `create_episode` `{ season, id?, releaseDate, kind, week, place, cast, words, lessons, title, summary?, level? }` | A new episode from `src/model/skeleton.ts`, with its calendar row when the season has a calendar. The week must have an arc (`series_overview` lists each season's `arcWeeks`; a refusal names them). In proposals mode the agent goes on reading and editing its proposed episode: each edit is the new episode proposed again, built on the last, with its calendar row. `comment`, `read_notes` and `set_review` reach it once it is accepted; `show` opens its preview |
 | `set_calendar` `{ season, story, row: { date, kind, week }, mtime? }` | The season's calendar row and the episode's `releaseDate`, `kind` and arc, together |
 | `comment` `{ id, step?, text }` | A review comment. It is a note, not content, so it is written at once (with `--write`) in both modes |
 | `set_review` `{ id, status }` | Direct mode only. In proposals mode a person decides where an episode stands |
@@ -335,6 +336,7 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 **The assistant** is an agent loop on the server. It reaches backstage only as an MCP client of its own MCP server (`createMcp`, over an in-memory transport), so it uses the same tools and checks as any agent.
 - Its edits are made `by: "assistant"` and follow the agent-edits mode. That is the settings' `agentEdits`, else the server's `--agent-edits`, so proposals by default.
 - Its system prompt is built from the series: the title, the main language and the translations (and which run right to left), the narrator and the stand-in, a summary of the format, and how edits are made. Nothing in it belongs to one language.
+- It also holds what the assistant can and cannot do (`src/model/abilities.ts`, the lists the panel shows), and tells it to say plainly when it is asked for something it cannot do, and where the person can do it, rather than write as if it did.
 - **The second reader** is `fresh: true`: a new conversation of the person's last message alone. It never sees the drafting history, and it is told to comment rather than change.
 - **A big ask** (drafting or reviewing a whole season, or every episode) is estimated first. If it would cost more than `confirmOverUsd`, or use more tokens than are left today, nothing runs: the answer is a `confirm` event, and the editor sends the request again with `confirm: true`.
 - When the browser closes the request, the model's request is aborted, so a closed tab stops spending.

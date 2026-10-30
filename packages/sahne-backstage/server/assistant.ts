@@ -14,6 +14,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { allLanguages, dirOf, languagesOf, seasonOf, textOf, type SeriesDoc } from "../../sahne-story/src/index.ts";
+import { abilities } from "../src/model/abilities.ts";
 import { listing } from "./content.ts";
 import { createMcp, type AgentEdits, type McpOptions } from "./mcp.ts";
 import type { Events } from "./events.ts";
@@ -75,10 +76,11 @@ export const usageSummary = (caps: Caps) => ({ ...totals(), caps });
 const language = (code: string) => { try { return new Intl.DisplayNames(["en"], { type: "language" }).of(code) ?? code; } catch { return code; } };
 
 /** The system prompt: the series, its languages, its narrator and stand-in, the format, and how edits are made. */
-export function systemPrompt(o: { agentEdits: AgentEdits; writable: boolean; fresh?: boolean; context?: AssistantContext }): string {
+export function systemPrompt(o: { agentEdits: AgentEdits; writable: boolean; shareCards?: boolean; fresh?: boolean; context?: AssistantContext }): string {
   const w = listing(), series = (w.series ?? null) as SeriesDoc | null, l = languagesOf(series);
   const name = (id?: string) => (id && w.characters[id] ? textOf(w.characters[id].name, l.main) ?? id : id ?? "?");
   const rtl = allLanguages(l).filter(x => dirOf(x) === "rtl");
+  const ab = abilities({ writable: o.writable, agentEdits: o.agentEdits, shareCards: o.shareCards, cards: !!w.cards });
   const parts = [
     `You are the assistant in Backstage, the editor of ${series ? `the series "${textOf(series.title, l.main, ...l.translations) ?? series.id}"` : "a series"}: short language-learning scenes played on a paper-theatre stage, read by people who are learning ${language(l.main)} (${l.main}).`,
     `Every line is written in ${language(l.main)}, at the episode's level: short, natural, everyday. Each line also carries its translations, in ${l.translations.map(x => `${language(x)} (${x})`).join(", ") || "no other language"}, which say the same thing as naturally as a person would${rtl.length ? `; ${rtl.join(", ")} ${rtl.length > 1 ? "are" : "is"} written right to left` : ""}.`,
@@ -88,6 +90,8 @@ export function systemPrompt(o: { agentEdits: AgentEdits; writable: boolean; fre
     !o.writable ? "Backstage is read-only now: you can read, check and advise, not edit."
       : o.agentEdits === "proposals" ? "Your edits are proposals: each is checked and shown to the person in the editor, who accepts or rejects it, and nothing is saved until they do. Say briefly what you proposed and why."
         : "Your edits are saved at once, each after the same check a person's save passes. Say briefly what you changed.",
+    `What you can do:\n${ab.can.map(x => `- ${x}`).join("\n")}\nWhat you cannot do:\n${ab.cannot.map(x => `- ${x}`).join("\n")}\nWhen the person asks for something you cannot do, say so plainly in one sentence and where in the editor they can do it themselves; never write as if you did it, and never promise to do it later. When a tool refuses, say what was refused and why in plain words.`,
+    "A new episode you propose (create_episode) exists only as your proposal until the person accepts it: you can read it and keep editing it, and every edit builds on your proposal. Tell the person to open it to accept or reject it. Pick its week from the season's arc weeks (series_overview).",
     "An edit that brings a new error is refused with the problems: fix them and try again. Answer briefly, in the language the person writes to you in.",
   ];
   if (o.fresh) parts.push("You are a second reader. You did not write this episode and have not seen how it was drafted. Read it fresh, as a careful reviewer would, and report what must be fixed: wrong or unnatural words, words above the level, translations that do not say what the line says, lines that do not fit the scene, quiz answers that do not hold, staging that contradicts the words. Leave a comment on each step that needs one; change nothing unless you are asked to.");
@@ -137,7 +141,7 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
     await Promise.all([server.connect(a), client.connect(b)]);
     const tools: ToolDef[] = (await client.listTools()).tools.map(t => ({ name: t.name, description: t.description ?? "", schema: t.inputSchema as Record<string, unknown> }));
     const writable = !!JSON.parse(((await client.callTool({ name: "series_overview", arguments: {} })).content as { text: string }[]).at(-1)!.text).writable;
-    const system = systemPrompt({ agentEdits, writable, fresh: req.fresh, context: req.context });
+    const system = systemPrompt({ agentEdits, writable, shareCards: o.shareCards, fresh: req.fresh, context: req.context });
     const history = req.fresh ? [req.messages.at(-1)!] : req.messages;
     const messages: unknown[] = history.map(m => p.message(m.role, m.content));
     for (let turn = 0; ; turn++) {

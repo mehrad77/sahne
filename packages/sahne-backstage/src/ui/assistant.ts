@@ -13,7 +13,8 @@ import { signal } from "@preact/signals";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Path } from "../model/path.ts";
 import { route, say, world } from "../store.ts";
-import { selection, usage } from "../events.ts";
+import { proposals, selection, usage } from "../events.ts";
+import { abilities } from "../model/abilities.ts";
 import { Icon } from "./kit/index.ts";
 import { Markdown } from "./md.ts";
 
@@ -155,24 +156,47 @@ export function Meter() {
     <span class="bar"><span style=${`width:${Math.round(share * 100)}%`} class=${share > 0.85 ? "hot" : ""}></span></span>${fmtUsd(u.today.usd)}</a>`;
 }
 
+/** What the assistant can and cannot do here: the same list its instructions hold (model/abilities.ts). */
+function Abilities() {
+  const w = world.value!;
+  const a = abilities({ writable: w.writable, agentEdits: w.agentEdits ?? "proposals", shareCards: w.shareCards, cards: w.cards });
+  return html`<div class="abilities">
+    <div><b>It can</b><ul>${a.can.map(x => html`<li>${x}</li>`)}</ul></div>
+    <div><b>It cannot</b><ul>${a.cannot.map(x => html`<li>${x}</li>`)}</ul></div></div>`;
+}
+
+const PAGE: Record<string, string> = { story: "episode", character: "character", place: "place" };
+/** A proposal the assistant made, with where to answer it; once answered, only that it was. */
+function Proposed(p: { id: string }) {
+  const x = proposals.value.find(y => y.id === p.id);
+  if (!x) return html`<div class="tool ok">Proposed an edit (${p.id}): answered, no longer waiting.</div>`;
+  const href = `#/${PAGE[x.kind] ?? "agents"}/${x.doc}`;
+  if (x.create) return html`<div class="tool ok">${x.after ? "Updated the proposed new episode" : "Proposed a new episode,"} <b>${x.doc}</b>. <a href=${href}>Open it</a> to accept or reject it; nothing is saved until you do.</div>`;
+  return html`<div class="tool ok">Proposed an edit to <b>${x.doc}</b>: <a href=${href}>accept or reject it</a> above the ${x.kind === "story" ? "script" : "page"}.</div>`;
+}
+
 /** The conversation, in the side panel's Assistant tab. */
 export function AssistantChat() {
   const w = world.value!;
   loadChats();
   const [text, setText] = useState("");
   const [past, setPast] = useState(false);
+  const [about, setAbout] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [turns.value]);
   const ai = typeof w.ai === "object" ? w.ai : null;
   const ctx = contextNow();
-  return html`${ai ? html`<p class="note model">${ai.provider === "anthropic" ? "Claude" : "A local model"} · ${ai.model ?? ""} · <a href="#/settings">change</a></p>` : ""}
+  const empty = !turns.value.length;
+  return html`${ai ? html`<p class="note model">${ai.provider === "anthropic" ? "Claude" : "A local model"} · ${ai.model ?? ""} · <a href="#/settings">change</a>
+      ${!empty && html` · <button type="button" class="linkish" aria-expanded=${about} onClick=${() => setAbout(!about)}>What it can do</button>`}</p>` : ""}
+    ${w.ai && about && !empty && html`<${Abilities} />`}
     ${!w.ai ? html`<p>The assistant is off. Set up Claude (an API key) or a local model (LM Studio, Ollama) in <a href="#/settings">Settings</a>.</p>` : html`
     <div class="chat">
-      ${!turns.value.length && html`<div class="note">Ask anything about the series, or pick an ask. It sees ${ctx.id ? html`<b>${ctx.id}</b>${(ctx as { path?: Path }).path ? html` at <b>${(ctx as { path: Path }).path.slice(1).join(".")}</b>` : ""}` : `the ${ctx.page}`}, and its edits arrive as proposals to accept.<${AskMenu} /></div>`}
+      ${empty && html`<div class="note">Ask anything about the series, or pick an ask. It sees ${ctx.id ? html`<b>${ctx.id}</b>${(ctx as { path?: Path }).path ? html` at <b>${(ctx as { path: Path }).path.slice(1).join(".")}</b>` : ""}` : `the ${ctx.page}`}.<${Abilities} /><${AskMenu} /></div>`}
       ${turns.value.map(t => html`<div class=${`turn ${t.role}${t.fresh ? " fresh" : ""}`}>
         ${t.role === "user" ? t.content : (t.parts ?? []).map(p => p.type === "text" ? html`<${Markdown} class="said" text=${p.text} />`
           : p.type === "tool" ? html`<div class=${`tool${p.ok === false ? " bad" : ""}`} title=${p.input ? JSON.stringify(p.input) : undefined}><${Icon} name="plug" size=${12} /> ${p.name.replace(/_/g, " ")}${p.summary ? `: ${p.summary}` : p.ok === undefined ? " …" : ""}</div>`
-          : p.type === "proposal" ? html`<div class="tool ok">Proposed an edit: accept or reject it above the script.</div>`
+          : p.type === "proposal" ? html`<${Proposed} id=${p.id} />`
           : p.type === "confirm" ? html`<div class="confirm">${p.why} It would cost about ${fmtUsd(p.estimateUsd)}. <button class="small primary" onClick=${() => { const q = [...turns.value].reverse().find(x => x.role === "user"); if (q) void send(q.content, { confirm: true, fresh: q.fresh }); }}>Go ahead</button></div>`
           : p.type === "error" ? html`<div class="tool bad">${p.message}</div>`
           : html`<div class="note">${p.usd !== undefined ? fmtUsd(p.usd) : ""}</div>`)}

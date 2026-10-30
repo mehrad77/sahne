@@ -41,7 +41,8 @@ declare global { interface Window { backstage?: { preview: Preview; select(path:
 export function Episode(p: { id?: string }) {
   const id = p.id ?? "";
   // a new episode an agent proposes is not on disk: its page shows the proposal until it is taken (then its draft opens)
-  const proposed = proposals.value.find(x => x.kind === "story" && x.doc === id && x.create);
+  // the latest: an agent that goes on editing its new episode proposes it again, each holding the one before
+  const proposed = proposals.value.filter(x => x.kind === "story" && x.doc === id && x.create).sort((a, b) => b.at - a.at)[0];
   const [missing, setMissing] = useState(false);
   const read = proposalsRead.value;
   useEffect(() => { setMissing(false); if (read && !draftOf("story", id) && !proposed) void openDoc("story", id).then(d => setMissing(!d)); }, [id, !!proposed, read]);

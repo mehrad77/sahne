@@ -8,7 +8,7 @@ import { textOf, type StoryDoc } from "sahne-story";
 import { diffWords } from "../../model/diff.ts";
 import { get, type Path } from "../../model/path.ts";
 import { rows } from "../../model/steps.ts";
-import { accept, reject, type Proposal } from "../../events.ts";
+import { accept, proposals, reject, type Proposal } from "../../events.ts";
 import { world } from "../../store.ts";
 import { inLang, useLangs } from "../lang.ts";
 
@@ -41,6 +41,9 @@ export function ProposalsBar(p: { list: Proposal[]; story: StoryDoc; select(path
   </div>`;
 }
 
+/** The proposal a chain starts from: rejecting it rejects every one built on it, so the whole new episode goes. */
+const firstOf = (x: Proposal): Proposal => { let a = x; for (let b; a.after && (b = proposals.value.find(y => y.id === a.after)); a = b); return a; };
+
 /**
  * A new episode an agent proposes (`create_episode`): it is not on disk, so it cannot open in the studio until it is
  * taken. Its page shows what it would be (its titles, place, cast and date, the problems the check finds, and its steps in
@@ -57,7 +60,7 @@ export function ProposedEpisode(p: { x: Proposal }) {
     <div class="toolbar row">
       <div class="grow"><h2 style="margin:0"><span class="note">${p.x.doc}</span> <span ...${inLang(main)}>${textOf(doc.title, main) ?? p.x.doc}</span></h2>
         <span class="note">A new episode ${p.x.by === "assistant" ? "the assistant" : p.x.by} proposes${gloss && textOf(doc.title, gloss) ? html` · <span ...${inLang(gloss)}>${textOf(doc.title, gloss)}</span>` : ""}</span></div>
-      <button disabled=${busy} onClick=${() => { setBusy(true); void reject(p.x).then(() => history.back()); }}>Reject</button>
+      <button disabled=${busy} onClick=${() => { setBusy(true); void reject(firstOf(p.x)).then(() => history.back()); }}>Reject</button>
       <button class="primary" disabled=${busy} onClick=${() => { setBusy(true); void accept(p.x); }}>Accept and open</button>
     </div>
     <p class="banner">Not written yet: nothing changes until you accept it, and then it is a new, unsaved episode you can edit before you save.</p>
