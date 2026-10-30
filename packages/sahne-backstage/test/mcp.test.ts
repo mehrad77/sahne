@@ -345,7 +345,7 @@ test("kit_search lists set pieces and props with family, use and variants, and f
     const food = await search({ kind: "props", family: "food" });
     assert.ok(food.length > 3 && food.every(r => r.family === "food" && r.as !== "set"));
     assert.ok((await search({ kind: "set", family: "street", as: "prop" })).every(r => r.as === "prop"));
-    const tag = (await search({ kind: "props", query: "" })).find(r => r.id === "tea")!;
+    const tag = (await search({ kind: "props", query: "tea" })).find(r => r.id === "tea")!;
     assert.deepEqual((await search({ kind: "props", family: "food", query: "tea" })).map(r => r.id).includes(tag.id), true);
     assert.deepEqual(await search({ kind: "set", family: "nonesuch" }), []);
     // an item that is both a set piece and a prop shows under each
