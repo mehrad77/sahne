@@ -195,6 +195,17 @@ test("autostage: the director's choices as ghosts, the rules' as suggestions", a
   assert.deepEqual(taken({ link: { a: "obj:a" }, do: "nod" }, { link: { b: "obj:b" }, do: "wave" }), { link: { a: "obj:a", b: "obj:b" }, do: "wave" });
 });
 
+test("autostage: English motives (whole words, phrases at the end of a line)", async () => {
+  const { suggestionsOf } = await import("../src/model/autostage.ts");
+  const { enLang } = await import("../../sahne-story/src/index.ts");
+  const story = { ...STORY, steps: [{ scene: "bakkal", at: {} }, { who: "ismail", en: "Hi there." }, { who: "nima", en: "I don't know." }, { who: "ismail", en: "This history is long." }] } as unknown as StoryDoc;
+  const s = suggestionsOf(story, { lang: enLang, lints: [], gestures: ["wave", "shrug", "nod"], emotions: [], narrator: "kerim", standin: "nima" });
+  assert.deepEqual(s["steps/1"].map(x => x.fix), [{ do: "wave" }], "hi$ is a whole word");
+  assert.ok(!s["steps/1"][0].why.includes("$"), s["steps/1"][0].why);
+  assert.deepEqual(s["steps/2"].map(x => x.fix), [{ do: "shrug" }], "a phrase that ends the line");
+  assert.equal(s["steps/3"], undefined, "history does not wave");
+});
+
 test("notes: problems in plain words, with a fix where one is obvious", async () => {
   const { notesOf } = await import("../src/model/notes.ts");
   const c = { name: (id: string) => (id === "ismail" ? "İsmail" : id), langName: (l: string) => (l === "fa" ? "Persian" : l), standin: "nima" };

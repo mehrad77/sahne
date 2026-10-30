@@ -13,10 +13,9 @@ import type { ObjOp, Staging, Target } from "sahne";
 import { clockMinutes, deixis, lowerTr, match, readClock, readNumber, tokens } from "sahne-tr";
 import type { LineContext, LineWord, StoryLang } from "../lang.ts";
 import { resolver, words as checkWords } from "./tr-words.ts";
+import { DEIXIS_GESTURES, FAR, NEAR, lintClock } from "./shared.ts";
 
-/** Within reach for *bu* (metres, on the floor plan); beyond `FAR` it is *o*. */
-export const NEAR = 1.5, FAR = 3;
-export const DEIXIS_GESTURES = new Set(["point", "point_far", "hold_up", "touch"]);
+export { NEAR, FAR, DEIXIS_GESTURES };
 /** Which deixis gestures each demonstrative takes. `point` for *bu* and *o* only by distance. */
 const AGREE: Record<"bu" | "şu" | "o", string[]> = { bu: ["hold_up", "touch", "point"], şu: ["point"], o: ["point_far", "point"] };
 const ADVICE: Record<"bu" | "şu" | "o", string> = { bu: "hold_up", şu: "point", o: "point_far" };
@@ -105,19 +104,7 @@ function lintLine(c: LineContext) {
     }
   });
 
-  // ---- clock times
-  const times = readClock(c.text);
-  if (times.length) {
-    const clocks = Object.values(st.link ?? {}).filter((t): t is string => t.startsWith("obj:")).map(t => t.slice(4)).filter(id => { const p = c.prop(id); return p && (p.params.time !== undefined || /clock|watch|saat/.test(p.kit)); });
-    for (const id of clocks) {
-      const shown = c.prop(id)!.params.time;
-      const m = typeof shown === "string" ? clockMinutes(shown) : null;
-      if (!times.some(t => clockMinutes(t) === m)) {
-        const said = `${times[0].h}:${String(times[0].m).padStart(2, "0")}`;
-        add("time", `the line says ${said}, but obj:${id} shows ${shown ?? "no time"}`, { obj: [{ id, op: "set", set: { time: said } }] });
-      }
-    }
-  }
+  lintClock(c, readClock, clockMinutes);
 }
 
 /** Parenthetical words that stage a line, in Turkish and English (an editor's `(el sallar, mutlu)`). */

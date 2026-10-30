@@ -9,6 +9,7 @@ packages/
   sahne/          the engine                                    → packages/sahne/README.md, DESIGN.md
   sahne-kit/      the first kit: people, set pieces, props, sounds, music, Kerim → STYLE.md, CATALOGUE.md, SET.md
   sahne-tr/       the Turkish plugin                            → packages/sahne-tr/README.md
+  sahne-en/       the English plugin                            → packages/sahne-en/README.md
   sahne-story/    the story format, its checks, paths.ts, samples/ → packages/sahne-story/README.md
   sahne-backstage/ the studio an app runs on its content root (:5181), and its MCP server → packages/sahne-backstage/README.md
   sahne-gallery/  the dev gallery and the checks (:5180)        → packages/sahne-gallery/README.md
