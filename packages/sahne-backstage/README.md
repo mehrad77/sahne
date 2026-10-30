@@ -179,6 +179,7 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 - An edit that changes only words (`src/model/steps.ts` `wordsOnly`) re-directs the cues: `storyPlayer.replace`, with no reload.
 - Any other edit adapts the story again and loads the stage.
 - Either way, the stage returns to the cue that was showing.
+- The stage's language plugin (mouth timing, word matching) follows the series' main language: `sahne-tr` for Turkish, `sahne-de` for German, none for another (`langPlugin` in `src/stage.ts`).
 - A sign's or a phone's text is drawn into the art, so editing it needs a load. A load happens anyway, because that text is not one of the word keys.
 
 ## How saving works (`server/content.ts`, with `sahne-story/json.ts`)
