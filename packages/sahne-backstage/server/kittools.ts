@@ -149,6 +149,43 @@ function sheets(t: Target, o: { looks?: [string, Record<string, unknown>][]; vie
   return (o.seeds?.length ? o.seeds : ["a"]).map(seed => renderPng(kitSheetSvg(t.kit, [item], { seed, ...(o.views?.length ? { views: o.views } : {}) })));
 }
 
+// ---- a list of items on one sheet -----------------------------------------------------------------------------------------
+
+const MANY_MAX = 16;
+const ITEM = z.object({
+  id: z.string().optional().describe("A kit item id"), doc: z.record(z.string(), z.unknown()).optional().describe("A drawing document not yet saved"),
+  as: z.enum(["set", "prop"]).optional(), params: z.record(z.string(), z.unknown()).optional().describe("The look to draw: params like { \"n\": 3 }"), variant: z.string().optional(),
+});
+type Req = z.infer<typeof ITEM>;
+
+/** Several items on ONE sheet: a labelled cell per item (its default, or the `variant`/`params` look given), by day and night. Drafted docs are checked together. */
+function many(reqs: Req[], o: { views?: ("day" | "night")[]; seeds?: string[] }): { text: string; data: unknown; pngs: Buffer[] } {
+  if (reqs.some(r => (r.id === undefined) === (r.doc === undefined))) throw new Refusal("each item is an id or a doc, one of them");
+  const docs = reqs.filter(r => r.doc !== undefined).map(r => r.doc!);
+  for (const d of docs) if (!isObject(d) || typeof d.id !== "string" || !CONTENT_ID.test(d.id)) throw new Refusal(`a drawing needs an id that starts with x_ (then lowercase letters, digits and _), not ${JSON.stringify(isObject(d) ? d.id : d)}`);
+  let kit = kitOf();
+  if (docs.length) {
+    const r = kitWithEdits(docs.map(d => ({ kind: "kit_piece" as const, id: (d as { id: string }).id, doc: d })));
+    if (r.problems.length) throw new Refusal(`not drawable:\n${r.problems.map(p => p.message).join("\n")}`);
+    kit = r.kit;
+  }
+  const items: SheetItem[] = [], lines: string[] = [], rows: { id: string; problems: string[]; errors: number }[] = [];
+  for (const r of reqs) {
+    const row = rowOf(r.id ?? (r.doc as { id: string }).id, r.as, kit), slot: KitSlot = r.as ? (r.as === "prop" ? "props" : "set") : row.slot;
+    if (r.variant !== undefined && !Object.hasOwn(row.def.variants ?? {}, r.variant)) throw new Refusal(`${row.id} has no variant ${r.variant} (${Object.keys(row.def.variants ?? {}).join(", ") || "none"})`);
+    const bad = r.params ? paramProblems(row.def, r.params, ["variant", "n", "held"]) : [];
+    if (bad.length) throw new Refusal(`${row.id} params: ${bad.map(p => p.message).join("; ")}`);
+    const word = (k: string, v: unknown) => (v === true ? k : `${k} ${typeof v === "string" ? v : JSON.stringify(v)}`);
+    const look: [string, Record<string, unknown>] = r.params || r.variant !== undefined ? [r.variant ?? Object.entries(r.params ?? {}).map(([k, v]) => word(k, v)).join(", ").slice(0, 40), { ...(r.variant !== undefined ? { variant: r.variant } : {}), ...r.params }] : ["default", {}];
+    items.push({ id: row.id, def: row.def, kind: slot, looks: [look] });
+    const c = checks({ kit, row, slot });
+    lines.push(summary(row.id, c), ...c.lines.map(l => `  ${l}`));
+    rows.push({ id: row.id, problems: c.lines, errors: c.errors });
+  }
+  const pngs = (o.seeds?.length ? o.seeds : ["a"]).map(seed => renderPng(kitSheetSvg(kit, items, { seed, flow: true, ...(o.views?.length ? { views: o.views } : {}) })));
+  return { text: `${items.length} items on ${pngs.length === 1 ? "one sheet" : `${pngs.length} sheets (one per seed)`}\n${lines.join("\n")}`, data: { items: rows, sheets: pngs.length }, pngs };
+}
+
 const summary = (id: string, c: { errors: number; warnings: number }) => `${id}: ${c.errors} error${c.errors === 1 ? "" : "s"}, ${c.warnings} warning${c.warnings === 1 ? "" : "s"}${c.errors ? ": fix them before saving" : ""}`;
 
 // ---- the guide ----------------------------------------------------------------------------------------------------------
@@ -201,13 +238,19 @@ export function registerKitTools(server: McpServer, k: KitToolsCtx): void {
 
   server.registerTool("kit_render", {
     title: "Render a set piece or prop",
-    description: "A sheet of an item as a PNG, with the kit's checks on it (the same ones the gate runs). Give an `id` (a kit item or one of this series) or a `doc` (a drawing not yet saved). The sheet shows its default, each variant, and for a prop three of it and held, by day and by night, each on a 10 cm grid beside a 170 cm adult; give `variant` or `params` for one look, `views` for day or night only, `seeds` (up to 3) for a picture per seed. `as` picks the set piece or the prop look (a prop also shows n 3 and held). A TypeScript generator is drawn from the source the process read at its start.",
+    description: "A sheet of an item as a PNG, with the kit's checks on it (the same ones the gate runs). Give an `id` (a kit item or one of this series) or a `doc` (a drawing not yet saved). The sheet shows its default, each variant, and for a prop three of it and held, by day and by night, each on a 10 cm grid beside a 170 cm adult; give `variant` or `params` for one look, `views` for day or night only, `seeds` (up to 3) for a picture per seed. `as` picks the set piece or the prop look (a prop also shows n 3 and held). A TypeScript generator is drawn from the source the process read at its start (call.ts --session restarts its server when the source changes).",
     inputSchema: {
       id: z.string().optional().describe("A kit item id"), doc: DOC.optional().describe("A drawing document to render without saving it"), as: z.enum(["set", "prop"]).optional(),
+      items: z.array(ITEM).min(1).max(MANY_MAX).optional().describe("Instead of id/doc: a list of items (each { id | doc, as?, variant?, params? }) drawn on ONE sheet, a labelled cell per item (its default look, or the variant/params given), by day and night. For comparing a family or checking a batch in one look"),
       params: z.record(z.string(), z.unknown()).optional().describe("One look: the params to draw it with, like { \"n\": 3, \"label\": \"Menu\" }"), variant: z.string().optional(), views: VIEWS.optional(), seeds: SEEDS.optional(),
     },
     annotations: { readOnlyHint: true },
-  }, run("kit_render", ({ id, doc, as, params, variant, views, seeds }) => {
+  }, run("kit_render", ({ id, doc, as, params, variant, views, seeds, items }) => {
+    if (items) {
+      if (id !== undefined || doc !== undefined) throw new Refusal("give items, or an id or a doc, not both");
+      const m = many(items, { views, seeds });
+      return ok(m.text, m.data, m.pngs);
+    }
     if ((id === undefined) === (doc === undefined)) throw new Refusal("give an id or a doc, one of them");
     const t = doc !== undefined ? draftPiece(doc) : (() => { const r = rowOf(id!, as); return { kit: kitOf(), row: r, slot: r.slot } as Target; })();
     if (as) t.slot = as === "prop" ? "props" : "set";
@@ -224,9 +267,15 @@ export function registerKitTools(server: McpServer, k: KitToolsCtx): void {
   server.registerTool("draft_kit_item", {
     title: "Draft a drawing",
     description: "Check a drawing document (`sahne-kit/drawing`, the kit-guide resource has the format) as it would be saved, and render its sheet: nothing is written. It checks the schema, the id (x_…), the caps, every path and `$param`, and the kit's own checks on the piece. A document that cannot be drawn is answered with what to fix; a drawn one with its sheet and the problems that remain (errors fail a save; warnings are advice). Revise and draft again until there are none, then save_kit_item.",
-    inputSchema: { doc: DOC.describe("The drawing: { id: \"x_…\", as, about, params?, kinds, … }"), as: z.enum(["set", "prop"]).optional().describe("For a drawing that is `both`: which look to render"), views: VIEWS.optional(), seeds: SEEDS.optional() },
+    inputSchema: { doc: DOC.optional().describe("The drawing: { id: \"x_…\", as, about, params?, kinds, … }"), docs: z.array(DOC).min(2).max(MANY_MAX).optional().describe("Instead of doc: several drawings, checked together and drawn on ONE sheet, a labelled cell each"), as: z.enum(["set", "prop"]).optional().describe("For a drawing that is `both`: which look to render"), views: VIEWS.optional(), seeds: SEEDS.optional() },
     annotations: { readOnlyHint: true },
-  }, run("draft_kit_item", ({ doc, as, views, seeds }) => {
+  }, run("draft_kit_item", ({ doc, docs, as, views, seeds }) => {
+    if (docs) {
+      if (doc !== undefined) throw new Refusal("give doc or docs, not both");
+      const m = many(docs.map(d => ({ doc: d, ...(as ? { as } : {}) })), { views, seeds });
+      return ok(m.text, m.data, m.pngs);
+    }
+    if (doc === undefined) throw new Refusal("give a doc (or docs)");
     const t = draftPiece(doc);
     if (as) t.slot = as === "prop" ? "props" : "set";
     const c = checks(t), pngs = sheets(t, { views, seeds });

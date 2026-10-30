@@ -382,6 +382,24 @@ test("kit_read shows a generator's params, variants and source, with its sheet; 
   } finally { await close(); }
 });
 
+test("kit_render takes a list of items and draft_kit_item a list of drawings: one picture, the problems of each", async () => {
+  const { client, close } = await connect({ write: false, agentEdits: "proposals" });
+  try {
+    const r = await call(client, "kit_render", { items: [{ id: "chair" }, { id: "frontage", variant: "firin" }, { doc: chalkboard(), params: { held: true } }] });
+    assert.ok(!r.isError, r.text);
+    assert.equal(r.images.length, 1);
+    assert.ok(isPng(r.images[0]));
+    assert.deepEqual(json(r).items.map((i: { id: string }) => i.id), ["chair", "frontage", "x_cafe_chalkboard"]);
+    const d = await call(client, "draft_kit_item", { docs: [chalkboard(), { ...chalkboard(), id: "x_cafe_chalkboard_two" }] });
+    assert.ok(!d.isError, d.text);
+    assert.equal(d.images.length, 1);
+    assert.match(d.text, /^x_cafe_chalkboard_two: 0 errors/m);
+    assert.match((await call(client, "kit_render", { items: [{ id: "chair" }], id: "chair" })).text, /not both/);
+    assert.match((await call(client, "kit_render", { items: [{ id: "chair", variant: "nope" }] })).text, /no variant nope/);
+    assert.ok(!existsSync(kitFile("pieces", "x_cafe_chalkboard_two.json")), "a draft writes nothing");
+  } finally { await close(); }
+});
+
 test("draft_kit_item renders a drawing and writes nothing; a bad drawing is refused with what to fix", async () => {
   const { client, close } = await connect({ write: false, agentEdits: "proposals" });
   try {

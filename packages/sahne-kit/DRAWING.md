@@ -56,3 +56,13 @@ Every id a content root adds starts with `x_`, and `test/drawing.test.ts` assert
 ## Checking
 
 `checkDrawing` reads what a schema cannot: that every path parses, every `$param` is declared (and a colour in a colour place), the kinds match the `kind` param, and the caps hold. `checkPiece` (`sahne-kit/check`) then holds the compiled generator to the kit's own rules as for any other: the meta, the variants, every param read declared, finite art that fits an atlas layer, motion, and text with a language. Both run on a document before an app loads it.
+
+## The loop, over MCP or from the shell
+
+Backstage's MCP tools (this file is its `sahne://kit-guide` resource) do the plumbing, so the effort goes to the drawing: `kit_search` for what exists, `kit_read` a neighbour, `draft_kit_item` and look at the sheet, revise until there are no problems, then `save_kit_item`. An agent with no MCP set up reaches the very same tools from the shell and reads the PNGs it prints:
+
+```bash
+node packages/sahne-backstage/server/call.ts draft_kit_item @doc.json --content <root> --session kit
+```
+
+`kit_render` and `draft_kit_item` take a list (`items`, `docs`) and answer ONE sheet with a labelled cell per item, so a batch or a family is judged in one look. `--session kit` keeps the server alive between calls (about 0.35 s a render instead of about 1.5 s) and restarts it when TypeScript of the kit changed, so a generator you edited draws as edited. The flags and the tool list are in sahne-backstage's README (*Calling a tool from the shell*).

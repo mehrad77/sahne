@@ -57,6 +57,24 @@ Everything a scene is made of is picked from a gallery of pictures, not a list o
 
 A gallery has a search box and filters by tag; a picker is a gallery in a popover. A card's picture is asked for only as the card nears the screen. The pictures the stage draws (a place's wide shot, a gesture, a step for the storyboard) come from one hidden stage, one at a time, and are kept in the browser's IndexedDB under a key that changes with what they show, so each is drawn once (`src/thumbs.ts`).
 
+### Calling a tool from the shell (`server/call.ts`)
+
+An agent without MCP uses the same tools through one command. It embeds the MCP server in its own process (`createMcp` over an in-memory transport), so no tool is reimplemented, and prints each text and JSON answer. Each image answer is saved as a PNG and printed as `image: <path>`, for the caller to Read. The exit code is 1 when the tool answered with an error (the answer is then on stderr).
+
+```bash
+node packages/sahne-backstage/server/call.ts kit_search '{"kind":"set","query":"frontage"}' --content <root>
+node packages/sahne-backstage/server/call.ts kit_render '{"items":[{"id":"chair"},{"id":"frontage","variant":"firin"}]}' --content <root> --out /tmp/sheets
+node packages/sahne-backstage/server/call.ts draft_kit_item @doc.json --content <root>      # the arguments: '{…}', @file.json, or - for stdin
+node packages/sahne-backstage/server/call.ts list [<tool>] --content <root>                 # the tools with their input schemas, and the resources
+node packages/sahne-backstage/server/call.ts read sahne://kit-guide --content <root>        # a resource
+```
+
+- **Flags.** `--content <absolute folder>` (default `$SAHNE_CONTENT`, else the samples), `--write` (without it every write tool refuses), `--agent-edits direct|proposals` (default `direct` with `--write`, since a one-shot process has no editor to accept a proposal, and `proposals` without), `--share-cards`, `--out <dir>` (default a new temp folder, or a stable one per session; files are numbered `001-<tool>.png`, …).
+- **`kit_render` and `draft_kit_item` take lists** (`items`, `docs`, up to 16) and answer one sheet with a labelled cell per item (its default look, or the `variant`/`params` given, by day and night; `flow` in `kitSheetSvg`). Use it to compare a family or check a batch in one look; a single item still gets all its looks (variants, `n 3`, held).
+- **`--session <name>`** keeps one server process alive across calls. It starts on first use, talks over a unix socket in the temp folder, and ends after 15 idle minutes or with `--session <name> --stop` (`--status` says whether it runs). The kit and resvg load once: a render of three items took about 0.35 s with it, against about 1.5 to 2 s for a fresh process each time (this machine, warm disk cache; the first call of a session pays the load, about 1 s). A session serves one setup (content root, `--write`, `--agent-edits`): another is refused with a message to `--stop` it first.
+- **TypeScript kit sources are never stale.** Before each call the session process compares the newest mtime of the `.ts` of `sahne`, `sahne-kit`, `sahne-story` and `sahne-backstage` with what it loaded, and when something changed it starts a fresh process for that call, so an agent that edits a generator and renders sees its edit. Drawings and every other document of the content root are read fresh on each call. (`SAHNE_CALL_WATCH`, a `:` list of folders, replaces the watched ones, for the test.)
+- `test/call.test.ts` runs it: PNGs for `kit_render` and `draft_kit_item` (one and a list), errors, `--write`, and the session's reuse, restart and stop.
+
 **The kit page** (`#/kit/<section>/<shelf>`, `src/ui/kitpage.ts`) lays the kit out as a library:
 - **The side.** It lists the sections (props, set pieces, gestures, emotions, sounds) with their icons and counts. The side folds sideways to its icons, and remembers whether it is folded. On a small screen, the sections become a row across the top with the shelves as chips under it, the tags go on one line that scrolls, and the details open as a sheet from the bottom. The open section is split into shelves (`src/model/kitgroups.ts`). Each shelf gathers several of the kit's tags, and an item goes on the first shelf one of its tags belongs to, else on *Other*. Gestures are shelved by what they need, sounds by their bus. A test fails when a prop or set-piece tag is on no shelf. The content root's own kit items (`kit/`, drawn as data, sahne-kit's DRAWING.md) have a shelf of their own, **This series**, first on props and set pieces, whatever their tags, and a small badge on their card; the page reads them from `GET /api/kit` and draws again when one is saved (`src/kitdocs.ts`).
 - **The bar.** It has a search of the section, the shelf's commonest tags as filters, and the card size (S, M or L, remembered).
@@ -260,6 +278,7 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 
   The flags are those of the server (below), plus `--backstage`.
 - **In memory**, to the editor's assistant (`server/assistant.ts`).
+- **From the shell**, with no MCP set up: `server/call.ts` (below) calls any tool and saves its pictures as files.
 
 **The flags** (of `cli.ts` and `cli.ts mcp`; `startBackstage()` takes them as `agentEdits` and `shareCards`; `GET /api/world` answers both):
 - `--write`: without it every write tool refuses, and so it does on a root in the old language shape. The refusal says why.
@@ -281,8 +300,8 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 | `read_step` `{ id, path }` | The JSON at a path |
 | `kit_search` `{ kind, query?, limit?, family?, tag?, as? }` | Characters, places (with marks and props), the kit's props and set pieces (kind `set`; each `{ id, family, as, about, variants, tags }`, filtered by `family` (`series` for this root's own drawings), `tag` and `as`), gestures, emotions and sounds (`sahne-kit` `full`, with this root's kit items) |
 | `kit_read` `{ id, as? }` | A set piece or prop: its family, params, variants and source (a TypeScript generator's definition and file) or its document and `mtime` (a drawing of this series; `<of>.<x_name>` reads a variant document), with its sheet as a picture |
-| `kit_render` `{ id \| doc, as?, params?, variant?, views?, seeds? }` | A PNG sheet (a picture per seed) of a kit item or of a drawing not yet saved, with `checkPiece`'s problems: default, variants, and for a prop `n 3` and held, by day and night, on a 10 cm grid beside a 170 cm adult |
-| `draft_kit_item` `{ doc, as?, views?, seeds? }` | Check a drawing as it would be saved (schema, `x_` id, caps, paths, `$param`s, `checkPiece`) and render its sheet. Writes nothing. A drawing that cannot be drawn is answered with what to fix |
+| `kit_render` `{ id \| doc \| items, as?, params?, variant?, views?, seeds? }` | A PNG sheet (a picture per seed) of a kit item or of a drawing not yet saved (`items`: a list of `{ id \| doc, as?, variant?, params? }` on ONE sheet, a labelled cell each), with `checkPiece`'s problems: default, variants, and for a prop `n 3` and held, by day and night, on a 10 cm grid beside a 170 cm adult |
+| `draft_kit_item` `{ doc \| docs, as?, views?, seeds? }` | Check a drawing (`docs`: several, together, on one sheet) as it would be saved (schema, `x_` id, caps, paths, `$param`s, `checkPiece`) and render its sheet. Writes nothing. A drawing that cannot be drawn is answered with what to fix |
 | `draft_variant` `{ of, name, params, views? }` | The same for a variant `{ of, name: "x_…", params }`: `paramProblems` and its sheet beside the default |
 | `save_kit_item` `{ doc, mtime? }`, `save_variant` `{ of, name, params, mtime? }` | Save the drawing (`kit/pieces/<id>.json`) or the variant (`kit/variants/<of>.<name>.json`) through the same `submit()` as any edit: a proposal, or a file in direct mode. Refused on an error, an id without `x_`, an id already saved (unless the `mtime` `kit_read` gave is passed), or a file changed since |
 | `search_words` `{ query, limit? }` | Card ids and levels, and the word with `--share-cards` |
@@ -428,7 +447,7 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `content.ts` (kinds, files, checks, saves);
   - `git.ts`;
   - `review.ts`;
-  - `mcp.ts` (the MCP server: its tools and resources), `kittools.ts` (its kit tools: search, read, render, draft and save kit items), `result.ts` (what a tool answers: text, pictures, data), `render.ts` (SVG to PNG), `proposals.ts` (agents' edits waiting for a person), `events.ts` (the editors' event stream and selection) and `agents.ts` (the connected agents and their calls);
+  - `mcp.ts` (the MCP server: its tools and resources), `kittools.ts` (its kit tools: search, read, render, draft and save kit items), `result.ts` (what a tool answers: text, pictures, data), `render.ts` (SVG to PNG), `call.ts` (any tool from the shell, with sessions), `proposals.ts` (agents' edits waiting for a person), `events.ts` (the editors' event stream and selection) and `agents.ts` (the connected agents and their calls);
   - `assistant.ts` (the assistant's loop and its system prompt), `settings.ts` (the person's AI settings), and `ai/`: `provider.ts` (what a provider does, and the stream reader), `providers/anthropic.ts`, `providers/openai.ts` and `budget.ts` (the prices, the caps and the usage log).
 - The server reads sahne-story's Node-only files (`paths.ts`, `check/`, `load.ts`) by path. The package exports only `"."`.
 - **`src/`** is the browser side (the studio's shared parts in `src/ui/kit/`: icons, chips, drawers, popovers, the palette; the theme in `src/ui/theme.ts`), built with Preact and htm tagged templates (no JSX, so the source stays erasable TypeScript). It contains:

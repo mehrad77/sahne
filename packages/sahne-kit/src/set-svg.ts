@@ -126,10 +126,18 @@ function cellSvg(kit: Kit, item: SheetItem, label: string, params: Record<string
     + `<g transform="translate(${sx} ${floor})">${ADULT}</g><g${SVG_BASE}>${a.body}</g></g></svg>${cap}</g>`;
 }
 
-/** A contact sheet as one SVG (render it with server/render.ts): a titled row per item, in cells of each look by day and by night (`views` picks), held and counted for a prop, every cell on a faint 10 cm grid with a 170 cm adult beside it. Words are written (`text`). */
-export function kitSheetSvg(kit: Kit, items: readonly SheetItem[], opts: { seed?: string; text?: boolean; columns?: number; views?: readonly ("day" | "night")[] } = {}) {
+/** A contact sheet as one SVG (render it with server/render.ts): a titled row per item (`flow`: one grid of cells, each captioned with its item), in cells of each look by day and by night (`views` picks), held and counted for a prop, every cell on a faint 10 cm grid with a 170 cm adult beside it. Words are written (`text`). */
+export function kitSheetSvg(kit: Kit, items: readonly SheetItem[], opts: { seed?: string; text?: boolean; columns?: number; views?: readonly ("day" | "night")[]; flow?: boolean } = {}) {
   const { w: W, h: H } = CELL, cols = opts.columns ?? 6, gap = 8, seed = opts.seed ?? "a", text = opts.text ?? true, views = opts.views?.length ? opts.views : ["day", "night"];
   let y = gap, body = "", n = 0;
+  if (opts.flow) {
+    // one cell per look of every item in a single grid, no row titles: each cell's caption names its item (a list of items on one picture)
+    const cells: string[] = [];
+    for (const item of items) for (const [label, params] of sheetLooks(item)) for (const view of views) cells.push(cellSvg(kit, item, label, params, view === "night", `${item.id}/${seed}`, `s${n++}`, text));
+    const across = Math.max(1, Math.min(cols, cells.length)), width = gap + across * (W + gap), height = gap + Math.ceil(cells.length / across) * (H + gap);
+    cells.forEach((c, i) => { body += `<g transform="translate(${gap + (i % across) * (W + gap)} ${gap + Math.floor(i / across) * (H + gap)})">${c}</g>`; });
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="${width}" height="${height}" fill="#E8E1D4"/>${body}</svg>`;
+  }
   for (const item of items) {
     const cells: string[] = [];
     for (const [label, params] of sheetLooks(item)) for (const view of views) cells.push(cellSvg(kit, item, label, params, view === "night", `${item.id}/${seed}`, `s${n++}`, text));
