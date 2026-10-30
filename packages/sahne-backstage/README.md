@@ -52,7 +52,7 @@ Everything a scene is made of is picked from a gallery of pictures, not a list o
 - **Characters** as portraits (`portrait`), the extras on their own tab.
 - **Places** as their wide shot.
 - **Props and set pieces** as sketches (`pieceSvg`, `sahne-kit/set-svg`).
-- **Emotions** as the stand-in's face, **gestures** as the stand-in caught at the gesture's stroke.
+- **Emotions** as the stand-in's face close up at the end of the emotion, **gestures** as the stand-in caught at the gesture's stroke. Both are frames of the scene the kit page's hover preview plays, so the preview keeps the picture's frame and zoom.
 - **Sounds** as their waveform (the patch, drawn when idle) with their word. A click plays one through an `AudioEngine`: the recording where there is one, else the patch. A click on a playing loop stops it.
 
 A gallery has a search box and filters by tag; a picker is a gallery in a popover. A card's picture is asked for only as the card nears the screen. The pictures the stage draws (a place's wide shot, a gesture, a step for the storyboard) come from one hidden stage, one at a time, and are kept in the browser's IndexedDB under a key that changes with what they show, so each is drawn once (`src/thumbs.ts`).

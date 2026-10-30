@@ -11,7 +11,7 @@ import { pieceSvg } from "sahne-kit/set-svg";
 import { textOf, type CharacterDoc, type StoryPlace } from "sahne-story";
 import { EMOTION_SHELVES, PROP_SHELVES, SET_SHELVES, gestureShelf, shelfOf } from "../model/kitgroups.ts";
 import { KIT, SOUNDS } from "../stage.ts";
-import { emotionScene, gestureScene, gestureThumb, placeThumb } from "../thumbs.ts";
+import { emotionScene, emotionThumb, gestureScene, gestureThumb, placeThumb } from "../thumbs.ts";
 import { world } from "../store.ts";
 import { Gallery, type Item } from "./kit/gallery.ts";
 import { Popover } from "./kit/index.ts";
@@ -53,7 +53,7 @@ export function pieceItems(which: "props" | "set"): Item[] {
   }));
 }
 
-export const emotionItems = (): Item[] => Object.keys(KIT.face.emotions).map(e => ({ id: e, label: e, shelf: shelfOf(EMOTION_SHELVES, [e]).id, art: svgOf(() => { const m = model(); return m ? portrait(m, KIT, { framing: "head", size: 88, emotion: e, trusted: true }) : ""; }) || null }));
+export const emotionItems = (): Item[] => Object.keys(KIT.face.emotions).map(e => { const m = model(); return { id: e, label: e, shelf: shelfOf(EMOTION_SHELVES, [e]).id, art: m ? () => emotionThumb(e, m) : null }; });
 
 export const gestureItems = (): Item[] => Object.entries(KIT.gestures).sort(([a], [b]) => a.localeCompare(b)).map(([g, def]) => {
   const m = model();

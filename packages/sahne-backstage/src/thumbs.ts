@@ -110,12 +110,18 @@ export const gestureScene = (gesture: string, doc: AvatarDoc): Scene & { play: {
   play: { cue: 1, at: Math.min(0.9, (KIT.gestures[gesture]?.stroke ?? 600) / Math.max(1, KIT.gestures[gesture]?.dur ?? 1200)) },
 });
 
-/** `doc`'s face going from neutral to an emotion, close. */
+/** `doc`'s face going from neutral to an emotion, close: a neutral close-up first, so the camera is set before the face moves. */
 export const emotionScene = (emotion: string, doc: AvatarDoc): Scene & { play: { cue: number; at: number } } => ({
   place: ROOM, cast: { a: doc },
-  cues: [{ scene: { place: ROOM.id, at: { a: "a" }, cam: "close" } }, { line: { who: "a", text: "… … …", emo: emotion, cam: "close", voice: "silent" } }],
-  play: { cue: 1, at: 1 },
+  cues: [{ scene: { place: ROOM.id, at: { a: "a" }, cam: "close" } }, { line: { who: "a", text: "…", emo: "neutral", cam: "close", voice: "silent" } }, { line: { who: "a", text: "… … …", emo: emotion, cam: "close", voice: "silent" } }],
+  play: { cue: 2, at: 1 },
 });
+
+/** `doc`'s face at the end of an emotion: the last frame of the kit page's hover preview, so the two match. */
+export const emotionThumb = (emotion: string, doc: AvatarDoc) => snapshot(`emotion2|${emotion}|${hashString(JSON.stringify(doc))}`, () => emotionScene(emotion, doc));
+
+/** The size the pictures are drawn at (16:10); a card shows one covering its picture box. */
+export const THUMB = { w: W, h: H };
 
 /** A gesture done by `doc`, at its stroke, the whole figure. */
 export const gestureThumb = (gesture: string, doc: AvatarDoc) => snapshot(`gesture2|${gesture}|${hashString(JSON.stringify(doc))}`, () => gestureScene(gesture, doc));
