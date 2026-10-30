@@ -94,6 +94,30 @@ test("lint es gibt: the prop is shown or hidden by then; questions are not asser
   assert.deepEqual(rules(lint(s)), [], "a question by its mark");
 });
 
+test("lint es gibt: \"gibt\" alone is the verb to give, not the existential", () => {
+  let s = german(); line(s, 9).de = "Nima gibt dem Kunden Milch."; line(s, 9).link = { milch: "obj:sut" }; delete line(s, 9).do;
+  assert.deepEqual(rules(lint(s)), [], "a hidden prop, and gibt means gives");
+  s = german(); line(s, 9).de = "Er gibt ihr kein Brot."; line(s, 9).link = { brot: "obj:ekmek" }; delete line(s, 9).do;
+  assert.deepEqual(rules(lint(s)), [], "a shown prop, and gibt means gives");
+  s = german(); line(s, 9).de = "Heute gibt es Milch."; line(s, 9).link = { milch: "obj:sut" }; delete line(s, 9).do;
+  assert.deepEqual(rules(lint(s)), ["var_yok@9"], "inverted order is still the existential");
+});
+
+test("lint time: a clock time said aloud matches the linked clock", () => {
+  const clock = (time: string, text: string) => {
+    const s = german();
+    s.props = { uhr: { kit: "clock", at: { x: -3.5, y: 2.3, z: -2.1 }, time } } as StoryDoc["props"];
+    Object.assign(line(s, 9), { de: text, link: { uhr: "obj:uhr" } }); delete line(s, 9).do;
+    return s;
+  };
+  assert.deepEqual(lint(clock("2:30", "Die Uhr zeigt halb drei.")), [], "halb drei is 2:30");
+  const p = lint(clock("3:30", "Die Uhr zeigt halb drei."));
+  assert.deepEqual(rules(p), ["time@9"]);
+  assert.deepEqual(p[0].fix, { obj: [{ id: "uhr", op: "set", set: { time: "2:30" } }] });
+  assert.deepEqual(lint(clock("9:45", "Die Uhr zeigt Viertel vor zehn.")), []);
+  assert.deepEqual(rules(lint(clock("10:00", "Die Uhr zeigt Viertel vor zehn."))), ["time@9"]);
+});
+
 test("lint number: a number before a linked prop matches n", () => {
   let s = german();
   const ch = (s.steps[8] as { choice: { options: { n?: number; reply?: LineStep[] }[] } }).choice;

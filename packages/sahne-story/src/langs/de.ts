@@ -82,7 +82,7 @@ function lintLine(c: LineContext) {
       }
     }
     // es gibt / es gibt kein: the assertion, not the question ("Gibt es Brot?", "Es gibt Brot?")
-    if (t.w === "gibt") {
+    if (t.w === "gibt" && (ws[i - 1]?.w === "es" || ws[i + 1]?.w === "es")) { // "gibt" alone is also "gives"
       let from = i, to = i;
       while (from > 0 && !(ws[from - 1].pause && ws[from - 1].w === ".")) from--;
       while (to < ws.length - 1 && !(ws[to].pause && ws[to].w === ".")) to++;
