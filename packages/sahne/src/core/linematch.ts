@@ -58,12 +58,27 @@ export function lineMatcher(lang: LineMatcherLang): LineMatcher {
   function letters(a: string, b: string): number {
     const A = [...a], B = [...b];
     let prev = Array.from({ length: B.length + 1 }, (_, j) => B.slice(0, j).reduce((s, c) => s + cheap(c), 0));
+    const rows = [prev];
     for (let i = 1; i <= A.length; i++) {
       const cur = [prev[0] + cheap(A[i - 1])];
       for (let j = 1; j <= B.length; j++) {
         const x = A[i - 1], y = B[j - 1];
         const sub = x === y ? 0 : fold(x) === fold(y) ? SLIP : 1;
         cur[j] = Math.min(prev[j - 1] + sub, prev[j] + cheap(x), cur[j - 1] + cheap(y));
+      }
+      rows.push(cur);
+      // a letter that folds to several (ß → ss) against those letters in the other word
+      for (let j = 0; j <= B.length; j++) {
+        const x = A[i - 1], fx = [...fold(x)];
+        if (fx.length > 1 && j >= fx.length && fx.every((c, k) => B[j - fx.length + k] === c)) {
+          const from = rows[i - 1][j - fx.length] + SLIP;
+          if (from < cur[j]) cur[j] = from;
+        }
+        const y = B[j - 1], fy = y === undefined ? [] : [...fold(y)];
+        if (fy.length > 1 && i >= fy.length && fy.every((c, k) => A[i - fy.length + k] === c)) {
+          const from = rows[i - fy.length][j - 1] + SLIP;
+          if (from < cur[j]) cur[j] = from;
+        }
       }
       prev = cur;
     }

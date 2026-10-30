@@ -26,3 +26,15 @@ test("a near letter is a slip, a different word is a miss", () => {
   assert.equal(m.letters("o", "ö"), 0.25);
   assert.equal(m.allowance(3), 0.5);
 });
+
+test("a letter that folds to several letters (ß → ss) is a slip, both ways", () => {
+  const m = lineMatcher({ normalise: s => s.toLowerCase().split(/\s+/).filter(Boolean), near: { ß: "ss", ä: "a" } });
+  assert.equal(m.letters("ß", "ss"), 0.25);
+  assert.equal(m.letters("straße", "strasse"), 0.25);
+  assert.equal(m.letters("strasse", "straße"), 0.25);
+  assert.equal(m.letters("bär", "bar"), 0.25);
+  assert.equal(m.matchLine("strasse", ["straße"]).matched, true);
+  assert.equal(m.matchLine("straße", ["strasse"]).matched, true);
+  assert.equal(m.matchLine("strase", ["straße"]).matched, true);
+  assert.equal(m.matchLine("strand", ["straße"]).matched, false);
+});
