@@ -34,8 +34,9 @@ export async function render(host: HTMLElement, ctx: Ctx) {
 
   // ---- the hero ----
   const hero = $("section", "hero");
-  const word = $("h1", "wordmark", "Sahne");
-  word.append($("small", "", "Turkish for “stage”"));
+  const word = $("h1", "wordmark");
+  word.setAttribute("aria-label", "Sahne, Turkish for “stage”");
+  word.append($("span", "word"), $("small", "", "Turkish for “stage”"));
   const go = $("div", "ctas");
   const cta = (label: string, href: string, main = false) => { const a = link(label, href); a.className = `cta${main ? " main" : ""}`; return a; };
   const gh = cta("GitHub ↗", "https://github.com/mehrad77/sahne");

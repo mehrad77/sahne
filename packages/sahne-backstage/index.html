@@ -94,8 +94,12 @@ pre.json { font: 12px/1.4 ui-monospace, monospace; white-space: pre-wrap; margin
 /* ---- the studio shell: a top bar, a rail, the page, a drawer */
 .studio { display: grid; grid-template-rows: 52px 1fr; grid-template-columns: 64px minmax(0, 1fr) auto; grid-template-areas: "top top top" "rail page drawer"; height: 100vh; }
 .topbar { grid-area: top; display: flex; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--panel); min-width: 0; }
-.topbar .brand { display: flex; align-items: center; gap: 8px; font-weight: 700; letter-spacing: .01em; white-space: nowrap; }
-.topbar .brand svg { color: var(--curtain); }
+/* the sahne BACKSTAGE lockup (assets/brand/, written by sahne-gallery/brand/build.mjs), light or dark with the theme */
+:root { --lockup: url(/brand/lockup.svg); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --lockup: url(/brand/lockup-dark.svg); } }
+:root[data-theme="dark"] { --lockup: url(/brand/lockup-dark.svg); }
+.topbar .brand { display: flex; align-items: center; flex: none; }
+.topbar .brand .lockup { display: block; height: 34px; aspect-ratio: 722 / 112; background: var(--lockup) left center / contain no-repeat; }
 .topbar .series { color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22vw; }
 .season-tabs { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; border-bottom: 1px solid var(--line); }
 .season-tabs a { padding: 6px 12px 7px; text-decoration: none; color: var(--mute); font-size: 13.5px; border-bottom: 2px solid transparent; margin-bottom: -1px; }

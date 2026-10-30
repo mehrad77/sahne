@@ -59,7 +59,7 @@ export function App() {
   const link = ([path, icon, label]: [string, string, string]) => html`<a href=${`#/${path}`} aria-current=${area === path ? "page" : undefined}><${Icon} name=${icon} size=${22} />${label}${path === "agents" && waiting ? html`<span class="badge" title=${`${waiting} proposed edit${waiting > 1 ? "s" : ""} waiting`}>${waiting}</span>` : ""}</a>`;
   return html`<div class="studio">
     <header class="topbar">
-      <a class="brand" href="#/" style="text-decoration:none;color:inherit"><${Icon} name="stage" size=${22} /> Backstage</a>
+      <a class="brand" href="#/" aria-label="sahne backstage"><span class="lockup"></span></a>
       <span class="series" title=${w.series ? tx(w.series.title, "en") : ""}>${w.series ? tx(w.series.title, "en") : "No series yet"}</span>
       <button class="search" onClick=${() => setPalette(true)} aria-label="Search and commands"><${Icon} name="search" size=${16} /> Search or run a command <kbd>${MOD} K</kbd></button>
       ${w.writable ? html`<span class=${`state${dirty ? " dirty" : ""}`} title=${dirty ? dirtyKeys.value.map(k => k.replace(":", " ")).join(", ") : ""}>${dirty ? `${dirty} unsaved` : "All saved"}</span>`

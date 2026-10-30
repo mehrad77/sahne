@@ -17,8 +17,9 @@ document.head.append(Object.assign(document.createElement("style"), { textConten
 ctx.applyPage();
 
 const app = $("div", "app"), side = $("aside", "side"), main = $("div", "main"), top = $("div", "topbar"), view = $("main", "view");
-const brand = Object.assign($("a", "brand", "Sahne"), { href: "#/" });
-brand.append($("small", "", "a paper-theatre stage engine: demos and docs"));
+const brand = Object.assign($("a", "brand"), { href: "#/" });
+brand.setAttribute("aria-label", "sahne gallery");
+brand.append($("span", "lockup"), $("small", "", "a paper-theatre stage engine: demos and docs"));
 const nav = $("nav");
 nav.setAttribute("aria-label", "Gallery");
 side.append(brand, nav);
