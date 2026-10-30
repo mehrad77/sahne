@@ -821,7 +821,7 @@ function euroTram(kind: string, p: Record<string, unknown>, r: Rng): PieceOut {
       sh.push(S(rrect(x, -280, wd, 84, [18, 18, 3, 3]), glass));
       if (r.chance(0.6)) sh.push(...rider(r, x + wd / 2 + r.range(-8, 8), -202, 1));
       sh.push(L([[x + 12, -208], [x + wd * 0.5, -272]], "#FFFFFF", 3, 0.22));
-      glow.push(S(rrect(x, -280, wd, 84, [18, 18, 3, 3]), "#FFE6B0", { flat: true, opacity: 0.42 }));
+      glow.push(S(rrect(x, -280, wd, 84, [18, 18, 3, 3]), "#FFE6B0", { flat: true, opacity: 0.85 }));
     }
     for (const e of [-1, 1]) {
       sh.push(S(rrect(e > 0 ? half - 66 : -half + 6, -290, 60, 100, 8), "#5E6E7E"), L([[e * (half - 8), -80], [e * (half - 8), -300]], "#B8BEC4", 3, 1), S(ellipse(e * (half - 2), -130, 9), e > 0 ? "#F4F1E0" : "#B3261E"));
@@ -843,7 +843,7 @@ function euroTram(kind: string, p: Record<string, unknown>, r: Rng): PieceOut {
       if (door) sh.push(S(rect(x, -318, wd, 192), "#37475A"), L([[x + wd / 2, -318], [x + wd / 2, -126]], tone(body, "shade"), 2, 1), S(rect(x + 8, -306, wd / 2 - 12, 100), "#5E7388"), S(rect(x + wd / 2 + 4, -306, wd / 2 - 12, 100), "#5E7388"));
       else sh.push(S(rrect(x, -312, wd, 164, 6), glass), L([[x + 14, -150], [x + wd * 0.5, -300]], "#FFFFFF", 4, 0.2));
       if (!door && r.chance(0.55)) sh.push(...rider(r, x + wd / 2 + r.range(-12, 12), -152, 1.15));
-      glow.push(S(rrect(x, -312, wd, door ? 192 : 164, 6), "#FFE6B0", { flat: true, opacity: 0.4 }));
+      glow.push(S(rrect(x, -312, wd, door ? 192 : 164, 6), "#FFE6B0", { flat: true, opacity: 0.85 }));
     }
     sh.push(S(rect(-14, -336, 28, 292), "#2A2D31"), ...[-1, 1].map(e => L([[e * 14, -330], [e * 14, -50]], "#1F2124", 2, 1)));
     for (const e of [-1, 1]) {

@@ -720,9 +720,9 @@ const frontage: PieceDef = { draw(p, r) {
     lf.push(L([[dx + dW / 2 - 9, gt + 26], [dx + dW / 2, gt + 15], [dx + dW / 2 + 9, gt + 26]], "#3B3B40", 0.8, 1), S(rrect(dx + dW / 2 - 14, gt + 26, 28, 15, 2), "#F7F3EA"), R(dx + dW / 2 - 11, gt + 29, 22, 9, kind === "eczane" || kind === "pharmacy" ? "#3FA05A" : "#2F8C88", pr()));
     // inside lights up where the shutter is not down
     const cb = -H0 + 26 + (1 - open) * (H0 - 26), gy = Math.max(gt, cb), dy = Math.max(gt + 9, cb);
-    // a thin wash, so the wares still read through the lit glass; a brighter pool under the lamps and a hot strip at the sill
-    if (sill - gy > 4) glow.push(R(wx0, gy, wx1 - wx0, sill - gy, "#FFE2A6", pr(0.22)), R(wx0, Math.max(gy, sill - 26), wx1 - wx0, Math.min(26, sill - gy), "#FFD98A", pr(0.1)));
-    if (-35 - dy > 4) glow.push(R(dx + 9, dy, dW - 18, -35 - dy, "#FFE2A6", pr(0.2)));
+    // the older shops keep their flat half-lit pane; the European ones get a warm wash the wares still read through, a brighter pool low in the glass and a hot strip at the sill
+    if (sill - gy > 4) glow.push(...(eu ? [R(wx0, gy, wx1 - wx0, sill - gy, "#FFD98A", pr(0.36)), R(wx0, Math.max(gy, sill - 70), wx1 - wx0, Math.min(70, sill - gy), "#FFE9B0", pr(0.2)), R(wx0, Math.max(gy, sill - 12), wx1 - wx0, Math.min(12, sill - gy), "#FFF3CC", pr(0.55))] : [R(wx0, gy, wx1 - wx0, sill - gy, "#FFE2A6", pr(0.5))]));
+    if (-35 - dy > 4) glow.push(R(dx + 9, dy, dW - 18, -35 - dy, eu ? "#FFD98A" : "#FFE2A6", pr(eu ? 0.34 : 0.5)));
     if (kind === "firin") {
       const fx = left ? x1 - 26 : x0 + 26;
       main.push(R(fx - 8, -H0 - 300, 16, 220, "#4A4A4E"), R(fx - 8, -H0 - 300, 4, 220, "#FFFFFF", pr(0.2)), S(many([[fx - 10, -H0 - 160, 20, 5], [fx - 10, -H0 - 240, 20, 5]]), "#3B3B40"), P([[fx - 18, -H0 - 300, 0], [fx + 18, -H0 - 300, 0], [fx, -H0 - 318, 0]], "#3B3B40"));
