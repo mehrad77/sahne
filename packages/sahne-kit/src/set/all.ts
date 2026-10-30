@@ -27,11 +27,12 @@ import * as clothes from "./clothes.ts";
 import * as animals from "./animals.ts";
 import * as garden from "./garden.ts";
 import * as streetlife from "./streetlife.ts";
+import * as festival from "./festival.ts";
 
 export interface Family { set: Record<string, PieceDef>; props: Record<string, PieceDef> }
 
 /** The families by name, in the order the catalogue lists them. Add a family here and in `index.ts`'s `FAMILIES`. */
-export const FAMILY_MODULES: Record<string, Family> = { base, airport, metro, props, outdoor, street, interior, furniture, vehicles, food, paper, misc, cookware, meals, produce, household, health, tech, stationery, leisure, play, clothes, animals, garden, streetlife };
+export const FAMILY_MODULES: Record<string, Family> = { base, airport, metro, props, outdoor, street, interior, furniture, vehicles, food, paper, misc, cookware, meals, produce, household, health, tech, stationery, leisure, play, clothes, animals, garden, streetlife, festival };
 
 function merge(kind: "set" | "props") {
   const out: Record<string, PieceDef> = {};
