@@ -496,11 +496,21 @@ select.tone { width: auto; font-size: 12px; padding: 0 4px; }
 .meter .bar span { display: block; height: 100%; background: var(--accent); } .meter .bar span.hot { background: var(--bad); }
 .chat { display: grid; gap: 10px; font-size: 14px; }
 .turn.user { justify-self: end; background: var(--accent-soft); padding: 6px 10px; border-radius: 12px 12px 2px 12px; max-width: 90%; white-space: pre-wrap; }
-.turn.assistant { display: grid; gap: 4px; } .turn.assistant .said { white-space: pre-wrap; line-height: 1.5; }
+.turn.assistant { display: grid; gap: 4px; min-width: 0; } .turn.assistant .said { line-height: 1.5; min-width: 0; }
+/* the assistant's answers as Markdown (src/ui/md.ts) */
+.md > :first-child { margin-top: 0; } .md > :last-child { margin-bottom: 0; }
+.md p { margin: 6px 0; } .md .md-h { font-weight: 700; margin: 10px 0 4px; }
+.md ul, .md ol { margin: 4px 0; padding-left: 20px; } .md li > p { margin: 2px 0; }
+.md code { background: var(--chip); padding: 0 4px; border-radius: 4px; font-size: .9em; overflow-wrap: anywhere; }
+.md pre.code { background: var(--bg); padding: 8px 10px; border-radius: 8px; overflow: auto; font-size: 12.5px; } .md pre.code code { background: none; padding: 0; }
+.md .tablewrap { overflow-x: auto; margin: 6px 0; border: 1px solid var(--line); border-radius: 8px; }
+.md table.grid { font-size: 12.5px; border-collapse: collapse; min-width: 100%; } .md table.grid th, .md table.grid td { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.md blockquote { margin: 6px 0; padding-left: 10px; border-left: 3px solid var(--line); color: var(--mute); }
 .turn.fresh.user::before { content: "second reader · "; color: var(--mute); }
 .turn .tool { font-size: 12px; color: var(--mute); background: var(--bg); border-radius: 6px; padding: 2px 6px; } .turn .tool.bad { color: var(--bad); } .turn .tool.ok { color: var(--ok); }
 .turn .confirm { background: var(--new); padding: 6px 8px; border-radius: 8px; }
-.chat-input { position: sticky; bottom: 0; background: var(--panel); padding-top: 8px; display: grid; gap: 6px; }
+/* the composer covers the panel's bottom padding too, so no answer shows through under it */
+.chat-input { position: sticky; bottom: -12px; margin-bottom: -12px; padding: 8px 0 12px; background: var(--panel); display: grid; gap: 6px; border-top: 1px solid var(--line); }
 .settings { max-width: 860px; }
 @media (max-width: 1100px) { .studio-split { grid-template-columns: 1fr; } .stage-col { position: static; max-height: none; order: -1; } }
 /* the rail's badge, and the side panel's tabs */

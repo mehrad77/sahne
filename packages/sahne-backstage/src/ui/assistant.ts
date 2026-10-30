@@ -12,6 +12,7 @@ import type { Path } from "../model/path.ts";
 import { route, say, world } from "../store.ts";
 import { selection, usage } from "../events.ts";
 import { Icon } from "./kit/index.ts";
+import { Markdown } from "./md.ts";
 
 type Part = { type: "text"; text: string } | { type: "tool"; name: string; input?: unknown; ok?: boolean; summary?: string } | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number };
 interface Turn { role: "user" | "assistant"; content: string; parts?: Part[]; fresh?: boolean }
@@ -118,8 +119,8 @@ export function AssistantChat() {
     <div class="chat">
       ${!turns.value.length && html`<div class="note">Ask anything about the series, or pick an ask. It sees ${ctx.id ? html`<b>${ctx.id}</b>${(ctx as { path?: Path }).path ? html` at <b>${(ctx as { path: Path }).path.slice(1).join(".")}</b>` : ""}` : `the ${ctx.page}`}, and its edits arrive as proposals to accept.<${AskMenu} /></div>`}
       ${turns.value.map(t => html`<div class=${`turn ${t.role}${t.fresh ? " fresh" : ""}`}>
-        ${t.role === "user" ? t.content : (t.parts ?? []).map(p => p.type === "text" ? html`<div class="said">${p.text}</div>`
-          : p.type === "tool" ? html`<div class=${`tool${p.ok === false ? " bad" : ""}`}><${Icon} name="settings" size=${12} /> ${p.name}${p.summary ? `: ${p.summary}` : p.ok === undefined ? " …" : ""}</div>`
+        ${t.role === "user" ? t.content : (t.parts ?? []).map(p => p.type === "text" ? html`<${Markdown} class="said" text=${p.text} />`
+          : p.type === "tool" ? html`<div class=${`tool${p.ok === false ? " bad" : ""}`} title=${p.input ? JSON.stringify(p.input) : undefined}><${Icon} name="plug" size=${12} /> ${p.name.replace(/_/g, " ")}${p.summary ? `: ${p.summary}` : p.ok === undefined ? " …" : ""}</div>`
           : p.type === "proposal" ? html`<div class="tool ok">Proposed an edit: accept or reject it above the script.</div>`
           : p.type === "confirm" ? html`<div class="confirm">${p.why} It would cost about ${fmtUsd(p.estimateUsd)}. <button class="small primary" onClick=${() => { const q = [...turns.value].reverse().find(x => x.role === "user"); if (q) void send(q.content, { confirm: true, fresh: q.fresh }); }}>Go ahead</button></div>`
           : p.type === "error" ? html`<div class="tool bad">${p.message}</div>`
