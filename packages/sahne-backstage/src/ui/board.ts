@@ -128,7 +128,7 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
               onDragOver=${(e: DragEvent) => { if (drag && wk.week !== null) { e.preventDefault(); setOver(day.date); } }}
               onDragLeave=${() => setOver(o => (o === day.date ? null : o))}
               onDrop=${(e: DragEvent) => { e.preventDefault(); setOver(null); const id = e.dataTransfer?.getData("text/plain") || drag; if (id) move(id, day); setDrag(null); }}>
-              <span class="date">${dayLabel(day.date, wk === weeks[0] && k === 0)}${day.date === today ? html` <b>today</b>` : ""}</span>
+              <span class="date"><span class="wd">${DAYS[k]} </span>${dayLabel(day.date, wk === weeks[0] && k === 0)}${day.date === today ? html` <b>today</b>` : ""}</span>
               ${ep ? html`<${EpisodeCard} e=${ep} story=${story(ep.id)} onDrag=${(on: boolean) => setDrag(on ? ep.id : null)} />`
                 : can ? html`<a class="slot" href=${`#/new/${p.id}/${day.date}`} title=${`A new ${day.kind} on ${short(day.date)}`}><${Icon} name="plus" size=${16} /><span>${day.kind === "special" ? "Special" : "Episode"}</span></a>` : ""}
             </div>`;
