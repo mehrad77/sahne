@@ -34,7 +34,7 @@ console.log(b.url);
 ## The studio
 
 The page is a studio: a top bar, a rail on the left, and the page.
-- **The top bar.** The series, a tab per season (`S1`, `S2`), the search box, whether everything is saved (or why nothing can be: read-only, the samples, a root in the old language shape), and the theme (as the system is, light or dark, kept in this browser).
+- **The top bar.** The series, the search box, whether everything is saved (or why nothing can be: read-only, the samples, a root in the old language shape), and the theme (as the system is, light or dark, kept in this browser).
 - **Search and commands** (`⌘ K`, or Ctrl K, or the search box): type a few letters of an episode, a season, a character, an extra or a place to go there, or of a command (a new episode in a season, the theme). Words match anywhere in a name or its keywords, accents ignored (`src/model/search.ts`).
 - **The rail:** the board, the cast, the places, the kit, review; at its foot the agents (with how many proposals wait), the guides and settings.
 - **The side panel** (`src/ui/side.ts`), beside any page: ✦ in the top bar opens it on the assistant, ? on the guide's part about the page you are on. Its tabs:
@@ -81,10 +81,12 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 | `#/review` | Where every episode stands: status, blocks reviewed, each translation checked, errors, warnings, the known-word ratio (when the root has cards), open comments; *Export the notes* downloads them as markdown |
 
 **The board** (`src/ui/board.ts`, its dates in `src/model/board.ts`):
+- **The seasons are tabs at its top** (*Season 1*, *Season 2*, with each title), and *+ Season* starts the next one. The top bar names only the series.
 - A season's weeks are rows and Monday to Saturday the columns: an episode on a weekday, a special on Saturday, no Sunday. The rows run from the season's launch week (or its first episode's) to its last episode's, and one more to plan into. A row's week is the one its episodes' calendar rows (or arcs) name; an empty row between two weeks is a break.
 - **Each episode is a card on its release day:** its place's picture, its title in the main language, a special or not, a draft or not, its review status (an edge: to review, reviewed, approved) and its errors and warnings. A click opens it.
 - **Dragging a card to another day moves its release:** the season's calendar row and the story's own date and kind change together (a season with no calendar starts one from every episode's date), and to another week the episode takes that week's theme (a week with none takes the episode's). The changes wait in a save bar; a save the check refuses lists the new errors there (a story's `ref` belongs to its week's unit, for one).
 - **An empty day** starts a new episode on it (`#/new/<season>/<date>`).
+- **A new episode not on disk shows too, on its day:** one an agent proposes is a dashed card marked *proposed* (it opens the preview to accept or reject, and cannot be dragged until accepted; the season's count says how many), and one accepted or started but not saved yet is marked *unsaved* until its Save.
 - **Reading it:** a day shows its number, with the month where one begins; a week its span (`14–19 Sept`). Today has a red edge, and past days are quieter. A week with no episode yet is a low row. Saturday's column is marked special. The title is in the main language, with the first translation under it. On a phone (under 720 px) the board is an agenda: each week a block, its days a list with the weekday, an episode a wide card.
 - **Each row starts with its week's theme** (its arc), edited in place in the main language; its menu edits it in every language and what the learner does that week (`mechanics`). A theme is written in the season and in every story of the week, saved together.
 - Episodes with no date wait under the board, to be dragged onto a day.

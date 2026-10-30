@@ -1,18 +1,20 @@
-// The season board (#/board and #/season/<id>): a season's weeks as rows and Monday to Saturday as
+// The season board (#/board and #/season/<id>), under the series' seasons as tabs (and + Season): a season's weeks as rows and Monday to Saturday as
 // columns (model/board.ts), each episode a card on its release day: the picture of its place, its title, a special or not,
 // a draft, its review status and its problems. Each week's row starts with its theme (its arc, edited in place in the
 // main language, and in every language and with its mechanics from its menu: written in the season and in every story of
 // the week, saved together). Dragging a card to another day moves its release (the season's calendar row and the story's
 // own date and kind, saved together); an empty day starts a new episode on it. Episodes with no date wait under the
-// board. The series' and the season's settings open in a modal.
+// board. A new episode not on disk shows too, on its day: one an agent proposes (dashed, "proposed": it opens the preview
+// to accept or reject) and one taken but not saved yet ("unsaved"). The series' and the season's settings open in a modal.
 
 import { html } from "htm/preact";
 import { useEffect, useState } from "preact/hooks";
-import { allLanguages, textOf, type SeasonDoc, type StoryDoc } from "sahne-story";
+import { allLanguages, seasonOf, textOf, type SeasonDoc, type StoryDoc } from "sahne-story";
 import { arcOfWeek, boardOf, datesOf, rowOn, weekOfArc, type Day, type Week } from "../model/board.ts";
 import { set } from "../model/path.ts";
 import { dirty } from "../model/history.ts";
-import { allProblems, change, checked, draftOf, keyOf, loadAllProblems, openDoc, review, route, saveDocs, say, world } from "../store.ts";
+import { allProblems, change, checked, draftOf, drafts, keyOf, loadAllProblems, openDoc, review, route, saveDocs, say, world } from "../store.ts";
+import { proposals } from "../events.ts";
 import type { Episode } from "../api.ts";
 import { placeThumb } from "../thumbs.ts";
 import { Empty, Icon, Modal, Popover } from "./kit/index.ts";
@@ -47,21 +49,29 @@ export function Board(p: { id?: string }) {
 
 function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setSettings(s: "series" | "season" | null): void }) {
   const w = world.value!, langs = useLangs(), gloss = langs.translations[0];
-  const eps = w.episodes.filter(e => e.season === w.seasons[p.id].n).sort((a, b) => a.id.localeCompare(b.id));
+  const n = w.seasons[p.id].n;
+  const onDisk = w.episodes.filter(e => e.season === n);
+  // new episodes not on disk: taken but unsaved (a draft), or proposed by an agent (the latest of its proposals)
+  const asEpisode = (id: string, d: StoryDoc): Episode => ({ id, season: n, title: d.title, kind: d.kind, releaseDate: d.releaseDate, draft: !!d.draft, place: d.place, cast: d.cast ?? [] });
+  const unsaved = Object.keys(drafts.value).filter(k => k.startsWith("story:")).map(k => k.slice(6)).filter(id => seasonOf(id) === n && !onDisk.some(e => e.id === id)).map(id => asEpisode(id, draftOf("story", id)!.doc as StoryDoc));
+  const proposed = new Map<string, StoryDoc>();
+  for (const x of [...proposals.value].sort((a, b) => a.at - b.at)) if (x.kind === "story" && x.create && seasonOf(x.doc) === n && !onDisk.some(e => e.id === x.doc) && !unsaved.some(e => e.id === x.doc)) proposed.set(x.doc, x.next as StoryDoc);
+  const eps = [...onDisk, ...unsaved, ...[...proposed].map(([id, d]) => asEpisode(id, d))].sort((a, b) => a.id.localeCompare(b.id));
+  const markOf = (id: string) => (proposed.has(id) ? "proposed" : unsaved.some(e => e.id === id) ? "unsaved" : undefined);
   const [ready, setReady] = useState(false);
   const [drag, setDrag] = useState<string | null>(null), [over, setOver] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ week: number; x: number; y: number } | null>(null);
   // the season and its stories open, so a move or a theme edits them together
-  useEffect(() => { void Promise.all([openDoc("season", p.id), ...eps.map(e => openDoc("story", e.id))]).then(() => setReady(true)); }, [p.id]);
+  useEffect(() => { void Promise.all([openDoc("season", p.id), ...onDisk.map(e => openDoc("story", e.id))]).then(() => setReady(true)); }, [p.id]);
   useEffect(() => { if (!allProblems.value) void loadAllProblems(); }, []);
   const sd = draftOf("season", p.id);
   const se = (sd?.doc ?? w.seasons[p.id]) as SeasonDoc;
-  const story = (id: string) => draftOf("story", id)?.doc as StoryDoc | undefined;
+  const story = (id: string) => (draftOf("story", id)?.doc ?? proposed.get(id)) as StoryDoc | undefined;
   const dates = datesOf(se, eps.map(e => ({ id: e.id, releaseDate: story(e.id)?.releaseDate ?? e.releaseDate })));
   const arcWeeks = Object.fromEntries(eps.flatMap(e => { const wk = weekOfArc(story(e.id)?.arc?.id); return wk === undefined ? [] : [[e.id, wk]]; }));
   const weeks = boardOf(se, dates, 1, arcWeeks);
   const unscheduled = eps.filter(e => !dates[e.id]);
-  const keys = [keyOf("season", p.id), ...eps.map(e => keyOf("story", e.id))];
+  const keys = [keyOf("season", p.id), ...eps.filter(e => !proposed.has(e.id)).map(e => keyOf("story", e.id))];
   const changed = keys.filter(k => { const [kind, id] = k.split(":") as ["season" | "story", string]; return dirty(draftOf(kind, id)); });
 
   /**
@@ -70,6 +80,7 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
    */
   const move = (ep: string, day: Day) => {
     if (!ready) return say("still opening the season's episodes", true);
+    if (proposed.has(ep)) return say(`${ep} is only proposed: accept it first, then move it`, true);
     if (dates[ep] === day.date) return;
     const taken = Object.entries(dates).find(([, d]) => d === day.date)?.[0];
     if (taken) return say(`${taken} is on ${short(day.date)} already: move it first`, true);
@@ -98,13 +109,14 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
   const arcOf = (week: number) => se.arcs?.[arcOfWeek(se.n, week)];
   const blankArc = () => ({ ...Object.fromEntries(allLanguages(langs).map(l => [l, ""])), mechanics: ["say"] }) as unknown as NonNullable<SeasonDoc["arcs"]>[string];
 
+  const seasons = Object.values(w.seasons).sort((a, b) => a.n - b.n);
   return html`<section class="board-page">
+    <nav class="season-tabs" aria-label="Seasons">${seasons.map(x => html`<a href=${`#/season/${x.id}`} aria-current=${x.id === p.id ? "page" : undefined}>Season ${x.n}${textOf(x.title, langs.main) && textOf(x.title, langs.main) !== `Season ${x.n}` ? html`<small ...${inLang(langs.main)}>${textOf(x.title, langs.main)}</small>` : ""}</a>`)}<${NewSeason} /></nav>
     <div class="pagehead">
       <div class="grow"><h2 ...${inLang(langs.main)}>${textOf(se.title, langs.main, ...langs.translations) ?? `Season ${se.n}`}</h2>
-        <span class="note">${[gloss && textOf(se.title, gloss) && html`<span ...${inLang(gloss)}>${textOf(se.title, gloss)}</span>`, plural(eps.length, "episode"), se.launch && `from ${short(se.launch)}`].filter(Boolean).map((x, k) => html`${k ? " · " : ""}${x}`)}</span></div>
+        <span class="note">${[gloss && textOf(se.title, gloss) && html`<span ...${inLang(gloss)}>${textOf(se.title, gloss)}</span>`, plural(eps.length - proposed.size, "episode"), proposed.size > 0 && `${proposed.size} proposed`, se.launch && `from ${short(se.launch)}`].filter(Boolean).map((x, k) => html`${k ? " · " : ""}${x}`)}</span></div>
       <button onClick=${() => p.setSettings("season")} title="The season's titles, summary and launch day"><${Icon} name="settings" size=${16} /> Season settings</button>
       <button onClick=${() => p.setSettings("series")} title="The series' titles, languages, narrator and stand-in"><${Icon} name="settings" size=${16} /> Series settings</button>
-      <${NewSeason} />
       <a href=${`#/new/${p.id}`}><button class="primary"><${Icon} name="plus" size=${16} /> New episode</button></a>
     </div>
     ${!se.calendar && w.writable && html`<p class="note">The days come from each episode's own date. Drag an episode to another day to start the season's calendar.</p>`}
@@ -130,7 +142,7 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
               onDragLeave=${() => setOver(o => (o === day.date ? null : o))}
               onDrop=${(e: DragEvent) => { e.preventDefault(); setOver(null); const id = e.dataTransfer?.getData("text/plain") || drag; if (id) move(id, day); setDrag(null); }}>
               <span class="date"><span class="wd">${DAYS[k]} </span>${dayLabel(day.date, wk === weeks[0] && k === 0)}${day.date === today ? html` <b>today</b>` : ""}</span>
-              ${ep ? html`<${EpisodeCard} e=${ep} story=${story(ep.id)} onDrag=${(on: boolean) => setDrag(on ? ep.id : null)} />`
+              ${ep ? html`<${EpisodeCard} e=${ep} story=${story(ep.id)} mark=${markOf(ep.id)} onDrag=${(on: boolean) => setDrag(on ? ep.id : null)} />`
                 : can ? html`<a class="slot" href=${`#/new/${p.id}/${day.date}`} title=${`A new ${day.kind} on ${short(day.date)}`}><${Icon} name="plus" size=${16} /><span>${day.kind === "special" ? "Special" : "Episode"}</span></a>` : ""}
             </div>`;
           })}
@@ -138,7 +150,7 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
       })}
     </div>
     ${unscheduled.length > 0 && html`<h3>Not on the calendar (${unscheduled.length})</h3><p class="note">Drag one onto a day.</p>
-      <div class="tray">${unscheduled.map(e => html`<${EpisodeCard} e=${e} story=${story(e.id)} onDrag=${(on: boolean) => setDrag(on ? e.id : null)} />`)}</div>`}
+      <div class="tray">${unscheduled.map(e => html`<${EpisodeCard} e=${e} story=${story(e.id)} mark=${markOf(e.id)} onDrag=${(on: boolean) => setDrag(on ? e.id : null)} />`)}</div>`}
     ${changed.length > 0 && html`<div class="savebar"><span class="grow">${changed.map(k => k.replace(":", " ")).join(", ")}
         ${changed.flatMap(k => (checked.value[k] ?? []).filter(x => x.new && x.level === "error")).map(x => html`<span class="bad-line">${x.story}: ${x.message}</span>`)}</span>
       <button onClick=${() => { for (const k of changed) { const [kind, id] = k.split(":") as ["season" | "story", string]; void openDoc(kind, id, true); } }}>Discard</button>
@@ -156,20 +168,23 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
 }
 
 /** An episode on the board: its place's picture, title, kind, draft, review status and problems; a link, and a drag handle. */
-function EpisodeCard(p: { e: Episode; story?: StoryDoc; onDrag(on: boolean): void }) {
+function EpisodeCard(p: { e: Episode; story?: StoryDoc; mark?: "proposed" | "unsaved"; onDrag(on: boolean): void }) {
   const w = world.value!, { main } = useLangs();
   const status = review.value[p.e.id]?.status ?? "draft";
   const probs = (allProblems.value ?? []).filter(x => x.story === p.e.id);
   const errors = probs.filter(x => x.level === "error").length, warnings = probs.filter(x => x.level === "warning").length;
   const place = w.places[p.story?.place ?? p.e.place];
   const title = p.story?.title ?? p.e.title;
-  return html`<a class=${`ep-card ${status}`} href=${`#/episode/${p.e.id}`} draggable=${w.writable ? "true" : "false"}
+  const proposed = p.mark === "proposed";
+  return html`<a class=${`ep-card ${proposed ? "proposed" : status}`} href=${`#/episode/${p.e.id}`} draggable=${w.writable && !proposed ? "true" : "false"}
+    title=${proposed ? "Proposed by an agent: open it to accept or reject it" : p.mark === "unsaved" ? "New and not saved yet: open it and save" : undefined}
     onDragStart=${(ev: DragEvent) => { ev.dataTransfer?.setData("text/plain", p.e.id); p.onDrag(true); }} onDragEnd=${() => p.onDrag(false)}>
     <${Picture} art=${place ? () => placeThumb(place) : null} label=${p.e.id} />
     <b ...${inLang(main)}>${textOf(title, main) ?? p.e.id}</b>
     <small>${p.e.id}${(p.story?.kind ?? p.e.kind) === "special" ? " · special" : ""}</small>
     <span class="badges">
-      <span class=${`chip ${status === "approved" ? "ok" : status === "reviewed" ? "" : "warn"}`}>${status === "draft" ? "to review" : status}</span>
+      ${p.mark ? html`<span class=${`chip ${proposed ? "suggest" : "warn"}`}>${p.mark}</span>`
+        : html`<span class=${`chip ${status === "approved" ? "ok" : status === "reviewed" ? "" : "warn"}`}>${status === "draft" ? "to review" : status}</span>`}
       ${(p.story?.draft ?? p.e.draft) && html`<span class="chip">draft</span>`}
       ${errors > 0 && html`<span class="chip bad" title="errors">${errors} ✕</span>`}${warnings > 0 && html`<span class="chip warn" title="warnings">${warnings} !</span>`}
     </span></a>`;
