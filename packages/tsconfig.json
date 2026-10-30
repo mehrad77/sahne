@@ -16,5 +16,5 @@
     "noFallthroughCasesInSwitch": true,
     "types": []
   },
-  "include": ["sahne/src/**/*.ts", "sahne-kit/src/**/*.ts", "sahne-tr/src/**/*.ts", "sahne-story/src/**/*.ts", "sahne-gallery/src/**/*.ts", "sahne-backstage/src/**/*.ts"]
+  "include": ["sahne/src/**/*.ts", "sahne-kit/src/**/*.ts", "sahne-tr/src/**/*.ts", "sahne-de/src/**/*.ts", "sahne-story/src/**/*.ts", "sahne-gallery/src/**/*.ts", "sahne-backstage/src/**/*.ts"]
 }

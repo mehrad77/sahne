@@ -16,6 +16,7 @@ const ROOT = new URL("../", import.meta.url).pathname;
 const E = (names) => ({ code: `export { ${names} } from ${JSON.stringify(ROOT + "sahne/src/index.ts")};` });
 const BUNDLES = [
   { name: "engine and Turkish plugin", entries: ["sahne/src/index.ts", "sahne-tr/src/index.ts"], budget: 150 },
+  { name: "the German plugin (sahne-de)", entries: ["sahne-de/src/index.ts"], budget: 25 },
   { name: "kit code", entries: ["sahne-kit/src/index.ts"], budget: 150 },
   { name: "Kerim's puppet (sahne-kit/kerim)", entries: ["sahne-kit/src/kerim/index.ts"], budget: 8 },
   { name: "the animal puppets (sahne-kit/puppets: Pisi, the gulls)", entries: ["sahne-kit/src/puppets/index.ts"], budget: 8 },
