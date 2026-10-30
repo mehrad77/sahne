@@ -15,7 +15,7 @@ import { change, checkDocs, checked, createDoc, draftOf, go, history, keyOf, ope
 import { NumberField, Problems, Section, Select, tx } from "./fields.ts";
 import { Gallery } from "./kit/gallery.ts";
 import { characterItems } from "./galleries.ts";
-import { Texts, useLangs } from "./lang.ts";
+import { inSeries, Texts, useLangs } from "./lang.ts";
 import { Json } from "./staging.ts";
 
 const svg = (doc: unknown, size = 120, framing: "head" | "bust" | "full" = "bust") => {
@@ -128,7 +128,7 @@ function Character(p: { id: string }) {
         </${Section}>
         <${Section} title="Where they belong (places)">
           <div class="row">${Object.entries(w.places).map(([pid, pl]) => html`<label class="row"><input type="checkbox" style="width:auto" checked=${(c.places ?? []).includes(pid)}
-            onChange=${(e: Event) => { const on = (e.target as HTMLInputElement).checked, now = (c.places ?? []) as string[]; const n = on ? [...now, pid] : now.filter(x => x !== pid); put("places", n.length ? n : undefined); }} /> ${pl.name?.en ?? pid}</label>`)}</div>
+            onChange=${(e: Event) => { const on = (e.target as HTMLInputElement).checked, now = (c.places ?? []) as string[]; const n = on ? [...now, pid] : now.filter(x => x !== pid); put("places", n.length ? n : undefined); }} /> ${inSeries(pl.name) ?? pid}</label>`)}</div>
         </${Section}>
         <${Section} title="The whole document (album, catchphrases, motion …)" open=${false}>
           <${Json} label=${`characters/${p.id}.json`} rows=${16} value=${c} onInput=${(v: unknown) => v && typeof v === "object" && edit(() => v as CharacterDoc)} />

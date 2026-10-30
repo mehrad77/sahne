@@ -11,7 +11,7 @@ import { allProblems, loadAllProblems, review, reviewer, setReview, setReviewer,
 import { rows } from "../model/steps.ts";
 import type { Path } from "../model/path.ts";
 import { Select, tx } from "./fields.ts";
-import { langName, useLangs } from "./lang.ts";
+import { inLang, langName, useLangs } from "./lang.ts";
 
 export const STATUS_NAME: Record<Status, string> = { draft: "to review", reviewed: "reviewed", approved: "approved" };
 /** A block's key in the review notes: its step, option and reply (`3`, `5.1`, `5.1.0`). */
@@ -105,7 +105,7 @@ export function ReviewPage() {
       <tbody>${eps.map(e => {
         const r = review.value[e.id] ?? {}, steps = Object.values(r.steps ?? {});
         const ratio = ps ? ratioOf(ps.filter(p => p.doc === `story:${e.id}`)) : null;
-        return html`<tr><td><a href=${`#/episode/${e.id}`}>${e.id}</a> <span lang="tr">${tx(e.title)}</span></td>
+        return html`<tr><td><a href=${`#/episode/${e.id}`}>${e.id}</a> <span ...${inLang(langs.main)}>${tx(e.title)}</span></td>
           <td><span class=${`chip ${r.status === "approved" ? "ok" : r.status === "reviewed" ? "" : "warn"}`}>${STATUS_NAME[r.status ?? "draft"]}</span>${r.ai !== false ? " · AI" : ""}</td>
           <td>${steps.filter(s => s.reviewed).length}</td>${langs.translations.map(l => html`<td>${steps.filter(s => checkedOf(s).includes(l)).length}</td>`)}
           <td>${ps ? count(e.id, "error") : "…"}</td><td>${ps ? count(e.id, "warning") : "…"}</td><td>${ratio === null ? "—" : `${ratio}%`}</td>

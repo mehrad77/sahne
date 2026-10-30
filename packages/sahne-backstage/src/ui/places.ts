@@ -22,7 +22,7 @@ import { Problems } from "./fields.ts";
 import type { Problem } from "../api.ts";
 import { Gallery } from "./kit/gallery.ts";
 import { placeItems } from "./galleries.ts";
-import { useLangs } from "./lang.ts";
+import { inLang, inSeries, useLangs } from "./lang.ts";
 import { Catalogue } from "./place/catalogue.ts";
 import { Inspector } from "./place/inspector.ts";
 import { MoodStrip } from "./place/mood.ts";
@@ -119,7 +119,8 @@ function Place(p: { id: string }) {
     return () => removeEventListener("keydown", key);
   }, [tab, sel, drop, doc]);
 
-  const lints = useMemo(() => { try { return lintPlace(doc, { kit: KIT }).map(x => ({ ...x, story: `place:${p.id}`, doc: key } as Problem)); } catch (e) { return [{ rule: "lint", level: "error", story: p.id, message: String(e), doc: key } as Problem]; } }, [doc]);
+  const langs = useLangs();
+  const lints = useMemo(() => { try { return lintPlace(doc, { kit: KIT, languages: langs }).map(x => ({ ...x, story: `place:${p.id}`, doc: key } as Problem)); } catch (e) { return [{ rule: "lint", level: "error", story: p.id, message: String(e), doc: key } as Problem]; } }, [doc, langs.main, langs.translations.join()]);
   const server = (checked.value[key] ?? []).filter(x => x.rule === "schema");
   const size = bytesOf(doc);
   const used = w.episodes.filter(e => e.place === p.id);
@@ -127,7 +128,7 @@ function Place(p: { id: string }) {
 
   return html`<section>
     <div class="toolbar row">
-      <div class="grow"><h2 style="margin:0">${doc.name?.en ?? p.id} <small class="note">${p.id}${d.create ? " · new" : ""}${doc.site ? ` · site ${doc.site}` : ""}${used.length ? ` · opens ${used.map(e => e.id).join(", ")}` : ""}</small></h2></div>
+      <div class="grow"><h2 style="margin:0" ...${inLang(langs.main)}>${inSeries(doc.name) ?? p.id} <small dir="ltr" lang="en" class="note">${p.id}${d.create ? " · new" : ""}${doc.site ? ` · site ${doc.site}` : ""}${used.length ? ` · opens ${used.map(e => e.id).join(", ")}` : ""}</small></h2></div>
       <div class="tabs" role="tablist" style="margin:0;border:0">
         <button role="tab" aria-selected=${tab === "stage"} onClick=${() => setTab("stage")}>Stage</button>
         <button role="tab" aria-selected=${tab === "source"} onClick=${() => setTab("source")}>Source</button></div>

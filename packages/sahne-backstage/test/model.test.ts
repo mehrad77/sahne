@@ -86,6 +86,8 @@ test("only words, or what the stage draws", () => {
   assert.ok(wordsOnly(STORY, set(STORY, ["quiz", 0, "why"], "x")));
   assert.ok(!wordsOnly(STORY, set(STORY, ["steps", 1, "emo"], "sad")));
   assert.ok(!wordsOnly(STORY, set(STORY, ["steps", 1, "who"], "nima")));
+  assert.ok(wordsOnly(STORY, set(STORY, ["steps", 1, "de"], "Hallo"), ["de", "en"]), "a series' own language is words");
+  assert.ok(!wordsOnly(STORY, set(STORY, ["steps", 1, "de"], "Hallo")), "and is staging where the series has no such language");
 });
 
 test("the flags a story's callbacks read", () => {

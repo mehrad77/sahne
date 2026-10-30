@@ -13,7 +13,7 @@ import { CHARACTERS, IS_SAMPLES, PLACES, SERIES, seasonFile, seasonIds, storyFil
 import { loadCards, loadNeeds } from "../../sahne-story/load.ts";
 import { checkCast, checkPlaces, checkSeason, checkSeries, checkStory, RETIRED_CHARACTERS, type CheckOptions, type CheckProblem } from "../../sahne-story/check/rules.ts";
 import { calendarOf, charactersOf, loadWorld, type World } from "../../sahne-story/check/world.ts";
-import { lintPlace, seasonOf, upgrade, type CharacterDoc, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
+import { languagesOf, lintPlace, seasonOf, upgrade, type CharacterDoc, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
 import { plain, readFile, textFor, writeAtomic } from "../../sahne-story/json.ts";
 
 export type Kind = "series" | "season" | "story" | "character" | "place";
@@ -134,7 +134,7 @@ function problemsIn(w: World, edits: Edit[]): Problem[] {
   for (const e of edits.filter(e => e.kind === "place")) {
     const doc = w.places[e.id];
     out.push(...checkPlaces({ ...w, places: { [e.id]: doc } }).map(tag(`place:${e.id}`)));
-    for (const p of lintPlace(doc, { kit, cards: o.cards, needs: o.needs })) out.push({ rule: p.rule, level: p.level, story: `place:${e.id}`, message: p.message, doc: `place:${e.id}` });
+    for (const p of lintPlace(doc, { kit, cards: o.cards, needs: o.needs, languages: languagesOf(w.series) })) out.push({ rule: p.rule, level: p.level, story: `place:${e.id}`, message: p.message, doc: `place:${e.id}` });
   }
   if (edits.some(e => e.kind === "series" || e.kind === "season")) {
     for (const p of checkSeries(w)) {

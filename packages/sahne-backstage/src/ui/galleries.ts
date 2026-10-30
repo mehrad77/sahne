@@ -8,7 +8,7 @@ import { signal } from "@preact/signals";
 import { html } from "htm/preact";
 import { AudioEngine, hashString, portrait, type AvatarDoc } from "sahne";
 import { pieceSvg } from "sahne-kit/set-svg";
-import { textOf, type CharacterDoc, type StoryPlace } from "sahne-story";
+import { languagesOf, textOf, type CharacterDoc, type StoryPlace } from "sahne-story";
 import { EMOTION_SHELVES, PROP_SHELVES, SET_SHELVES, gestureShelf, shelfOf } from "../model/kitgroups.ts";
 import { KIT, SOUNDS } from "../stage.ts";
 import { emotionScene, emotionThumb, gestureScene, gestureThumb, placeThumb } from "../thumbs.ts";
@@ -38,8 +38,9 @@ export function characterItems(o: { main: string; ids?: string[]; href?: boolean
 
 export function placeItems(o: { href?: boolean } = {}): Item[] {
   const w = world.value;
+  const l = languagesOf(w?.series);
   return Object.entries(w?.places ?? {}).map(([id, p]: [string, StoryPlace]) => ({
-    id, label: textOf(p.name, "en") ?? id, sub: `${textOf(p.name, "tr") ?? ""} · ${w!.episodes.filter(e => e.place === id).length} episodes`, keywords: `${id} ${Object.values(p.name ?? {}).join(" ")} ${p.district ?? ""}`,
+    id, label: textOf(p.name, l.main, ...l.translations) ?? id, sub: `${l.translations.length ? `${textOf(p.name, ...l.translations) ?? ""} · ` : ""}${w!.episodes.filter(e => e.place === id).length} episodes`, keywords: `${id} ${Object.values(p.name ?? {}).join(" ")} ${p.district ?? ""}`,
     tags: [p.outdoor ? "outdoors" : "indoors"], art: () => placeThumb(p), ...(o.href ? { href: `#/place/${id}` } : {}),
   }));
 }

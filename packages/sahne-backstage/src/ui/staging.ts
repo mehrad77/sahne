@@ -12,6 +12,7 @@ import { get, set, type Path } from "../model/path.ts";
 import { KIT } from "../stage.ts";
 import { world } from "../store.ts";
 import { Check, NumberField, Select, Text, tx } from "./fields.ts";
+import { inLang, inSeries, mainLang } from "./lang.ts";
 
 export interface StagingProps {
   story: StoryDoc;
@@ -71,7 +72,7 @@ export function Staging(p: StagingProps) {
       <div class="fields" style="margin-top:6px">
         <${Text} label="Place change (env): time:night, state:-open, weather:rain, thunder, lights_on, fireworks, stop, depart (comma between)" value=${[v.env].flat().filter(Boolean).join(", ")} onInput=${(x: string | undefined) => { const l = (x ?? "").split(",").map(t => t.trim()).filter(Boolean); put("env", !l.length ? undefined : l.length === 1 ? l[0] : l); }} />
         ${sel("via", "On the phone or a video call (via)", ["phone", "video"])}
-        <${Text} label="A word of the line to stress (on)" lang="tr" value=${v.on} onInput=${(x: string | undefined) => put("on", x)} />
+        <${Text} label="A word of the line to stress (on)" lang=${mainLang()} value=${v.on} onInput=${(x: string | undefined) => put("on", x)} />
         ${p.path.at(-1) === "beat" && html`<${NumberField} label="Wait (ms)" value=${v.wait} min=${0} step=${100} onInput=${(x: number | undefined) => put("wait", x)} />`}
         ${p.path.at(-1) === "beat" && sel("who", "Who the beat is about (who)", p.cast)}
         ${sel("frame", "Flashback (frame)", ["past", "past_inset"])}
@@ -90,7 +91,7 @@ export function SceneFields(p: StagingProps) {
   const at = (v.at ?? {}) as Record<string, string>;
   return html`<div class="fields">
     <h3>The scene</h3>
-    <${Select} label="Place" value=${v.scene} options=${Object.entries(world.value?.places ?? {}).map(([id, d]) => [id, `${d.name?.en ?? id} (${id})`] as [string, string])} onInput=${(x: string | undefined) => x && put("scene", x)} />
+    <${Select} label="Place" value=${v.scene} options=${Object.entries(world.value?.places ?? {}).map(([id, d]) => [id, `${inSeries(d.name) ?? id} (${id})`] as [string, string])} onInput=${(x: string | undefined) => x && put("scene", x)} />
     <div class="row">
       <div class="grow"><${Select} label="Time" value=${v.time} options=${TIMES} onInput=${(x: string | undefined) => put("time", x)} /></div>
       <div class="grow"><${Select} label="Weather" value=${v.weather} options=${["grey", "rain"]} onInput=${(x: string | undefined) => put("weather", x)} /></div>
@@ -150,10 +151,10 @@ function Links(p: { value: unknown; targets: string[]; line: string; onInput(v: 
   const [word, setWord] = useState("");
   const write = (m: Record<string, string>) => p.onInput(Object.keys(m).length ? m : undefined);
   return html`<div><b>Words that point at things (link)</b>
-    ${Object.entries(map).map(([w, t]) => html`<div class="row"><span lang="tr" style="min-width:90px">${w}</span>
+    ${Object.entries(map).map(([w, t]) => html`<div class="row"><span ...${inLang(mainLang())} style="min-width:90px">${w}</span>
       <div class="grow"><${Select} label="" value=${t} options=${p.targets} onInput=${(x: string | undefined) => write(x ? { ...map, [w]: x } : Object.fromEntries(Object.entries(map).filter(([k]) => k !== w)))} /></div></div>`)}
     <div class="row"><select value=${word} style="max-width:200px" aria-label="A word of the line" onChange=${(e: Event) => setWord((e.target as HTMLSelectElement).value)}>
-      <option value="">a word of the line…</option>${[...new Set(p.line.toLocaleLowerCase("tr").match(/[\p{L}']+/gu) ?? [])].map(w => html`<option value=${w}>${w}</option>`)}</select>
+      <option value="">a word of the line…</option>${[...new Set(p.line.toLocaleLowerCase(mainLang()).match(/[\p{L}']+/gu) ?? [])].map(w => html`<option value=${w}>${w}</option>`)}</select>
       <button class="small" disabled=${!word} onClick=${() => { write({ ...map, [word]: p.targets[0] }); setWord(""); }}>+ link it</button></div>
   </div>`;
 }
@@ -164,7 +165,7 @@ function Sfx(p: { value: unknown; onInput(v: unknown): void }) {
   return html`<div><b>Sounds (sfx)</b> <button class="small" onClick=${() => write([...list, { id: SOUNDS[0] }])}>+ a sound</button>
     ${list.map((s, i) => html`<div class="row">
       <div class="grow"><${Select} label="Sound" value=${s.id} options=${SOUNDS} onInput=${(x: string | undefined) => write(list.map((y, k) => (k === i ? { ...y, id: x } : y)))} /></div>
-      <div class="grow"><${Text} label="Its written word (a caption)" lang="tr" value=${s.word} onInput=${(x: string | undefined) => write(list.map((y, k) => (k === i ? { ...y, word: x } : y)))} /></div>
+      <div class="grow"><${Text} label="Its written word (a caption)" lang=${mainLang()} value=${s.word} onInput=${(x: string | undefined) => write(list.map((y, k) => (k === i ? { ...y, word: x } : y)))} /></div>
       <button class="small danger" onClick=${() => write(list.filter((_, k) => k !== i))} aria-label="Remove the sound">×</button></div>`)}
   </div>`;
 }

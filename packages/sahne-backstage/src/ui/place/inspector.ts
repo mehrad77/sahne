@@ -9,6 +9,7 @@ import { set } from "../../model/path.ts";
 import { duplicate, heights, posOf, remove, type Sel } from "../../model/place.ts";
 import { KIT } from "../../stage.ts";
 import { Check, NumberField, Text } from "../fields.ts";
+import { Texts } from "../lang.ts";
 import { pieceItems } from "../galleries.ts";
 import { Picture } from "../kit/gallery.ts";
 import { Json } from "../staging.ts";
@@ -57,7 +58,7 @@ function PlaceCard(p: { doc: StoryPlace; edit: Edit }) {
   const setWide = (from: number, to: number) => edit(x => set(x, ["camera", "wide"], { ...x.camera?.wide, x: r2((from + to) / 2), w: r2(Math.max(0.5, to - from)) }), "camera.wide");
   return html`<div class="panel pl-card">
     <header><div class="grow"><h3>The place</h3><small>Select a thing on the stage or the plan to change it.</small></div></header>
-    ${(["tr", "en", "fa"] as const).map(k => html`<${Text} label=${`Name · ${k}`} lang=${k} value=${doc.name?.[k]} onInput=${(v: string | undefined) => edit(x => set(x, ["name", k], v ?? ""), `name.${k}`)} />`)}
+    <${Texts} label="Name" value=${doc.name} onInput=${(l: string, v: string | undefined) => edit(x => set(x, ["name", l], v ?? ""), `name.${l}`)} />
     <div class="row">
       <div class="grow"><${NumberField} label="Width (m)" value=${doc.size.w} step=${0.5} onInput=${(v: number | undefined) => v && edit(x => set(x, ["size", "w"], v))} /></div>
       <div class="grow"><${NumberField} label="Depth (m)" value=${doc.size.d} step=${0.5} onInput=${(v: number | undefined) => v && edit(x => set(x, ["size", "d"], v))} /></div>

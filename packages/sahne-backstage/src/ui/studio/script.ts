@@ -11,7 +11,7 @@
 
 import { html } from "htm/preact";
 import { useEffect, useRef, useState } from "preact/hooks";
-import { allLanguages, textOf, type StoryDoc } from "sahne-story";
+import { allLanguages, languagesOf, textOf, type StoryDoc } from "sahne-story";
 import { get, set, type Path } from "../../model/path.ts";
 import { addAfter, blocks, convert, duplicateAt, emptyLine, INSERTS, moveBy, nextSpeaker, remove, stagingIn, template, type Block, type Insert } from "../../model/script.ts";
 import { chipsOf, parseParenthetical } from "../../model/parenthetical.ts";
@@ -274,7 +274,7 @@ function ChoiceBlock(p: Common) {
     <button class="small" disabled=${c.options.length >= 3} onClick=${() => p.edit(s => set(s, [...p.b.path, "choice", "options", c.options.length], Object.fromEntries(allLanguages(languagesNow()).map(l => [l, ""]))))}>+ an option</button></div>`;
 }
 /** The open series' languages, outside a component. */
-const languagesNow = () => { const s = world.value?.series; return s?.languages ?? { main: "tr", translations: ["en", "fa"] }; };
+const languagesNow = () => languagesOf(world.value?.series);
 
 function SpotBlock(p: Common) {
   const { main } = useLangs();

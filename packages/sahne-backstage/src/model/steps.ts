@@ -61,15 +61,18 @@ function describe(b: Record<string, any> | undefined): string {
   return parts.join(" · ") || "beat";
 }
 
-/** Keys whose values are words a learner reads (never what the stage draws). */
-const WORDS = new Set(["tr", "en", "fa", "note", "title", "titleEn", "titleFa", "summary", "summaryFa", "quiz", "gl", "followUp", "why", "q", "prompt"]);
-const skeleton = (v: unknown): unknown => {
-  if (Array.isArray(v)) return v.map(skeleton);
-  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).filter(([k]) => !WORDS.has(k)).map(([k, x]) => [k, skeleton(x)]));
+/** Keys whose values are words a learner reads (never what the stage draws), besides the series' language codes. */
+const WORDS = ["note", "title", "titleEn", "titleFa", "summary", "summaryFa", "quiz", "gl", "followUp", "why", "q", "prompt"];
+const skeleton = (v: unknown, words: ReadonlySet<string>): unknown => {
+  if (Array.isArray(v)) return v.map(x => skeleton(x, words));
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).filter(([k]) => !words.has(k)).map(([k, x]) => [k, skeleton(x, words)]));
   return v;
 };
-/** Whether `next` differs from `prev` only in words (the stage can re-direct its cues, no load). */
-export const wordsOnly = (prev: unknown, next: unknown) => equal(skeleton(prev), skeleton(next));
+/** Whether `next` differs from `prev` only in words, in the series' `langs` (the stage can re-direct its cues, no load). */
+export const wordsOnly = (prev: unknown, next: unknown, langs: readonly string[] = ["tr", "en", "fa"]) => {
+  const words = new Set([...WORDS, ...langs]);
+  return equal(skeleton(prev, words), skeleton(next, words));
+};
 
 /** Every flag a story's gates name (`if`, `unless`), for the preview's flag switches. */
 export function flagsIn(story: unknown): string[] {

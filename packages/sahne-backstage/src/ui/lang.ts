@@ -5,11 +5,17 @@
 
 import { html } from "htm/preact";
 import { useId } from "preact/hooks";
-import { dirOf, languagesOf, type Languages } from "sahne-story";
+import { dirOf, languagesOf, textOf, type Languages } from "sahne-story";
 import { world } from "../store.ts";
 
 /** The open series' languages. */
 export const useLangs = (): Languages => languagesOf(world.value?.series);
+
+/** The open series' main language: the one the stage plays and its words are in. */
+export const mainLang = (): string => languagesOf(world.value?.series).main;
+
+/** A text map (a place's name, a title) in the series' main language, else a translation, else any it has. */
+export const inSeries = (t: unknown): string | undefined => { const l = languagesOf(world.value?.series); return textOf(t, l.main, ...l.translations); };
 
 const names = (() => { try { return new Intl.DisplayNames(["en"], { type: "language" }); } catch { return null; } })();
 /** A language's English name (`fa` → Persian). */

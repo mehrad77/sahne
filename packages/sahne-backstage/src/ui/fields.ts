@@ -1,22 +1,23 @@
-// The form controls every page edits with: a text field (Turkish, English or Persian: Persian runs right to left), a
-// Turkish/English/Persian group for a step's or a title's three texts, a select, a number, a check box, and the problems
-// list. Each writes through `onInput` with the value only; the page turns it into an edit of its document.
+// The form controls every page edits with: a text field (in any language, written in its direction: Persian or Arabic
+// right to left), a select, a number, a check box, and the problems list. A text in each of the series' languages is
+// `Texts` (lang.ts). Each writes through `onInput` with the value only; the page turns it into an edit of its document.
 
 import { html } from "htm/preact";
 import type { ComponentChildren } from "preact";
 import { useId } from "preact/hooks";
-import { textOf } from "sahne-story";
+import { dirOf, languagesOf, textOf } from "sahne-story";
 import type { Problem } from "../api.ts";
+import { world } from "../store.ts";
 
-export type Lang = "tr" | "en" | "fa";
+/** A text map's entry in `lang`, else in the series' main language, a translation, or any, as a string to show. */
+export const tx = (t: unknown, lang?: string): string => {
+  const l = languagesOf(world.value?.series);
+  return textOf(t, ...(lang ? [lang] : []), l.main, ...l.translations) ?? "";
+};
 
-/** A text map's entry in `lang` (or its first), as a string to show. */
-export const tx = (t: unknown, lang: string = "tr"): string => textOf(t, lang) ?? "";
-const LANG_NAME: Record<Lang, string> = { tr: "Turkish", en: "English", fa: "Persian" };
-
-export function Text(p: { label: string; value: unknown; lang?: Lang; multi?: boolean; changed?: boolean; placeholder?: string; onInput(v: string | undefined): void }) {
+export function Text(p: { label: string; value: unknown; lang?: string; multi?: boolean; changed?: boolean; placeholder?: string; onInput(v: string | undefined): void }) {
   const v = typeof p.value === "string" ? p.value : p.value === undefined ? "" : String(p.value);
-  const dir = p.lang === "fa" ? "rtl" : "ltr";
+  const dir = p.lang ? dirOf(p.lang) : "ltr";
   const onInput = (e: Event) => { const t = (e.target as HTMLInputElement).value; p.onInput(t === "" ? undefined : t); };
   const id = useId();
   return html`<div class=${`field${p.changed ? " changed" : ""}`}>
@@ -24,16 +25,6 @@ export function Text(p: { label: string; value: unknown; lang?: Lang; multi?: bo
     ${p.multi
       ? html`<textarea id=${id} dir=${dir} lang=${p.lang} rows=${Math.min(6, Math.max(1, Math.ceil(v.length / 60)))} value=${v} placeholder=${p.placeholder} onInput=${onInput} />`
       : html`<input id=${id} dir=${dir} lang=${p.lang} value=${v} placeholder=${p.placeholder} onInput=${onInput} />`}
-  </div>`;
-}
-
-/** Three texts of one thing: keys default to tr / en / fa (a title's map, or a line's own keys). */
-export function Tri(p: { label: string; doc: Record<string, unknown> | undefined; keys?: [string, string, string]; saved?: Record<string, unknown>; multi?: boolean; onInput(key: string, v: string | undefined): void }) {
-  const keys = p.keys ?? ["tr", "en", "fa"];
-  const langs: Lang[] = ["tr", "en", "fa"];
-  return html`<div class="tri">
-    ${keys.map((k, i) => html`<${Text} label=${`${p.label} · ${LANG_NAME[langs[i]]}`} lang=${langs[i]} multi=${p.multi} value=${p.doc?.[k]}
-      changed=${!!p.saved && p.saved[k] !== p.doc?.[k]} onInput=${(v: string | undefined) => p.onInput(k, v)} />`)}
   </div>`;
 }
 

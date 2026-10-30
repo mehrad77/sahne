@@ -68,7 +68,7 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
 
 | Route | What |
 |---|---|
-| `#/` | The home: the series' name, the next episode's place on a paper theatre's stage, *Continue* into that episode (the next to be released, else the last), the board, and the cast, places, kit and guides. A root with no series or no episode asks for the first |
+| `#/` | The home: the series' name, the scene last worked on framed as a paper theatre's stage, *Continue* back into it, the board, and the cast, places, kit and guides. The episode page keeps the episode, the cue on its stage and a picture of that stage in this browser (`src/recent.ts`). Before any, the home shows the next episode's place. *Continue* opens the curtains and grows the scene to fill the page. The episode then opens under it at that cue. With reduced motion, it simply opens. A root with no series or no episode asks for the first |
 | `#/board`, `#/season/<id>` | The board of a season (the first, or the one named), described below |
 | `#/new/<season>[/<date>]` | A new episode (on that day), described below |
 | `#/episode/<id>` | An episode, described below |
@@ -153,7 +153,7 @@ A gallery has a search box and filters by tag; a picker is a gallery in a popove
   - The wide shot is a red bracket at the depth it fits. What stands behind the room is drawn on a strip at the top.
   - Drag anything to move it in x and z.
 - **The inspector** (`place/inspector.ts`) shows what is selected, in plain words.
-  - **Nothing selected:** the place, with its names, size, Kerim's perch, the floor's sound and what the wide shot spans.
+  - **Nothing selected:** the place, with its name in each of the series' languages (the main one first; `lintPlace` and the server's check ask for those, not Turkish, English and Persian), size, Kerim's perch, the floor's sound and what the wide shot spans.
   - **A piece:** its sketch and look (variant), a control for each param its generator declares (`PieceDef.meta`), the states it is in, and its id.
   - **A prop:**
     - what it sits on: a mark, or free;
