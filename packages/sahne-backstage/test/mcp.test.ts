@@ -352,6 +352,10 @@ test("kit_search lists set pieces and props with family, use and variants, and f
     const all = (await search({ kind: "props", limit: 200 })).length;
     assert.equal(all, Object.keys(fullKit.props).length, "kind props lists every prop, the both ones too");
     assert.equal((await search({ kind: "set", limit: 200 })).length, Object.keys(fullKit.set).length);
+    // no kind: props and set pieces together, each saying which
+    const any = await search({ query: "flag" });
+    assert.ok(any.some(r => r.as !== "prop") && any.every(r => typeof r.as === "string"), JSON.stringify(any.map(r => [r.id, r.as])));
+    assert.ok((await search({ query: "cup" })).some(r => r.id === "cup"));
   } finally { await close(); }
 });
 
@@ -364,7 +368,13 @@ test("kit_read shows a generator's params, variants and source, with its sheet; 
     assert.equal(d.id, "tea");
     assert.equal(d.family, "food");
     assert.ok(Object.keys(d.params).length > 0 && d.source.file === "packages/sahne-kit/src/set/food.ts");
-    assert.match(d.source.text, /tea/i);
+    // where the source is, not the source: an agent reads lines from..to of the file itself
+    assert.equal(d.source.text, undefined);
+    assert.ok(d.source.line > 0 && d.source.from <= d.source.line && d.source.to > d.source.line);
+    assert.match(r.text, /source: packages\/sahne-kit\/src\/set\/food\.ts:\d+ \(lines \d+-\d+\)/);
+    const src = readFileSync(new URL(`../../../${d.source.file}`, import.meta.url), "utf8").split("\n");
+    assert.match(src[d.source.line - 1], /^(export\s+)?(const|function)\s/);
+    assert.ok(Buffer.byteLength(r.text) < 4000, `kit_read stays short (${Buffer.byteLength(r.text)} bytes)`);
     assert.equal(r.images.length, 1);
     assert.ok(isPng(r.images[0]));
     const g = await call(client, "kit_render", { id: "frontage", views: ["day"], seeds: ["a", "b"] });
@@ -373,6 +383,8 @@ test("kit_read shows a generator's params, variants and source, with its sheet; 
     assert.ok(g.images.every(isPng));
     assert.match(g.text, /^frontage: 0 errors/);
     assert.ok(Array.isArray(json(g).problems));
+    assert.ok(!(await call(client, "kit_render", { id: "tea", zoom: "scene", views: ["day"] })).isError, "zoom scene");
+    assert.ok((await call(client, "kit_render", { id: "tea", zoom: "huge" })).isError, "zoom is auto or scene");
     const one = await call(client, "kit_render", { id: "tea", params: { n: 3 } });
     assert.equal(one.images.length, 1);
     assert.match((await call(client, "kit_render", { id: "tea", params: { nonesuch: 1 } })).text, /nonesuch/);

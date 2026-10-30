@@ -10,23 +10,27 @@
 // Flags: --write (else every write tool refuses), --agent-edits direct|proposals (default direct with --write: a one-shot
 // process has no editor to accept a proposal), --share-cards, --out <dir>.
 //
-// --session <name> keeps one server process alive across calls (started on first use, on a unix socket in the temp dir),
+// --session <name> keeps one server process alive across calls (started on first use, on a unix socket in a private folder),
 // so the kit and resvg load once; it stops after 15 idle minutes, with `--session <name> --stop`, and restarts itself when a
 // TypeScript source of the kit, the engine, the story package or backstage changed, so an edit to a generator shows in the
 // next render. `--session <name> --status` says whether it runs. Drawings (kit/*.json) are read fresh on every call.
+// The socket, the session's log and the default --out live in a folder only this user can open (privateDir); a call waits
+// at most --timeout seconds (default 120, or SAHNE_CALL_TIMEOUT_MS) for its session to answer.
 
 import { parseArgs } from "node:util";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { createConnection, createServer, type Socket } from "node:net";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = fileURLToPath(import.meta.url);
 const PACKAGES = join(dirname(HERE), "../..");
 export const IDLE_MS = 15 * 60_000;
+/** How long a call waits for its session's answer before it gives up (SAHNE_CALL_TIMEOUT_MS or --timeout replace it). */
+export const TIMEOUT_MS = 120_000;
 
 // ---- the answer: what a call comes back as ------------------------------------------------------------------------------
 
@@ -69,10 +73,31 @@ async function perform(client: Booted, cmd: Command): Promise<Answer> {
 
 // ---- the session: one server process kept alive ---------------------------------------------------------------------------
 
-const sockOf = (name: string) => {
-  const p = join(tmpdir(), `sahne-call-${process.getuid?.() ?? 0}-${createHash("sha1").update(name).digest("hex").slice(0, 10)}.sock`);
-  return p.length < 100 ? p : join("/tmp", `sahne-call-${process.getuid?.() ?? 0}-${createHash("sha1").update(name).digest("hex").slice(0, 10)}.sock`);
-};
+/** `dir` made (mode 0700) or checked: a real folder (not a link), owned by this user, that no one else can open. Throws otherwise. */
+export function privateDir(dir: string): string {
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const st = lstatSync(dir), uid = process.getuid?.();
+  if (st.isSymbolicLink() || !st.isDirectory()) throw new Error(`${dir} is not a folder of its own (a link or a file): remove it, call.ts keeps its sockets there`);
+  if (uid !== undefined && st.uid !== uid) throw new Error(`${dir} belongs to another user (uid ${st.uid}): call.ts will not put its sockets there`);
+  if (st.mode & 0o077) chmodSync(dir, 0o700);
+  return dir;
+}
+
+/** A unix socket's path must stay short (104 bytes on macOS, with its NUL): the longest one call.ts makes. */
+const SOCK_MAX = 100;
+
+/** The private folder of this user's sessions: in the temp folder, or ~/.cache/sahne-call when a socket's path there would be too long. */
+export function callDir(tmp = tmpdir(), cacheHome = process.env.XDG_CACHE_HOME || join(homedir(), ".cache")): string {
+  const inTmp = join(tmp, `sahne-call-${process.getuid?.() ?? 0}`);
+  if (Buffer.byteLength(join(inTmp, "0123456789.sock")) <= SOCK_MAX) return privateDir(inTmp);
+  const cache = join(cacheHome, "sahne-call");
+  if (Buffer.byteLength(join(cache, "0123456789.sock")) > SOCK_MAX) throw new Error(`no short folder for the session's socket (${cache} is too long): set TMPDIR to a shorter folder`);
+  mkdirSync(cacheHome, { recursive: true, mode: 0o700 });
+  return privateDir(cache);
+}
+
+/** The socket of a session: <callDir>/<10 hex of this checkout and its name>.sock, so two worktrees' sessions of one name never meet. */
+export const sockOf = (name: string, dir = callDir()) => join(dir, `${createHash("sha1").update(`${PACKAGES}\0${name}`).digest("hex").slice(0, 10)}.sock`);
 
 /** The newest mtime of the TypeScript the server was built from (SAHNE_CALL_WATCH: other folders, for the test). */
 export function newest(dirs: string[] = (process.env.SAHNE_CALL_WATCH ? process.env.SAHNE_CALL_WATCH.split(":") : ["sahne", "sahne-kit", "sahne-story", "sahne-backstage"].map(p => join(PACKAGES, p)))): number {
@@ -134,20 +159,32 @@ async function serve(name: string, c: Config) {
 
 const alive = (path: string) => new Promise<boolean>(res => { const s = createConnection(path, () => { s.destroy(); res(true); }); s.on("error", () => res(false)); });
 
-/** One request to the session process on `path`: the answer, or null when nothing listens. */
-function ask(path: string, req: unknown): Promise<Record<string, unknown> | null> {
-  return new Promise(res => {
+/** The wait for a session's answer: --timeout (seconds), else SAHNE_CALL_TIMEOUT_MS, else TIMEOUT_MS. */
+export function timeoutOf(flag?: string): number {
+  const ms = flag !== undefined ? Number(flag) * 1000 : Number(process.env.SAHNE_CALL_TIMEOUT_MS || TIMEOUT_MS);
+  if (!Number.isFinite(ms) || ms <= 0) throw new Error(`--timeout is a number of seconds above 0, not ${flag}`);
+  return ms;
+}
+
+/** One request to the session process on `path`: the answer, or null when nothing listens. Rejects when nothing came back in `ms`. */
+export function ask(path: string, req: unknown, ms = timeoutOf(), name = "this"): Promise<Record<string, unknown> | null> {
+  return new Promise((res, rej) => {
     const s = createConnection(path);
-    let buf = "";
-    s.on("connect", () => s.write(`${JSON.stringify(req)}\n`));
+    let buf = "", connected = false;
+    const timer = setTimeout(() => {
+      s.destroy();
+      rej(new Error(`the session ${name} did not answer within ${Math.round(ms / 100) / 10} s${connected ? " (it serves one call at a time: one may still be running before this one)" : ""}. Wait longer with --timeout <seconds> (or SAHNE_CALL_TIMEOUT_MS), or stop it with --session ${name} --stop`));
+    }, ms);
+    const done = (v: Record<string, unknown> | null) => { clearTimeout(timer); res(v); };
+    s.on("connect", () => { connected = true; s.write(`${JSON.stringify(req)}\n`); });
     s.on("data", d => { buf += d; });
-    s.on("end", () => { try { res(JSON.parse(buf)); } catch { res(null); } });
-    s.on("error", () => res(null));
+    s.on("end", () => { try { done(JSON.parse(buf)); } catch { done(null); } });
+    s.on("error", () => done(null));
   });
 }
 
 async function startSession(name: string, c: Config, flags: string[]) {
-  const path = sockOf(name), log = join(tmpdir(), `sahne-call-${name.replace(/\W/g, "_")}.log`);
+  const path = sockOf(name), log = join(callDir(), `${name.replace(/\W/g, "_")}.log`);
   const fd = openSync(log, "a");
   const p = spawn(process.execPath, [HERE, "--serve", "--session", name, ...flags], { detached: true, stdio: ["ignore", fd, fd], env: process.env });
   p.unref();
@@ -160,11 +197,11 @@ async function startSession(name: string, c: Config, flags: string[]) {
 }
 
 /** The answer of a session process, starting or restarting it when it is not running or its source is stale. */
-async function viaSession(name: string, c: Config, flags: string[], cmd: Command): Promise<Answer> {
+async function viaSession(name: string, c: Config, flags: string[], cmd: Command, ms: number): Promise<Answer> {
   const path = sockOf(name);
   for (let attempt = 0; attempt < 3; attempt++) {
-    let r = await ask(path, { op: "run", config: c, cmd });
-    if (r === null) { await startSession(name, c, flags); r = await ask(path, { op: "run", config: c, cmd }); }
+    let r = await ask(path, { op: "run", config: c, cmd }, ms, name);
+    if (r === null) { await startSession(name, c, flags); r = await ask(path, { op: "run", config: c, cmd }, ms, name); }
     if (r === null || r.restart) continue;
     if (r.mismatch) throw new Error(String(r.mismatch));
     return r as unknown as Answer;
@@ -183,14 +220,20 @@ async function argsOf(raw: string | undefined): Promise<Record<string, unknown>>
   return v as Record<string, unknown>;
 }
 
-/** The pictures of an answer saved as PNGs under `dir`, and its text with each picture's path where it came. */
+/** A PNG's name no other call shares, in the order they were made: <yyyymmdd-hhmmss-mmm>-<pid>-<n>-<4 hex>-<tool>.png. */
+export function pngName(tool: string, n: number, at = new Date()): string {
+  const stamp = at.toISOString().replace(/[-:]/g, "").replace("T", "-").replace(".", "-").slice(0, 19);
+  return `${stamp}-${process.pid}-${n}-${randomBytes(2).toString("hex")}-${tool.replace(/\W+/g, "_")}.png`;
+}
+
+/** The pictures of an answer saved as PNGs under `dir` (never over another file), and its text with each picture's path where it came. */
 function emit(a: Answer, dir: string, tool: string): string {
   mkdirSync(dir, { recursive: true });
-  let seq = readdirSync(dir).filter(f => f.endsWith(".png")).length;
+  let n = 0;
   return a.content.map(b => {
     if (b.type === "text") return b.text;
-    const file = join(dir, `${String(++seq).padStart(3, "0")}-${tool.replace(/\W+/g, "_")}.png`);
-    writeFileSync(file, Buffer.from(b.data, "base64"));
+    const file = join(dir, pngName(tool, ++n));
+    writeFileSync(file, Buffer.from(b.data, "base64"), { flag: "wx" });
     return `image: ${file}`;
   }).join("\n");
 }
@@ -201,6 +244,7 @@ async function main(): Promise<"serving" | void> {
     options: {
       content: { type: "string" }, write: { type: "boolean", default: false }, out: { type: "string" }, session: { type: "string" }, stop: { type: "boolean", default: false },
       status: { type: "boolean", default: false }, serve: { type: "boolean", default: false }, "agent-edits": { type: "string" }, "share-cards": { type: "boolean", default: false },
+      timeout: { type: "string" },
     },
   });
   const content = o.content ?? process.env.SAHNE_CONTENT ?? "";
@@ -211,21 +255,23 @@ async function main(): Promise<"serving" | void> {
   // the flags a session process is started with (it reads the same ones)
   const flags = [...(config.content ? ["--content", config.content] : []), ...(config.write ? ["--write"] : []), "--agent-edits", agentEdits, ...(config.shareCards ? ["--share-cards"] : [])];
 
+  const ms = timeoutOf(o.timeout);
   if (o.serve) { if (!o.session) throw new Error("--serve is for a session"); await serve(o.session, config); return "serving"; }
   if (o.session && (o.stop || o.status)) {
-    const r = await ask(sockOf(o.session), { op: o.stop ? "stop" : "status" });
+    const r = await ask(sockOf(o.session), { op: o.stop ? "stop" : "status" }, ms, o.session);
     if (o.stop) console.log(r ? `session ${o.session} stopped` : `session ${o.session} was not running`);
     else console.log(r ? `session ${o.session}: pid ${r.pid}, up ${r.up} s, ${(r.config as Config).content || "the samples"}${(r.config as Config).write ? " (--write)" : ""}${r.stale ? ", its source changed (the next call restarts it)" : ""}` : `session ${o.session} is not running`);
     return;
   }
   const [verb, ...rest] = pos;
   if (!verb) {
-    console.error("usage: call.ts <tool> ['<json args>' | @file | -] --content <abs folder> [--write] [--out <dir>] [--session <name>]\n       call.ts list [<tool>]   call.ts read <uri>   call.ts --session <name> --stop|--status");
+    console.error("usage: call.ts <tool> ['<json args>' | @file | -] --content <abs folder> [--write] [--out <dir>] [--session <name>] [--timeout <s>]\n       call.ts list [<tool>]   call.ts read <uri>   call.ts --session <name> --stop|--status");
     process.exit(2);
   }
   const cmd: Command = verb === "list" ? { kind: "list", name: rest[0] } : verb === "read" ? { kind: "read", uri: rest[0] ?? "sahne://kit-guide" } : { kind: "tool", name: verb, args: await argsOf(rest[0]) };
-  const out = o.out ?? (o.session ? join(tmpdir(), `sahne-call-out-${o.session.replace(/\W/g, "_")}`) : mkdtempSync(join(tmpdir(), "sahne-call-")));
-  const a = o.session ? await viaSession(o.session, config, flags, cmd) : await perform(await boot(config), cmd);
+  // the default --out: a private folder (a session's own, kept; else a new one per call)
+  const out = o.out ?? (o.session ? privateDir(join(callDir(), `out-${o.session.replace(/\W/g, "_")}`)) : mkdtempSync(join(callDir(), "out-")));
+  const a = o.session ? await viaSession(o.session, config, flags, cmd, ms) : await perform(await boot(config), cmd);
   const text = emit(a, out, verb);
   if (a.isError) { console.error(text); process.exitCode = 1; } else console.log(text);
 }
