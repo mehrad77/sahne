@@ -106,19 +106,19 @@ test("a place is named in each of the series' languages", () => {
   assert.ok(lintPlace(bakkal, { kit, languages: { main: "tr", translations: ["en", "de"] } }).some(p => p.message === "no name in de"));
 });
 
-test("the story language: Turkish by plugin, another by plain words", async () => {
+test("the story language: Turkish and German by plugin, another by plain words", async () => {
   const { langFor, lintStory, suggest, trLang } = await import("../src/index.ts");
   assert.equal(langFor("tr"), trLang);
-  const de = langFor("de");
-  assert.equal(de.id, "de");
-  assert.deepEqual(de.words("Guten Tag, Nima!").map(w => w.w), ["guten", "tag", ",", "nima", "."]);
-  assert.ok(de.resolver(["Brot"])("brot") && !de.resolver(["Brot"])("brote"), "exact words only");
+  const nl = langFor("nl");
+  assert.equal(nl.id, "nl");
+  assert.deepEqual(nl.words("Goedemorgen, Nima!").map(w => w.w), ["goedemorgen", ",", "nima", "."]);
+  assert.ok(nl.resolver(["Brood"])("brood") && !nl.resolver(["Brood"])("broden"), "exact words only");
   // the samples' story, read as Turkish by default and by name, gives the same lints and suggestions
   const d = world.drafts[0], o = { places: world.places, characters: d.characters, kit };
   assert.deepEqual(lintStory(d.story, { ...o, lang: trLang }), lintStory(d.story, o));
   assert.deepEqual(suggest(d.story, { ...o, lang: trLang }), suggest(d.story, o));
-  // a series in German has no Turkish lints: its line keys are de
+  // a series in a language with no plugin has no Turkish lints: its line keys are nl
   const story = structuredClone(d.story) as StoryDoc & { steps: Record<string, unknown>[] };
-  for (const s of story.steps) if ("who" in s) { s.de = s.tr; delete s.tr; }
-  assert.ok(!lintStory(story, { ...o, lang: de }).some(p => ["deixis", "var_yok", "number", "time"].includes(p.rule)));
+  for (const s of story.steps) if ("who" in s) { s.nl = s.tr; delete s.tr; }
+  assert.ok(!lintStory(story, { ...o, lang: nl }).some(p => ["deixis", "var_yok", "number", "time"].includes(p.rule)));
 });

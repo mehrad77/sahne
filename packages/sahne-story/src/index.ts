@@ -18,3 +18,4 @@ export { upgrade, isOldShape, type UpgradeKind } from "./upgrade.ts";
 export { langFor, plainLang, motivated, motiveText, LANGS, type StoryLang, type LineWord, type LineContext, type PropView, type Resolver } from "./lang.ts";
 export { trLang } from "./langs/tr.ts";
 export { enLang } from "./langs/en.ts";
+export { deLang } from "./langs/de.ts";

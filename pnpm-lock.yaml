@@ -36,6 +36,9 @@ importers:
       sahne:
         specifier: workspace:*
         version: link:../sahne
+      sahne-de:
+        specifier: workspace:*
+        version: link:../sahne-de
       sahne-en:
         specifier: workspace:*
         version: link:../sahne-en
@@ -52,6 +55,12 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
 
+  packages/sahne-de:
+    dependencies:
+      sahne:
+        specifier: workspace:*
+        version: link:../sahne
+
   packages/sahne-en:
     dependencies:
       sahne:
@@ -63,6 +72,9 @@ importers:
       sahne:
         specifier: workspace:*
         version: link:../sahne
+      sahne-de:
+        specifier: workspace:*
+        version: link:../sahne-de
       sahne-en:
         specifier: workspace:*
         version: link:../sahne-en
@@ -103,6 +115,9 @@ importers:
       sahne:
         specifier: workspace:*
         version: link:../sahne
+      sahne-de:
+        specifier: workspace:*
+        version: link:../sahne-de
       sahne-en:
         specifier: workspace:*
         version: link:../sahne-en

@@ -27,6 +27,7 @@
     "sahne-kit": "workspace:*",
     "sahne-en": "workspace:*",
     "sahne-story": "workspace:*",
+    "sahne-de": "workspace:*",
     "sahne-tr": "workspace:*",
     "zod": "4.6.7"
   }

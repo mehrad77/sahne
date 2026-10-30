@@ -5,7 +5,7 @@
 // reduced motion, the pictures stay still.
 
 import { mountStage, type Run, type Stage } from "sahne";
-import { KIT, LANG } from "./stage.ts";
+import { KIT, seriesLang } from "./stage.ts";
 import { THUMB, loadScene, type Scene } from "./thumbs.ts";
 
 let stage: Stage | null = null, host: HTMLElement | null = null, inner: HTMLElement | null = null, run: Run | null = null;
@@ -42,7 +42,8 @@ function start(t: number, el: HTMLElement, s: Scene & { play: { cue: number } })
   Object.assign(host.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, visibility: "visible" });
   // drawn at the pictures' size, scaled to cover the box as the picture's object-fit does
   inner!.style.transform = `translate(-50%, -50%) scale(${Math.max(r.width / THUMB.w, r.height / THUMB.h)})`;
-  stage ??= mountStage(inner!, { kit: KIT, lang: LANG, bubbles: false, motion: "full", maxDpr: 2 });
+  if (stage && stage.lang.id !== (seriesLang()?.id ?? "und")) { stage.destroy(); stage = null; }
+  stage ??= mountStage(inner!, { kit: KIT, lang: seriesLang(), bubbles: false, motion: "full", maxDpr: 2 });
   loadScene(stage, s);
   const loop = () => {
     if (t !== token || !stage) return;

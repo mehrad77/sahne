@@ -17,6 +17,7 @@ const E = (names) => ({ code: `export { ${names} } from ${JSON.stringify(ROOT + 
 const BUNDLES = [
   { name: "engine and Turkish plugin", entries: ["sahne/src/index.ts", "sahne-tr/src/index.ts"], budget: 150 },
   { name: "English plugin (sahne-en)", entries: ["sahne-en/src/index.ts"], external: ["sahne"], budget: 25 },
+  { name: "German plugin (sahne-de)", entries: ["sahne-de/src/index.ts"], external: ["sahne"], budget: 25 },
   { name: "kit code", entries: ["sahne-kit/src/index.ts"], budget: 150 },
   { name: "Kerim's puppet (sahne-kit/kerim)", entries: ["sahne-kit/src/kerim/index.ts"], budget: 8 },
   { name: "pieces drawn as data (sahne-kit/drawing)", entries: ["sahne-kit/src/drawing.ts"], budget: 8 },
@@ -25,7 +26,7 @@ const BUNDLES = [
   { name: "the builder with its stage", ...E("normalize, serialize, portrait, mountBuilder"), budget: 100 },
   // measured, no budget yet: the optional listening module, and Kumru's story adapter with its lints
   { name: "say it aloud (sahne/listen)", entries: ["sahne/src/listen/index.ts"] },
-  { name: "story adapter and lints (sahne-story)", entries: ["sahne-story/src/index.ts"], external: ["sahne", "sahne-tr", "sahne-en"] },
+  { name: "story adapter and lints (sahne-story)", entries: ["sahne-story/src/index.ts"], external: ["sahne", "sahne-tr", "sahne-en", "sahne-de"] },
 ];
 // the set kit (sahne-kit/set): each family is a chunk an app loads when its places need it, measured
 // without the engine and without the kit code it shares (palette, carry); the whole set is told, not held
