@@ -21,6 +21,8 @@ import { AskMenu } from "../assistant.ts";
 import { settingsNow } from "../settings.ts";
 import { Popover } from "../kit/index.ts";
 import { Drawer, Icon, MOD } from "../kit/index.ts";
+import { SaveButton } from "../readonly.ts";
+import { SuggestionsReview } from "./suggestions.ts";
 import { inLang, useLangs } from "../lang.ts";
 import type { Problem } from "../../api.ts";
 import { Script } from "./script.ts";
@@ -29,20 +31,25 @@ import { Details } from "./details.ts";
 import { Direct } from "./direct.ts";
 import { Strip } from "./strip.ts";
 import { rememberScene, takeResume } from "../../recent.ts";
-import { ProposalsBar } from "./proposals.ts";
-import { conflicts, postSelection, proposals, shown as agentShown } from "../../events.ts";
-import { ghostsOf, suggestionsOf, taken } from "../../model/autostage.ts";
+import { ProposalsBar, ProposedEpisode } from "./proposals.ts";
+import { conflicts, postSelection, proposals, proposalsRead, shown as agentShown } from "../../events.ts";
+import { ghostsOf, suggestionsOf, taken, type Suggest } from "../../model/autostage.ts";
 import { get, set } from "../../model/path.ts";
 
 declare global { interface Window { backstage?: { preview: Preview; select(path: Path | null): void } } }
 
 export function Episode(p: { id?: string }) {
   const id = p.id ?? "";
-  const [ready, setReady] = useState(!!draftOf("story", id));
-  useEffect(() => { void openDoc("story", id).then(d => setReady(!!d)); }, [id]);
+  // a new episode an agent proposes is not on disk: its page shows the proposal until it is taken (then its draft opens)
+  // the latest: an agent that goes on editing its new episode proposes it again, each holding the one before
+  const proposed = proposals.value.filter(x => x.kind === "story" && x.doc === id && x.create).sort((a, b) => b.at - a.at)[0];
+  const [missing, setMissing] = useState(false);
+  const read = proposalsRead.value;
+  useEffect(() => { setMissing(false); if (read && !draftOf("story", id) && !proposed) void openDoc("story", id).then(d => setMissing(!d)); }, [id, !!proposed, read]);
   const d = draftOf("story", id);
-  if (!ready || !d) return html`<p class="note">Opening ${id}…</p>`;
-  return html`<${Studio} id=${id} />`;
+  if (d) return html`<${Studio} key=${id} id=${id} />`;
+  if (proposed) return html`<${ProposedEpisode} x=${proposed} />`;
+  return html`<p class="note">${missing ? html`There is no episode ${id}. <a href="#/board">Back to the board</a>` : `Opening ${id}…`}</p>`;
 }
 
 function Studio(p: { id: string }) {
@@ -105,14 +112,16 @@ function Studio(p: { id: string }) {
     } catch (e) { return { lints: [{ rule: "lint", level: "error", story: p.id, message: String(e), doc: key } as Problem], suggestions: {} }; }
   }, [story]);
   const nSuggest = Object.values(suggestions).reduce((n, x) => n + x.length, 0);
+  const [reviewing, setReviewing] = useState(false);
+  const nameOf = (id: string) => textOf(w.characters[id]?.name, langs.main) ?? id;
   /** One block's suggestions, taken. */
   const takeAt = (at: Path) => {
     const ss = suggestions[at.join("/")];
     if (!ss?.length) return;
     edit(s => { const base = "beat" in ((get(s, at) ?? {}) as object) ? [...at, "beat"] : at; return set(s, base, ss.reduce((st, sg) => taken(st, sg.fix), (get(s, base) ?? {}) as Record<string, unknown>)); }, "take-auto");
   };
-  /** Every suggestion of the episode, taken (one edit). */
-  const takeAll = () => edit(s => Object.entries(suggestions).reduce((x, [k, ss]) => {
+  /** The picked suggestions (by block), taken as one edit: what the review dialog adds. */
+  const takeSome = (picked: Record<string, Suggest[]>) => edit(s => Object.entries(picked).reduce((x, [k, ss]) => {
     const path = k.split("/").map(v => (/^\d+$/.test(v) ? Number(v) : v));
     const base = "beat" in ((get(x, path) ?? {}) as object) ? [...path, "beat"] : path;
     return set(x, base, ss.reduce((st, sg) => taken(st, sg.fix), (get(x, base) ?? {}) as Record<string, unknown>));
@@ -167,10 +176,10 @@ function Studio(p: { id: string }) {
       <button class="iconbtn" onClick=${() => history("story", p.id, "undo")} disabled=${!d.past.length} title=${`Undo (${MOD} Z)`} aria-label="Undo"><${Icon} name="undo" /></button>
       <button class="iconbtn" onClick=${() => history("story", p.id, "redo")} disabled=${!d.future.length} title=${`Redo (⇧${MOD} Z)`} aria-label="Redo"><${Icon} name="redo" /></button>
       <button onClick=${() => history("story", p.id, "revert")} disabled=${!dirty(d)}>Revert</button>
-      ${nSuggest > 0 && html`<button onClick=${takeAll} title="Take every staging the rules suggest (the dashed chips); undo takes them back">Take ${nSuggest} suggestion${nSuggest > 1 ? "s" : ""}</button>`}
+      ${nSuggest > 0 && html`<button onClick=${() => setReviewing(true)} title="The rules suggest staging the script lacks: a gesture the words call for, a feeling the punctuation shows, a fix for a check (the dashed chips in the script). Review them before any is added."><${Icon} name="spark" size=${16} /> ${nSuggest} suggested staging${nSuggest > 1 ? "s" : ""}…</button>`}
       ${w.ai && html`<button onClick=${(e: MouseEvent) => setAsks({ x: e.clientX, y: e.clientY + 12 })} title="Ask the assistant about this episode or the selected block"><${Icon} name="spark" size=${16} /> Ask</button>`}
       <button aria-pressed=${details} onClick=${() => setDetails(!details)} title="All the staging of the selected block">Details</button>
-      <button class="primary" onClick=${save} disabled=${!dirty(d) || !w.writable} title=${w.writable ? `Save (${MOD} S)` : "read-only"}><${Icon} name="save" size=${16} /> Save</button>
+      <${SaveButton} onSave=${save} disabled=${!dirty(d)} title=${`Save (${MOD} S)`} />
     </div>
     ${conflict && html`<div class="banner">An agent wrote this episode while you had unsaved edits: <button class="small" onClick=${() => { void openDoc("story", p.id, true); conflicts.value = new Set([...conflicts.value].filter(k => k !== key)); }}>Take theirs</button> or save yours over it (the server will say it changed on disk; reload first to merge by hand).</div>`}
     <${ProposalsBar} list=${mine} story=${story} select=${select} />
@@ -201,7 +210,9 @@ function Studio(p: { id: string }) {
       </div>
     </div>
     ${asks && html`<${Popover} x=${asks.x} y=${asks.y} onClose=${() => setAsks(null)} label="Ask the assistant"><${AskMenu} onDone=${() => setAsks(null)} /></${Popover}>`}
-    ${details && html`<${Drawer} title="Details" onClose=${() => setDetails(false)}><${Details} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} /></${Drawer}>`}
+    ${reviewing && nSuggest > 0 && html`<${SuggestionsReview} story=${story} suggestions=${suggestions} name=${nameOf} onClose=${() => setReviewing(false)}
+      onAdd=${(picked: Record<string, Suggest[]>) => { takeSome(picked); setReviewing(false); }} onGo=${(at: Path) => { setReviewing(false); select(at, true); }} />`}
+    ${details && html`<${Drawer} float title="Details" onClose=${() => setDetails(false)}><${Details} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} /></${Drawer}>`}
   </section>`;
 }
 

@@ -13,6 +13,7 @@ import { change, checked, createDoc, draftOf, go, keyOf, openDoc, saveDocs, worl
 import { Problems, Select } from "./fields.ts";
 import { startSeries } from "../model/series.ts";
 import { langName, Texts, useLangs } from "./lang.ts";
+import { SaveButton } from "./readonly.ts";
 
 const filled = (codes: string[], text: (l: string) => string) => Object.fromEntries(codes.map(l => [l, text(l)]));
 
@@ -37,7 +38,7 @@ export function SeriesSettings() {
       <div class="grow"><${Select} label="Narrator" value=${s.narrator} options=${people} onInput=${(v?: string) => v && put("narrator", v)} /></div>
       <div class="grow"><${Select} label="Stand-in (the learner)" value=${s.standin} options=${people} onInput=${(v?: string) => v && put("standin", v)} /></div>
     </div>
-    <div class="row"><span class="grow"></span><button class="primary" disabled=${!dirty(d) || !w.writable} onClick=${() => void saveDocs([key])}>Save the series</button></div>
+    <div class="row"><span class="grow"></span><${SaveButton} disabled=${!dirty(d)} onSave=${() => void saveDocs([key])} label="Save the series" /></div>
     <${Problems} problems=${checked.value[key] ?? []} empty="" />
   </div>`;
 }
@@ -68,7 +69,6 @@ function NewSeries() {
 
 /** A season's own fields: titles, summary, launch day. */
 export function SeasonSettings(p: { id: string }) {
-  const w = world.value!;
   const [ready, setReady] = useState(false);
   useEffect(() => { void openDoc("season", p.id).then(d => setReady(!!d)); }, [p.id]);
   const d = draftOf("season", p.id);
@@ -79,7 +79,7 @@ export function SeasonSettings(p: { id: string }) {
     <${Texts} label="Title" value=${se.title} saved=${was.title} onInput=${(l: string, v?: string) => put("title", { ...se.title, [l]: v ?? "" })} />
     <${Texts} label="Summary" multi value=${se.summary} saved=${was.summary} onInput=${(l: string, v?: string) => put("summary", { ...se.summary, [l]: v ?? "" })} />
     <div class="field"><label>Launch day (the board starts its week)</label><input type="date" value=${se.launch ?? ""} onInput=${(e: Event) => put("launch", (e.target as HTMLInputElement).value || undefined)} /></div>
-    <div class="row"><span class="grow"></span><button class="primary" disabled=${!dirty(d) || !w.writable} onClick=${() => void saveDocs([key])}>Save the season</button></div>
+    <div class="row"><span class="grow"></span><${SaveButton} disabled=${!dirty(d)} onSave=${() => void saveDocs([key])} label="Save the season" /></div>
     <${Problems} problems=${checked.value[key] ?? []} empty="" />
   </div>`;
 }
@@ -94,5 +94,5 @@ export function NewSeason() {
     createDoc("season", id, { v: 1, id, n, title: filled(all, () => `Season ${n}`), arcs: { [`s${n}w01`]: { ...filled(all, () => "…"), mechanics: ["say"] } }, calendar: {} });
     if (await saveDocs([keyOf("season", id)])) go("season", id);
   };
-  return html`<button disabled=${!w.series || !w.writable} onClick=${() => void make()} title=${w.writable ? "" : "read-only"}>+ Season ${n}</button>`;
+  return html`<button disabled=${!w.series || !w.writable} onClick=${() => void make()} title=${w.writable ? "" : "Read-only: backstage was started without --write"}>+ Season ${n}</button>`;
 }

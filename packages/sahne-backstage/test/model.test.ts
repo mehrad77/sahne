@@ -222,3 +222,17 @@ test("notes: problems in plain words, with a fix where one is obvious", async ()
   const [deixis] = notesOf([{ rule: "deixis", level: "error", message: "\"bu elma\" needs a deixis gesture at obj:elma (hold_up)", step: 0, fix: { do: "hold_up", at: "obj:elma" } }], c);
   assert.deepEqual(deixis.fix!.apply(story).steps[0], { who: "ismail", tr: "a", do: "hold_up", at: "obj:elma" });
 });
+
+test("abilities: by mode, and the page's own first", async () => {
+  const { abilities } = await import("../src/model/abilities.ts");
+  const ro = abilities({ writable: false, agentEdits: "proposals" });
+  assert.match(ro.cannot[0], /read-only/);
+  assert.ok(!ro.can.some(x => /^Edit an episode/.test(x)));
+  const place = abilities({ writable: true, agentEdits: "proposals", page: "place" });
+  assert.match(place.can[0], /this place/);
+  assert.ok(place.cannot.some(x => /^Change this place/.test(x)));
+  assert.ok(!place.cannot.some(x => /^Change places, characters/.test(x)));
+  const direct = abilities({ writable: true, agentEdits: "direct", page: "episode" });
+  assert.ok(direct.can.some(x => /^Set where an episode stands/.test(x)));
+  assert.ok(!direct.cannot.some(x => /^Save anything/.test(x)));
+});

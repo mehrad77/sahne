@@ -208,8 +208,15 @@ export function createMcp(o: McpOptions): McpServer {
     return null;
   };
 
-  /** The document an agent edits: its own latest pending proposal on it in proposals mode, else the file. */
-  async function current(kind: Kind, id: string, mtime?: number): Promise<{ doc: Record<string, unknown>; mtime: number; after?: string }> {
+  /**
+   * The document an agent edits: its own latest pending proposal on it in proposals mode, else the file. A new episode it
+   * proposed (create_episode) is not on disk yet: it is that proposal, `create`, with the documents that change with it.
+   */
+  async function current(kind: Kind, id: string, mtime?: number): Promise<{ doc: Record<string, unknown>; mtime: number; after?: string; create?: boolean; also?: ProposalEdit[] }> {
+    if (o.agentEdits === "proposals" && !exists(kind, id)) {
+      const p = latestOf(await queue.pending(), by(), kind, id);
+      if (p?.create) return { doc: p.next as Record<string, unknown>, mtime: 0, after: p.id, create: true, also: p.also };
+    }
     const disk = docOf(kind, id);
     if (mtime !== undefined && mtime !== disk.mtime) throw new Refusal(`${kind} ${id} changed on disk since you read it (mtime ${mtime}, now ${disk.mtime}): read it again`);
     if (o.agentEdits === "proposals") {
@@ -254,8 +261,22 @@ export function createMcp(o: McpOptions): McpServer {
     if (why) return fail(why);
     const c = await current("story", id, mtime);
     const next = fn(c.doc);
-    return submit([{ kind: "story", doc: id, next, base: c.mtime }], { summary, paths, after: c.after });
+    const main: ProposalEdit = c.create ? { kind: "story", doc: id, next, create: true } : { kind: "story", doc: id, next, base: c.mtime };
+    return submit([main, ...(c.also ?? [])], { summary, paths, after: c.after });
   }
+
+  /** An episode as this agent reads it: as it would edit it (`current`), with a line saying what is not saved yet. */
+  async function seen(id: string): Promise<{ doc: Record<string, unknown>; mtime?: number; create?: boolean; note: string }> {
+    const c = await current("story", id);
+    const note = !c.after ? "" : c.create ? `${id} is your proposal ${c.after}, a new episode: nothing is on disk until a person accepts it. Edits build on it.` : `This is ${id} with your pending proposal ${c.after}, not saved yet.`;
+    return { doc: c.doc, mtime: c.create ? undefined : c.mtime, create: c.create, note };
+  }
+
+  /** The answer for an episode that is not on disk: none at all, or one only proposed so far. */
+  const absent = async (id: string, what: string): Promise<Result> => {
+    const p = (await queue.pending()).find(x => x.kind === "story" && x.doc === id && x.create);
+    return fail(p ? `${id} is only proposed (${p.id}), not saved yet: ${what} once a person accepts it` : `there is no story ${id} (list_episodes lists them)`);
+  };
 
   const objectAt = (doc: unknown, path: Key[]): Record<string, unknown> => {
     const v = get(doc, path);
@@ -278,12 +299,12 @@ export function createMcp(o: McpOptions): McpServer {
 
   server.registerTool("series_overview", {
     title: "The series",
-    description: "Start here. The series: its titles, its languages (the main one the stage plays and the learner learns, and the translations), the narrator and the stand-in (the learner's own character), and every season with its episodes (id, title, kind, release date, draft). Also whether backstage can edit, and how edits are made.",
+    description: "Start here. The series: its titles, its languages (the main one the stage plays and the learner learns, and the translations), the narrator and the stand-in (the learner's own character), and every season with the weeks it has arcs for (a new episode's week is one of them) and its episodes (id, title, kind, release date, draft). Also whether backstage can edit, and how edits are made.",
     annotations: { readOnlyHint: true },
   }, run("series_overview", () => {
     const w = listing(), c = ctx();
-    const seasons = new Map<string, { id: string; title?: string; launch?: string; episodes: unknown[] }>();
-    for (const [id, se] of Object.entries(w.seasons as Record<string, SeasonDoc>)) seasons.set(id, { id, title: textOf(se.title, c.langs.main), launch: se.launch, episodes: [] });
+    const seasons = new Map<string, { id: string; title?: string; launch?: string; arcWeeks?: number[]; episodes: unknown[] }>();
+    for (const [id, se] of Object.entries(w.seasons as Record<string, SeasonDoc>)) seasons.set(id, { id, title: textOf(se.title, c.langs.main), launch: se.launch, arcWeeks: Object.keys(se.arcs ?? {}).map(k => Number(k.split("w")[1])).sort((x, y) => x - y), episodes: [] });
     for (const e of w.episodes) {
       const sid = `s${seasonOf(e.id)}`;
       if (!seasons.has(sid)) seasons.set(sid, { id: sid, title: "(no season document)", episodes: [] });
@@ -315,9 +336,9 @@ export function createMcp(o: McpOptions): McpServer {
     description: "An episode as a script: its header (title, kind, date, level, place, cast, target words as card ids, lessons), then one line per step with its path (steps/3), the speaker, whom it is said to, the main-language text, the translations and a staging summary; a choice's options and replies on their own lines; then the quiz. Also its mtime, to pass to an edit. raw: true adds the whole JSON document.",
     inputSchema: { id: ID, raw: z.boolean().optional().describe("Also return the JSON document") },
     annotations: { readOnlyHint: true },
-  }, run("read_episode", ({ id, raw }) => {
-    const d = docOf("story", id);
-    const text = `${script(d.doc, ctx())}\n\nmtime ${d.mtime}`;
+  }, run("read_episode", async ({ id, raw }) => {
+    const d = await seen(id);
+    const text = `${d.note ? `${d.note}\n\n` : ""}${script(d.doc, ctx())}\n\nmtime ${d.mtime ?? "none (not on disk yet)"}`;
     return raw ? ok(text, d.doc) : ok(text);
   }));
 
@@ -326,10 +347,10 @@ export function createMcp(o: McpOptions): McpServer {
     description: "The JSON at a path of an episode: a step, a choice option, a reply, a quiz item or any field. Use it before edit_step to see exactly what is there.",
     inputSchema: { id: ID, path: PATH },
     annotations: { readOnlyHint: true },
-  }, run("read_step", ({ id, path }) => {
-    const p = pathOf(path), d = docOf("story", id), v = get(d.doc, p);
+  }, run("read_step", async ({ id, path }) => {
+    const p = pathOf(path), d = await seen(id), v = get(d.doc, p);
     if (v === undefined) return fail(`${pathText(p)} is not in ${id}`);
-    return ok(`${id} ${pathText(p)} (mtime ${d.mtime})`, v);
+    return ok(`${id} ${pathText(p)} (mtime ${d.mtime ?? "none: not on disk yet"})${d.note ? ` ${d.note}` : ""}`, v);
   }));
 
   const KIT_KINDS = ["characters", "places", "props", "set", "gestures", "emotions", "sounds"] as const;
@@ -375,14 +396,14 @@ export function createMcp(o: McpOptions): McpServer {
 
   server.registerTool("check_episode", {
     title: "Check an episode",
-    description: "The story check on an episode as it is on disk (the same check a save passes): its errors, warnings and notes, each with its rule and step.",
+    description: "The story check on an episode (the same check a save passes), as you would edit it: your pending proposal on it included. Its errors, warnings and notes, each with its rule and step.",
     inputSchema: { id: ID },
     annotations: { readOnlyHint: true },
-  }, run("check_episode", ({ id }) => {
-    const d = docOf("story", id);
-    const problems = check([{ kind: "story", id, doc: d.doc }]).map(p => ({ ...p, new: undefined }));
+  }, run("check_episode", async ({ id }) => {
+    const d = await seen(id);
+    const problems = check([{ kind: "story", id, doc: d.doc, ...(d.create ? { create: true } : {}) }]).map(p => ({ ...p, new: undefined }));
     const n = (l: string) => problems.filter(p => p.level === l).length;
-    return ok(`${id}: ${n("error")} errors, ${n("warning")} warnings, ${n("info")} notes`, problems.map(fmt));
+    return ok(`${id}: ${n("error")} errors, ${n("warning")} warnings, ${n("info")} notes${d.note ? `. ${d.note}` : ""}`, problems.map(fmt));
   }));
 
   server.registerTool("read_notes", {
@@ -390,8 +411,8 @@ export function createMcp(o: McpOptions): McpServer {
     description: "An episode's review notes: where it stands (draft, reviewed, approved), whether AI wrote it, the steps reviewed and whose Persian was checked, and the comments on it and its steps (a step key is \"12\", or \"12.0.1\" for a choice's option and reply).",
     inputSchema: { id: ID },
     annotations: { readOnlyHint: true },
-  }, run("read_notes", ({ id }) => {
-    if (!exists("story", id)) return fail(`there is no story ${id}`);
+  }, run("read_notes", async ({ id }) => {
+    if (!exists("story", id)) return absent(id, "it has review notes");
     return ok(`${id}'s review notes`, readReview().episodes[id] ?? {});
   }));
 
@@ -486,7 +507,7 @@ export function createMcp(o: McpOptions): McpServer {
     description: `Start a new episode from a brief: a first draft the story check can read (a scene with the cast on the place's floor marks, the narrator's opening, a few placeholder lines, one choice, one spot and three quiz items, marked draft: true), with its row in the season's calendar when the season has one. Then write its steps with the other tools. The id defaults to the season's next free one. ${writeNote}`,
     inputSchema: {
       season: z.number().int().positive(), id: z.string().optional().describe("s<season>e<NN>; default the next free"),
-      releaseDate: z.string().describe("YYYY-MM-DD"), kind: z.enum(["episode", "special"]), week: z.number().int().nonnegative().describe("Its week: its arc is the season's arc of that week"),
+      releaseDate: z.string().describe("YYYY-MM-DD"), kind: z.enum(["episode", "special"]), week: z.number().int().nonnegative().describe("Its week: one the season has an arc for (series_overview lists each season's arcWeeks); its arc is that week's"),
       place: z.string(), cast: z.array(z.string()).describe("Who speaks: 2 to 6 character ids, the stand-in among them"), words: z.array(z.string()).describe("Target word card ids (search_words)"),
       lessons: z.array(z.string()).describe("Grammar lesson ids"), title: TEXT, summary: TEXT.optional(), level: z.string().optional(),
     },
@@ -506,7 +527,10 @@ export function createMcp(o: McpOptions): McpServer {
     if (exists("story", id)) return fail(`${id} exists already: ids are permanent, pick a new one`);
     if (!(w.places as Record<string, unknown>)[b.place]) return fail(`there is no place ${b.place} (kit_search places)`);
     const aid = arcId(b.season, b.week), arc = se.arcs?.[aid];
-    if (!arc) return fail(`season ${sid} has no arc for week ${b.week} (${aid}): add the week's arc to the season first`);
+    if (!arc) {
+      const weeks = Object.keys(se.arcs ?? {}).map(k => Number(k.split("w")[1])).sort((x, y) => x - y);
+      return fail(`season ${sid} has no arc for week ${b.week} (${aid}). ${weeks.length ? `It has arcs for week${weeks.length > 1 ? "s" : ""} ${weeks.join(", ")}: pick one of those` : "It has no arcs at all"}, or ask the person to write week ${b.week}'s theme (its arc) on the Board (you cannot edit a season).`);
+    }
     if (!b.title[languagesOf(series).main]) return fail(`the title needs the main language's (${languagesOf(series).main})`);
     const next = skeleton({ id, season: b.season, releaseDate: b.releaseDate, kind: b.kind, week: b.week, arc: { ...arc, id: aid }, place: b.place, cast: b.cast, words: b.words, lessons: b.lessons, title: b.title, summary: b.summary, level: b.level },
       { narrator: series.narrator, standin: series.standin, places: w.places as Record<string, StoryPlace> });
@@ -536,16 +560,16 @@ export function createMcp(o: McpOptions): McpServer {
       next = { ...next, arc: { ...arcs[aid], id: aid } };
     }
     const nextSeason = { ...se.doc, calendar: { ...((se.doc.calendar ?? {}) as object), [story]: row } };
-    return submit([{ kind: "season", doc: sid, next: nextSeason, base: se.mtime }, { kind: "story", doc: story, next, base: st.mtime }], { summary: `${story} on ${row.date} (${row.kind}, week ${row.week})`, paths: [["calendar", story]], after: st.after });
+    return submit([{ kind: "season", doc: sid, next: nextSeason, base: se.mtime }, st.create ? { kind: "story", doc: story, next, create: true } : { kind: "story", doc: story, next, base: st.mtime }], { summary: `${story} on ${row.date} (${row.kind}, week ${row.week})`, paths: [["calendar", story]], after: st.after });
   }));
 
   server.registerTool("comment", {
     title: "Comment",
     description: "Leave a review comment on an episode, or on one of its steps (a path like steps/4, or steps/12/choice/options/0): a note for the people who review it, kept in the review notes beside the content, never in the story. It is written at once (with --write) in either edit mode.",
     inputSchema: { id: ID, step: PATH.optional(), text: z.string().min(1).max(4000) },
-  }, run("comment", ({ id, step, text }) => {
+  }, run("comment", async ({ id, step, text }) => {
     if (!o.write) return fail(readOnly() ?? "read-only");
-    if (!exists("story", id)) return fail(`there is no story ${id}`);
+    if (!exists("story", id)) return absent(id, "it takes comments");
     const at = step === undefined ? undefined : stepKey(pathOf(step));
     if (step !== undefined && !at) return fail("a comment's step is a step, an option or a reply (steps/4, steps/12/choice/options/0/reply/1)");
     const cur: EpisodeReview = readReview().episodes[id] ?? {};
@@ -560,10 +584,10 @@ export function createMcp(o: McpOptions): McpServer {
       ? "Not available in proposals mode: a person decides whether an episode is reviewed or approved. Leave a comment instead."
       : `Set an episode's review status: ${STATUSES.join(", ")}.`,
     inputSchema: { id: ID, status: z.enum(STATUSES as [string, ...string[]]) },
-  }, run("set_review", ({ id, status }) => {
+  }, run("set_review", async ({ id, status }) => {
     if (o.agentEdits === "proposals") return fail("in proposals mode a person sets where an episode stands: leave a comment instead");
     if (!o.write) return fail(readOnly() ?? "read-only");
-    if (!exists("story", id)) return fail(`there is no story ${id}`);
+    if (!exists("story", id)) return absent(id, "it has a review status");
     const cur: EpisodeReview = readReview().episodes[id] ?? {};
     writeReview({ id, review: { ...cur, status } });
     return ok(`${id} is ${status}`);
@@ -576,9 +600,11 @@ export function createMcp(o: McpOptions): McpServer {
     description: "Open an episode, at a step, or a set piece or prop (by its id, on the kit page), in the open backstage editors: to point a person at what you mean.",
     inputSchema: { id: z.string().describe("An episode id like s1e04, or a set piece or prop id"), step: PATH.optional(), as: z.enum(["set", "prop"]).optional().describe("For a kit item that is both: which shelf") },
     annotations: { readOnlyHint: true },
-  }, run("show", ({ id, step, as }) => {
-    const item = !exists("story", id) ? pieceRows().filter(r => r.id === id) : [];
-    if (!exists("story", id) && !item.length) return fail(`there is no story, set piece or prop ${id}`);
+  }, run("show", async ({ id, step, as }) => {
+    // a proposed new episode shows too: the editor opens it as a preview to accept or reject
+    const story = exists("story", id) || (await queue.pending()).some(x => x.kind === "story" && x.doc === id && x.create);
+    const item = !story ? pieceRows().filter(r => r.id === id) : [];
+    if (!story && !item.length) return fail(`there is no story, set piece or prop ${id} (list_episodes and kit_search list them)`);
     if (item.length) {
       const r = (as ? item.find(x => x.as === as || x.as === "both") : item[0]) ?? item[0];
       if (!o.events.size) return ok(`no editor is listening: open backstage in a browser to see ${id} (an MCP server on stdio reaches one only with --backstage)`);

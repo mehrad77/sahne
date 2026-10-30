@@ -30,6 +30,7 @@ import { GroundPlan } from "./place/plan.ts";
 import { PlaceSource } from "./place/source.ts";
 import { PlaceStage, type Drop } from "./place/stage.ts";
 import { placeStyles } from "./place/style.ts";
+import { SaveButton } from "./readonly.ts";
 
 const bytesOf = (doc: unknown) => new TextEncoder().encode(JSON.stringify(doc)).length;
 const typing = (e: KeyboardEvent) => { const t = e.target as HTMLElement | null; return !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)); };
@@ -135,7 +136,7 @@ function Place(p: { id: string }) {
       <a href="#/places">← places</a>
       <button onClick=${() => history("place", p.id, "undo")} disabled=${!d.past.length} title="Undo (⌘Z)">↶ Undo</button>
       <button onClick=${() => history("place", p.id, "redo")} disabled=${!d.future.length} title="Redo (⇧⌘Z)">↷ Redo</button>
-      <button class="primary" onClick=${() => void saveDocs([key])} disabled=${!dirty(d) || !w.writable}>Save</button>
+      <${SaveButton} onSave=${() => void saveDocs([key])} disabled=${!dirty(d)} />
     </div>
     <div class="pl">
       <div class="pl-main">

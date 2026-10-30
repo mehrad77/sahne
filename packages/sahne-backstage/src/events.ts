@@ -34,9 +34,12 @@ export const shown = signal<{ id: string; step: Path | null; n: number } | null>
 /** A set piece or prop an agent pointed at (`show`), on its kit section; the kit page opens its card. */
 export const shownKit = signal<{ id: string; section: "set" | "props"; n: number } | null>(null);
 
+/** Whether the proposals have been read once (a page that may show a proposed new document waits for it). */
+export const proposalsRead = signal(false);
 async function refresh() {
   const r = await api.get<{ proposals: Proposal[] }>("proposals");
   if (r.status === 200) proposals.value = r.proposals ?? [];
+  proposalsRead.value = true;
 }
 
 let source: EventSource | null = null;
