@@ -1,19 +1,25 @@
 // The stage an episode plays on in backstage: the whole kit (every set family), Kerim's puppet and the animals', the
-// Turkish plugin, the kit's sounds, the interaction layer (acts, explore, picking) and prop text; Kerim's round window for
+// language plugins (Turkish, English; a preview takes its series' main language's), the kit's sounds, the interaction layer (acts, explore, picking) and prop text; Kerim's round window for
 // the narrator. `Preview` keeps one stage and a story player over it, and follows the document as it is edited: a change
 // to words re-directs the cues (`player.replace`, no reload), anything else adapts and loads again; either way the stage
 // goes back to the cue that was showing.
 
-import { interact, mountStage, placeSolids, propText, type Interaction, type Kit, type Solid, type Stage } from "sahne";
+import { interact, mountStage, placeSolids, propText, type Interaction, type Kit, type LangPlugin, type Solid, type Stage } from "sahne";
 import full from "sahne-kit/full";
 import { puppets as kerimPuppets } from "sahne-kit/kerim";
 import { puppets as animals } from "sahne-kit/puppets";
 import { K_BUST, K_HEAD, K_HEAD_VB } from "sahne-kit/kerim/art";
 import { kerimOnTalk, kerimPortrait } from "sahne-kit/kerim/portrait";
+import en from "sahne-en";
 import tr from "sahne-tr";
 import { adaptStory, storyPlayer, type CharacterDoc, type Languages, type StoryDoc, type StoryPlace, type StoryPlayer, type StoryStage } from "sahne-story";
 
 export const KIT: Kit = { ...full, puppets: { ...full.puppets, ...kerimPuppets, ...animals } };
+/** The language plugins, by the code of a series' main language. */
+export const PLUGINS: Record<string, LangPlugin> = { tr, en };
+/** The plugin of a series' main language: its mouth timing and matching; Turkish for a language with none. */
+export const pluginFor = (main?: string): LangPlugin => PLUGINS[main ?? "tr"] ?? tr;
+/** The plugin of the default series (Turkish), for the stages that know no series. */
 export const LANG = tr;
 /** Where the kit's recordings are served. */
 export const SOUNDS = new URL("/sounds/", location.href).href;
@@ -49,7 +55,7 @@ export class Preview {
 
   constructor(el: HTMLElement, story: StoryDoc, o: PreviewOptions) {
     this.o = o;
-    this.stage = mountStage(el, { kit: KIT, lang: LANG, sounds: SOUNDS, bubbles: true, motion: "full" });
+    this.stage = mountStage(el, { kit: KIT, lang: pluginFor(o.languages?.main), sounds: SOUNDS, bubbles: true, motion: "full" });
     this.ix = interact(this.stage, { explore: true });
     propText(this.stage);
     this.kerim = kerimPortrait({ vb: K_HEAD_VB, bust: K_BUST, head: K_HEAD });

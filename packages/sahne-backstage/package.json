@@ -24,6 +24,7 @@
     "preact": "^11.0.1",
     "sahne": "workspace:*",
     "sahne-kit": "workspace:*",
+    "sahne-en": "workspace:*",
     "sahne-story": "workspace:*",
     "sahne-tr": "workspace:*",
     "zod": "4.6.7"
