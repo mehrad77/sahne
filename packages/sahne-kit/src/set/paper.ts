@@ -6,6 +6,7 @@
 
 import { ellipse, rect, rrect, poly, smooth, tone, mix, luma, mul, rotate, translate, groupBounds, clipsOf, Path, type Affine, type PieceDef, type PieceOut, type Rng, type Shape, type TextSpec, type Vec2 } from "sahne";
 import { S, P, num, str, type Pt } from "./draw.ts";
+import { COUNTRIES, countryOf, flagCloth, flagWidth, shifted } from "../flags.ts";
 import { CROWD_FABRIC, FABRIC, HAIR, SKIN } from "../palette.ts";
 
 const INK = "#2B2420", PEN = "#27408B", RED = "#C0392B", WHITE = "#FBF8F1", CREAM = "#F2E8D0", GOLD = "#D7B256", STEEL = "#B8BEC4", WOOD = "#C99A68", NAVY = "#2E3A59";
@@ -18,7 +19,7 @@ const PRINT: Partial<TextSpec> = { font: "print", color: INK }, HAND: Partial<Te
 interface Q {
   r: Rng; held: boolean; n: number; c?: string; label: string; lines: string[]; title?: string; labels?: string[];
   fields?: string[]; names?: string[]; rows?: number[]; missing?: number; stamped?: boolean; signed?: boolean; open?: boolean;
-  picture?: string; time?: string; score?: string; flag?: boolean; spiral?: boolean; tabs?: boolean; level?: string;
+  picture?: string; time?: string; score?: string; flag?: boolean; country?: string; spiral?: boolean; tabs?: boolean; level?: string;
 }
 /** One drawn thing: its shapes and words, its size (x −w/2…w/2, y −h…0), where a hand holds it (the art's offset from the grip), and whether it is shown when held. */
 interface Out { sh: Shape[]; tx: TextSpec[]; w: number; h: number; gx?: number; gy?: number; show?: boolean }
@@ -81,7 +82,8 @@ function titled(o: Out, r: Rng, txt: string | undefined, x: number, y: number, w
 /** Text that reads on `c`. */
 const onC = (c: string) => luma(c) > 0.55 ? INK : "#F6EBCB";
 /** A small Turkish flag on a toothpick, its top-left at (x, y), `w` wide. */
-function flagOn(x: number, y: number, w: number): Shape[] {
+function flagOn(x: number, y: number, w: number, country = "tr"): Shape[] {
+  if (country !== "tr") { const h = Math.min(w * 2 / 3, w / flagWidth(1, country)); return [S(rect(x - 0.3, y, 0.5, h * 3), WOOD), ...shifted(flagCloth(h, 0, 0, country), x, y)]; }
   const h = w * 2 / 3, cx = x + w * 0.36, cy = y + h / 2, star: Pt[] = Array.from({ length: 10 }, (_, i) => { const a = -Math.PI / 2 + i * Math.PI / 5, k = i % 2 ? h * 0.05 : h * 0.125; return [cx + h * 0.25 + Math.cos(a) * k, cy + Math.sin(a) * k, 0]; });
   return [S(rect(x - 0.3, y, 0.5, h * 3), WOOD), S(rect(x, y, w, h), "#E30A17"), flatS(ellipse(cx, cy, h * 0.25).add(ellipse(cx + h * 0.0625, cy, h * 0.2)), "#FFFFFF", 1, { evenodd: true }), P(star, "#FFFFFF", { flat: true })];
 }
@@ -297,7 +299,7 @@ const PAPER: Record<string, Kind> = {
     const { r } = q, w = 24, c = q.c ?? "#E8B931", pts: Pt[] = [[-w / 2, 0, 0]], J = ["#C8372D", "#2E6FB6", "#2E9E5B"];
     for (let i = 0; i <= 8; i++) pts.push([-w / 2 + i * w / 8, i % 2 ? -6.5 : i === 4 ? -13 : -11.5, 0]);
     pts.push([w / 2, 0, 0]);
-    const cr = P(pts, c), o: Out = { sh: [...(q.flag ? flagOn(7.4, -20.5, 6) : []), cr, flatS(rect(-w / 2, -3.4, w, 3.4), tone(c, "shade"), 0.35, { clip: cr.path }), flatS(rect(-w / 2, -13, w * 0.4, 13), tone(c, "light"), 0.3, { clip: cr.path })], tx: [], w, h: q.flag ? 20.5 : 13 };
+    const cr = P(pts, c), o: Out = { sh: [...(q.flag ? flagOn(7.4, -20.5, 6, q.country) : []), cr, flatS(rect(-w / 2, -3.4, w, 3.4), tone(c, "shade"), 0.35, { clip: cr.path }), flatS(rect(-w / 2, -13, w * 0.4, 13), tone(c, "light"), 0.3, { clip: cr.path })], tx: [], w, h: q.flag ? 20.5 : 13 };
     for (let i = 0; i < 3; i++) o.sh.push(S(ellipse((i - 1) * 6, i === 1 ? -9.6 : -8.6, 0.85), J[i]), S(ellipse((i - 1) * 7, -1.7, 1, 0.75), J[(i + 1) % 3]));
     o.sh.push(...bars(r, -w / 2 + 1, -5, w - 2, 1, 0.5, "#FFF6D8", 0.5, 0.4));
     return o;
@@ -413,7 +415,7 @@ function lay(id: string, outs: Out[], held: boolean, front: boolean, edge: numbe
  * a closed `envelope` (a name as `label`), a greeting `card` (folded, a drawing and `title` on the front; `open`, or any
  * `lines`, shows it open and written in), a sticky `note`, a shopping `list` (`lines` growing, `title`), a `stack` of
  * papers (`n` sheets; held, a sheaf), a `family_tree` (`names` in boxes by generation `rows`, e.g. [2, 3, 2], the box
- * `missing` dashed and empty, `title`), a paper `crown` (`flag`: a small Turkish flag stuck in it), a café `napkin`, a
+ * `missing` dashed and empty, `title`), a paper `crown` (`flag`: a small flag stuck in it, `country`'s), a café `napkin`, a
  * `flash_card` (the word as `label`, a `picture`: bird, house, tea, apple), a `clipboard` with a mark sheet, a cardboard
  * `clock_face` (`time` "H:MM" sets its hands), a `label` card (a proverb), a `price_tag` on a stick ("Domates · kilo 80 TL":
  * the name, then the price), a `flat_ad` pinned up (`title` on its band, the `label`'s parts one per line, tear-off strips).
@@ -427,7 +429,7 @@ const paper: PieceDef = { draw(p, r, kit) {
   const outs = Array.from({ length: n }, (_, i) => f({
     r, held, n: cnt(p.n, 40), c: typeof p.color === "string" ? kit.color(p.color) : undefined, title: str(p.title, "").trim(), lines: i ? [] : list(p.lines),
     label: labels[i] || (!i ? label : kind === "number_slip" && /^\d+$/.test(label) ? String(+label + i) : ""), fields: list(p.fields), names: list(p.names), rows: rows.length ? rows : undefined,
-    missing: num(p.missing, -1), stamped: !!p.stamped, signed: !!p.signed, open: typeof p.open === "boolean" ? p.open : undefined, picture: str(p.picture, ""), time: times[i] || str(p.time, "10:10"), score: str(p.score, "").trim(), flag: !!p.flag,
+    missing: num(p.missing, -1), stamped: !!p.stamped, signed: !!p.signed, open: typeof p.open === "boolean" ? p.open : undefined, picture: str(p.picture, ""), time: times[i] || str(p.time, "10:10"), score: str(p.score, "").trim(), flag: !!p.flag, country: countryOf(p.country),
   }));
   return lay("paper", outs, held, kind !== "stack", 0.25, kind === "family_tree" || kind === "flat_ad");
 }, variants: { ...Object.fromEntries(Object.keys(PAPER).filter(k => k !== "plain").map(k => [k, { kind: k }])), crown: { kind: "crown", flag: true }, contract: { kind: "contract", title: "KİRA SÖZLEŞMESİ" }, flat_ad: { kind: "flat_ad", title: "KİRALIK" } },
@@ -450,7 +452,8 @@ const paper: PieceDef = { draw(p, r, kit) {
       names: { type: "list", about: "family_tree: names in the boxes" },
       rows: { type: "list", about: "family_tree: boxes per generation, e.g. [2, 3, 2]" },
       missing: { type: "int", about: "family_tree: the box left dashed and empty (index)" },
-      flag: { type: "bool", default: false, about: "crown: a small Turkish flag stuck in it" },
+      flag: { type: "bool", default: false, about: "crown: a small flag stuck in it" },
+      country: { type: "enum", values: COUNTRIES, default: "tr", about: "crown: whose flag it is" },
       picture: { type: "text", about: "flash_card: bird, house, tea or apple (Turkish words too); else a sun over hills" },
       time: { type: "text", default: "10:10", about: "clock_face: \"H:MM\"" },
       times: { type: "list", about: "clock_face: each copy's time" },

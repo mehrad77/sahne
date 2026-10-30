@@ -6,6 +6,7 @@
 import { arcPoints, band, ellipse, luma, poly, rect, rrect, smooth, tone, type EmitSpec, type FlatSpec, type LightSpec, type Path, type PieceDef, type Rng, type Shape, type TextSpec, type Vec2 } from "sahne";
 import { S, P, L, num, str, holed, glowOnly, litByTurns, solidLine, type Pt } from "./draw.ts";
 import { SET } from "../palette.ts";
+import { COUNTRIES, countryOf, flagCloth, flagWidth, shifted } from "../flags.ts";
 
 // ---- Shared bits ------------------------------------------------------------------------------------
 
@@ -40,8 +41,9 @@ const SHUTTERS = ["#A9B0B5", "#9AA3A8", "#B4B9B5", "#8E979C"];
 const AWNINGS: [string, string][] = [["#C4302B", "#F4F1EA"], ["#2F8C88", "#F4F1EA"], ["#2F6B4A", "#F4F1EA"], ["#E0A83A", "#B3261E"], ["#2E3A59", "#F4F1EA"], ["#B3261E", "#B3261E"], ["#2F6B4A", "#2F6B4A"]];
 const GREENS = ["#4E7A48", "#5E8F52", "#3F6B3E", "#6E9E5C"];
 
-/** The Turkish flag, its hoist's top at (x, y), `w` wide, the fly rippling by `wave` cm. */
-function flag(x: number, y: number, w: number, wave = 0): Shape[] {
+/** The Turkish flag (or the `country`'s), its hoist's top at (x, y), `w` wide, the fly rippling by `wave` cm. */
+function flag(x: number, y: number, w: number, wave = 0, country = "tr"): Shape[] {
+  if (country !== "tr") { const h = Math.min(w / 1.5, w / flagWidth(1, country)); return shifted(flagCloth(h, wave / h, 0.8, country), x, y); }
   const h = w / 1.5, cy = y + h / 2;
   return [
     P([[x, y, 0], [x + w * 0.35, y - wave], [x + w * 0.7, y + wave * 0.6], [x + w, y + wave * 0.2, 0], [x + w, y + h + wave * 0.2, 0], [x + w * 0.7, y + h + wave * 0.6], [x + w * 0.35, y + h - wave], [x, y + h, 0]], "#E30A17"),
@@ -316,7 +318,7 @@ const facade: PieceDef = { draw(p, r) {
   const shutters = cl(num(p.shutters, apt ? 0.3 : 0)), balconies = cl(num(p.balconies, apt ? 0.45 : 0)), boxes = cl(num(p.boxes, apt ? 0.15 : 0));
   const acs = cl(num(p.ac, apt ? 0.2 : school ? 0 : 0.15)), flags = cl(num(p.flags, apt ? 0.5 : 0)), age = cl(num(p.age, apt ? 0.3 : 0.1));
   const floorsIn = (v: unknown) => new Set(Array.isArray(v) ? v.filter((x): x is number => typeof x === "number") : []);
-  const litF = floorsIn(p.lit), ger = floorsIn(p.geraniums), litState = str(p.litState, ""), flagState = str(p.flagState, "flags");
+  const litF = floorsIn(p.lit), ger = floorsIn(p.geraniums), litState = str(p.litState, ""), flagState = str(p.flagState, "flags"), fc = countryOf(p.country);
   let laundry = Math.round(num(p.laundry, apt ? 1 : 0)), dishes = Math.round(num(p.dishes, apt ? 1 : 0));
   const db = Math.max(0, Math.min(bays - 1, Math.round(num(p.door, Math.floor(bays / 2))))), cb = p.cumba && floors > 0 ? db : -1, k1 = floors > 2 ? floors - 1 : floors;
   const bal = Array.from({ length: bays }, (_, i) => r() < balconies && i !== cb);
@@ -353,7 +355,7 @@ const facade: PieceDef = { draw(p, r) {
     else front.push(S(many(span(x0 + 5, x1 - 7, railKind ? 13 : 10.5).map(x => [x, top + 6, 2.2, 78])), IRON));
     if (railKind === 2) for (const x of span(x0 + 11.6, x1 - 12, 13)) front.push(ring(x, top + 16, 5.2, IRON, 1.5), ring(x, top + 72, 5.2, IRON, 1.5));
     front.push(R(x0 - 3, top, bwid + 6, 6, IRON), R(x0, y0 - 14, bwid, 4, IRON));
-    if (r() < flags) flagB.push(...flag(xm - 42, top + 3, 84, 3));
+    if (r() < flags) flagB.push(...flag(xm - 42, top + 3, 84, 3, fc));
     if (dishes > 0 && r() < 0.5) { dishes--; front.push(...dish(x1 - 22, top - 22)); }
   };
 
@@ -376,7 +378,7 @@ const facade: PieceDef = { draw(p, r) {
       if (u < acs) acUnit(up, x + ww / 2 - 34 + r.range(-12, 12), y + h + 24);
       else if (laundry > 0 && i !== cb && u < acs + 0.3) { laundry--; wash.push(...washing(x - 28, x + ww + 28, y + h + 30, r)); }
       else if (u < acs + 0.3 + age * 0.6) up.push(R(x + ww * r.range(0.2, 0.8), y + h + 14, 3.5, r.range(30, 80), INK, pr(0.09)));
-      if (r() < flags * 0.4) flagW.push(...flag(x + ww / 2 - 33, y + h + 12, 66, 2));
+      if (r() < flags * 0.4) flagW.push(...flag(x + ww / 2 - 33, y + h + 12, 66, 2, fc));
     }
   }
 
@@ -498,7 +500,7 @@ const facade: PieceDef = { draw(p, r) {
     gr.push(R(dx - ew / 2 - 70, top - 52, ew + 140, 22, "#E9E4DA"), R(dx - ew / 2 - 70, top - 30, ew + 140, 5, INK, pr(0.25)));
     const sc = school ? "#F4F1EA" : "#1F3F7A", sy = top - 116;
     gr.push(R(dx - sw / 2 - 4, sy - 4, sw + 8, 62, school ? "#B3261E" : "#E9E4DA"), R(dx - sw / 2, sy, sw, 54, sc));
-    if (!school) gr.push(...flag(dx - sw / 2 + 8, sy + 12, 46));
+    if (!school) gr.push(...flag(dx - sw / 2 + 8, sy + 12, 46, 0, fc));
     if (sign.trim()) text.push({ text: sign, x: dx - sw / 2 + (school ? 10 : 62), y: sy + 6, w: sw - (school ? 20 : 72), h: 42, size: 22, font: "print", color: school ? "#B3261E" : "#FFFFFF", weight: 700 });
     hinge = dx - ew / 2;
     leaf.push(R(dx - ew / 2, top + 52, ew / 2, eh - 52, "#4A5058"), R(dx - ew / 2 + 7, top + 60, ew / 2 - 14, eh - 96, GLASS), R(dx - 14, top + eh * 0.55, 4, 30, SET.steel), L([[dx - ew / 2 + 20, top + eh * 0.8], [dx - ew / 2 + 50, top + eh * 0.35]], "#FFFFFF", 4, 0.18));
@@ -506,7 +508,7 @@ const facade: PieceDef = { draw(p, r) {
     if (p.pole !== false) {
       const fx = -w / 2 + bw * 0.5, hp = school ? 760 : 900;
       pole.push({ group: { shapes: [R(fx - 22, -18, 44, 18, STONE), R(fx - 14, -30, 28, 14, tone(STONE, "light")), R(fx - 3.5, -hp, 7, hp - 30, "#C9CCCB"), R(fx - 3.5, -hp, 2, hp - 30, "#FFFFFF", pr(0.4)), S(ellipse(fx, -hp - 6, 7), "#C9A24A")], edge: 0.6 }, z: 150, ppcm: Math.min(2, 1900 / hp) });
-      pole.push({ group: { shapes: flag(0, 0, 150, 6), edge: 0.5 }, x: fx + 3.5, y: hp - 12, z: 150.5, ppcm: 2, pick: false, move: { sway: { rot: 0.035, dy: 1, ms: 2400 }, phase: r() } });
+      pole.push({ group: { shapes: flag(0, 0, 150, 6, fc), edge: 0.5 }, x: fx + 3.5, y: hp - 12, z: 150.5, ppcm: 2, pick: false, move: { sway: { rot: 0.035, dy: 1, ms: 2400 }, phase: r() } });
     }
   }
   if (typeof p.street === "string" && p.street.trim()) {
@@ -569,6 +571,7 @@ const facade: PieceDef = { draw(p, r) {
       litState: { type: "text", about: "the place state the lit floors light in" },
       flags: { type: "num", min: 0, max: 1, about: "share of balconies (and fewer windows) hung with a flag (0.5 apartment, else 0)" },
       flagState: { type: "text", default: "flags", about: "the place state the flags show in" },
+      country: { type: "enum", values: COUNTRIES, default: "tr", about: "whose flags hang on the balconies and the school's pole" },
     },
     states: ["flags"],
     terms: ["bina", "apartman", "okul"],
