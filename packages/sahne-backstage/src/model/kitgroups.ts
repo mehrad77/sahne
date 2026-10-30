@@ -9,7 +9,7 @@ export const PROP_SHELVES: readonly Shelf[] = [
   { id: "home", label: "Home", tags: ["home", "furniture", "bed", "rug", "linen", "cleaning", "laundry", "toiletry", "bathroom", "sewing", "light", "door", "window", "floor", "box", "appliance", "fire", "seating"] },
   { id: "nature", label: "Animals & nature", tags: ["animal", "bird", "pet", "farm", "insect", "zoo", "nature", "plant", "garden"] },
   { id: "transport", label: "Transport & travel", tags: ["vehicle", "metro", "airport", "transport", "travel", "ticket", "pass"] },
-  { id: "street", label: "Shops & street", tags: ["shop", "market", "vendor", "street", "sign", "flag", "building", "money", "cash", "lira", "card", "id"] },
+  { id: "street", label: "Shops & street", tags: ["shop", "market", "vendor", "street", "sign", "flag", "building", "city", "money", "cash", "lira", "card", "id"] },
   { id: "wear", label: "Clothes & carry", tags: ["clothes", "bag", "shoes", "jewellery", "pocket", "cloth", "charm", "souvenir", "turkey", "carry"] },
   { id: "paper", label: "Paper & school", tags: ["paper", "school", "stationery", "desk", "print", "reading", "words"] },
   { id: "tech", label: "Tech & tools", tags: ["tech", "phone", "gadget", "machine", "hardware", "tool"] },
