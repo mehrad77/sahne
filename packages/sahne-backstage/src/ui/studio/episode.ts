@@ -7,7 +7,7 @@
 
 import { html } from "htm/preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { langFor, lintStory, seasonOf, suggest, textOf, type StoryDoc } from "sahne-story";
+import { allLanguages, langFor, lintStory, seasonOf, suggest, textOf, type StoryDoc } from "sahne-story";
 import type { Run } from "sahne";
 import { checkDocs, checked, change, draftOf, history, keyOf, openDoc, review, saveDocs, world } from "../../store.ts";
 import { cueOf, cuePath, type Path } from "../../model/path.ts";
@@ -82,7 +82,7 @@ function Studio(p: { id: string }) {
     const pv = preview.current;
     if (!pv || shown.current === story) return;
     const t = setTimeout(() => {
-      pv.update(story, Math.max(0, pv.player.next - 1), wordsOnly(shown.current, story));
+      pv.update(story, Math.max(0, pv.player.next - 1), wordsOnly(shown.current, story, allLanguages(langs)));
       shown.current = story;
       redraw();
     }, 250);
@@ -207,6 +207,8 @@ function Studio(p: { id: string }) {
 
 /** Play controls: from the start, back, play on, a scrubber over every cue and one through the cue playing, the learner's card. */
 function Transport(p: { preview: Preview; redraw(): void }) {
+  // a card shows its line in the main language, and a choice option its first translation under it
+  const { main, translations: [gloss] } = useLangs();
   const pl = p.preview.player, info = pl.info, f = pl.footer();
   const run = pl.run as unknown as Run | null;
   const [t, setT] = useState(0);
@@ -229,8 +231,8 @@ function Transport(p: { preview: Preview; redraw(): void }) {
     </div>
     ${run && html`<input type="range" min="0" max="1000" value=${Math.round(t * 1000)} aria-label="Inside this cue" title="Inside this cue (mid-cue: held props and gestures)" onInput=${(e: Event) => { run.pause(); run.seek(Number((e.target as HTMLInputElement).value) / 1000 * run.dur); setT(run.t / Math.max(1, run.dur)); }} />`}
     ${f.kind === "turn" && html`<div class="footcard">
-      ${f.turn.kind === "say" && html`<button onClick=${() => { pl.say(); p.redraw(); }}><b>Say:</b> <span ...${inLang(useLangs().main)}>${f.turn.options[0].tr}</span></button>`}
-      ${f.turn.kind === "choice" && f.turn.options.map((o, k) => html`<button onClick=${() => { pl.choose(k); p.redraw(); }}>${o.ok ? "✓ " : ""}<span ...${inLang(useLangs().main)}>${o.tr}</span> <small class="note">${o.en ?? ""}</small></button>`)}
+      ${f.turn.kind === "say" && html`<button onClick=${() => { pl.say(); p.redraw(); }}><b>Say:</b> <span ...${inLang(main)}>${f.turn.options[0].text[main] ?? f.turn.options[0].tr}</span></button>`}
+      ${f.turn.kind === "choice" && f.turn.options.map((o, k) => html`<button onClick=${() => { pl.choose(k); p.redraw(); }}>${o.ok ? "✓ " : ""}<span ...${inLang(main)}>${o.text[main] ?? o.tr}</span>${gloss && o.text[gloss] && html` <small class="note" ...${inLang(gloss)}>${o.text[gloss]}</small>`}</button>`)}
       ${f.turn.kind === "act" && html`<button onClick=${() => { void pl.act().then(p.redraw); p.redraw(); }}>Act on stage: ${f.turn.act.kind} ${f.turn.prompt?.tr ?? ""}</button>`}
     </div>`}
     ${f.kind === "end" && html`<p class="note">The end of the episode.</p>`}
