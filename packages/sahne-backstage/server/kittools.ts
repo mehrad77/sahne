@@ -79,8 +79,9 @@ const asOf = (r: Row, kit: Kit): As => ({ ids: [r.id], set: kit.set?.[r.id] === 
 
 // ---- a generator's source --------------------------------------------------------------------------------------------------
 
-/** Where a TypeScript generator is written: its family file, and the text of its definition (with the comment above it). */
-function sourceOf(r: Row): { file: string; line?: number; text?: string } | null {
+/** Where a TypeScript generator is written: its family file, the line its definition starts on, and the lines of the comment
+ *  above it to its end (`from`..`to`, 1-based), so an agent reads just that part of the file; never the text itself. */
+function sourceOf(r: Row): { file: string; line?: number; from?: number; to?: number } | null {
   if (!FAMILY.has(`${r.slot}:${r.id}`)) return null;
   const path = join(SET_DIR, `${r.family}.ts`), file = relative(KIT_ROOT, path), src = readFileSync(path, "utf8"), lines = src.split("\n");
   // the registry names the generator's variable: `{ food, tea, plate: plateP }` or `"x": f`
@@ -93,7 +94,7 @@ function sourceOf(r: Row): { file: string; line?: number; text?: string } | null
     while (from > 0 && /^\s*(\/\*\*|\*|\/\/)/.test(lines[from - 1])) from--;
     let to = at;
     while (to < lines.length - 1 && to - at < 140 && !/^[}\]];?\s*$/.test(lines[to])) to++;
-    return { file, line: at + 1, text: lines.slice(from, to + 1).join("\n") };
+    return { file, line: at + 1, from: from + 1, to: to + 1 };
   }
   return { file };
 }
@@ -216,7 +217,7 @@ export function registerKitTools(server: McpServer, k: KitToolsCtx): void {
 
   server.registerTool("kit_read", {
     title: "Read a set piece or prop",
-    description: "A set piece or prop to study before drawing a neighbour: what it is, its family, its params (type, default, values), its variants and what they set, and its source (a TypeScript generator's definition and file) or its document (a drawing of this series, with the mtime to pass to save_kit_item), with its sheet as a picture. Give a content variant as <generator>.<x_name> to read its document.",
+    description: "A set piece or prop to study before drawing a neighbour: what it is, its family, its params (type, default, values), its variants and what they set, and where its source is (a TypeScript generator's file, the line its definition starts on and the lines `from`..`to` it spans with its comment, to read just those) or its document (a drawing of this series, with the mtime to pass to save_kit_item), with its sheet as a picture. Give a content variant as <generator>.<x_name> to read its document.",
     inputSchema: { id: z.string().describe("A set piece or prop id, like chair or x_cafe_chalkboard; <generator>.<x_name> for a variant document"), as: z.enum(["set", "prop"]).optional().describe("Which one when the id is both a set piece and a different prop") },
     annotations: { readOnlyHint: true },
   }, run("kit_read", ({ id, as }) => {
@@ -227,13 +228,14 @@ export function registerKitTools(server: McpServer, k: KitToolsCtx): void {
     }
     const r = rowOf(id, as), kit = kitOf(), meta = r.def.meta;
     const own = exists("kit_piece", id) ? readDoc("kit_piece", id) : null;
-    const note = stale(r);
+    const note = stale(r), src = own ? null : sourceOf(r);
     const data = {
       id, family: r.family, as: r.as, about: r.about, tags: r.tags, terms: meta?.terms ?? [], states: meta?.states ?? [],
       params: meta?.params ?? {}, variants: r.def.variants ?? {}, solid: !!r.def.solid,
-      ...(own ? { doc: own.doc, mtime: own.mtime } : { source: sourceOf(r) }),
+      ...(own ? { doc: own.doc, mtime: own.mtime } : { source: src }),
     };
-    return ok(`${id}: ${r.family} ${r.as} — ${r.about}${own ? ` (mtime ${own.mtime})` : ""}${note ? `\n${note}` : ""}`, data, sheets({ kit, row: r, slot: r.slot }, {}));
+    const where = src ? `\nsource: ${src.file}${src.line ? `:${src.line} (lines ${src.from}-${src.to})` : ""}` : "";
+    return ok(`${id}: ${r.family} ${r.as} — ${r.about}${own ? ` (mtime ${own.mtime})` : ""}${where}${note ? `\n${note}` : ""}`, data, sheets({ kit, row: r, slot: r.slot }, {}));
   }));
 
   server.registerTool("kit_render", {
