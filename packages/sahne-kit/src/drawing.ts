@@ -30,7 +30,7 @@ export interface DrawingDoc {
 export interface VariantDoc { of: string; name: string; params: Record<string, unknown> }
 
 /** What a document may hold (the schema says the same; these are the numbers). */
-export const DRAWING_LIMITS = { bytes: 64 * 1024, shapes: 400, commands: 20000, copies: 12, flats: 12 };
+export const DRAWING_LIMITS = { bytes: 64 * 1024, shapes: 400, commands: 20000, copies: 12, flats: 12, reach: 1000 };
 
 /** A content id starts with `x_`: no id of the kit ever does, so the kit can never break a story that uses one. */
 export const CONTENT_ID = /^x_[a-z0-9_]+$/;
@@ -71,13 +71,14 @@ export function compileDrawing(doc: DrawingDoc): { def: PieceDef; problems: stri
       try { path = Path.fromSvg(s.d); } catch (e) { bad(`${where}: ${(e as Error).message}`); path = new Path().moveTo(0, 0); }
       commands += path.cmds.length;
       if (!path.finite()) bad(`${where}: a coordinate is not finite`);
+      else if (path.cmds.some(c => c.some((v, i) => i > 0 && Math.abs(v) > DRAWING_LIMITS.reach))) bad(`${where}: a coordinate is beyond ${DRAWING_LIMITS.reach} cm from the origin`);
       colour(s.fill, `${where} fill`); if (s.stroke) colour(s.stroke.color, `${where} stroke`);
       return { path, src: s };
     };
     if (!doc.kinds || !Object.keys(doc.kinds).length) bad("kinds: at least one");
     for (const [kn, k] of Object.entries(doc.kinds ?? {})) {
       const at = `kind ${kn}`;
-      if (!(k.size?.length === 2 && k.size.every(v => v > 0))) bad(`${at}: size is [width, height] in cm`);
+      if (!(k.size?.length === 2 && k.size.every(v => v > 0 && v <= DRAWING_LIMITS.reach))) bad(`${at}: size is [width, height] in cm, each over 0 and at most ${DRAWING_LIMITS.reach}`);
       if (k.ppcm !== undefined && !(k.ppcm > 0 && k.ppcm <= 16)) bad(`${at}: ppcm over 0 and at most 16`);
       if (!k.flats?.length) bad(`${at}: no flats`);
       else if (k.flats.length > DRAWING_LIMITS.flats) bad(`${at}: ${k.flats.length} flats: at most ${DRAWING_LIMITS.flats}`);

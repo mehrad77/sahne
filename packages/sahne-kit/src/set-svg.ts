@@ -116,9 +116,11 @@ function cellSvg(kit: Kit, item: SheetItem, label: string, params: Record<string
   const ox = pad + ((W - 2 * pad) - (right - left) * k) / 2 - left * k, oy = pad + ((H - 2 * pad - L) - (bottom - top) * k) / 2 - top * k;
   // the 10 cm grid, over the cell's reach, in cm (so a stroke of 0.15 cm shows as about a pixel)
   const gx0 = Math.floor((-ox / k) / 10) * 10, gx1 = Math.ceil(((W - ox) / k) / 10) * 10, gy0 = Math.floor((-oy / k) / 10) * 10, gy1 = Math.ceil(((H - L - oy) / k) / 10) * 10;
+  // at most about 60 lines an axis, however far the art reaches
+  const step = 10 * Math.max(1, Math.ceil(Math.max(gx1 - gx0, gy1 - gy0) / 600));
   let grid = "";
-  for (let x = gx0; x <= gx1; x += 10) grid += `M${x} ${gy0}V${gy1}`;
-  for (let y = gy0; y <= gy1; y += 10) grid += `M${gx0} ${y}H${gx1}`;
+  for (let x = gx0; x <= gx1; x += step) grid += `M${x} ${gy0}V${gy1}`;
+  for (let y = gy0; y <= gy1; y += step) grid += `M${gx0} ${y}H${gx1}`;
   const gridInk = night ? "#8892B8" : "#8A7F70";
   return `<g>${frame}<svg x="0" y="0" width="${W}" height="${H - L}" viewBox="0 0 ${W} ${H - L}" overflow="hidden"><g transform="translate(${+ox.toFixed(2)} ${+oy.toFixed(2)}) scale(${+k.toFixed(4)})">`
     + `<path d="${grid}" fill="none" stroke="${gridInk}" stroke-opacity=".22" stroke-width="${+(0.8 / k).toFixed(3)}"/>`

@@ -90,6 +90,8 @@ test("a bad document says what is wrong: ids, references, path data and the caps
   says(d => { delete d.kinds.wall; }, /enum whose values are the kinds/);
   says(d => { d.params!.n = { type: "int" }; }, /the engine gives it/);
   says(d => { d.variants!.wall = { colour: "x" }; }, /colour is not a declared param/);
+  says(d => { d.kinds.easel.flats[0].shapes[0].d = "M0 0L1e7 1e7L-1e7 5Z"; }, /beyond 1000 cm/);
+  says(d => { d.kinds.easel.size = [1e7, 5]; }, /at most 1000/);
   says(d => { d.kinds.easel.flats[0].text![0].lang = ""; }, /no lang/);
   says(d => { d.kinds.easel.flats[0].shapes = Array.from({ length: DRAWING_LIMITS.shapes + 1 }, () => ({ d: "M0 0L1 0L1 -1Z", fill: "#fff" })); }, /shapes: at most 400/);
   says(d => { d.kinds.easel.flats[0].shapes = [{ d: "M0 0" + "L1 0L1 -1".repeat(DRAWING_LIMITS.commands / 2) + "Z", fill: "#fff" }]; }, /path commands|KB/);

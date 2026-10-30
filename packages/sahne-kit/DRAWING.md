@@ -55,7 +55,7 @@ Every id a content root adds starts with `x_`, and `test/drawing.test.ts` assert
 
 ## Checking
 
-`checkDrawing` reads what a schema cannot: that every path parses, every `$param` is declared (and a colour in a colour place), the kinds match the `kind` param, and the caps hold. `checkPiece` (`sahne-kit/check`) then holds the compiled generator to the kit's own rules as for any other: the meta, the variants, every param read declared, finite art that fits an atlas layer, motion, and text with a language. Both run on a document before an app loads it.
+`checkDrawing` reads what a schema cannot: that every path parses, every `$param` is declared (and a colour in a colour place), the kinds match the `kind` param, and the caps hold (including every coordinate and size within 1000 cm). `checkPiece` (`sahne-kit/check`) then holds the compiled generator to the kit's own rules as for any other: the meta, the variants, every param read declared, finite art that fits an atlas layer, motion, and text with a language. Both run on a document before an app loads it.
 
 ## The loop, over MCP or from the shell
 
