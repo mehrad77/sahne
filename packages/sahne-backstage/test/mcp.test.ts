@@ -379,6 +379,8 @@ test("kit_read shows a generator's params, variants and source, with its sheet; 
     assert.ok(g.images.every(isPng));
     assert.match(g.text, /^frontage: 0 errors/);
     assert.ok(Array.isArray(json(g).problems));
+    assert.ok(!(await call(client, "kit_render", { id: "tea", zoom: "scene", views: ["day"] })).isError, "zoom scene");
+    assert.ok((await call(client, "kit_render", { id: "tea", zoom: "huge" })).isError, "zoom is auto or scene");
     const one = await call(client, "kit_render", { id: "tea", params: { n: 3 } });
     assert.equal(one.images.length, 1);
     assert.match((await call(client, "kit_render", { id: "tea", params: { nonesuch: 1 } })).text, /nonesuch/);
