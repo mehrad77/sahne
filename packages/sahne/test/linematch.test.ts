@@ -38,3 +38,14 @@ test("a letter that folds to several letters (ß → ss) is a slip, both ways", 
   assert.equal(m.matchLine("strase", ["straße"]).matched, true);
   assert.equal(m.matchLine("strand", ["straße"]).matched, false);
 });
+
+test("the input is bounded: a long transcript is no match, and is refused fast", () => {
+  const long = Array.from({ length: 5000 }, (_, i) => `w${i}`).join(" ");
+  const t = performance.now();
+  assert.equal(m.matchLine(long, [long]).matched, false);
+  assert.equal(m.matchLine(Array.from({ length: 50 }, () => long), ["hello there"]).matched, false);
+  assert.equal(m.matchLine("x".repeat(100000), ["hello there"]).matched, false);
+  assert.ok(performance.now() - t < 100, "refused fast");
+  const forty = Array.from({ length: 40 }, () => "bread").join(" ");
+  assert.equal(m.matchLine(forty, [forty]).matched, true, "a line at the cap still matches");
+});

@@ -40,6 +40,8 @@ const SLIP = 0.25;
 const NAME = "\u0000";
 /** A word the learner said that is not in the line costs a little less than one left out (an "evet" before the line). */
 const EXTRA = 0.5;
+/** The most words of a line, heard or expected, that are compared (a card's line is short; a longer transcript is no match), the most letters of a heard line, and the most alternatives. */
+const MAX_WORDS = 40, MAX_CHARS = 600, MAX_ALTS = 10;
 
 export function lineMatcher(lang: LineMatcherLang): LineMatcher {
   const near = lang.near ?? {}, soft = new Set([...(lang.soft ?? "")]);
@@ -112,16 +114,16 @@ export function lineMatcher(lang: LineMatcherLang): LineMatcher {
 
   function matchLine(heard: string | string[], expected: string[], o: MatchLineOptions = {}): LineMatch {
     const names = new Set((o.names ?? []).flatMap(sayWords));
-    const alts = [heard].flat().filter(h => h && h.trim());
+    const alts = [heard].flat().filter(h => h && h.trim()).map(h => h.slice(0, 4 * MAX_CHARS)).slice(0, MAX_ALTS);
     let best: LineMatch = { matched: false, best: -1, heard: alts[0] ?? "", score: 0 };
     let bestErr = Infinity;
     expected.forEach((line, k) => {
       const E = sayWords(line).map(w => (names.has(w) ? NAME : w));
       const chars = E.reduce((s, w) => s + (w === NAME ? 0 : [...w].length), 0);
-      if (!chars) return;
+      if (!chars || E.length > MAX_WORDS) return;
       for (const h of alts) {
         const H = sayWords(h);
-        if (!H.length) continue;
+        if (!H.length || H.length > MAX_WORDS || H.reduce((n, w) => n + w.length, 0) > MAX_CHARS) continue;
         const c = cost(E, H), err = c / chars;
         if (err < bestErr) {
           bestErr = err;
