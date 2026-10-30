@@ -28,6 +28,7 @@ import { EpisodeHead, Glosses, Quiz } from "./sections.ts";
 import { Details } from "./details.ts";
 import { Direct } from "./direct.ts";
 import { Strip } from "./strip.ts";
+import { rememberScene, takeResume } from "../../recent.ts";
 import { ProposalsBar } from "./proposals.ts";
 import { conflicts, postSelection, proposals, shown as agentShown } from "../../events.ts";
 import { ghostsOf, suggestionsOf, taken } from "../../model/autostage.ts";
@@ -69,6 +70,9 @@ function Studio(p: { id: string }) {
     preview.current = pv;
     shown.current = story;
     window.backstage = { preview: pv, select: x => select(x, true) };
+    // opened from the home's Continue: back at the cue last worked on
+    const resume = takeResume(p.id);
+    if (resume !== null && resume < pv.player.info.length) pv.player.jump(resume);
     redraw();
     return () => { pv.destroy(); preview.current = null; };
   }, []);
@@ -115,6 +119,9 @@ function Studio(p: { id: string }) {
   }, s), "take-all");
 
   const pv = preview.current, player = pv?.player, info = player?.info ?? [];
+  // the cue on the stage is the scene last worked on (the home shows it)
+  const at = player ? Math.max(0, player.next - 1) : -1;
+  useEffect(() => { if (pv && at >= 0 && box.current) rememberScene(p.id, at, pv, box.current); }, [at, pv]);
   const ghosts = pv ? ghostsOf(info, pv.stage.perfs) : {};
   const playing = player && player.next > 0 ? cuePath(info[Math.max(0, player.next - 1)] ?? { step: 0, kind: "scene" }) : null;
 

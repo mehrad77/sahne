@@ -178,6 +178,16 @@ a.button.primary { background: var(--accent); color: var(--accent-ink); border-c
 .home-scene { position: relative; border-radius: 6px 6px 0 0; overflow: hidden; box-shadow: inset 0 0 0 1px #0003; }
 .home-scene::before, .home-scene::after { content: ""; position: absolute; top: 0; bottom: 0; width: 12%; z-index: 1; background: repeating-linear-gradient(90deg, #0000 0 7px, #0000001f 7px 9px), var(--curtain); }
 .home-scene::before { left: 0; border-radius: 0 0 60% 0; } .home-scene::after { right: 0; border-radius: 0 0 0 60%; }
+.home-scene::before, .home-scene::after { transition: transform .6s cubic-bezier(.6, 0, .3, 1), width .6s cubic-bezier(.6, 0, .3, 1); }
+.home:has(.home-go .primary:hover) .home-scene::before { transform: translateX(-30%); }
+.home:has(.home-go .primary:hover) .home-scene::after { transform: translateX(30%); }
+.home.opening .home-scene::before { transform: translateX(-102%); width: 52%; }
+.home.opening .home-scene::after { transform: translateX(102%); width: 52%; }
+.home > :not(.home-stage) { transition: opacity .35s ease, transform .35s ease; }
+.home.opening > :not(.home-stage) { opacity: 0; transform: translateY(8px); }
+.home-fly { position: fixed; z-index: 45; overflow: hidden; pointer-events: none; background: var(--chip); box-shadow: var(--shadow); }
+.home-fly img { width: 100%; height: 100%; object-fit: cover; display: block; }
+@media (prefers-reduced-motion: reduce) { .home-scene::before, .home-scene::after, .home > :not(.home-stage) { transition: none; } .home:has(.home-go .primary:hover) .home-scene::before, .home:has(.home-go .primary:hover) .home-scene::after { transform: none; } }
 .home-scene .art { aspect-ratio: 16 / 10; display: grid; place-items: center; background: var(--chip); color: var(--mute); }
 .home-scene .art img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .home-kicker { margin: 4px 0 0; font-size: 12.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
