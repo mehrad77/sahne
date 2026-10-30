@@ -162,7 +162,7 @@ function canalHouse(c: Cx): number {
     pts.push([-hw, top, 0], ...half, [0, top - gh], ...half.map(([x, y]) => [-x, y] as Vec2).reverse(), [hw, top, 0]);
   }
   const outline = c.gable === "bell" ? smooth(pts as Vec2[], true, 1) : poly(pts as Vec2[]);
-  c.main.push(...T(outline, c.wall, bond(tone(c.wall, "deep"), 15, 5.5, 0.35)), { path: outline, stroke: { color: trim, width: 7, join: "round" } });
+  c.main.push(...T(outline, c.wall, bond(tone(c.wall, "deep"), 15, 5.5, 0.35)), c.gable === "bell" ? rod(pts as Vec2[], trim, 7) : line(pts as Vec2[], trim, 7));
   win(c, -24, top - gh * 0.42, 48, 80, { frame: trim, bars: [2, 3] });
   c.main.push(S(ellipse(0, top - gh + 18, 7), IRON), rod([[0, top - gh + 22], [3, top - gh + 80]], "#6B5A44", 1.2), rod([[3, top - gh + 80], [3, top - gh + 90], [-3, top - gh + 94]], IRON, 1.6));
   return H + gh + 20;
@@ -301,7 +301,7 @@ function gabledHouse(c: Cx): number {
     pts = [...L2, ...[...L2].reverse().map(([x, y]) => [-x, y] as Vec2)];
   } else pts = [[-hw, top], [0, top - gh], [hw, top]];
   const gp = poly(pts);
-  c.main.push(S(gp, c.wall), { path: gp, stroke: { color: c.gable === "stepped" ? "#D8D0BE" : tim, width: c.gable === "stepped" ? 7 : 10, join: "round" } });
+  c.main.push(S(gp, c.wall), line(pts, c.gable === "stepped" ? "#D8D0BE" : tim, c.gable === "stepped" ? 7 : 10));
   if (c.gable === "steep") {
     c.main.push(R(-4, top - gh * 0.86, 8, gh * 0.86, tim), R(-hw * 0.55, top - gh * 0.3, hw * 1.1, 8, tim), rod([[-hw * 0.55, top - gh * 0.3], [-4, top - gh * 0.62]], tim, 5), rod([[hw * 0.55, top - gh * 0.3], [4, top - gh * 0.62]], tim, 5));
     const sl = gh / hw, o = 16, e1: Vec2 = [-hw - o, top + o * sl], e2: Vec2 = [hw + o, top + o * sl];
