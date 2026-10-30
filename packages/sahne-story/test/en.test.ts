@@ -123,4 +123,8 @@ test("lint budget: a gesture needs an English word to motivate it", () => {
   assert.deepEqual(rules(lint(s), "warning"), ["budget@9"], "hi$ is a whole word: history does not wave");
   s = story(); line(s, 9).do = "wave"; line(s, 9).en = "Hi, how are you?";
   assert.deepEqual(rules(lint(s)), []);
+  for (const [g, t] of [["shrug", "I don't know."], ["shrug", "Who knows."], ["wave", "See you."], ["nod", "Of course."], ["thumb_up", "Well done."], ["give", "There you go."]] as const) {
+    s = story(); line(s, 9).do = g; line(s, 9).en = t;
+    assert.deepEqual(rules(lint(s), "warning"), [], `${g} on a line that ends in its phrase: ${t}`);
+  }
 });

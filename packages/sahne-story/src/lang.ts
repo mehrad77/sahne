@@ -95,3 +95,16 @@ export const LANGS: Record<string, StoryLang> = { tr: trLang, en: enLang };
 /** The story language of a code: its plugin, else `plainLang`. */
 export const langFor = (id: string): StoryLang => LANGS[id] ?? plainLang(id);
 
+
+/**
+ * The first entry of a gesture's motive that the line's words (`plain`) satisfy, else undefined.
+ * `"hi$"` is a whole word; `"of course"` is a phrase of whole words, at the start, middle or end of the line;
+ * any other entry is the start of a word.
+ */
+export function motivated(entries: readonly string[], plain: readonly string[]): string | undefined {
+  const padded = ` ${plain.join(" ")} `;
+  return entries.find(m => m.endsWith("$") ? plain.includes(m.slice(0, -1)) : plain.some(w => w.startsWith(m)) || padded.includes(` ${m} `));
+}
+
+/** An entry as a person reads it: without the whole-word `$`. */
+export const motiveText = (m: string): string => m.replace(/\$$/, "");

@@ -20,7 +20,7 @@
 // the links a line could have (the `--suggest` of Kumru's STORIES_STAGE.md §4).
 
 import { applyLook, inState, placeState, route, detour, WEATHER, CLOTHING_FIELDS, lookFields, normalize, type AvatarDoc, type AvatarNote, type KitManifest, type Look, type PlaceDoc, type PropRef, type Solid, type Staging, type Target, type Vec3 } from "sahne";
-import { langFor, type LineContext, type StoryLang } from "./lang.ts";
+import { langFor, motivated, type LineContext, type StoryLang } from "./lang.ts";
 import { DEIXIS_GESTURES } from "./langs/tr.ts";
 import { placesOf, storyProps } from "./props.ts";
 import { canon, dress, forLearner, LEARNER_FIELDS, looksOf } from "./looks.ts";
@@ -187,8 +187,7 @@ export function lintStory(story: StoryDoc, o: LintOptions): Problem[] {
     // ---- a gesture needs a word to motivate it
     const motive = st.do ? lang.motive[st.do] : undefined;
     if (st.do && motive) {
-      const said = plain.join(" ");
-      const ok = st.do === "count" ? !lang.number || plain.some((_, i) => { const r = lang.number!(plain, i); return !!r && (r.n !== 1 || st.n === 1); }) : motive.some(m => (m.endsWith("$") ? plain.includes(m.slice(0, -1)) : said.split(" ").some(w => w.startsWith(m)) || said.includes(m + " ")));
+      const ok = st.do === "count" ? !lang.number || plain.some((_, i) => { const r = lang.number!(plain, i); return !!r && (r.n !== 1 || st.n === 1); }) : motivated(motive, plain) !== undefined;
       if (!ok) add(u, "budget", `"${st.do}" has no word in the line to motivate it`, undefined, "warning");
     }
     if (st.do && DEIXIS_GESTURES.has(st.do) && st.at?.startsWith("obj:")) {
