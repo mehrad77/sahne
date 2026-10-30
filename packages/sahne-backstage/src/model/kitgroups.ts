@@ -46,6 +46,9 @@ export const SOUND_SHELVES: readonly Shelf[] = [
   { id: "ambience", label: "Ambience loops", tags: ["ambience"] },
 ];
 
+/** The content root's own items, whatever their tags (kit page): first on the shelves of props and set pieces. */
+export const SERIES_SHELF: Shelf = { id: "series", label: "This series" };
+
 export const OTHER: Shelf = { id: "other", label: "Other" };
 
 /** The shelf an item with these tags goes on. */

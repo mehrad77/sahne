@@ -10,6 +10,7 @@ import { api, type Kind } from "./api.ts";
 import { get, set, type Path } from "./model/path.ts";
 import * as H from "./model/history.ts";
 import { change, createDoc, drafts, go, keyOf, loadWorld, openDoc, say } from "./store.ts";
+import { loadKitDocs } from "./kitdocs.ts";
 
 export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean }
 export interface Proposal extends ProposalEdit {
@@ -49,6 +50,7 @@ export function connectEvents() {
     if (draft && H.dirty(draft)) { conflicts.value = new Set([...conflicts.value, k]); say(`${d.by ?? "An agent"} wrote ${d.kind} ${d.id} while you have unsaved edits of it`, true); }
     else { if (draft) void openDoc(d.kind, d.id, true); say(`${d.by ?? "An agent"} wrote ${d.kind} ${d.id}`); }
     void loadWorld();
+    if (d.kind === "kit_piece" || d.kind === "kit_variant") void loadKitDocs();
   });
   source.addEventListener("show", e => {
     const d = JSON.parse((e as MessageEvent).data) as { id: string; step: Path | null };

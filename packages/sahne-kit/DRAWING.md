@@ -9,6 +9,8 @@ checkDrawing(doc);           // the problems as a list, [] when good
 withDrawings(kit, docs);     // the kit with pieces and variants added (after withSet, so variants can name its generators)
 ```
 
+A content root keeps its documents in `kit/pieces/<id>.json` and `kit/variants/<of>.<name>.json`; `loadContentKit()` (`sahne-story/load.ts`) reads and checks them, and backstage, the story checks and the gallery add them to their kit (sahne-story's README, *Where the data lives*).
+
 ## A drawing
 
 ```jsonc

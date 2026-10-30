@@ -35,6 +35,7 @@ Every node reader (the story check, the place checker, the extras' generator, th
 | `syllabus/a1.json` | what each unit teaches, for the known-word ratio | no |
 | `days.json` | the release calendar, `{ "<story id>": { "date", "week", "kind" } }`, until the seasons carry it (`calendar`); while both exist, the seasons are the source and a `days.json` that differs is a warning to regenerate it | no: without either the calendar rules do not run, and a flag's story is dated by its own `releaseDate` |
 | `needs.json` | what the stories' briefs ask of each place, keyed by site | no: without it the place lint's `needs` rule does not run |
+| `kit/pieces/<id>.json`, `kit/variants/<of>.<name>.json` | the root's own kit items, drawn as data (`sahne-kit/DRAWING.md`): a set piece or prop `x_<id>`, and named param sets (`x_<name>`) on generators the kit has | no: without them the kit is the kit's own |
 | `thumbs/` | the story pictures, written by `sahne-gallery/thumbs.mjs` | no |
 
 Story docs are separate from the data. The optional env var `SAHNE_STORY_DOCS` (an absolute folder) holds `STORIES_WORLD.md`: the stories' sites, as the tables of its §2. The gallery's places board (`/data/world.json`) and `test/needs.test.ts` read it. Without it, the board leaves the sites out and that test skips. Nothing in Sahne reads `STORIES_A1.md`; the calendar is the seasons' `calendar`, or `days.json`.
@@ -52,8 +53,11 @@ Story docs are separate from the data. The optional env var `SAHNE_STORY_DOCS` (
 | syllabus | `<root>/syllabus/a1.json` | `{ words, lessons, units }` | the known-word ratio uses the cards alone, or skips |
 | calendar | each season's `calendar`, else `<root>/days.json` | `{ "s1e01": { "date": "2026-09-07", "week": 1, "kind": "episode" } }` | the calendar rules skip; a flag's story is dated by its own `releaseDate` |
 | needs | `<root>/needs.json` | `src/needs.ts` `Needs`, keyed by site | `loadNeeds()` returns `undefined`; the place lint's `needs` rule and `test/needs.test.ts` skip |
+| kit items | `<root>/kit/pieces/<id>.json`, `<root>/kit/variants/<of>.<name>.json` | `schema/kit-piece.json`, `kit-variant.json`; ids `x_…` | `loadContentKit()` returns `{ docs: [], problems: [] }`; the kit is the kit's own |
 | extras | written to `<root>/characters/` by `cast/extras.ts` | `kind: "extra"` | `--check` fails: run the generator |
 | thumbs | written to `<root>/thumbs/` by `sahne-gallery/thumbs.mjs` | `<id>.webp` and `thumbs.json` | `--check` fails: run the script |
+
+**The root's own kit items.** `loadContentKit({ kit })` (`load.ts`, Node) reads `kit/` through `paths.ts` (`KIT_PIECES`, `KIT_VARIANTS`, `kitPieceFile`, `kitVariantFile`, `kitPieceIds`, `kitVariantIds`): each file must be JSON, pass its schema, be named for what it holds and compile (`compileDrawing`), and with `kit` it must also add cleanly (`withDrawings`: its id free, a variant's generator and params there). A file that is not good is left out and named in `problems`, so one bad file never keeps the rest from the stage. An app adds them to its kit with one line after `loadSet`: `const kit = withDrawings(withSet(base, loaded), loadContentKit().docs)` (a browser app is served the docs, as backstage's `GET /api/kit` and the gallery's `/data/kit.json` do). Sahne's own stages do this: `stories.ts --check` and `places.ts` (a bad file is an error `kit`), backstage's stage, checks and place lints, and the gallery under `SAHNE_CONTENT`.
 
 A missing optional file is never an error: each rule that needs it skips. The samples have no cards, grammar, syllabus, calendar or needs (their season has arcs but no calendar), and pass `stories.ts --check` with 0 errors and 0 warnings.
 

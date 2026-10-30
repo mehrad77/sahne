@@ -8,7 +8,8 @@
 import { html } from "htm/preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { search } from "../model/search.ts";
-import { EMOTION_SHELVES, GESTURE_SHELVES, PROP_SHELVES, SET_SHELVES, SOUND_SHELVES, shelvesWith, type Shelf } from "../model/kitgroups.ts";
+import { EMOTION_SHELVES, GESTURE_SHELVES, PROP_SHELVES, SERIES_SHELF, SET_SHELVES, SOUND_SHELVES, shelvesWith, type Shelf } from "../model/kitgroups.ts";
+import { kitVersion } from "../kitdocs.ts";
 import { liveOff, liveOn } from "../live.ts";
 import { KIT } from "../stage.ts";
 import { route, say } from "../store.ts";
@@ -19,7 +20,7 @@ import { useLangs } from "./lang.ts";
 
 type Section = "props" | "set" | "gestures" | "emotions" | "sounds";
 const SECTIONS: [Section, string, string, readonly Shelf[], string][] = [
-  ["props", "Props", "prop", PROP_SHELVES, "box"], ["set", "Set pieces", "set piece", SET_SHELVES, "stage"], ["gestures", "Gestures", "gesture", GESTURE_SHELVES, "hand"],
+  ["props", "Props", "prop", [SERIES_SHELF, ...PROP_SHELVES], "box"], ["set", "Set pieces", "set piece", [SERIES_SHELF, ...SET_SHELVES], "stage"], ["gestures", "Gestures", "gesture", GESTURE_SHELVES, "hand"],
   ["emotions", "Emotions", "emotion", EMOTION_SHELVES, "face"], ["sounds", "Sounds", "sound", SOUND_SHELVES, "sound"],
 ];
 /** Cards a shelf shows in the overview, and cards per page when listing. */
@@ -31,7 +32,7 @@ export function KitPage() {
   const section = (SECTIONS.some(s => s[0] === r[1]) ? r[1] : "props") as Section, shelfId = r[2] ?? null;
   const [, label, one, shelves] = SECTIONS.find(s => s[0] === section)!;
   const { main } = useLangs();
-  const all = useMemo(() => Object.fromEntries(SECTIONS.map(([s]) => [s, s === "props" || s === "set" ? pieceItems(s) : s === "gestures" ? gestureItems() : s === "emotions" ? emotionItems() : soundItems(main)])) as Record<Section, Item[]>, [main]);
+  const all = useMemo(() => Object.fromEntries(SECTIONS.map(([s]) => [s, s === "props" || s === "set" ? pieceItems(s) : s === "gestures" ? gestureItems() : s === "emotions" ? emotionItems() : soundItems(main)])) as Record<Section, Item[]>, [main, kitVersion.value]);
   const items = all[section];
   const [q, setQ] = useState(""), [tag, setTag] = useState<string | null>(null), [open, setOpen] = useState<string | null>(null);
   const [size, setSize] = useState<"s" | "m" | "l">(() => { try { return (localStorage.getItem(SIZE_KEY) as "s" | "m" | "l") || "m"; } catch { return "m"; } });

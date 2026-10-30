@@ -58,7 +58,7 @@ Everything a scene is made of is picked from a gallery of pictures, not a list o
 A gallery has a search box and filters by tag; a picker is a gallery in a popover. A card's picture is asked for only as the card nears the screen. The pictures the stage draws (a place's wide shot, a gesture, a step for the storyboard) come from one hidden stage, one at a time, and are kept in the browser's IndexedDB under a key that changes with what they show, so each is drawn once (`src/thumbs.ts`).
 
 **The kit page** (`#/kit/<section>/<shelf>`, `src/ui/kitpage.ts`) lays the kit out as a library:
-- **The side.** It lists the sections (props, set pieces, gestures, emotions, sounds) with their icons and counts. The side folds sideways to its icons, and remembers whether it is folded. On a small screen, the sections become a row across the top with the shelves as chips under it, the tags go on one line that scrolls, and the details open as a sheet from the bottom. The open section is split into shelves (`src/model/kitgroups.ts`). Each shelf gathers several of the kit's tags, and an item goes on the first shelf one of its tags belongs to, else on *Other*. Gestures are shelved by what they need, sounds by their bus. A test fails when a prop or set-piece tag is on no shelf.
+- **The side.** It lists the sections (props, set pieces, gestures, emotions, sounds) with their icons and counts. The side folds sideways to its icons, and remembers whether it is folded. On a small screen, the sections become a row across the top with the shelves as chips under it, the tags go on one line that scrolls, and the details open as a sheet from the bottom. The open section is split into shelves (`src/model/kitgroups.ts`). Each shelf gathers several of the kit's tags, and an item goes on the first shelf one of its tags belongs to, else on *Other*. Gestures are shelved by what they need, sounds by their bus. A test fails when a prop or set-piece tag is on no shelf. The content root's own kit items (`kit/`, drawn as data, sahne-kit's DRAWING.md) have a shelf of their own, **This series**, first on props and set pieces, whatever their tags, and a small badge on their card; the page reads them from `GET /api/kit` and draws again when one is saved (`src/kitdocs.ts`).
 - **The bar.** It has a search of the section, the shelf's commonest tags as filters, and the card size (S, M or L, remembered).
 - **The cards.** With no shelf and no search, each shelf shows its first row and *See all*. Otherwise the cards come in pages as the list scrolls.
 - **Details.** A click opens a card's details: its id to copy, what it is, its tags, other names and parameters with their defaults. A sound also plays, with a playhead over its waveform and the time into it. A loop's playhead goes round from where the engine started it. The waveform is the recording where one loads, so it matches what plays.
@@ -385,13 +385,14 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
 | Request | Answer |
 |---|---|
 | `GET /api/world` | `{ series, seasons, episodes, characters, places, days, cards, samples, writable }` |
-| `GET /api/doc/<kind>/<id>` | `{ doc, mtime }`. The kind is `series` (id `series`), `season`, `story`, `character` or `place` |
+| `GET /api/doc/<kind>/<id>` | `{ doc, mtime }`. The kind is `series` (id `series`), `season`, `story`, `character`, `place`, `kit_piece` (id `x_…`, a drawn set piece or prop) or `kit_variant` (id `<of>.x_<name>`) |
 | `POST /api/check` `{ edits }` | `{ problems }`. An edit is `{ kind, id, doc, mtime?, create? }`, and each problem names its `doc` and whether it is `new` |
 | `POST /api/save` `{ edits }` | 200 `{ saved: { "<kind>:<id>": mtime }, problems }`, or 400, 403, 409 or 422 `{ message, problems? }` |
 | `GET /api/head/<kind>/<id>` | `{ doc }`: the document at git's HEAD, or null |
 | `GET /api/thumbs` | `{ stale, command }` |
 | `GET /api/cards?q=` | `{ cards: [{ id, tr, en, level? }] }`: up to 40 word cards matching the search, read live (the word picker) |
 | `GET /api/lessons` | `{ lessons: [{ id, ref? }] }`: the grammar lessons, when the root has them |
+| `GET /api/kit` | `{ docs, problems }`: the content root's own kit items that are good (the stage adds them with `withDrawings`), and a line for each file that is not |
 | `GET /api/problems` | `{ problems }`: every problem of the content root, as `stories.ts --check` finds them (the review page) |
 | `GET /api/review`, `POST /api/review` `{ id, review }` | The review notes; a POST replaces one episode's (cleaned: unknown keys dropped) and answers all of them |
 | `POST /api/reload` | The server forgets the world it has read (after a change made elsewhere) |

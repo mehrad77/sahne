@@ -18,11 +18,10 @@
 import { readFileSync } from "node:fs";
 import * as z from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import kit from "../../sahne-kit/src/full.ts";
 import { IS_SAMPLES } from "../../sahne-story/paths.ts";
 import { arcId } from "../../sahne-story/check/rules.ts";
 import { allLanguages, languagesOf, seasonOf, textOf, type Languages, type SeasonDoc, type SeriesDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
-import { check, exists, forget, idsOf, listing, oldShape, readDoc, save, searchCards, type Edit, type Kind, type Problem } from "./content.ts";
+import { check, exists, forget, idsOf, kit as kitOf, listing, oldShape, readDoc, save, searchCards, type Edit, type Kind, type Problem } from "./content.ts";
 import { readReview, STATUSES, writeReview, type EpisodeReview } from "./review.ts";
 import type { Call } from "./agents.ts";
 import type { Events, Selection } from "./events.ts";
@@ -353,10 +352,10 @@ export function createMcp(o: McpOptions): McpServer {
       const times = Object.keys((p as { times?: Record<string, unknown> }).times ?? {});
       return { id, about: `${textOf((p as { name?: unknown }).name, c.langs.main, ...c.langs.translations) ?? id}; marks ${marks.join(", ") || "none"}${props.length ? `; props ${props.join(", ")}` : ""}${times.length ? `; times ${times.join(", ")}` : ""}${p.perch ? `; kerim's perch ${Object.keys(p.perch).join(", ")}` : ""}` };
     });
-    else if (kind === "props") rows = Object.entries(kit.props).map(([id, d]) => ({ id, about: d.meta?.about ?? "" }));
-    else if (kind === "gestures") rows = Object.entries(kit.gestures ?? {}).map(([id, g]) => ({ id, about: `${Math.round(g.dur)} ms${g.needs?.length ? `, needs ${g.needs.join(" and ")}` : ""}${g.loop ? ", loops" : ""}` }));
-    else if (kind === "emotions") rows = Object.keys(kit.face.emotions).map(id => ({ id, about: "a face" }));
-    else rows = Object.entries(kit.sounds ?? {}).map(([id, s]) => ({ id, about: `${s.bus}${s.loop ? " loop" : ""}${s.word ? `, written ${JSON.stringify(s.word[c.langs.main] ?? s.word.en ?? Object.values(s.word)[0])}` : ""}` }));
+    else if (kind === "props") rows = Object.entries(kitOf().props).map(([id, d]) => ({ id, about: d.meta?.about ?? "" }));
+    else if (kind === "gestures") rows = Object.entries(kitOf().gestures ?? {}).map(([id, g]) => ({ id, about: `${Math.round(g.dur)} ms${g.needs?.length ? `, needs ${g.needs.join(" and ")}` : ""}${g.loop ? ", loops" : ""}` }));
+    else if (kind === "emotions") rows = Object.keys(kitOf().face.emotions).map(id => ({ id, about: "a face" }));
+    else rows = Object.entries(kitOf().sounds ?? {}).map(([id, s]) => ({ id, about: `${s.bus}${s.loop ? " loop" : ""}${s.word ? `, written ${JSON.stringify(s.word[c.langs.main] ?? s.word.en ?? Object.values(s.word)[0])}` : ""}` }));
     const q = (query ?? "").trim().toLowerCase();
     const hits = rows.filter(r => !q || r.id.toLowerCase().includes(q) || r.about.toLowerCase().includes(q)).sort((a, b) => a.id.localeCompare(b.id));
     const max = limit ?? 80;

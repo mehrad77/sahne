@@ -15,7 +15,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CONTENT, IS_SAMPLES } from "../../sahne-story/paths.ts";
-import { allProblems, check, exists, forget, isKind, lessons, listing, oldShape, readDoc, save, searchCards, type Edit } from "./content.ts";
+import { allProblems, check, exists, forget, isKind, kitDocs, lessons, listing, oldShape, readDoc, save, searchCards, type Edit } from "./content.ts";
 import { headOf } from "./git.ts";
 import { readReview, writeReview } from "./review.ts";
 import { requestOf, runAssistant, usageSummary } from "./assistant.ts";
@@ -186,6 +186,7 @@ export async function serve(o: Options): Promise<Running> {
     }
     if (route === "cards" && m === "GET") return json(res, 200, { cards: searchCards(new URL(req.url ?? "", "http://localhost").searchParams.get("q") ?? "") });
     if (route === "lessons" && m === "GET") return json(res, 200, { lessons: lessons() });
+    if (route === "kit" && m === "GET") return json(res, 200, kitDocs());
     if (route === "problems" && m === "GET") return json(res, 200, { problems: allProblems() });
     if (route === "review" && m === "GET") return json(res, 200, readReview());
     if (route === "review" && m === "POST") {

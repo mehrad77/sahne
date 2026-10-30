@@ -2,7 +2,7 @@
 
 import type { CharacterDoc, LangText, SeasonDoc, SeriesDoc, StoryPlace } from "sahne-story";
 
-export type Kind = "series" | "season" | "story" | "character" | "place";
+export type Kind = "series" | "season" | "story" | "character" | "place" | "kit_piece" | "kit_variant";
 
 export interface Episode { id: string; season?: number; title: LangText; kind?: "episode" | "special"; releaseDate?: string; draft: boolean; place: string; cast: string[] }
 export interface World {
