@@ -162,7 +162,7 @@ function Studio(p: { id: string }) {
   return html`<section class="studio-episode" onKeyDown=${(e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); } }}>
     <div class="toolbar row">
       <div class="grow" style="min-width:0"><h2 style="margin:0"><span class="note">${p.id}</span> <span ...${inLang(langs.main)}>${textOf(story.title, langs.main)}</span></h2>
-        <span class="note">${textOf(story.title, "en") ?? ""}${story.kind === "special" ? " · special" : ""}${story.releaseDate ? ` · ${story.releaseDate}` : ""}${story.draft ? " · draft" : ""}</span></div>
+        <span class="note">${[langs.translations[0] && html`<span ...${inLang(langs.translations[0])}>${textOf(story.title, langs.translations[0]) ?? ""}</span>`, story.kind === "special" && "special", story.releaseDate, story.draft && "draft"].filter(Boolean).map((x, k) => html`${k ? " · " : ""}${x}`)}</span></div>
       <button onClick=${() => setTab("review")} title="Its status and comments">${status === "draft" ? "To review" : status}${comments ? ` · ${comments} 💬` : ""}</button>
       <button class="iconbtn" onClick=${() => history("story", p.id, "undo")} disabled=${!d.past.length} title=${`Undo (${MOD} Z)`} aria-label="Undo"><${Icon} name="undo" /></button>
       <button class="iconbtn" onClick=${() => history("story", p.id, "redo")} disabled=${!d.future.length} title=${`Redo (⇧${MOD} Z)`} aria-label="Redo"><${Icon} name="redo" /></button>

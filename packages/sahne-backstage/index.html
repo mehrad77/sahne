@@ -54,6 +54,8 @@ h3 { font-size: 15px; margin: 16px 0 6px; }
 .field.changed label::after { content: " • changed"; color: var(--warn); }
 .tri { display: grid; grid-template-columns: 1fr; gap: 6px; }
 .toolbar { position: sticky; top: 0; z-index: 5; background: var(--bg); padding: 8px 0; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+/* a toolbar's title keeps room for itself: on a narrow page its buttons wrap under it instead of squeezing it to a word a line */
+.toolbar > .grow { flex: 1 1 18rem; min-width: 0; }
 .notice { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; z-index: 50; max-width: 80vw; }
 .notice.bad { background: var(--bad); color: #fff; }
 .episode { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
