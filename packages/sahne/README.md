@@ -40,7 +40,7 @@ type-checks the five packages, measures the bundles against their budgets (`size
 | `src/script/` | The script's cues (`types.ts`) and the world state after a cue (`world.ts`) |
 | `src/director/direct.ts` | The director: one cue and the world before it become a performance; `fold` |
 | `src/anim/timeline.ts` | A performance's tracks and `evaluate(perf, t)`, the state of the stage at any moment |
-| `src/art/` | `Path` and the shape helpers (`smooth`, `band`, `ellipse`, `rrect`…), groups and their paper drawing (rim and layer shadows) |
+| `src/art/` | `Path` and the shape helpers (`smooth`, `band`, `ellipse`, `rrect`…, `Path.fromSvg` for SVG path data), groups and their paper drawing (rim and layer shadows) |
 | `src/rig/` | The humanoid skeleton and forward kinematics (`skeleton.ts`); `composePose` (`pose.ts`): carry, walk, posture, idle, gestures, IK and the floor, one pure function; the kit puppets' rigs, a bird (`bird.ts`) and a cat (`cat.ts`) |
 | `src/face/params.ts` | The face model every backend reads |
 | `src/avatar/` | Avatar document + kit → puppet with the slot rules (`compose.ts`, `rules.ts`), checking and trimming an untrusted document (`normalize.ts`), the headless builder model (`builder.ts`), changes of clothes (`look.ts`: `applyLook`) |

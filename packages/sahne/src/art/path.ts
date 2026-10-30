@@ -20,6 +20,13 @@ export class Path {
   quadTo(x1: number, y1: number, x: number, y: number) { this.cmds.push(["Q", x1, y1, x, y]); return this; }
   close() { this.cmds.push(["Z"]); return this; }
 
+  /**
+   * A path from SVG path data (`d`): M L H V C S Q T A Z, absolute and relative, with the implicit repeats and the
+   * run-together numbers SVG allows (`M0 0L-5-5`, an arc's flags as `011`). H, V, S and T become L, C and Q, an arc
+   * becomes cubics, so the result holds only the commands of `Cmd`. Throws an `Error` that says where the data is wrong.
+   */
+  static fromSvg(d: string): Path { return parseSvgPath(d); }
+
   /** Append another path's commands (for compound shapes and holes). */
   add(p: Path) { this.cmds.push(...p.cmds.map(c => [...c] as Cmd)); return this; }
 
@@ -70,6 +77,84 @@ export class Path {
         case "Z": ctx.closePath(); break;
       }
     }
+  }
+}
+
+// ---- SVG path data -----------------------------------------------------------
+
+const NUM = /[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/y;
+const ARGS: Record<string, number> = { m: 2, l: 2, h: 1, v: 1, c: 6, s: 4, q: 4, t: 2, a: 7, z: 0 };
+
+function parseSvgPath(d: string): Path {
+  const p = new Path(), n = d.length;
+  let i = 0, cmd = "", cx = 0, cy = 0, sx = 0, sy = 0, kx = 0, ky = 0, prev = "";
+  const ws = () => { while (i < n && /[\s,]/.test(d[i])) i++; };
+  const bad = (what: string): never => { throw new Error(`path data: ${what} at ${i} in "${d.length > 40 ? d.slice(0, 40) + "…" : d}"`); };
+  const num = () => { ws(); NUM.lastIndex = i; const m = NUM.exec(d); if (!m) bad("a number was expected"); i += m![0].length; return +m![0]; };
+  const flag = () => { ws(); const c = d[i]; if (c !== "0" && c !== "1") bad("an arc flag (0 or 1) was expected"); i++; return c === "1"; };
+  for (ws(); i < n; ws()) {
+    if (/[A-Za-z]/.test(d[i])) {
+      cmd = d[i++];
+      if (!Object.hasOwn(ARGS, cmd.toLowerCase())) { i--; bad(`unknown command ${cmd}`); }
+      if (!p.cmds.length && cmd !== "M" && cmd !== "m") bad("a path starts with M");
+    } else if (!cmd || /z/i.test(cmd)) bad("a number with no command");
+    const rel = cmd === cmd.toLowerCase(), c = cmd.toLowerCase(), ox = rel ? cx : 0, oy = rel ? cy : 0;
+    if (c === "z") { p.close(); cx = sx; cy = sy; prev = "z"; continue; }
+    let x: number, y: number;
+    switch (c) {
+      case "m": x = ox + num(); y = oy + num(); p.moveTo(x, y); sx = x; sy = y; cmd = rel ? "l" : "L"; break;
+      case "l": x = ox + num(); y = oy + num(); p.lineTo(x, y); break;
+      case "h": x = ox + num(); y = cy; p.lineTo(x, y); break;
+      case "v": x = cx; y = oy + num(); p.lineTo(x, y); break;
+      case "c": case "s": {
+        // S: the first control is the last one reflected, when the command before was a cubic
+        let x1: number, y1: number;
+        if (c === "c") { x1 = ox + num(); y1 = oy + num(); }
+        else { x1 = prev === "c" ? 2 * cx - kx : cx; y1 = prev === "c" ? 2 * cy - ky : cy; }
+        const x2 = ox + num(), y2 = oy + num(); x = ox + num(); y = oy + num();
+        p.cubicTo(x1, y1, x2, y2, x, y); kx = x2; ky = y2; break;
+      }
+      case "q": case "t": {
+        let x1: number, y1: number;
+        if (c === "q") { x1 = ox + num(); y1 = oy + num(); }
+        else { x1 = prev === "q" ? 2 * cx - kx : cx; y1 = prev === "q" ? 2 * cy - ky : cy; }
+        x = ox + num(); y = oy + num(); p.quadTo(x1, y1, x, y); kx = x1; ky = y1; break;
+      }
+      default: { // a
+        const rx = num(), ry = num(), rot = num(), large = flag(), sweep = flag();
+        x = ox + num(); y = oy + num();
+        arcTo(p, cx, cy, rx, ry, rot, large, sweep, x, y);
+      }
+    }
+    prev = c; cx = x; cy = y;
+  }
+  if (!p.cmds.length) bad("no path");
+  return p;
+}
+
+/** An SVG elliptical arc (the endpoint form, SVG 1.1 appendix F.6) as cubics of at most a quarter turn each. */
+function arcTo(p: Path, x1: number, y1: number, rx: number, ry: number, deg: number, large: boolean, sweep: boolean, x2: number, y2: number) {
+  if (x1 === x2 && y1 === y2) return;
+  rx = Math.abs(rx); ry = Math.abs(ry);
+  if (!rx || !ry) { p.lineTo(x2, y2); return; }
+  const phi = deg * Math.PI / 180, cp = Math.cos(phi), sp = Math.sin(phi);
+  const dx = (x1 - x2) / 2, dy = (y1 - y2) / 2, xp = cp * dx + sp * dy, yp = -sp * dx + cp * dy;
+  const lam = (xp * xp) / (rx * rx) + (yp * yp) / (ry * ry);
+  if (lam > 1) { const s = Math.sqrt(lam); rx *= s; ry *= s; }
+  const num = rx * rx * ry * ry - rx * rx * yp * yp - ry * ry * xp * xp, den = rx * rx * yp * yp + ry * ry * xp * xp;
+  const k = (large === sweep ? -1 : 1) * Math.sqrt(Math.max(0, num / den)), cxp = k * rx * yp / ry, cyp = -k * ry * xp / rx;
+  const ccx = cp * cxp - sp * cyp + (x1 + x2) / 2, ccy = sp * cxp + cp * cyp + (y1 + y2) / 2;
+  const ang = (ux: number, uy: number, vx: number, vy: number) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+  const t1 = ang(1, 0, (xp - cxp) / rx, (yp - cyp) / ry);
+  let dt = ang((xp - cxp) / rx, (yp - cyp) / ry, (-xp - cxp) / rx, (-yp - cyp) / ry);
+  if (!sweep && dt > 0) dt -= 2 * Math.PI; else if (sweep && dt < 0) dt += 2 * Math.PI;
+  const segs = Math.max(1, Math.ceil(Math.abs(dt) / (Math.PI / 2) - 1e-9)), step = dt / segs, h = 4 / 3 * Math.tan(step / 4);
+  // a point of the rotated ellipse at angle t, and its tangent (the derivative)
+  const pt = (t: number): [number, number] => { const ex = rx * Math.cos(t), ey = ry * Math.sin(t); return [ccx + cp * ex - sp * ey, ccy + sp * ex + cp * ey]; };
+  const tan = (t: number): [number, number] => { const ex = -rx * Math.sin(t), ey = ry * Math.cos(t); return [cp * ex - sp * ey, sp * ex + cp * ey]; };
+  for (let i = 0; i < segs; i++) {
+    const a = t1 + i * step, b = a + step, [ax, ay] = i ? pt(a) : [x1, y1], [bx, by] = i === segs - 1 ? [x2, y2] : pt(b), ta = tan(a), tb = tan(b);
+    p.cubicTo(ax + h * ta[0], ay + h * ta[1], bx - h * tb[0], by - h * tb[1], bx, by);
   }
 }
 
