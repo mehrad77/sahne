@@ -1,14 +1,17 @@
 // server/call.ts: any MCP tool from the shell. kit_render and draft_kit_item (one item and a list of them) write a PNG and
 // print its path, an error is exit code 1, and a --session keeps one server process across calls, starts a new one when a
-// watched source changed, and stops on request. On a temp copy of the samples.
+// watched source changed, and stops on request. Its socket, log and default --out are in a private folder, a call that gets
+// no answer gives up with a clear error, and two calls at once never write one PNG. On a temp copy of the samples.
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ask, callDir, pngName, privateDir, sockOf, timeoutOf } from "../server/call.ts";
 
 const SAMPLES = fileURLToPath(new URL("../../sahne-story/samples/", import.meta.url));
 const CALL = fileURLToPath(new URL("../server/call.ts", import.meta.url));
@@ -124,4 +127,71 @@ test("a running --write session reads the content root's kit fresh on every call
     assert.equal(r.status, 0, r.stderr);
     assert.ok(isPng(pngs(r.stdout)[0]));
   } finally { stop(); }
+});
+
+test("the session's folder is private: made 0700, a group-readable one is closed, a link refused", () => {
+  const base = mkdtempSync(join(tmpdir(), "backstage-call-priv-"));
+  try {
+    const d = privateDir(join(base, "a"));
+    assert.equal(statSync(d).mode & 0o777, 0o700);
+    mkdirSync(join(base, "open"), { mode: 0o755 });
+    chmodSync(join(base, "open"), 0o777);
+    assert.equal(statSync(privateDir(join(base, "open"))).mode & 0o777, 0o700, "an open folder of ours is closed");
+    symlinkSync(d, join(base, "link"));
+    assert.throws(() => privateDir(join(base, "link")), /not a folder of its own/);
+    writeFileSync(join(base, "file"), "");
+    assert.throws(() => privateDir(join(base, "file")));
+    // the socket is in the user's own folder under the temp dir, never a shared /tmp
+    const dir = callDir(base);
+    assert.equal(dirname(sockOf("x", dir)), dir);
+    assert.equal(statSync(dir).mode & 0o777, 0o700);
+    assert.notEqual(sockOf("x", dir), sockOf("y", dir));
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
+
+test("with a temp dir too long for a socket, the folder is <cache>/sahne-call (0700), not /tmp", () => {
+  const base = mkdtempSync(join(tmpdir(), "c")), long = join(base, "x".repeat(120)), cache = join(base, "h");
+  try {
+    const dir = callDir(long, cache);
+    assert.equal(dir, join(cache, "sahne-call"));
+    assert.equal(statSync(dir).mode & 0o777, 0o700);
+    assert.ok(Buffer.byteLength(sockOf("a long session name", dir)) <= 103);
+    assert.throws(() => callDir(long, long), /too long/);
+  } finally { rmSync(base, { recursive: true, force: true }); }
+});
+
+test("a session that never answers is given up on after the timeout, with a clear error", async () => {
+  const dir = privateDir(mkdtempSync(join(tmpdir(), "backstage-call-mute-"))), path = join(dir, "mute.sock");
+  const mute = createServer(() => {}); // accepts, never answers
+  await new Promise<void>(r => mute.listen(path, () => r()));
+  try {
+    const t0 = Date.now();
+    await assert.rejects(ask(path, { op: "status" }, 300, "mute"), /session mute did not answer within 0\.3 s.*--timeout.*--session mute --stop/s);
+    assert.ok(Date.now() - t0 < 3000);
+    assert.equal(await ask(join(dir, "none.sock"), { op: "status" }, 300), null, "nothing listening is null, at once");
+    assert.equal(timeoutOf("2.5"), 2500);
+    assert.throws(() => timeoutOf("soon"), /--timeout/);
+  } finally { mute.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test("the default --out is a private folder, and two calls at once into one --out write two PNGs", async () => {
+  const one = spawnSync(process.execPath, [CALL, "kit_render", JSON.stringify({ id: "chair" }), "--content", root], { encoding: "utf8", env: ENV });
+  assert.equal(one.status, 0, one.stderr);
+  const file = pngs(one.stdout)[0];
+  assert.equal(statSync(dirname(file)).mode & 0o777, 0o700);
+  rmSync(dirname(file), { recursive: true, force: true });
+  assert.notEqual(pngName("kit_render", 1), pngName("kit_render", 1));
+  const shared = mkdtempSync(join(tmpdir(), "backstage-call-both-"));
+  try {
+    const run = () => new Promise<string>((res, rej) => {
+      const p = spawn(process.execPath, [CALL, "kit_render", JSON.stringify({ id: "chair" }), "--content", root, "--out", shared], { env: ENV });
+      let o = "";
+      p.stdout.on("data", d => { o += d; });
+      p.on("exit", code => (code === 0 ? res(o) : rej(new Error(`exit ${code}`))));
+    });
+    const [a, b] = await Promise.all([run(), run()]);
+    const files = [...pngs(a), ...pngs(b)];
+    assert.equal(new Set(files).size, 2, "two names");
+    for (const f of files) assert.ok(isPng(f));
+  } finally { rmSync(shared, { recursive: true, force: true }); }
 });
