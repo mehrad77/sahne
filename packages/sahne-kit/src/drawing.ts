@@ -71,7 +71,7 @@ export function compileDrawing(doc: DrawingDoc): { def: PieceDef; problems: stri
       try { path = Path.fromSvg(s.d); } catch (e) { bad(`${where}: ${(e as Error).message}`); path = new Path().moveTo(0, 0); }
       commands += path.cmds.length;
       if (!path.finite()) bad(`${where}: a coordinate is not finite`);
-      else if (path.cmds.some(c => c.some((v, i) => i > 0 && Math.abs(v) > DRAWING_LIMITS.reach))) bad(`${where}: a coordinate is beyond ${DRAWING_LIMITS.reach} cm from the origin`);
+      else if (path.cmds.some(c => c.some((v, i) => i > 0 && Math.abs(v as number) > DRAWING_LIMITS.reach))) bad(`${where}: a coordinate is beyond ${DRAWING_LIMITS.reach} cm from the origin`);
       colour(s.fill, `${where} fill`); if (s.stroke) colour(s.stroke.color, `${where} stroke`);
       return { path, src: s };
     };
