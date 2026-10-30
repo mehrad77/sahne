@@ -720,8 +720,9 @@ const frontage: PieceDef = { draw(p, r) {
     lf.push(L([[dx + dW / 2 - 9, gt + 26], [dx + dW / 2, gt + 15], [dx + dW / 2 + 9, gt + 26]], "#3B3B40", 0.8, 1), S(rrect(dx + dW / 2 - 14, gt + 26, 28, 15, 2), "#F7F3EA"), R(dx + dW / 2 - 11, gt + 29, 22, 9, kind === "eczane" || kind === "pharmacy" ? "#3FA05A" : "#2F8C88", pr()));
     // inside lights up where the shutter is not down
     const cb = -H0 + 26 + (1 - open) * (H0 - 26), gy = Math.max(gt, cb), dy = Math.max(gt + 9, cb);
-    if (sill - gy > 4) glow.push(R(wx0, gy, wx1 - wx0, sill - gy, "#FFE2A6", pr(0.5)));
-    if (-35 - dy > 4) glow.push(R(dx + 9, dy, dW - 18, -35 - dy, "#FFE2A6", pr(0.5)));
+    // a thin wash, so the wares still read through the lit glass; a brighter pool under the lamps and a hot strip at the sill
+    if (sill - gy > 4) glow.push(R(wx0, gy, wx1 - wx0, sill - gy, "#FFE2A6", pr(0.22)), R(wx0, Math.max(gy, sill - 26), wx1 - wx0, Math.min(26, sill - gy), "#FFD98A", pr(0.1)));
+    if (-35 - dy > 4) glow.push(R(dx + 9, dy, dW - 18, -35 - dy, "#FFE2A6", pr(0.2)));
     if (kind === "firin") {
       const fx = left ? x1 - 26 : x0 + 26;
       main.push(R(fx - 8, -H0 - 300, 16, 220, "#4A4A4E"), R(fx - 8, -H0 - 300, 4, 220, "#FFFFFF", pr(0.2)), S(many([[fx - 10, -H0 - 160, 20, 5], [fx - 10, -H0 - 240, 20, 5]]), "#3B3B40"), P([[fx - 18, -H0 - 300, 0], [fx + 18, -H0 - 300, 0], [fx, -H0 - 318, 0]], "#3B3B40"));
@@ -839,12 +840,12 @@ function oldLamp(kind: string, p: Record<string, unknown>) {
     glow.push(S(g, "#FFE6A8", pr()), S(ellipse(0, top - 22, 38, 34), "#FFD98A", pr(0.22)));
     lights.push({ x: 0, y: -(top - 22), z: 20, color: "#FFD59A", radius: 4, intensity: 0.85, switch: false, at: ["dawn", "dusk", "night"] });
   } else {
-    const hx = 56;
-    sh.push(R(-9, -10, 18, 10, c), R(-6, -h, 12, h - 10, c), L([[-3, -14], [-3, -h + 40]], tone(c, "light"), 1.4, 0.5), R(-8, -h * 0.35, 16, 5, tone(c, "deep")));
-    sh.push({ path: smooth([[0, -h + 30], [0, -h + 4], [hx * 0.4, -h - 10], [hx, -h - 8]], false), stroke: { color: c, width: 9, cap: "round" } }, R(hx - 4, -h - 14, 8, 8, c));
-    sh.push(P([[hx - 26, -h - 6, 0], [hx + 26, -h - 6, 0], [hx + 20, -h + 6], [hx - 20, -h + 6]], tone(c, "deep")), R(hx - 26, -h - 8, 52, 3, c));
-    glow.push(S(ellipse(hx, -h + 7, 17, 3), "#FFF1C4", pr()), P([[hx - 17, -h + 8, 0], [hx + 17, -h + 8, 0], [hx + 40, -h * 0.55, 0], [hx - 40, -h * 0.55, 0]], "#FFE9AE", pr(0.1)));
-    lights.push({ x: hx, y: h - 8, z: 20, color: "#FFE3A8", radius: 5, intensity: 0.8, switch: false, at: ["dawn", "dusk", "night"] });
+    const hx = 66;
+    sh.push(R(-9, -10, 18, 10, c), R(-6, -h + 40, 12, h - 50, c), L([[-3, -14], [-3, -h + 50]], tone(c, "light"), 1.4, 0.5), R(-8, -h * 0.35, 16, 5, tone(c, "deep")));
+    sh.push({ path: smooth([[0, -h + 46], [0, -h + 12], [16, -h - 14], [hx * 0.6, -h - 22], [hx, -h - 8]], false), stroke: { color: c, width: 10, cap: "round" } }, R(hx - 3, -h - 12, 6, 12, c));
+    sh.push(P([[hx - 32, -h + 14, 0], [hx + 32, -h + 14, 0], [hx + 26, -h, 0], [hx + 12, -h - 12], [hx - 12, -h - 12], [hx - 26, -h]], tone(c, "deep")), R(hx - 32, -h + 12, 64, 3, c), L([[hx - 14, -h - 6], [hx + 4, -h - 9]], tone(c, "light"), 1.2, 0.5));
+    glow.push(S(ellipse(hx, -h + 16, 24, 3.5), "#FFF1C4", pr()), P([[hx - 24, -h + 18, 0], [hx + 24, -h + 18, 0], [hx + 52, -h * 0.5, 0], [hx - 52, -h * 0.5, 0]], "#FFE9AE", pr(0.1)));
+    lights.push({ x: hx, y: h - 14, z: 20, color: "#FFE3A8", radius: 5, intensity: 0.8, switch: false, at: ["dawn", "dusk", "night"] });
   }
   return { flats: [{ group: { shapes: sh, edge: 0.6 }, emissive: { shapes: glow, edge: 0 }, switch: false as const, glowAt: 0.05, ppcm: Math.min(2.4, 1900 / (h + 140)) }], lights };
 }
