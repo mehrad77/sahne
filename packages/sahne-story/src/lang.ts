@@ -50,7 +50,7 @@ export interface StoryLang {
   pointing(word: string): boolean;
   /** A word after which the next noun names the place itself, not a prop (Turkish burası, şurası, orası). */
   namesPlace(word: string): boolean;
-  /** Words that motivate a gesture (prefixes of the lower-case words): a gesture not listed needs none. */
+  /** Words that motivate a gesture (prefixes of the lower-case words; an entry starting with "=" must match a whole word): a gesture not listed needs none. */
   motive: Record<string, string[]>;
   /** A number said from `plain[i]` on: its value and how many words it takes. */
   number?(plain: string[], i: number): { n: number; len: number } | null;
