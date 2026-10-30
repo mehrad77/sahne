@@ -27,12 +27,21 @@ function start(args: string[]): Promise<{ url: string; p: ChildProcess }> {
     const onData = (d: Buffer) => { out += d; const m = /sahne-backstage on (http:\/\/localhost:\d+\/)/.exec(out); if (m) res({ url: m[1], p }); };
     p.stdout!.on("data", onData); p.stderr!.on("data", onData);
     p.on("exit", c => rej(new Error(`exited ${c}: ${out}`)));
+    // a server that never says where it listens fails the file in a minute, rather than hanging the gate
+    setTimeout(() => { p.kill(); rej(new Error(`no "sahne-backstage on" line in 60 s: ${out}`)); }, 60_000).unref();
   });
 }
 
 let rw: { url: string; p: ChildProcess }, ro: { url: string; p: ChildProcess };
 before(async () => { [rw, ro] = await Promise.all([start(["--content", root, "--write"]), start([])]); });
-after(() => { rw?.p.kill(); ro?.p.kill(); rmSync(root, { recursive: true, force: true }); rmSync(config, { recursive: true, force: true }); });
+/** End a spawned backstage and let go of its pipes, so nothing it started (its esbuild) keeps this test's process alive. */
+const stop = (p?: ChildProcess) => new Promise<void>(r => {
+  if (!p || p.exitCode !== null || p.signalCode !== null) { p?.stdout?.destroy(); p?.stderr?.destroy(); return r(); }
+  p.once("exit", () => r());
+  p.kill("SIGKILL");
+  p.stdout?.destroy(); p.stderr?.destroy();
+});
+after(async () => { await Promise.all([stop(rw?.p), stop(ro?.p)]); rmSync(root, { recursive: true, force: true }); rmSync(config, { recursive: true, force: true }); });
 
 const call = async (base: string, method: string, path: string, body?: unknown, headers: Record<string, string> = {}) => {
   const r = await fetch(base + "api/" + path, { method, headers: { ...(body !== undefined ? { "content-type": "application/json" } : {}), ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
