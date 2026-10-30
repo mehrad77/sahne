@@ -53,3 +53,18 @@ test("loadContentKit keeps the good items and names each bad file", () => {
     assert.deepEqual(loadContentKit({ root: pathToFileURL(join(dir, "none") + "/") }), { docs: [], problems: [] });
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test("a variant with an illegal value, or a piece the kit checks refuse, is left out and named", () => {
+  const dir = mkdtempSync(join(tmpdir(), "kit-"));
+  try {
+    mkdirSync(join(dir, "kit/pieces"), { recursive: true }); mkdirSync(join(dir, "kit/variants"), { recursive: true });
+    const withN = { ...piece("x_tin"), params: { shade: { type: "enum", values: ["a", "b"], default: "a" } } };
+    writeFileSync(join(dir, "kit/pieces/x_tin.json"), JSON.stringify(withN));
+    writeFileSync(join(dir, "kit/variants/x_tin.x_bad.json"), JSON.stringify({ of: "x_tin", name: "x_bad", params: { shade: "zzz" } }));
+    writeFileSync(join(dir, "kit/variants/x_tin.x_good.json"), JSON.stringify({ of: "x_tin", name: "x_good", params: { shade: "b" } }));
+    const r = loadContentKit({ root: pathToFileURL(dir + "/"), kit: full });
+    const names = r.docs.map(d => "of" in d ? `${d.of}.${d.name}` : d.id);
+    assert.ok(names.includes("x_tin.x_good") && !names.includes("x_tin.x_bad"));
+    assert.match(r.problems.join("\n"), /x_bad\.json: shade: "zzz"/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

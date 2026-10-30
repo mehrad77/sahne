@@ -5,7 +5,9 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import type { Kit } from "sahne";
 import { compileDrawing, withDrawings, type DrawingDoc, type VariantDoc } from "../sahne-kit/src/drawing.ts";
+import { checkPiece } from "../sahne-kit/src/check.ts";
 import { validateDoc } from "./check/schema.ts";
+import { paramProblems } from "./src/lint-place.ts";
 import type { CardIndex, CardInfo } from "./src/cards.ts";
 import type { Needs } from "./src/needs.ts";
 import { CARDS, CARDS_EXTRA, KIT_PIECES, KIT_VARIANTS, NEEDS } from "./paths.ts";
@@ -74,8 +76,18 @@ export function loadContentKit(o: { root?: URL; kit?: Kit } = {}): ContentKit {
   // against the kit: one at a time, so a clash leaves out only itself (pieces first: a variant may name one)
   let kit = o.kit;
   for (const doc of [...mine, ...named]) {
-    try { kit = withDrawings(kit, [doc]); docs.push(doc); }
-    catch (e) { problems.push(`kit/${"of" in doc ? `variants/${doc.of}.${doc.name}` : `pieces/${doc.id}`}.json: ${(e as Error).message}`); }
+    const where = `kit/${"of" in doc ? `variants/${doc.of}.${doc.name}` : `pieces/${doc.id}`}.json`;
+    try {
+      const next = withDrawings(kit, [doc]), bad: string[] = [];
+      if ("of" in doc) {
+        for (const m of [next.set, next.props]) if (Object.hasOwn(m, doc.of)) for (const p of paramProblems(m[doc.of], doc.params ?? {}, [])) if (p.level === "error") bad.push(p.message);
+      } else {
+        const def = (doc.as === "prop" ? next.props : next.set)[doc.id];
+        for (const p of checkPiece(def, { ids: [doc.id], set: doc.as !== "prop", prop: doc.as !== "set" }, next)) if (p.level === "error") bad.push(`[${p.rule}] ${p.msg}`);
+      }
+      if (bad.length) { problems.push(`${where}: ${[...new Set(bad)].slice(0, 5).join("; ")}`); continue; }
+      kit = next; docs.push(doc);
+    } catch (e) { problems.push(`${where}: ${(e as Error).message}`); }
   }
   return { docs, problems };
 }
