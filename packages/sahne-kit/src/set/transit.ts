@@ -290,7 +290,7 @@ const canal_boat: PieceDef = { draw(p, r) {
     for (let i = 0; i < 11; i++) sh.push(L([[-540 + i * 100, -60], [-540 + i * 100 + 8, -172 + Math.abs(i - 5) * 3]], c, 2.4, 0.9));
     sh.push(R([[-560, -176], [440, -176]], c, 4), S(rect(500, -86, 5, 30), STEEL), S(ellipse(502, -90, 6, 4), "#C8283A"), R([[-600, -56], [-600, -120]], STEEL, 2.4), F(poly([[-600, -118], [-568, -110], [-600, -102]]), "#E8A33A"));
     text.push({ text: str(p.name, "Prinsengracht"), x: -420, y: -34, w: 460, h: 18, size: 14, color: "#F4F2EE", font: "print", weight: 700, lang: "en" });
-    return flatOf(p, "canal_boat", sh, glow, text, 1.6, ROCK);
+    return flatOf(p, "canal_boat", sh, glow, text, 1.4, ROCK);
   }
   const c = hex(p.color, "#2F5D50"), acc = "#C8283A", hull = P([[-450, -52, 0], [-446, -8], [-400, 0], [380, 0], [430, -10], [462, -52, 0]], c);
   sh.push(hull, F(rect(-460, -34, 920, 5), "#E6B52E", 1, hull.path), F(rect(-460, -14, 920, 14), tone(c, "shade"), 0.5, hull.path), S(rrect(-466, -54, 936, 8, 3), "#3A2E2C"));
@@ -388,7 +388,7 @@ const bike: PieceDef = { draw(p, r) {
       ...GO,
     },
     terms: ["a1-w-bisiklet"],
-    tags: ["vehicle", "bike", "street", "city"],
+    tags: ["vehicle", "bike", "street"],
   } };
 
 // ---- vespa -------------------------------------------------------------------------------------
