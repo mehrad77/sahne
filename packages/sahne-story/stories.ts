@@ -8,12 +8,16 @@
 
 import { parseArgs } from "node:util";
 import { placeSolids } from "sahne";
-import kit from "../sahne-kit/src/full.ts";
-import { loadCards, loadNeeds } from "./load.ts";
+import full from "../sahne-kit/src/full.ts";
+import { withDrawings } from "../sahne-kit/src/drawing.ts";
+import { loadCards, loadContentKit, loadNeeds } from "./load.ts";
 import { checkCast, checkPlaces, checkSeason, checkSeries, checkStory, type CheckProblem } from "./check/rules.ts";
 import { loadWorld } from "./check/world.ts";
 
 const { values: o, positionals } = parseArgs({ allowPositionals: true, options: { check: { type: "boolean", default: false }, quiet: { type: "boolean", default: false } } });
+// the root's own kit items (kit/ of the content root) join the full kit; a file that is not good is an error
+const own = loadContentKit({ kit: full });
+const kit = withDrawings(full, own.docs);
 const world = loadWorld();
 const needs = loadNeeds();
 const solids = Object.fromEntries(world.drafts.map(d => [d.story.id, Object.fromEntries(Object.entries(world.places).map(([id, p]) => [id, placeSolids(p, kit)]))]));
@@ -21,7 +25,7 @@ const opts = { kit, cards: loadCards(), needs, solids };
 const drafts = world.drafts.filter(d => !positionals.length || positionals.includes(d.id));
 
 const RULES = ["schema", "id", "series", "calendar", "ref", "cast", "counts", "flags", "quiz", "mistake", "text", "words", "recycle", "character", "place"];
-const problems: CheckProblem[] = [...checkSeries(world).filter(p => !positionals.length || positionals.includes(p.story) || !/^s\d+e\d+$/.test(p.story)), ...checkPlaces(world), ...checkCast(world, opts), ...drafts.flatMap(d => checkStory(d, world, opts)), ...checkSeason(world, world.drafts, opts).filter(p => !positionals.length || positionals.includes(p.story) || p.story === "season")];
+const problems: CheckProblem[] = [...own.problems.map((message): CheckProblem => ({ rule: "kit", level: "error", story: "kit", message })), ...checkSeries(world).filter(p => !positionals.length || positionals.includes(p.story) || !/^s\d+e\d+$/.test(p.story)), ...checkPlaces(world), ...checkCast(world, opts), ...drafts.flatMap(d => checkStory(d, world, opts)), ...checkSeason(world, world.drafts, opts).filter(p => !positionals.length || positionals.includes(p.story) || p.story === "season")];
 const cell = (story: string, rule: string) => {
   const ps = problems.filter(p => p.story === story && (p.rule === rule || (rule === "place" && !RULES.includes(p.rule))));
   return ps.some(p => p.level === "error") ? "ERR" : ps.some(p => p.level === "warning") ? "warn" : ".";

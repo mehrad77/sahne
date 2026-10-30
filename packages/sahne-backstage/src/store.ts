@@ -5,6 +5,7 @@
 import { batch, computed, signal } from "@preact/signals";
 import { api, type Edit, type Kind, type Problem, type World } from "./api.ts";
 import * as H from "./model/history.ts";
+import { loadKitDocs } from "./kitdocs.ts";
 
 export const world = signal<World | null>(null);
 export const route = signal<string[]>(parseHash());
@@ -94,6 +95,7 @@ export async function saveDocs(keys: string[]): Promise<boolean> {
   });
   say(`saved ${list.map(k => k.replace(":", " ")).join(", ")}`);
   allProblems.value = null;
+  if (list.some(k => k.startsWith("kit_"))) await loadKitDocs();
   await loadWorld();
   return true;
 }

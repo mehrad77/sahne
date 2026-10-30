@@ -240,3 +240,24 @@ test("the agents: an MCP client's session and its calls, and how their edits lan
   assert.equal(JSON.parse(readFileSync(join(config, "settings.json"), "utf8")).agentEdits, "direct");
   await call(rw.url, "POST", "agents", { agentEdits: "proposals" });
 });
+
+test("the root's own kit items: served, saved as documents, checked against the kit, ids permanent", async () => {
+  const tin = { id: "x_tin", as: "prop", about: "A small tin box with a lid, for tests.", tags: ["box"],
+    kinds: { tin: { size: [10, 8], ppcm: 8, grip: [0, -4], flats: [{ shapes: [{ d: "M-5 0V-8H5V0Z", fill: "#B9B4A8" }] }] } } };
+  const save = (edits: unknown[]) => call(rw.url, "POST", "save", { edits });
+  assert.deepEqual((await call(rw.url, "GET", "kit")).body, { docs: [], problems: [] });
+  assert.equal((await save([{ kind: "kit_piece", id: "x_tin", doc: tin, create: true }])).status, 200);
+  assert.deepEqual((await call(rw.url, "GET", "kit")).body.docs.map((d: { id: string }) => d.id), ["x_tin"]);
+  assert.equal(JSON.parse(readFileSync(join(root, "kit/pieces/x_tin.json"), "utf8")).id, "x_tin");
+  assert.equal((await call(rw.url, "GET", "doc/kit_piece/x_tin")).body.doc.about, tin.about);
+  assert.equal((await save([{ kind: "kit_piece", id: "x_tin", doc: tin, create: true }])).status, 400, "an id is taken once");
+  assert.equal((await save([{ kind: "kit_piece", id: "x_tin", doc: { ...tin, id: "x_renamed" } }])).status, 400, "an id never changes");
+  assert.equal((await save([{ kind: "kit_piece", id: "tin", doc: { ...tin, id: "tin" }, create: true }])).status, 400, "a content id starts with x_");
+  const bad = await save([{ kind: "kit_piece", id: "x_empty", doc: { ...tin, id: "x_empty", kinds: {} }, create: true }]);
+  assert.equal(bad.status, 422); assert.ok(bad.body.problems.some((p: { rule: string; new?: boolean }) => p.rule === "kit" && p.new));
+  const v = { of: "x_tin", name: "x_pair", params: { n: 2 } };
+  assert.equal((await save([{ kind: "kit_variant", id: "x_tin.x_pair", doc: v, create: true }])).status, 200);
+  assert.equal((await save([{ kind: "kit_variant", id: "x_tin.x_nope", doc: { ...v, name: "x_nope", params: { nope: 1 } }, create: true }])).status, 422, "a param the generator does not declare");
+  assert.equal((await save([{ kind: "kit_variant", id: "x_tin.x_pair", doc: { ...v, name: "x_other" } }])).status, 400);
+  assert.equal((await call(ro.url, "POST", "save", { edits: [{ kind: "kit_piece", id: "x_ro", doc: { ...tin, id: "x_ro" }, create: true }] })).status, 403);
+});

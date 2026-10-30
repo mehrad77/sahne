@@ -18,12 +18,13 @@
 import { readFileSync } from "node:fs";
 import * as z from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import kit from "../../sahne-kit/src/full.ts";
 import { IS_SAMPLES } from "../../sahne-story/paths.ts";
 import { arcId } from "../../sahne-story/check/rules.ts";
 import { allLanguages, languagesOf, seasonOf, textOf, type Languages, type SeasonDoc, type SeriesDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
-import { check, exists, forget, idsOf, listing, oldShape, readDoc, save, searchCards, type Edit, type Kind, type Problem } from "./content.ts";
+import { check, exists, forget, idsOf, kit as kitOf, listing, oldShape, readDoc, save, searchCards, type Edit, type Kind, type Problem } from "./content.ts";
 import { readReview, STATUSES, writeReview, type EpisodeReview } from "./review.ts";
+import { fail, ok, Refusal, type Result } from "./result.ts";
+import { pieceRows, registerKitTools } from "./kittools.ts";
 import type { Call } from "./agents.ts";
 import type { Events, Selection } from "./events.ts";
 import { latestOf, proposalsOf, type ProposalEdit, type Queue } from "./proposals.ts";
@@ -58,13 +59,6 @@ const FORMAT = new URL("../../sahne-story/README.md", import.meta.url);
 const STAGING = ["to", "emo", "do", "at", "cam", "voice", "tempo", "n", "loop", "obj", "move", "react", "link", "sfx", "env", "via", "on", "wait", "frame", "looks", "costume"];
 
 // ---- small helpers -----------------------------------------------------------------------------------------------------
-
-class Refusal extends Error {}
-
-type Result = { content: { type: "text"; text: string }[]; isError?: boolean };
-/** An answer: a line for the agent, then the data as JSON in its own block. */
-const ok = (text: string, data?: unknown): Result => ({ content: [{ type: "text", text }, ...(data === undefined ? [] : [{ type: "text" as const, text: JSON.stringify(data, null, 1) }])] });
-const fail = (text: string): Result => ({ isError: true, content: [{ type: "text", text }] });
 
 const BAD_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 
@@ -194,7 +188,7 @@ const docOf = (kind: Kind, id: string): { doc: Record<string, unknown>; mtime: n
 export function createMcp(o: McpOptions): McpServer {
   const queue = o.queue ?? proposalsOf(o.events);
   const server = new McpServer({ name: "sahne-backstage", version: "0.1.0" }, {
-    instructions: `Backstage edits a Sahne content root: a series of short language-learning scenes played on a paper-theatre stage. Start with series_overview (the languages, the narrator, the stand-in, the seasons), read an episode with read_episode, and look up valid staging with kit_search. Paths name a place in a document: "steps/3", "steps/12/choice/options/0/reply/1", "quiz/0", "title". ${o.agentEdits === "proposals" ? "Your edits are proposals: each is checked and shown to a person in the editor, who accepts or rejects it. Nothing is saved until they do." : "Your edits are saved at once (direct mode), each after the same check a person's save passes."} An edit that brings a new error is refused: fix it and try again. Ids are permanent: never rename one.`,
+    instructions: `Backstage edits a Sahne content root: a series of short language-learning scenes played on a paper-theatre stage. Start with series_overview (the languages, the narrator, the stand-in, the seasons), read an episode with read_episode, and look up valid staging with kit_search. To draw a new set piece, prop or variant of this series, read the sahne://kit-guide resource, then kit_search, kit_read a neighbour, draft_kit_item (or draft_variant) and look at its sheet, revise until it has no problems, and save_kit_item (save_variant). Paths name a place in a document: "steps/3", "steps/12/choice/options/0/reply/1", "quiz/0", "title". ${o.agentEdits === "proposals" ? "Your edits are proposals: each is checked and shown to a person in the editor, who accepts or rejects it. Nothing is saved until they do." : "Your edits are saved at once (direct mode), each after the same check a person's save passes."} An edit that brings a new error is refused: fix it and try again. Ids are permanent: never rename one.`,
   });
   const by = () => o.by ?? server.server.getClientVersion()?.name ?? "agent";
 
@@ -204,7 +198,7 @@ export function createMcp(o: McpOptions): McpServer {
     const t0 = Date.now();
     let r: Result;
     try { r = await fn(a); } catch (e) { r = fail(e instanceof Refusal ? e.message : `failed: ${(e as Error).message}`); }
-    o.onCall?.({ at: t0, by: by(), tool, ok: !r.isError, ms: Date.now() - t0, summary: (r.content[0]?.text ?? "").split("\n")[0].slice(0, 300) });
+    o.onCall?.({ at: t0, by: by(), tool, ok: !r.isError, ms: Date.now() - t0, summary: (r.content[0]?.type === "text" ? r.content[0].text : "").split("\n")[0].slice(0, 300) });
     return r;
   };
 
@@ -338,29 +332,34 @@ export function createMcp(o: McpOptions): McpServer {
     return ok(`${id} ${pathText(p)} (mtime ${d.mtime})`, v);
   }));
 
-  const KIT_KINDS = ["characters", "places", "props", "gestures", "emotions", "sounds"] as const;
+  const KIT_KINDS = ["characters", "places", "props", "set", "gestures", "emotions", "sounds"] as const;
   server.registerTool("kit_search", {
     title: "Search the cast, places and kit",
-    description: "What a step may name: characters (ids, names, roles), places (with their marks, where people stand and move to, and their props), the kit's props, gestures (a line's `do`), emotions (`emo`) and sounds (`sfx`). Use it before staging a step so every id exists. An empty query lists everything of that kind.",
-    inputSchema: { kind: z.enum(KIT_KINDS), query: z.string().optional().describe("Part of an id or description"), limit: z.number().int().positive().max(200).optional() },
+    description: "What a step may name: characters (ids, names, roles), places (with their marks, where people stand and move to, and their props), the kit's props and set pieces (kind \"set\": each with its family, whether it is a prop, a set piece or both, what it draws and its variants; filter by family, tag or as), gestures (a line's `do`), emotions (`emo`) and sounds (`sfx`). Use it before staging a step so every id exists, and before drawing a kit item to find its neighbours (then kit_read one). An empty query lists everything of that kind.",
+    inputSchema: {
+      kind: z.enum(KIT_KINDS), query: z.string().optional().describe("Part of an id or description"), limit: z.number().int().positive().max(200).optional(),
+      family: z.string().optional().describe("props and set only: the kit family (food, street, furniture; \"series\" for this content root's own drawings)"), tag: z.string().optional().describe("props and set only: a tag, like cafe"),
+      as: z.enum(["set", "prop", "both"]).optional().describe("props and set only: whether it is a set piece, a prop or both"),
+    },
     annotations: { readOnlyHint: true },
-  }, run("kit_search", ({ kind, query, limit }) => {
+  }, run("kit_search", ({ kind, query, limit, family, tag, as }) => {
     const c = ctx(), w = listing();
-    let rows: { id: string; about: string }[] = [];
+    let rows: ({ id: string; about: string } & Record<string, unknown>)[] = [];
     if (kind === "characters") rows = Object.entries(w.characters).map(([id, ch]) => ({ id, about: `${textOf(ch.name, c.langs.main) ?? id}${ch.kind ? ` (${ch.kind})` : ""}${ch.role ? `: ${textOf(ch.role, ...c.langs.translations, c.langs.main)}` : ""}` }));
     else if (kind === "places") rows = Object.entries(w.places as Record<string, StoryPlace>).map(([id, p]) => {
       const marks = Object.keys(p.marks ?? {}), props = Object.keys((p as { props?: Record<string, unknown> }).props ?? {});
       const times = Object.keys((p as { times?: Record<string, unknown> }).times ?? {});
       return { id, about: `${textOf((p as { name?: unknown }).name, c.langs.main, ...c.langs.translations) ?? id}; marks ${marks.join(", ") || "none"}${props.length ? `; props ${props.join(", ")}` : ""}${times.length ? `; times ${times.join(", ")}` : ""}${p.perch ? `; kerim's perch ${Object.keys(p.perch).join(", ")}` : ""}` };
     });
-    else if (kind === "props") rows = Object.entries(kit.props).map(([id, d]) => ({ id, about: d.meta?.about ?? "" }));
-    else if (kind === "gestures") rows = Object.entries(kit.gestures ?? {}).map(([id, g]) => ({ id, about: `${Math.round(g.dur)} ms${g.needs?.length ? `, needs ${g.needs.join(" and ")}` : ""}${g.loop ? ", loops" : ""}` }));
-    else if (kind === "emotions") rows = Object.keys(kit.face.emotions).map(id => ({ id, about: "a face" }));
-    else rows = Object.entries(kit.sounds ?? {}).map(([id, s]) => ({ id, about: `${s.bus}${s.loop ? " loop" : ""}${s.word ? `, written ${JSON.stringify(s.word[c.langs.main] ?? s.word.en ?? Object.values(s.word)[0])}` : ""}` }));
+    else if (kind === "props" || kind === "set") rows = pieceRows().filter(r => (kind === "set" ? r.as !== "prop" : r.as !== "set") && (!family || r.family === family) && (!tag || r.tags.includes(tag)) && (!as || r.as === as))
+      .map(r => ({ id: r.id, family: r.family, as: r.as, about: r.about, variants: r.variants, tags: r.tags }));
+    else if (kind === "gestures") rows = Object.entries(kitOf().gestures ?? {}).map(([id, g]) => ({ id, about: `${Math.round(g.dur)} ms${g.needs?.length ? `, needs ${g.needs.join(" and ")}` : ""}${g.loop ? ", loops" : ""}` }));
+    else if (kind === "emotions") rows = Object.keys(kitOf().face.emotions).map(id => ({ id, about: "a face" }));
+    else rows = Object.entries(kitOf().sounds ?? {}).map(([id, s]) => ({ id, about: `${s.bus}${s.loop ? " loop" : ""}${s.word ? `, written ${JSON.stringify(s.word[c.langs.main] ?? s.word.en ?? Object.values(s.word)[0])}` : ""}` }));
     const q = (query ?? "").trim().toLowerCase();
-    const hits = rows.filter(r => !q || r.id.toLowerCase().includes(q) || r.about.toLowerCase().includes(q)).sort((a, b) => a.id.localeCompare(b.id));
+    const hits = rows.filter(r => !q || r.id.toLowerCase().includes(q) || r.about.toLowerCase().includes(q) || (Array.isArray(r.tags) && (r.tags as string[]).some(t => t.toLowerCase().includes(q))) || r.family === q).sort((a, b) => a.id.localeCompare(b.id));
     const max = limit ?? 80;
-    return ok(`${hits.length} ${kind}${hits.length > max ? ` (the first ${max})` : ""}`, hits.slice(0, max));
+    return ok(`${hits.length} ${kind === "set" ? "set pieces" : kind}${hits.length > max ? ` (the first ${max})` : ""}`, hits.slice(0, max));
   }));
 
   server.registerTool("search_words", {
@@ -574,16 +573,28 @@ export function createMcp(o: McpOptions): McpServer {
 
   server.registerTool("show", {
     title: "Show in the editor",
-    description: "Open an episode, at a step, in the open backstage editors: to point a person at what you mean.",
-    inputSchema: { id: ID, step: PATH.optional() },
+    description: "Open an episode, at a step, or a set piece or prop (by its id, on the kit page), in the open backstage editors: to point a person at what you mean.",
+    inputSchema: { id: z.string().describe("An episode id like s1e04, or a set piece or prop id"), step: PATH.optional(), as: z.enum(["set", "prop"]).optional().describe("For a kit item that is both: which shelf") },
     annotations: { readOnlyHint: true },
-  }, run("show", ({ id, step }) => {
-    if (!exists("story", id)) return fail(`there is no story ${id}`);
+  }, run("show", ({ id, step, as }) => {
+    const item = !exists("story", id) ? pieceRows().filter(r => r.id === id) : [];
+    if (!exists("story", id) && !item.length) return fail(`there is no story, set piece or prop ${id}`);
+    if (item.length) {
+      const r = (as ? item.find(x => x.as === as || x.as === "both") : item[0]) ?? item[0];
+      if (!o.events.size) return ok(`no editor is listening: open backstage in a browser to see ${id} (an MCP server on stdio reaches one only with --backstage)`);
+      o.events.emit("show", { id, kit: r.slot });
+      return ok(`the open editors show the ${r.slot === "set" ? "set piece" : "prop"} ${id} on the kit page`);
+    }
     const path = step === undefined ? undefined : pathOf(step);
     if (!o.events.size) return ok(`no editor is listening: open backstage in a browser to see ${id} (an MCP server on stdio reaches one only with --backstage)`);
     o.events.emit("show", { id, step: path ?? null });
     return ok(`the open editors show ${id}${path ? ` at ${pathText(path)}` : ""}`);
   }));
+
+  registerKitTools(server, {
+    run, readOnly, submit, writeNote,
+    latest: async (kind, id) => (o.agentEdits === "proposals" ? latestOf(await queue.pending(), by(), kind, id)?.id : undefined),
+  });
 
   // ---- resources ------------------------------------------------------------------------------------------------------------------
 

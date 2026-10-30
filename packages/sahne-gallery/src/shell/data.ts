@@ -4,6 +4,7 @@
 
 import type { AvatarDoc, PlaceDoc } from "sahne";
 import type { CardIndex, CharacterDoc, Needs, StoryDoc } from "sahne-story";
+import type { DrawingDoc, VariantDoc } from "sahne-kit/drawing";
 
 /** A planned place of Kumru's STORIES_WORLD.md §2. */
 export interface WorldRow { id: string; place: string; district: string; stories: string; notes: string; link: string; placeholder: boolean }
@@ -24,6 +25,8 @@ export interface Doc extends DocEntry { file: string; html: string; toc: { id: s
 export interface DataMap {
   places: PlaceDoc[];
   needs: Needs;
+  /** The content root's own kit items (kit/), [] when it has none. */
+  kit: (DrawingDoc | VariantDoc)[];
   /** The content root's cards, or null without them (the card rules do not run). */
   cards: CardIndex | null;
   catalogue: CataloguePlan;

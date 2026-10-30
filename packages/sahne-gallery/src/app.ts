@@ -4,11 +4,13 @@
 
 import { $, choice, toggle, button } from "./shell/dom.ts";
 import { Ctx, parseRoute, type Settings } from "./shell/ctx.ts";
+import { addContentKit } from "./shell/kit.ts";
 import { CSS } from "./shell/style.ts";
 import { SECTIONS, type NavItem } from "./registry.ts";
 
 declare global { interface Window { gallery: Ctx } }
 
+await addContentKit();
 const ctx = new Ctx();
 window.gallery = ctx;
 document.head.append(Object.assign(document.createElement("style"), { textContent: CSS }));

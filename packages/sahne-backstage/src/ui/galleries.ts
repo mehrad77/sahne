@@ -9,7 +9,8 @@ import { html } from "htm/preact";
 import { AudioEngine, hashString, portrait, type AvatarDoc } from "sahne";
 import { pieceSvg } from "sahne-kit/set-svg";
 import { languagesOf, textOf, type CharacterDoc, type StoryPlace } from "sahne-story";
-import { EMOTION_SHELVES, PROP_SHELVES, SET_SHELVES, gestureShelf, shelfOf } from "../model/kitgroups.ts";
+import { EMOTION_SHELVES, PROP_SHELVES, SERIES_SHELF, SET_SHELVES, gestureShelf, shelfOf } from "../model/kitgroups.ts";
+import { own } from "../kitdocs.ts";
 import { KIT, SOUNDS } from "../stage.ts";
 import { emotionScene, emotionThumb, gestureScene, gestureThumb, placeThumb } from "../thumbs.ts";
 import { world } from "../store.ts";
@@ -49,7 +50,8 @@ export function placeItems(o: { href?: boolean } = {}): Item[] {
 export function pieceItems(which: "props" | "set"): Item[] {
   return Object.entries(KIT[which]).sort(([a], [b]) => a.localeCompare(b)).map(([id, def]) => ({
     id, label: id.replace(/_/g, " "), sub: def.meta?.about, tags: def.meta?.tags, keywords: `${id} ${(def.meta?.terms ?? []).join(" ")} ${(def.meta?.tags ?? []).join(" ")}`,
-    shelf: shelfOf(which === "props" ? PROP_SHELVES : SET_SHELVES, def.meta?.tags).id,
+    shelf: own.has(id) ? SERIES_SHELF.id : shelfOf(which === "props" ? PROP_SHELVES : SET_SHELVES, def.meta?.tags).id,
+    ...(own.has(id) ? { badge: "this series" } : {}),
     art: async () => svgOf(() => pieceSvg(KIT, def, {}, id, 96)) || null,
   }));
 }
