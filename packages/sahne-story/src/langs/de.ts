@@ -13,7 +13,7 @@ import type { ObjOp, Staging, Target } from "sahne";
 import { clockMinutes, deixis, lowerDe, match, readClock, readNumber, tokens } from "sahne-de";
 import type { LineContext, LineWord, StoryLang } from "../lang.ts";
 import { resolver, words as checkWords } from "./de-words.ts";
-import { DEIXIS_GESTURES, FAR, NEAR } from "./tr.ts";
+import { DEIXIS_GESTURES, FAR, NEAR, lintClock } from "./shared.ts";
 
 type Dx = "dies" | "jen" | "da";
 /** Which deixis gestures each demonstrative takes. dieser is near (hold it up, touch it), jener is far, "da" points. */
@@ -125,18 +125,7 @@ function lintLine(c: LineContext) {
   });
 
   // ---- clock times
-  const times = readClock(c.text);
-  if (times.length) {
-    const clocks = Object.values(st.link ?? {}).filter((t): t is string => t.startsWith("obj:")).map(t => t.slice(4)).filter(id => { const p = c.prop(id); return p && (p.params.time !== undefined || /clock|watch|saat|uhr/.test(p.kit)); });
-    for (const id of clocks) {
-      const shown = c.prop(id)!.params.time;
-      const m = typeof shown === "string" ? clockMinutes(shown) : null;
-      if (!times.some(t => clockMinutes(t) === m)) {
-        const said = `${times[0].h}:${String(times[0].m).padStart(2, "0")}`;
-        add("time", `the line says ${said}, but obj:${id} shows ${shown ?? "no time"}`, { obj: [{ id, op: "set", set: { time: said } }] });
-      }
-    }
-  }
+  lintClock(c, readClock, clockMinutes);
 }
 
 /** Parenthetical words that stage a line, in German (an editor's `(winkt, froh)`). */
