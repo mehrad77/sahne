@@ -116,6 +116,11 @@ test("readClock: halb drei is 2:30, Viertel vor zehn is 9:45", () => {
   assert.deepEqual(t("Zehn Uhr dreißig."), [{ h: 10, m: 30 }]);
   assert.deepEqual(t("Es ist 10:30 Uhr."), [{ h: 10, m: 30 }]);
   assert.deepEqual(t("Um 8.15 Uhr."), [{ h: 8, m: 15 }]);
+  assert.deepEqual(t("Heute ist der 12.05."), [], "a date");
+  assert.deepEqual(t("Am 24.12. ist es kalt."), [], "a date");
+  assert.deepEqual(t("Es kostet 3.50 Euro."), [], "a price");
+  assert.deepEqual(t("Es ist 10.30 Uhr."), [{ h: 10, m: 30 }]);
+  assert.deepEqual(t("Am 12.05. um 10:30 Uhr, nein, halb elf."), [{ h: 10, m: 30 }, { h: 10, m: 30 }], "a spoken time after a written one");
   assert.deepEqual(t("Zwei Brezeln, bitte."), [], "a bare number is no time");
   assert.deepEqual(t("Ich habe zwei Brote."), []);
   assert.equal(clockMinutes("10:10"), 10 * 60 + 10);

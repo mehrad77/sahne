@@ -25,12 +25,12 @@ function minutesAt(words: string[], i: number): { m: number; len: number } | nul
   return r && r.n > 0 && r.n < 60 && r.len === 1 ? { m: r.n, len: 1 } : null;
 }
 
-/** Every clock time said in `text`, in order. A bare number counts only before "Uhr" ("zwei Brezeln" is no time). */
+/** Every clock time said in `text`: written ones first, then spoken ones. A bare number counts only before "Uhr" ("zwei Brezeln" is no time). */
 export function readClock(text: string): ClockTime[] {
   const out: ClockTime[] = [];
   const low = lowerDe(text).replace(/[’ʼ‘]/g, "'");
-  for (const m of low.matchAll(/(?<![\d.:])(\d{1,2})[:.](\d{2})(?![\d]|[.:]\d)/g)) if (+m[1] <= 24 && +m[2] < 60) out.push({ h: +m[1], m: +m[2] });
-  if (out.length) return out;
+  // "10:30" always; "10.30" only before "Uhr" ("12.05." is a date, "3.50 Euro" a price)
+  for (const m of low.matchAll(/(?<![\d.:])(\d{1,2})(?:(:)|\.(?=\d{2}\s*uhr(?![\p{L}])))(\d{2})(?![\d]|[.:]\d)/gu)) if (+m[1] <= 24 && +m[3] < 60) out.push({ h: +m[1], m: +m[3] });
   const words = low.replace(/(\d)[:.](\d)/g, "$1_$2").split(/[^\p{L}\p{N}'_]+/u).filter(Boolean);
   for (let i = 0; i < words.length; i++) {
     const w = words[i];
