@@ -41,6 +41,7 @@ See every one of them move at [sahne.shab.boo](https://sahne.shab.boo) (or run `
 | [`sahne-tr`](packages/sahne-tr/) | The Turkish plugin: mouth timing from spelling, word ↔ token matching, say-it-aloud matching, numbers and clock times |
 | [`sahne-en`](packages/sahne-en/) | The English plugin: the same for English (British spelling, `en-GB`), plus the English story lints in `sahne-story` |
 | [`sahne-de`](packages/sahne-de/) | The German plugin: mouth timing from spelling, word ↔ token matching, say-it-aloud matching, numbers and clock times |
+| [`sahne-fa`](packages/sahne-fa/) | The Persian plugin: the same for Persian (`fa-IR`, right to left), plus the Persian story lints in `sahne-story` |
 | [`sahne-story`](packages/sahne-story/) | The story format: the adapter (a story document becomes a script), the player, the story check and lints, the schemas, and a sample story |
 | [`sahne-backstage`](packages/sahne-backstage/) | The studio: an app runs it on its content root to plan seasons on a board, write episodes as scripts beside a live stage, direct them, review them and save them, checked as `pnpm check` checks them; with an assistant and an MCP server for agents |
 | [`sahne-gallery`](packages/sahne-gallery/) | The dev gallery: a live demo of every engine system, the whole kit, every place and every story. It also runs the checks (sizes, determinism, golden frames) |
@@ -90,6 +91,7 @@ Pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the setup, 
 |---|---|
 | Engine and Turkish plugin | 150 KB |
 | English plugin (`sahne-en`) | 25 KB |
+| Persian plugin (`sahne-fa`) | 25 KB |
 | Kit code | 150 KB |
 | Each set family (`sahne-kit/set`) | 40 KB |
 | Kerim's puppet (`sahne-kit/kerim`) | 8 KB |
