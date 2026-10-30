@@ -4,7 +4,7 @@
 // main language, and in every language and with its mechanics from its menu: written in the season and in every story of
 // the week, saved together). Dragging a card to another day moves its release (the season's calendar row and the story's
 // own date and kind, saved together); an empty day starts a new episode on it. Episodes with no date wait under the
-// board. The series' and the season's settings open in a drawer.
+// board. The series' and the season's settings open in a modal.
 
 import { html } from "htm/preact";
 import { useEffect, useState } from "preact/hooks";
@@ -15,7 +15,7 @@ import { dirty } from "../model/history.ts";
 import { allProblems, change, checked, draftOf, keyOf, loadAllProblems, openDoc, review, route, saveDocs, say, world } from "../store.ts";
 import type { Episode } from "../api.ts";
 import { placeThumb } from "../thumbs.ts";
-import { Drawer, Empty, Icon, Popover } from "./kit/index.ts";
+import { Empty, Icon, Modal, Popover } from "./kit/index.ts";
 import { Picture } from "./kit/gallery.ts";
 import { inLang, Texts, useLangs } from "./lang.ts";
 import { NewSeason, SeasonSettings, SeriesSettings } from "./seasons.ts";
@@ -24,6 +24,11 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MECHANICS = ["say", "explore", "act", "aloud", "unlocks"] as const;
 const short = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
 const today = new Date().toISOString().slice(0, 10);
+/** A day's label on the board: its number, with the month where a month begins and in the board's first cell. */
+const dayLabel = (date: string, first: boolean) => (first || date.endsWith("-01") ? short(date) : String(Number(date.slice(8))));
+/** A week's span, Monday to Saturday: `14–19 Sept`, or `28 Sept – 3 Oct` across a month. */
+const span = (monday: string, saturday: string) => (monday.slice(5, 7) === saturday.slice(5, 7) ? `${Number(monday.slice(8))}–${short(saturday)}` : `${short(monday)} – ${short(saturday)}`);
+const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
 export function Board(p: { id?: string }) {
   const w = world.value!;
@@ -34,13 +39,13 @@ export function Board(p: { id?: string }) {
     <div class="pagehead"><h2 class="grow">${w.series ? textOf(w.series.title, "en") : "A new series"}</h2>${w.series && html`<${NewSeason} />`}</div>
     <${Empty} icon="board" title=${w.series ? "No season yet" : "This content root has no series yet"}>
       ${w.series ? html`<p>Start the first season, then plan its weeks here.</p><${NewSeason} />` : html`<p>Name the series to start planning.</p><button class="primary" onClick=${() => setSettings("series")}>Start the series</button>`}</${Empty}>
-    ${settings && html`<${Drawer} title="The series" onClose=${() => setSettings(null)}><${SeriesSettings} /></${Drawer}>`}
+    ${settings && html`<${Modal} title="Series settings" onClose=${() => setSettings(null)}><${SeriesSettings} /></${Modal}>`}
   </section>`;
   return html`<${SeasonBoard} key=${id} id=${id} settings=${settings} setSettings=${setSettings} />`;
 }
 
 function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setSettings(s: "series" | "season" | null): void }) {
-  const w = world.value!, langs = useLangs();
+  const w = world.value!, langs = useLangs(), gloss = langs.translations[0];
   const eps = w.episodes.filter(e => e.season === w.seasons[p.id].n).sort((a, b) => a.id.localeCompare(b.id));
   const [ready, setReady] = useState(false);
   const [drag, setDrag] = useState<string | null>(null), [over, setOver] = useState<string | null>(null);
@@ -94,36 +99,36 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
 
   return html`<section class="board-page">
     <div class="pagehead">
-      <div class="grow"><h2>${textOf(se.title, "en") ?? se.id}</h2>
-        <span class="note" ...${inLang(langs.main)}>${textOf(se.title, langs.main)}</span>
-        <span class="note"> · ${eps.length} episodes${se.launch ? ` · from ${short(se.launch)}` : ""}</span></div>
-      <button onClick=${() => p.setSettings("season")}><${Icon} name="settings" size=${16} /> Season</button>
-      <button onClick=${() => p.setSettings("series")}><${Icon} name="settings" size=${16} /> Series</button>
+      <div class="grow"><h2 ...${inLang(langs.main)}>${textOf(se.title, langs.main, ...langs.translations) ?? `Season ${se.n}`}</h2>
+        <span class="note">${[gloss && textOf(se.title, gloss) && html`<span ...${inLang(gloss)}>${textOf(se.title, gloss)}</span>`, plural(eps.length, "episode"), se.launch && `from ${short(se.launch)}`].filter(Boolean).map((x, k) => html`${k ? " · " : ""}${x}`)}</span></div>
+      <button onClick=${() => p.setSettings("season")} title="The season's titles, summary and launch day"><${Icon} name="settings" size=${16} /> Season settings</button>
+      <button onClick=${() => p.setSettings("series")} title="The series' titles, languages, narrator and stand-in"><${Icon} name="settings" size=${16} /> Series settings</button>
       <${NewSeason} />
       <a href=${`#/new/${p.id}`}><button class="primary"><${Icon} name="plus" size=${16} /> New episode</button></a>
     </div>
-    ${!se.calendar && html`<p class="note">This season has no calendar of its own yet: the board shows the stories' dates, and the first move starts one from them.</p>`}
-    <div class="board" role="grid" aria-label=${`${textOf(se.title, "en")}: weeks and days`}>
-      <div class="board-head" role="row"><span role="columnheader">Week · theme</span>${DAYS.map(d => html`<span role="columnheader">${d}</span>`)}</div>
+    ${!se.calendar && w.writable && html`<p class="note">The days come from each episode's own date. Drag an episode to another day to start the season's calendar.</p>`}
+    <div class="board" role="grid" aria-label=${`Season ${se.n}: weeks and days`}>
+      <div class="board-head" role="row"><span role="columnheader">Week · theme</span>${DAYS.map((d, k) => html`<span role="columnheader" class=${k === 5 ? "special" : ""}>${d}${k === 5 ? html` <small>special</small>` : ""}</span>`)}</div>
       ${weeks.map((wk: Week) => {
         const arc = wk.week ? arcOf(wk.week) : undefined;
-        return html`<div class=${`board-row${wk.week === null ? " break" : ""}${wk.days.some(d => d.date === today) || (wk.monday <= today && today < wk.days[5].date) ? " now" : ""}`} role="row">
+        return html`<div class=${`board-row${wk.week === null ? " break" : ""}${wk.days.some(d => d.date === today) || (wk.monday <= today && today < wk.days[5].date) ? " now" : ""}${wk.days.some(d => d.episode) ? "" : " unplanned"}`} role="row">
           <div class="week" role="rowheader">
-            ${wk.week === null ? html`<b>Break</b><small>${short(wk.monday)}</small>` : html`
-              <div class="row" style="gap:4px;flex-wrap:nowrap"><b>Week ${wk.week}</b><small>${short(wk.monday)}</small><span class="grow"></span>
+            ${wk.week === null ? html`<b>Break</b><small>${span(wk.monday, wk.days[5].date)}</small>` : html`
+              <div class="row" style="gap:4px;flex-wrap:nowrap"><b>Week ${wk.week}</b><span class="grow"></span>
                 <button class="iconbtn" style="width:24px;height:24px" title="The theme in every language, and what the learner does" aria-label=${`Week ${wk.week}'s theme`} onClick=${(e: MouseEvent) => setMenu({ week: wk.week!, x: e.clientX, y: e.clientY })}><${Icon} name="settings" size=${14} /></button></div>
+              <small>${span(wk.monday, wk.days[5].date)}</small>
               <input class="theme" ...${inLang(langs.main)} value=${arc ? textOf(arc, langs.main) ?? "" : ""} placeholder="This week's theme…" aria-label=${`Week ${wk.week}'s theme`}
                 onInput=${(e: Event) => theme(wk.week!, { ...(arc ?? blankArc()), [langs.main]: (e.target as HTMLInputElement).value })} />
               ${arc && html`<div class="mech">${arc.mechanics.map(m => html`<span class="chip">${m}</span>`)}</div>`}`}
           </div>
-          ${wk.days.map(day => {
+          ${wk.days.map((day, k) => {
             const ep = day.episode ? eps.find(e => e.id === day.episode) : undefined;
             const can = wk.week !== null && !ep && w.writable;
-            return html`<div role="gridcell" class=${`day ${day.kind}${over === day.date ? " over" : ""}${day.date < today ? " past" : ""}`}
+            return html`<div role="gridcell" aria-label=${short(day.date)} class=${`day ${day.kind}${over === day.date ? " over" : ""}${day.date < today ? " past" : ""}${day.date === today ? " today" : ""}`}
               onDragOver=${(e: DragEvent) => { if (drag && wk.week !== null) { e.preventDefault(); setOver(day.date); } }}
               onDragLeave=${() => setOver(o => (o === day.date ? null : o))}
               onDrop=${(e: DragEvent) => { e.preventDefault(); setOver(null); const id = e.dataTransfer?.getData("text/plain") || drag; if (id) move(id, day); setDrag(null); }}>
-              <span class="date">${short(day.date)}</span>
+              <span class="date">${dayLabel(day.date, wk === weeks[0] && k === 0)}${day.date === today ? html` <b>today</b>` : ""}</span>
               ${ep ? html`<${EpisodeCard} e=${ep} story=${story(ep.id)} onDrag=${(on: boolean) => setDrag(on ? ep.id : null)} />`
                 : can ? html`<a class="slot" href=${`#/new/${p.id}/${day.date}`} title=${`A new ${day.kind} on ${short(day.date)}`}><${Icon} name="plus" size=${16} /><span>${day.kind === "special" ? "Special" : "Episode"}</span></a>` : ""}
             </div>`;
@@ -144,8 +149,8 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
           const a = arcOf(menu.week) ?? blankArc(), on = a.mechanics.includes(m);
           return html`<label class="row" style="gap:4px"><input type="checkbox" style="width:auto" checked=${on} onChange=${() => theme(menu.week, { ...a, mechanics: on ? a.mechanics.filter(x => x !== m) : [...a.mechanics, m] })} />${m}</label>`;
         })}</div></div></div></${Popover}>`}
-    ${p.settings && html`<${Drawer} title=${p.settings === "series" ? "The series" : `Season ${se.n}`} onClose=${() => p.setSettings(null)}>
-      ${p.settings === "series" ? html`<${SeriesSettings} />` : html`<${SeasonSettings} id=${p.id} />`}</${Drawer}>`}
+    ${p.settings && html`<${Modal} title=${p.settings === "series" ? "Series settings" : `Season ${se.n} settings`} onClose=${() => p.setSettings(null)}>
+      ${p.settings === "series" ? html`<${SeriesSettings} />` : html`<${SeasonSettings} id=${p.id} />`}</${Modal}>`}
   </section>`;
 }
 
