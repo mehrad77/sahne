@@ -19,6 +19,7 @@ import { Empty, Icon, Modal, Popover } from "./kit/index.ts";
 import { Picture } from "./kit/gallery.ts";
 import { inLang, Texts, useLangs } from "./lang.ts";
 import { NewSeason, SeasonSettings, SeriesSettings } from "./seasons.ts";
+import { SaveButton } from "./readonly.ts";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MECHANICS = ["say", "explore", "act", "aloud", "unlocks"] as const;
@@ -141,7 +142,7 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
     ${changed.length > 0 && html`<div class="savebar"><span class="grow">${changed.map(k => k.replace(":", " ")).join(", ")}
         ${changed.flatMap(k => (checked.value[k] ?? []).filter(x => x.new && x.level === "error")).map(x => html`<span class="bad-line">${x.story}: ${x.message}</span>`)}</span>
       <button onClick=${() => { for (const k of changed) { const [kind, id] = k.split(":") as ["season" | "story", string]; void openDoc(kind, id, true); } }}>Discard</button>
-      <button class="primary" disabled=${!w.writable} onClick=${() => void saveDocs(changed)}>Save the board</button></div>`}
+      <${SaveButton} onSave=${() => void saveDocs(changed)} label="Save the board" /></div>`}
     ${menu && html`<${Popover} x=${menu.x} y=${menu.y} onClose=${() => setMenu(null)} label=${`Week ${menu.week}`}>
       <div class="fields" style="width:min(360px,80vw)"><b>Week ${menu.week}: ${arcOfWeek(se.n, menu.week)}</b>
         <${Texts} label="The theme" value=${arcOf(menu.week) as unknown as Record<string, unknown>} onInput=${(l: string, v?: string) => theme(menu.week, { ...(arcOf(menu.week) ?? blankArc()), [l]: v ?? "" })} />

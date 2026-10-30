@@ -21,6 +21,7 @@ import { AskMenu } from "../assistant.ts";
 import { settingsNow } from "../settings.ts";
 import { Popover } from "../kit/index.ts";
 import { Drawer, Icon, MOD } from "../kit/index.ts";
+import { SaveButton } from "../readonly.ts";
 import { inLang, useLangs } from "../lang.ts";
 import type { Problem } from "../../api.ts";
 import { Script } from "./script.ts";
@@ -167,10 +168,10 @@ function Studio(p: { id: string }) {
       <button class="iconbtn" onClick=${() => history("story", p.id, "undo")} disabled=${!d.past.length} title=${`Undo (${MOD} Z)`} aria-label="Undo"><${Icon} name="undo" /></button>
       <button class="iconbtn" onClick=${() => history("story", p.id, "redo")} disabled=${!d.future.length} title=${`Redo (⇧${MOD} Z)`} aria-label="Redo"><${Icon} name="redo" /></button>
       <button onClick=${() => history("story", p.id, "revert")} disabled=${!dirty(d)}>Revert</button>
-      ${nSuggest > 0 && html`<button onClick=${takeAll} title="Take every staging the rules suggest (the dashed chips); undo takes them back">Take ${nSuggest} suggestion${nSuggest > 1 ? "s" : ""}</button>`}
+      ${nSuggest > 0 && html`<button onClick=${takeAll} title=${`The rules suggest staging the script lacks: a gesture the words call for, a feeling the punctuation shows, a fix for a check. They are the dashed chips in the script (a click adds one). This adds all ${nSuggest}; undo takes them back.`}><${Icon} name="spark" size=${16} /> Add ${nSuggest} suggested staging${nSuggest > 1 ? "s" : ""}</button>`}
       ${w.ai && html`<button onClick=${(e: MouseEvent) => setAsks({ x: e.clientX, y: e.clientY + 12 })} title="Ask the assistant about this episode or the selected block"><${Icon} name="spark" size=${16} /> Ask</button>`}
       <button aria-pressed=${details} onClick=${() => setDetails(!details)} title="All the staging of the selected block">Details</button>
-      <button class="primary" onClick=${save} disabled=${!dirty(d) || !w.writable} title=${w.writable ? `Save (${MOD} S)` : "read-only"}><${Icon} name="save" size=${16} /> Save</button>
+      <${SaveButton} onSave=${save} disabled=${!dirty(d)} title=${`Save (${MOD} S)`} />
     </div>
     ${conflict && html`<div class="banner">An agent wrote this episode while you had unsaved edits: <button class="small" onClick=${() => { void openDoc("story", p.id, true); conflicts.value = new Set([...conflicts.value].filter(k => k !== key)); }}>Take theirs</button> or save yours over it (the server will say it changed on disk; reload first to merge by hand).</div>`}
     <${ProposalsBar} list=${mine} story=${story} select=${select} />

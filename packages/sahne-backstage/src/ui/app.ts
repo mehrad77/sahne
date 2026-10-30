@@ -24,6 +24,7 @@ import { Palette } from "./kit/palette.ts";
 import { proposals } from "../events.ts";
 import { assistantOpen, Meter, sideTab } from "./assistant.ts";
 import { SidePanel, toggleSide } from "./side.ts";
+import { readOnlyHelp, ReadOnlyHelp } from "./readonly.ts";
 import { AgentsPage } from "./agents.ts";
 import { DocsPage } from "./docs.ts";
 import { SettingsPage } from "./settings.ts";
@@ -66,8 +67,8 @@ export function App() {
       <span class="series" title=${w.series ? tx(w.series.title, "en") : ""}>${w.series ? tx(w.series.title, "en") : "No series yet"}</span>
       <nav class="seasons" aria-label="Seasons">${seasons.map(s => html`<a href=${`#/season/${s.id}`} aria-current=${current === s.id ? "page" : undefined} title=${tx(s.title, "en")}>S${s.n}</a>`)}</nav>
       <button class="search" onClick=${() => setPalette(true)} aria-label="Search and commands"><${Icon} name="search" size=${16} /> Search or run a command <kbd>${MOD} K</kbd></button>
-      <span class=${`state${dirty ? " dirty" : ""}${w.writable ? "" : " ro"}`} title=${dirty ? dirtyKeys.value.map(k => k.replace(":", " ")).join(", ") : ""}>
-        ${!w.writable ? (w.oldShape ? "Read-only: convert the root" : w.samples ? "Samples · read-only" : "Read-only") : dirty ? `${dirty} unsaved` : "All saved"}</span>
+      ${w.writable ? html`<span class=${`state${dirty ? " dirty" : ""}`} title=${dirty ? dirtyKeys.value.map(k => k.replace(":", " ")).join(", ") : ""}>${dirty ? `${dirty} unsaved` : "All saved"}</span>`
+        : html`<button class="state ro" onClick=${() => { readOnlyHelp.value = true; }} title="Nothing is saved here. Click for why, and how to save.">${w.oldShape ? "Read-only: convert the root" : w.samples ? "Samples · read-only" : "Read-only"} <span aria-hidden="true">ⓘ</span></button>`}
       ${proposals.value.length > 0 && html`<a class="chip warn" href=${`#/episode/${proposals.value[0].doc}`} title=${proposals.value.map(x => `${x.doc}: ${x.summary}`).join("\n")}>${proposals.value.length} proposed edit${proposals.value.length > 1 ? "s" : ""}</a>`}
       <${Meter} />
       <button class="iconbtn" aria-pressed=${open && sideTab.value === "assistant"} onClick=${() => toggleSide("assistant")} title="The assistant" aria-label="The assistant"><${Icon} name="spark" /></button>
@@ -80,6 +81,7 @@ export function App() {
     <div class="page">${w.oldShape ? html`<div class="banner">This content root is in the old language shape (${w.oldShape} files), so nothing is saved until it is converted: <code>node packages/sahne-story/convert/languages.ts</code> with <code>SAHNE_CONTENT</code> set to it.</div>` : ""}
       <main>${pageFor(page, id)}</main></div>
     <${SidePanel} />
+    <${ReadOnlyHelp} />
     ${palette && html`<${Palette} commands=${commands} onClose=${() => setPalette(false)} />`}
     ${notice.value && html`<div class=${`notice${notice.value.bad ? " bad" : ""}`} role="status">${notice.value.text}</div>`}
   </div>`;
