@@ -133,6 +133,20 @@ kbd { font: 11.5px ui-monospace, monospace; border: 1px solid var(--line); borde
 /* popovers and menus */
 .modal { width: min(560px, calc(100vw - 32px)); max-height: min(86vh, 900px); padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--ink); box-shadow: var(--shadow); display: flex; flex-direction: column; }
 .modal:not([open]) { display: none; }
+.sugg-review { gap: 12px; }
+.sugg-block { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: grid; gap: 4px; }
+.sugg-line { justify-self: start; border: 0; background: none; padding: 0 0 2px; text-align: left; font-size: 14px; color: var(--ink); cursor: pointer; }
+.sugg-line:hover span { text-decoration: underline; }
+.sugg-row { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; row-gap: 2px; align-items: start; padding: 6px 4px; border-radius: 8px; cursor: pointer; }
+.sugg-row:hover { background: var(--chip); }
+.sugg-row input { width: auto; margin-top: 4px; grid-row: span 2; }
+.sugg-row.off .what, .sugg-row.off .why { opacity: .45; }
+.sugg-row .what { display: flex; flex-wrap: wrap; gap: 4px; }
+.sugg-chip { border: 1px dashed var(--suggest); color: var(--suggest); border-radius: 99px; padding: 1px 9px; font-size: 13px; }
+.sugg-chip small { color: var(--mute); margin-right: 2px; }
+.sugg-row .why { font-size: 12.5px; color: var(--mute); }
+.sugg-row .replaces { display: block; color: var(--warn); }
+.sugg-foot { position: sticky; bottom: -16px; background: var(--panel); padding: 10px 0 0; border-top: 1px solid var(--line); }
 .ro-help p { margin: 0; line-height: 1.5; } .ro-help p code { white-space: nowrap; }
 .ro-cmd { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
 .ro-cmd code { flex: 1; font: 12.5px/1.4 ui-monospace, monospace; word-break: break-all; }

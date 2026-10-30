@@ -22,6 +22,7 @@ import { settingsNow } from "../settings.ts";
 import { Popover } from "../kit/index.ts";
 import { Drawer, Icon, MOD } from "../kit/index.ts";
 import { SaveButton } from "../readonly.ts";
+import { SuggestionsReview } from "./suggestions.ts";
 import { inLang, useLangs } from "../lang.ts";
 import type { Problem } from "../../api.ts";
 import { Script } from "./script.ts";
@@ -32,7 +33,7 @@ import { Strip } from "./strip.ts";
 import { rememberScene, takeResume } from "../../recent.ts";
 import { ProposalsBar } from "./proposals.ts";
 import { conflicts, postSelection, proposals, shown as agentShown } from "../../events.ts";
-import { ghostsOf, suggestionsOf, taken } from "../../model/autostage.ts";
+import { ghostsOf, suggestionsOf, taken, type Suggest } from "../../model/autostage.ts";
 import { get, set } from "../../model/path.ts";
 
 declare global { interface Window { backstage?: { preview: Preview; select(path: Path | null): void } } }
@@ -106,14 +107,16 @@ function Studio(p: { id: string }) {
     } catch (e) { return { lints: [{ rule: "lint", level: "error", story: p.id, message: String(e), doc: key } as Problem], suggestions: {} }; }
   }, [story]);
   const nSuggest = Object.values(suggestions).reduce((n, x) => n + x.length, 0);
+  const [reviewing, setReviewing] = useState(false);
+  const nameOf = (id: string) => textOf(w.characters[id]?.name, langs.main) ?? id;
   /** One block's suggestions, taken. */
   const takeAt = (at: Path) => {
     const ss = suggestions[at.join("/")];
     if (!ss?.length) return;
     edit(s => { const base = "beat" in ((get(s, at) ?? {}) as object) ? [...at, "beat"] : at; return set(s, base, ss.reduce((st, sg) => taken(st, sg.fix), (get(s, base) ?? {}) as Record<string, unknown>)); }, "take-auto");
   };
-  /** Every suggestion of the episode, taken (one edit). */
-  const takeAll = () => edit(s => Object.entries(suggestions).reduce((x, [k, ss]) => {
+  /** The picked suggestions (by block), taken as one edit: what the review dialog adds. */
+  const takeSome = (picked: Record<string, Suggest[]>) => edit(s => Object.entries(picked).reduce((x, [k, ss]) => {
     const path = k.split("/").map(v => (/^\d+$/.test(v) ? Number(v) : v));
     const base = "beat" in ((get(x, path) ?? {}) as object) ? [...path, "beat"] : path;
     return set(x, base, ss.reduce((st, sg) => taken(st, sg.fix), (get(x, base) ?? {}) as Record<string, unknown>));
@@ -168,7 +171,7 @@ function Studio(p: { id: string }) {
       <button class="iconbtn" onClick=${() => history("story", p.id, "undo")} disabled=${!d.past.length} title=${`Undo (${MOD} Z)`} aria-label="Undo"><${Icon} name="undo" /></button>
       <button class="iconbtn" onClick=${() => history("story", p.id, "redo")} disabled=${!d.future.length} title=${`Redo (⇧${MOD} Z)`} aria-label="Redo"><${Icon} name="redo" /></button>
       <button onClick=${() => history("story", p.id, "revert")} disabled=${!dirty(d)}>Revert</button>
-      ${nSuggest > 0 && html`<button onClick=${takeAll} title=${`The rules suggest staging the script lacks: a gesture the words call for, a feeling the punctuation shows, a fix for a check. They are the dashed chips in the script (a click adds one). This adds all ${nSuggest}; undo takes them back.`}><${Icon} name="spark" size=${16} /> Add ${nSuggest} suggested staging${nSuggest > 1 ? "s" : ""}</button>`}
+      ${nSuggest > 0 && html`<button onClick=${() => setReviewing(true)} title="The rules suggest staging the script lacks: a gesture the words call for, a feeling the punctuation shows, a fix for a check (the dashed chips in the script). Review them before any is added."><${Icon} name="spark" size=${16} /> ${nSuggest} suggested staging${nSuggest > 1 ? "s" : ""}…</button>`}
       ${w.ai && html`<button onClick=${(e: MouseEvent) => setAsks({ x: e.clientX, y: e.clientY + 12 })} title="Ask the assistant about this episode or the selected block"><${Icon} name="spark" size=${16} /> Ask</button>`}
       <button aria-pressed=${details} onClick=${() => setDetails(!details)} title="All the staging of the selected block">Details</button>
       <${SaveButton} onSave=${save} disabled=${!dirty(d)} title=${`Save (${MOD} S)`} />
@@ -202,6 +205,8 @@ function Studio(p: { id: string }) {
       </div>
     </div>
     ${asks && html`<${Popover} x=${asks.x} y=${asks.y} onClose=${() => setAsks(null)} label="Ask the assistant"><${AskMenu} onDone=${() => setAsks(null)} /></${Popover}>`}
+    ${reviewing && nSuggest > 0 && html`<${SuggestionsReview} story=${story} suggestions=${suggestions} name=${nameOf} onClose=${() => setReviewing(false)}
+      onAdd=${(picked: Record<string, Suggest[]>) => { takeSome(picked); setReviewing(false); }} onGo=${(at: Path) => { setReviewing(false); select(at, true); }} />`}
     ${details && html`<${Drawer} float title="Details" onClose=${() => setDetails(false)}><${Details} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} /></${Drawer}>`}
   </section>`;
 }
