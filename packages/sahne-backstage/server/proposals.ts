@@ -14,7 +14,9 @@ import type { Kind, Problem } from "./content.ts";
 import type { Events } from "./events.ts";
 
 /** A document that changes with a proposal's main one (a season's calendar row with its episode's date). */
-export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean }
+/** A document a proposal changes. `paths` (for one that changes with the main one) are its changed places: accepting it
+ * sets only those, so it never undoes a person's unsaved edits or an earlier accepted proposal on the same document. */
+export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean; paths?: (string | number)[][] }
 
 export interface Proposal {
   id: string;

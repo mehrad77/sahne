@@ -218,6 +218,8 @@ export function createMcp(o: McpOptions): McpServer {
   /**
    * The document an agent edits: its own latest pending proposal on it in proposals mode, else the file. A new episode it
    * proposed (create_episode) is not on disk yet: it is that proposal, `create`, with the documents that change with it.
+   * A document its proposals only carry along (a season a new episode's calendar row goes in, the stories a week's new
+   * theme reaches) is read as the latest of those, so a second proposal builds on the first instead of undoing it.
    */
   async function current(kind: Kind, id: string, mtime?: number): Promise<{ doc: Record<string, unknown>; mtime: number; after?: string; create?: boolean; also?: ProposalEdit[] }> {
     if (o.agentEdits === "proposals" && !exists(kind, id)) {
@@ -227,8 +229,11 @@ export function createMcp(o: McpOptions): McpServer {
     const disk = docOf(kind, id);
     if (mtime !== undefined && mtime !== disk.mtime) throw new Refusal(`${kind} ${id} changed on disk since you read it (mtime ${mtime}, now ${disk.mtime}): read it again`);
     if (o.agentEdits === "proposals") {
-      const p = latestOf(await queue.pending(), by(), kind, id);
+      const pending = await queue.pending();
+      const p = latestOf(pending, by(), kind, id);
       if (p) return { doc: p.next as Record<string, unknown>, mtime: disk.mtime, after: p.id };
+      const carried = pending.filter(x => x.by === by()).sort((a, b) => b.at - a.at).flatMap(x => x.also ?? []).find(a => a.kind === kind && a.doc === id);
+      if (carried) return { doc: carried.next as Record<string, unknown>, mtime: disk.mtime };
     }
     return disk;
   }
@@ -538,8 +543,8 @@ export function createMcp(o: McpOptions): McpServer {
       { narrator: series.narrator, standin: series.standin, places: w.places as Record<string, StoryPlace> });
     const edits: ProposalEdit[] = [{ kind: "story", doc: id, next, create: true }];
     if (se.calendar) {
-      const s = docOf("season", sid);
-      edits.push({ kind: "season", doc: sid, next: { ...s.doc, calendar: { ...(s.doc.calendar as object), [id]: { date: b.releaseDate, kind: b.kind, week: b.week } } }, base: s.mtime });
+      const s = await current("season", sid);
+      edits.push({ kind: "season", doc: sid, next: { ...s.doc, calendar: { ...(s.doc.calendar as object), [id]: { date: b.releaseDate, kind: b.kind, week: b.week } } }, base: s.mtime, paths: [["calendar", id]] });
     }
     return submit(edits, { summary: `create ${id} (${textOf(b.title, languagesOf(series).main)})`, paths: [["steps"]] });
   }));
@@ -553,7 +558,7 @@ export function createMcp(o: McpOptions): McpServer {
     if (why) return fail(why);
     const n = Number(String(season).replace(/^s/, "")), sid = `s${n}`;
     if (seasonOf(story) !== n) return fail(`${story} is not an episode of ${sid}`);
-    const se = docOf("season", sid);
+    const se = await current("season", sid);
     const st = await current("story", story, mtime);
     const aid = arcId(n, row.week), arcs = (se.doc.arcs ?? {}) as Record<string, object>;
     let next: Record<string, unknown> = { ...st.doc, releaseDate: row.date, kind: row.kind };
@@ -562,7 +567,8 @@ export function createMcp(o: McpOptions): McpServer {
       next = { ...next, arc: { ...arcs[aid], id: aid } };
     }
     const nextSeason = { ...se.doc, calendar: { ...((se.doc.calendar ?? {}) as object), [story]: row } };
-    return submit([{ kind: "season", doc: sid, next: nextSeason, base: se.mtime }, st.create ? { kind: "story", doc: story, next, create: true } : { kind: "story", doc: story, next, base: st.mtime }], { summary: `${story} on ${row.date} (${row.kind}, week ${row.week})`, paths: [["calendar", story]], after: st.after });
+    const storyPaths = [["releaseDate"], ["kind"], ["arc"]];
+    return submit([{ kind: "season", doc: sid, next: nextSeason, base: se.mtime }, st.create ? { kind: "story", doc: story, next, create: true, paths: storyPaths } : { kind: "story", doc: story, next, base: st.mtime, paths: storyPaths }], { summary: `${story} on ${row.date} (${row.kind}, week ${row.week})`, paths: [["calendar", story]], after: st.after });
   }));
 
   server.registerTool("comment", {
