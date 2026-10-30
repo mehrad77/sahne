@@ -351,7 +351,7 @@ export function createMcp(o: McpOptions): McpServer {
       const times = Object.keys((p as { times?: Record<string, unknown> }).times ?? {});
       return { id, about: `${textOf((p as { name?: unknown }).name, c.langs.main, ...c.langs.translations) ?? id}; marks ${marks.join(", ") || "none"}${props.length ? `; props ${props.join(", ")}` : ""}${times.length ? `; times ${times.join(", ")}` : ""}${p.perch ? `; kerim's perch ${Object.keys(p.perch).join(", ")}` : ""}` };
     });
-    else if (kind === "props" || kind === "set") rows = pieceRows().filter(r => r.slot === kind && (!family || r.family === family) && (!tag || r.tags.includes(tag)) && (!as || r.as === as))
+    else if (kind === "props" || kind === "set") rows = pieceRows().filter(r => (kind === "set" ? r.as !== "prop" : r.as !== "set") && (!family || r.family === family) && (!tag || r.tags.includes(tag)) && (!as || r.as === as))
       .map(r => ({ id: r.id, family: r.family, as: r.as, about: r.about, variants: r.variants, tags: r.tags }));
     else if (kind === "gestures") rows = Object.entries(kitOf().gestures ?? {}).map(([id, g]) => ({ id, about: `${Math.round(g.dur)} ms${g.needs?.length ? `, needs ${g.needs.join(" and ")}` : ""}${g.loop ? ", loops" : ""}` }));
     else if (kind === "emotions") rows = Object.keys(kitOf().face.emotions).map(id => ({ id, about: "a face" }));

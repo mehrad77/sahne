@@ -12,6 +12,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import fullKit from "../../sahne-kit/src/full.ts";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -347,6 +348,10 @@ test("kit_search lists set pieces and props with family, use and variants, and f
     const tag = (await search({ kind: "props", query: "" })).find(r => r.id === "tea")!;
     assert.deepEqual((await search({ kind: "props", family: "food", query: "tea" })).map(r => r.id).includes(tag.id), true);
     assert.deepEqual(await search({ kind: "set", family: "nonesuch" }), []);
+    // an item that is both a set piece and a prop shows under each
+    const all = (await search({ kind: "props", limit: 200 })).length;
+    assert.equal(all, Object.keys(fullKit.props).length, "kind props lists every prop, the both ones too");
+    assert.equal((await search({ kind: "set", limit: 200 })).length, Object.keys(fullKit.set).length);
   } finally { await close(); }
 });
 
