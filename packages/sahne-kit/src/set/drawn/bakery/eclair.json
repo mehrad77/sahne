@@ -1,0 +1,79 @@
+{
+  "id": "eclair",
+  "as": "prop",
+  "about": "An eclair, a choux bun split and filled with cream, glazed on top (chocolate unless `color` says otherwise).",
+  "tags": [
+    "food",
+    "bakery",
+    "pastry"
+  ],
+  "terms": [],
+  "params": {
+    "color": {
+      "type": "color",
+      "default": "#4A2A1C",
+      "about": "the glaze"
+    }
+  },
+  "kinds": {
+    "main": {
+      "size": [
+        15,
+        5
+      ],
+      "ppcm": 14,
+      "grip": [
+        0,
+        -2.5
+      ],
+      "flats": [
+        {
+          "shapes": [
+            {
+              "d": "M-7.4 -1.4C-7.4 -3.6 -4.2 -4.4 0 -4.4C4.2 -4.4 7.4 -3.6 7.4 -1.4C7.4 -0.4 6.4 0 5.2 0H-5.2C-6.4 0 -7.4 -0.4 -7.4 -1.4Z",
+              "fill": "#DDA95A"
+            },
+            {
+              "d": "M-7.8 -2.4C-7.8 -3 -7.4 -3 -7 -3H7C7.4 -3 7.8 -3 7.8 -2.4C7.8 -1.8 7.4 -1.6 7 -1.6H-7C-7.4 -1.6 -7.8 -1.8 -7.8 -2.4Z",
+              "fill": "#F6EBC8"
+            },
+            {
+              "d": "M-7.2 -2.6C-7 -4.6 -3.6 -5.2 0 -5.2C3.6 -5.2 7 -4.6 7.2 -2.6C6.2 -3.1 5.6 -2.2 4.2 -2.9C3 -2.2 1.8 -3 0.4 -2.6C-1 -2.2 -2.2 -3 -3.6 -2.5C-5 -3 -5.8 -2.2 -7.2 -2.6Z",
+              "fill": "$color"
+            },
+            {
+              "d": "M-5 -4.3C-3.4 -4.9 -1.4 -4.9 0.4 -4.7C-1.6 -4.4 -3.4 -4.3 -5 -4.3Z",
+              "fill": {
+                "tone": "$color",
+                "step": "light"
+              },
+              "flat": true,
+              "opacity": 0.7
+            },
+            {
+              "d": "M-6.6 -0.5H6.6V-0.3H-6.6Z",
+              "fill": {
+                "tone": "#DDA95A",
+                "step": "shade"
+              },
+              "flat": true,
+              "opacity": 0.6
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "repeat": {
+    "gap": 4
+  },
+  "credit": {
+    "by": "Sahne kit agents",
+    "contact": "https://github.com/mehrad77/sahne",
+    "story": "the bakery family",
+    "date": "2026-10-31",
+    "licence": "CC-BY-4.0",
+    "consent": true,
+    "from": "x_eclair"
+  }
+}

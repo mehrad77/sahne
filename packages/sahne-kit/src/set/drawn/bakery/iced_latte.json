@@ -1,0 +1,117 @@
+{
+  "id": "iced_latte",
+  "as": "prop",
+  "about": "An iced latte in a tall glass: milk below, espresso above, ice cubes and a striped straw (held by the glass).",
+  "tags": [
+    "food",
+    "drink",
+    "cafe"
+  ],
+  "terms": [],
+  "params": {
+    "color": {
+      "type": "color",
+      "default": "#8A5A3C",
+      "about": "the coffee"
+    }
+  },
+  "kinds": {
+    "main": {
+      "size": [
+        8,
+        19
+      ],
+      "ppcm": 14,
+      "grip": [
+        0,
+        -6.5
+      ],
+      "flats": [
+        {
+          "shapes": [
+            {
+              "d": "M-3.2 0H3.2L3.7 -13.6H-3.7Z",
+              "fill": "#DCE9EE",
+              "opacity": 0.6
+            },
+            {
+              "d": "M-3.1 -0.1H3.1L3.3 -6.8H-3.3Z",
+              "fill": "#F3E6D0"
+            },
+            {
+              "d": "M-3.3 -6.8H3.3L3.55 -11.8H-3.55Z",
+              "fill": "$color"
+            },
+            {
+              "d": "M-3.3 -6.8C-1.6 -7.8 1.6 -5.8 3.3 -6.8V-8.2C1.6 -7.2 -1.6 -9.2 -3.3 -8.2Z",
+              "fill": {
+                "tone": "$color",
+                "step": "light"
+              },
+              "opacity": 0.75
+            },
+            {
+              "d": "M-2.9 -7.4H-0.9V-9.4H-2.9ZM0.4 -8.6H2.6V-10.8H0.4ZM-2.5 -10.2H-0.6V-12H-2.5Z",
+              "fill": "#FFFFFF",
+              "opacity": 0.55
+            },
+            {
+              "d": "M1.2 -14.6L2.4 -18.8",
+              "fill": {
+                "tone": "#C23B2B",
+                "step": "base"
+              },
+              "stroke": {
+                "color": "#C23B2B",
+                "width": 0.7,
+                "cap": "round"
+              }
+            },
+            {
+              "d": "M1.2 -14.6L1.8 -16.8",
+              "fill": {
+                "tone": "#FBF8F2",
+                "step": "base"
+              },
+              "stroke": {
+                "color": "#FBF8F2",
+                "width": 0.7,
+                "cap": "round"
+              },
+              "flat": true
+            },
+            {
+              "d": "M-2.6 -12.6L-2.2 -1.4",
+              "fill": "#FFFFFF",
+              "stroke": {
+                "color": "#FFFFFF",
+                "width": 0.5,
+                "cap": "round"
+              },
+              "flat": true,
+              "opacity": 0.6
+            },
+            {
+              "d": "M-3.8 -13.6H3.8V-13.2H-3.8Z",
+              "fill": "#FFFFFF",
+              "flat": true,
+              "opacity": 0.7
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "repeat": {
+    "gap": 3
+  },
+  "credit": {
+    "by": "Sahne kit agents",
+    "contact": "https://github.com/mehrad77/sahne",
+    "story": "the bakery family",
+    "date": "2026-10-31",
+    "licence": "CC-BY-4.0",
+    "consent": true,
+    "from": "x_iced_latte"
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "id": "salami",
+  "as": "prop",
+  "about": "A whole salami with its cut end, the casing netted in string and tied off (held by its end).",
+  "tags": [
+    "food",
+    "deli",
+    "bakery"
+  ],
+  "terms": [],
+  "params": {},
+  "kinds": {
+    "main": {
+      "size": [
+        34,
+        8
+      ],
+      "ppcm": 12,
+      "grip": [
+        -11,
+        -3.8
+      ],
+      "flats": [
+        {
+          "shapes": [
+            {
+              "d": "M-14 -3.8C-14 -6.6 -11 -7.6 -6 -7.6H6C10 -7.6 13 -6.8 13 -3.8C13 -0.8 10 0 6 0H-6C-11 0 -14 -1 -14 -3.8Z",
+              "fill": "#8E3A32"
+            },
+            {
+              "d": "M-14 -3.8C-14 -1 -12 0 -10.6 0V-7.5C-12.6 -7.2 -14 -6.2 -14 -3.8Z",
+              "fill": "#D9C7A0"
+            },
+            {
+              "d": "M-12.6 -3.8h0.01",
+              "fill": "#EDE0C0",
+              "stroke": {
+                "color": "#EDE0C0",
+                "width": 0.7,
+                "cap": "round"
+              },
+              "flat": true
+            },
+            {
+              "d": "M-9 -7.4L-5 0M-4 -7.6L0 0M1 -7.6L5 0M6 -7.5L10 -0.2M-9 -0.4L-5 -7.5M-4 -0.1L0 -7.6M1 -0.1L5 -7.6M6 -0.2L10 -7",
+              "fill": "#E5D3A8",
+              "stroke": {
+                "color": "#E5D3A8",
+                "width": 0.3,
+                "cap": "round"
+              },
+              "flat": true,
+              "opacity": 0.65
+            },
+            {
+              "d": "M-9 -5.5h0.5M-2 -2.5h0.5M3 -5.8h0.5M8 -2h0.5M-6 -1.6h0.5M1 -3.6h0.5M-8 -3.6h0.5",
+              "fill": "#F2E6D6",
+              "stroke": {
+                "color": "#F2E6D6",
+                "width": 0.6,
+                "cap": "round"
+              },
+              "flat": true
+            },
+            {
+              "d": "M-8 -7L2 -7.3L8 -7",
+              "fill": "#C26A5A",
+              "stroke": {
+                "color": "#C26A5A",
+                "width": 0.8,
+                "cap": "round"
+              },
+              "flat": true,
+              "opacity": 0.5
+            },
+            {
+              "d": "M7.3999999999999995 -3.6A2.8 3.6 0 1 1 13.0 -3.6A2.8 3.6 0 1 1 7.3999999999999995 -3.6Z",
+              "fill": "#A94A40"
+            },
+            {
+              "d": "M7.999999999999999 -3.6A2.2 2.9 0 1 1 12.399999999999999 -3.6A2.2 2.9 0 1 1 7.999999999999999 -3.6Z",
+              "fill": "#7E2D28"
+            },
+            {
+              "d": "M9 -5.2h0.6M10.6 -3h0.6M9.4 -2.2h0.6M11.2 -5h0.5",
+              "fill": "#F2E6D6",
+              "stroke": {
+                "color": "#F2E6D6",
+                "width": 0.6,
+                "cap": "round"
+              },
+              "flat": true
+            },
+            {
+              "d": "M13 -4.6C14.4 -4.6 15.6 -4 15.6 -3.6",
+              "fill": "#B8854A",
+              "stroke": {
+                "color": "#B8854A",
+                "width": 0.5,
+                "cap": "round"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "repeat": {
+    "gap": 4
+  },
+  "credit": {
+    "by": "Sahne kit agents",
+    "contact": "https://github.com/mehrad77/sahne",
+    "story": "the bakery family",
+    "date": "2026-10-31",
+    "licence": "CC-BY-4.0",
+    "consent": true,
+    "from": "x_salami"
+  }
+}

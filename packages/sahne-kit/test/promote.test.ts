@@ -5,7 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -146,7 +146,8 @@ test("promote.ts moves the drawing in, adds the alias and the credit, and --chec
   assert.doesNotMatch(gen, /credit|Ada/, "the credit is not shipped in the family's chunk");
   assert.match(readFileSync(join(root, "packages/sahne-kit/src/set/drawn/aliases.gen.ts"), "utf8"), /x_butter_cookie: "butter_cookie"/);
   const credits = JSON.parse(readFileSync(join(root, "packages/sahne-kit/src/set/drawn/CREDITS.json"), "utf8"));
-  assert.deepEqual(credits.map((c: { id: string; family: string; kind: string; by: string }) => [c.id, c.family, c.kind, c.by]), [["butter_cookie", "bakery", "prop", "Ada L."]]);
+  assert.deepEqual(credits.filter((c: { id: string }) => c.id === "butter_cookie").map((c: { id: string; family: string; kind: string; by: string }) => [c.id, c.family, c.kind, c.by]), [["butter_cookie", "bakery", "prop", "Ada L."]]);
+  assert.equal(credits.length, readdirSync(join(root, "packages/sahne-kit/src/set/drawn/bakery")).length, "a credit for every drawing in the folder");
   assert.match(readFileSync(join(root, "packages/sahne-kit/SET.md"), "utf8"), /## Credits[\s\S]*\| `butter_cookie` \| bakery \| Ada L\. \| github:ada \| – \| 2026-11-02 \| `x_butter_cookie` \|/);
   assert.match(readFileSync(join(root, "packages/sahne-kit/SET.md"), "utf8"), /\| `butter_cookie` \| prop \| A butter cookie/);
   assert.match(readFileSync(join(root, "packages/sahne-kit/src/set/families.gen.ts"), "utf8"), /butter_cookie: "bakery"/);

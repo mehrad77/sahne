@@ -1,1 +1,62 @@
-[]
+[
+  {
+    "id": "apple_strudel",
+    "family": "bakery",
+    "kind": "prop",
+    "by": "Sahne kit agents",
+    "contact": "https://github.com/mehrad77/sahne",
+    "story": "the bakery family",
+    "date": "2026-10-31",
+    "licence": "CC-BY-4.0",
+    "consent": true,
+    "from": "x_apple_strudel"
+  },
+  {
+    "id": "doughnut",
+    "family": "bakery",
+    "kind": "prop",
+    "by": "Sahne kit agents",
+    "contact": "https://github.com/mehrad77/sahne",
+    "story": "the bakery family",
+    "date": "2026-10-31",
+    "licence": "CC-BY-4.0",
+    "consent": true,
+    "from": "x_doughnut"
+  },
+  {
+    "id": "eclair",
+    "family": "bakery",
+    "kind": "prop",
+    "by": "Sahne kit agents",
+    "contact": "https://github.com/mehrad77/sahne",
+    "story": "the bakery family",
+    "date": "2026-10-31",
+    "licence": "CC-BY-4.0",
+    "consent": true,
+    "from": "x_eclair"
+  },
+  {
+    "id": "iced_latte",
+    "family": "bakery",
+    "kind": "prop",
+    "by": "Sahne kit agents",
+    "contact": "https://github.com/mehrad77/sahne",
+    "story": "the bakery family",
+    "date": "2026-10-31",
+    "licence": "CC-BY-4.0",
+    "consent": true,
+    "from": "x_iced_latte"
+  },
+  {
+    "id": "salami",
+    "family": "bakery",
+    "kind": "prop",
+    "by": "Sahne kit agents",
+    "contact": "https://github.com/mehrad77/sahne",
+    "story": "the bakery family",
+    "date": "2026-10-31",
+    "licence": "CC-BY-4.0",
+    "consent": true,
+    "from": "x_salami"
+  }
+]

@@ -77,7 +77,8 @@ test("palettes: strict colours, own ids only, a family for every fabric", () => 
   for (const id of Object.keys(PALETTES.lens)) assert.ok(LENS_ALPHA[id] > 0 && LENS_ALPHA[id] <= 1, `${id}: alpha`);
   for (const id of Object.keys(HAIR_BROW)) assert.ok(Object.hasOwn(PALETTES.hair, id) && Object.hasOwn(PALETTES.hair, HAIR_BROW[id]), `${id}: brows`);
   for (const [id, token] of Object.entries(kit.paletteUnlocks ?? {})) { assert.notEqual(color(id, ""), "", `${id}: a colour`); assert.match(token, /^[a-z]+:[a-z0-9_]+$/); }
-  assert.equal(kit.aliases && Object.keys(kit.aliases).length, 0, "no part has been retired yet");
+  // an alias key `x_…` is a content drawing a promoted set piece or prop replaced (drawing/promote.ts), never a part
+  assert.deepEqual(Object.keys(kit.aliases ?? {}).filter(k => !k.startsWith("x_")), [], "no part has been retired yet");
 });
 
 // ---- the vocabularies match the drawing ---------------------------------------------------------------

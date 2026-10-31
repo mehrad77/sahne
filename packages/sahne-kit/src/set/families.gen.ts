@@ -120,6 +120,7 @@ export const SET_FAMILY: Record<string, string> = {
 
 export const PROP_FAMILY: Record<string, string> = {
   airport_plane: "airport",
+  apple_strudel: "bakery",
   appliance: "cookware",
   art: "leisure",
   awning: "street",
@@ -155,6 +156,8 @@ export const PROP_FAMILY: Record<string, string> = {
   dish: "meals",
   dog: "animals",
   door: "interior",
+  doughnut: "bakery",
+  eclair: "bakery",
   facade: "street",
   farm_animal: "animals",
   festival_kit: "festival",
@@ -171,6 +174,7 @@ export const PROP_FAMILY: Record<string, string> = {
   hardware: "tech",
   hats: "misc",
   heater: "interior",
+  iced_latte: "bakery",
   instrument: "leisure",
   jar: "food",
   jewel: "clothes",
@@ -207,6 +211,7 @@ export const PROP_FAMILY: Record<string, string> = {
   potted: "garden",
   print: "stationery",
   rug: "household",
+  salami: "bakery",
   sewing: "household",
   shop_kit: "streetlife",
   sign_board: "props",

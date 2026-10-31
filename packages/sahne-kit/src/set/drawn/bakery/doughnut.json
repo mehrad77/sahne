@@ -1,0 +1,106 @@
+{
+  "id": "doughnut",
+  "as": "prop",
+  "about": "A ring doughnut with icing and sprinkles, the icing in `color` (pink unless told).",
+  "tags": [
+    "food",
+    "bakery",
+    "pastry",
+    "sweet"
+  ],
+  "terms": [],
+  "params": {
+    "color": {
+      "type": "color",
+      "default": "#E58AA8",
+      "about": "the icing"
+    }
+  },
+  "kinds": {
+    "main": {
+      "size": [
+        12,
+        7
+      ],
+      "ppcm": 14,
+      "grip": [
+        0,
+        -3.4
+      ],
+      "flats": [
+        {
+          "shapes": [
+            {
+              "d": "M-5.6 -3.4V-2.2C-5.6 -0.6 -3 0 0 0C3 0 5.6 -0.6 5.6 -2.2V-3.4Z",
+              "fill": "#D9A24F"
+            },
+            {
+              "d": "M-5.6 -3.4V-2.8C-5.6 -2.4 -4.6 -1.9 -3.6 -2.3C-2.8 -1.4 -1.8 -1.6 -1.2 -2.2C-0.2 -1.5 0.8 -1.7 1.4 -2.3C2.4 -1.6 3.4 -1.8 4 -2.4C5 -2 5.6 -2.4 5.6 -2.8V-3.4Z",
+              "fill": "$color"
+            },
+            {
+              "d": "M-5.6 -3.4A5.6 3.4 0 1 1 5.6 -3.4A5.6 3.4 0 1 1 -5.6 -3.4ZM-1.9 -3.4A1.9 1.1 0 1 0 1.9 -3.4A1.9 1.1 0 1 0 -1.9 -3.4Z",
+              "fill": "$color",
+              "evenodd": true
+            },
+            {
+              "d": "M-1.9 -3.4A1.9 1.1 0 0 0 1.9 -3.4A1.9 1.1 0 0 0 -1.9 -3.4Z",
+              "fill": {
+                "tone": "#D9A24F",
+                "step": "deep"
+              }
+            },
+            {
+              "d": "M-4 -4.6C-3 -5.8 -1.6 -6.2 -0.6 -6.2C-2 -5.8 -3.2 -5.2 -4 -4.6Z",
+              "fill": "#FFFFFF",
+              "flat": true,
+              "opacity": 0.5
+            },
+            {
+              "d": "M-3.6 -4.6l0.8 0.3M-1 -6l0.8 -0.2M2.4 -5.8l0.7 0.4M3.8 -3.8l0.8 -0.3M-4.6 -3l0.8 0.3M1 -1.6l0.8 0.2",
+              "fill": "#FBF8F2",
+              "stroke": {
+                "color": "#FBF8F2",
+                "width": 0.4,
+                "cap": "round"
+              },
+              "flat": true
+            },
+            {
+              "d": "M-2.4 -5.4l0.7 0.4M0.6 -5l0.8 0.1M3.2 -2.6l0.7 0.3M-4.8 -4l0.6 -0.4",
+              "fill": "#EFD04A",
+              "stroke": {
+                "color": "#EFD04A",
+                "width": 0.4,
+                "cap": "round"
+              },
+              "flat": true
+            },
+            {
+              "d": "M-0.2 -1.2l0.7 -0.3M2.4 -4.4l0.7 0.2M-3.2 -3.6l0.4 0.6",
+              "fill": "#3B7DB0",
+              "stroke": {
+                "color": "#3B7DB0",
+                "width": 0.4,
+                "cap": "round"
+              },
+              "flat": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "repeat": {
+    "gap": 4
+  },
+  "credit": {
+    "by": "Sahne kit agents",
+    "contact": "https://github.com/mehrad77/sahne",
+    "story": "the bakery family",
+    "date": "2026-10-31",
+    "licence": "CC-BY-4.0",
+    "consent": true,
+    "from": "x_doughnut"
+  }
+}
