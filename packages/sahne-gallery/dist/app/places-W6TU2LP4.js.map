@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["../../src/sections/places.ts"],
+  "sourcesContent": ["// #/places: the board; #/places/<id>: a place scouted; #/places/<id>/sheet and /camera: its checks.\n\nimport type { Ctx } from \"../shell/ctx.ts\";\n\nexport async function render(host: HTMLElement, ctx: Ctx) {\n  const [id, check] = ctx.route.path;\n  if (!id) return (await import(\"../places/board.ts\")).render(host, ctx);\n  if (check === \"sheet\" || check === \"camera\") return (await import(\"../places/checks.ts\")).render(host, ctx, id, check);\n  return (await import(\"../places/scout.ts\")).render(host, ctx, id);\n}\n"],
+  "mappings": ";;;AAIA,eAAsB,OAAO,MAAmB,KAAU;AACxD,QAAM,CAAC,IAAI,KAAK,IAAI,IAAI,MAAM;AAC9B,MAAI,CAAC,GAAI,SAAQ,MAAM,OAAO,qBAAoB,GAAG,OAAO,MAAM,GAAG;AACrE,MAAI,UAAU,WAAW,UAAU,SAAU,SAAQ,MAAM,OAAO,sBAAqB,GAAG,OAAO,MAAM,KAAK,IAAI,KAAK;AACrH,UAAQ,MAAM,OAAO,qBAAoB,GAAG,OAAO,MAAM,KAAK,EAAE;AAClE;",
+  "names": []
+}

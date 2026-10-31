@@ -1,0 +1,36 @@
+{
+  "name": "sahne-gallery",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Dev gallery for Sahne: the look, parts, faces, lights and cameras",
+  "scripts": {
+    "dev": "node serve.mjs",
+    "build": "node build.mjs",
+    "deploy": "node build.mjs && pnpm dlx wrangler@4 deploy",
+    "size": "node size.mjs",
+    "golden": "node golden.mjs",
+    "golden:update": "node golden.mjs --update",
+    "thumbs": "node thumbs.mjs",
+    "check": "tsc -p ../tsconfig.json && node brand/build.mjs --check && node size.mjs && node determinism.mjs && node ../sahne-story/stories.ts --check --quiet && node ../sahne-story/cast/extras.ts --check && node ../sahne-story/convert/languages.ts --check && node --test ../sahne/test/*.test.ts ../sahne-kit/test/*.test.ts ../sahne-tr/test/*.test.ts ../sahne-en/test/*.test.ts ../sahne-de/test/*.test.ts ../sahne-fa/test/*.test.ts ../sahne-story/test/*.test.ts ../sahne-backstage/test/*.test.ts test/*.test.ts && node golden.mjs"
+  },
+  "dependencies": {
+    "sahne": "workspace:*",
+    "sahne-kit": "workspace:*",
+    "sahne-en": "workspace:*",
+    "sahne-fa": "workspace:*",
+    "sahne-story": "workspace:*",
+    "sahne-de": "workspace:*",
+    "sahne-tr": "workspace:*"
+  },
+  "devDependencies": {
+    "@fontsource/comic-neue": "5.3.0",
+    "@fontsource/fraunces": "5.3.0",
+    "@fontsource/inter": "5.3.0",
+    "@playwright/test": "1.63.0",
+    "esbuild": "0.28.2",
+    "marked": "18.1.2",
+    "opentype.js": "2.0.0",
+    "typescript": "~6.0.3"
+  }
+}

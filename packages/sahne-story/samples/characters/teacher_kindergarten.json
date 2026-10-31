@@ -1,0 +1,83 @@
+{
+  "avatar": {
+    "body": {
+      "build": "adult",
+      "height": 0.75,
+      "shape": "round"
+    },
+    "face": {
+      "brows": "thin",
+      "ears": "large",
+      "eyeColor": "eye_dark",
+      "eyes": "almond",
+      "marks": [
+        "dimples"
+      ],
+      "nose": "long",
+      "shape": "round"
+    },
+    "hair": {
+      "color": "hair_03",
+      "style": "hair_shoulder"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "colors": [
+          "fab_04"
+        ],
+        "id": "bottom_trousers"
+      },
+      "shoes": {
+        "colors": [
+          "fab_01",
+          "fab_01",
+          "fab_19"
+        ],
+        "id": "shoes_sneakers"
+      },
+      "top": {
+        "colors": [
+          "fab_10"
+        ],
+        "id": "top_tee_long"
+      }
+    },
+    "skin": "skin_07",
+    "v": 1,
+    "wear": {
+      "ears": {
+        "colors": [
+          "met_gold"
+        ],
+        "id": "ear_stud"
+      },
+      "neck": {
+        "colors": [
+          "fab_14"
+        ],
+        "id": "lanyard_badge"
+      }
+    }
+  },
+  "bio": {
+    "en": "Stands at the side of the stage and keeps the row of children together.",
+    "fa": "کنارِ صحنه می‌ایستد و ردیفِ بچه‌ها را کنارِ هم نگه می‌دارد."
+  },
+  "color": "#8A8580",
+  "id": "teacher_kindergarten",
+  "kind": "extra",
+  "level": "A1",
+  "name": {
+    "fa": "معلم",
+    "tr": "Öğretmen"
+  },
+  "order": 108,
+  "places": [
+    "park_ferikoy"
+  ],
+  "role": {
+    "en": "The kindergarten teacher at the park show",
+    "fa": "معلمِ مهدکودک در جشنِ پارک"
+  }
+}

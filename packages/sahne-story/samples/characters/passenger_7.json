@@ -1,0 +1,86 @@
+{
+  "avatar": {
+    "body": {
+      "build": "adult",
+      "height": 0.11,
+      "shape": "average"
+    },
+    "face": {
+      "brows": "thin",
+      "ears": "large",
+      "eyeColor": "eye_hazel",
+      "eyes": "hooded",
+      "mouth": "thin",
+      "nose": "long",
+      "shape": "full"
+    },
+    "hair": {
+      "color": "hair_15",
+      "style": "hair_slick_back"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "colors": [
+          "fab_32"
+        ],
+        "id": "bottom_cargo"
+      },
+      "outer": {
+        "colors": [
+          "fab_40"
+        ],
+        "id": "outer_coat_parka"
+      },
+      "shoes": {
+        "colors": [
+          "fab_18",
+          "fab_28"
+        ],
+        "id": "shoes_leather"
+      },
+      "top": {
+        "colors": [
+          "fab_08"
+        ],
+        "id": "top_shirt_rolled"
+      }
+    },
+    "skin": "skin_23",
+    "v": 1,
+    "wear": {
+      "hat": {
+        "colors": [
+          "fab_24"
+        ],
+        "id": "hat_beanie"
+      }
+    }
+  },
+  "bio": {
+    "en": "Rides across the city with everyone else; also one of the crowd on the street.",
+    "fa": "مثلِ بقیه در شهر رفت‌وآمد می‌کند؛ گاهی هم یکی از جمعیتِ خیابان است."
+  },
+  "color": "#8A8580",
+  "id": "passenger_7",
+  "kind": "extra",
+  "level": "A1",
+  "name": {
+    "fa": "مسافر",
+    "tr": "Yolcu"
+  },
+  "order": 126,
+  "places": [
+    "metro_m2",
+    "metro_m11",
+    "bus",
+    "vapur_deck",
+    "vapur_pier",
+    "kadikoy",
+    "istiklal_street"
+  ],
+  "role": {
+    "en": "A passenger on the metro, the bus or the ferry",
+    "fa": "مسافرِ مترو، اتوبوس یا کشتی"
+  }
+}

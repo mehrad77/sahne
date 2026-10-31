@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sahne-story/series.json",
+  "title": "A series: the one story world of a content root (series.json)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["v", "id", "title", "narrator", "standin"],
+  "properties": {
+    "v": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "title": { "type": "object", "minProperties": 1, "propertyNames": { "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" }, "additionalProperties": { "type": "string", "minLength": 1 } },
+    "summary": { "type": "object", "minProperties": 1, "propertyNames": { "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" }, "additionalProperties": { "type": "string", "minLength": 1 } },
+    "languages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["main", "translations"],
+      "properties": {
+        "main": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" },
+        "translations": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" } }
+      }
+    },
+    "narrator": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "standin": { "type": "string", "pattern": "^[a-z0-9_]+$" }
+  }
+}

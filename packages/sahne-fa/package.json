@@ -1,0 +1,16 @@
+{
+  "name": "sahne-fa",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The Persian plugin of Sahne: mouth timing from spelling and word-to-token matching",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "sahne": "workspace:*"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts"
+  }
+}

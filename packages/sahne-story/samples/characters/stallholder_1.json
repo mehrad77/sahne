@@ -1,0 +1,81 @@
+{
+  "avatar": {
+    "body": {
+      "build": "elder",
+      "height": 0.63,
+      "shape": "average"
+    },
+    "face": {
+      "brows": "bushy",
+      "ears": "large",
+      "eyeColor": "eye_dark",
+      "eyes": "hooded",
+      "marks": [
+        "laugh_lines",
+        "crows_feet",
+        "wrinkles_deep"
+      ],
+      "mouth": "bowed",
+      "nose": "broad",
+      "shape": "full"
+    },
+    "facialHair": {
+      "style": "moustache"
+    },
+    "hair": {
+      "color": "hair_09",
+      "style": "hair_receding"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "id": "bottom_chinos"
+      },
+      "shoes": {
+        "id": "shoes_leather"
+      },
+      "top": {
+        "colors": [
+          "fab_29"
+        ],
+        "id": "top_sweater"
+      }
+    },
+    "skin": "skin_21",
+    "v": 1,
+    "wear": {
+      "hat": {
+        "colors": [
+          "fab_20"
+        ],
+        "id": "cap_flat"
+      },
+      "waist": {
+        "colors": [
+          "fab_09"
+        ],
+        "id": "apron_shop"
+      }
+    }
+  },
+  "bio": {
+    "en": "Calls 'Gel abla gel!' over his tomatoes.",
+    "fa": "پشتِ گوجه‌هایش صدا می‌زند «بیا خواهر، بیا!»"
+  },
+  "color": "#8A8580",
+  "id": "stallholder_1",
+  "kind": "extra",
+  "level": "A1",
+  "name": {
+    "fa": "فروشنده‌ی بازار",
+    "tr": "Pazarcı"
+  },
+  "order": 117,
+  "places": [
+    "pazar_ferikoy"
+  ],
+  "role": {
+    "en": "A stallholder at the Feriköy Saturday market",
+    "fa": "فروشنده‌ای در بازارِ شنبه‌های فری‌کؤی"
+  }
+}

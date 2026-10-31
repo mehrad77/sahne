@@ -1,0 +1,362 @@
+{
+  "arc": {
+    "en": "A sample",
+    "fa": "یک نمونه",
+    "id": "s1w00",
+    "mechanics": [
+      "say",
+      "explore",
+      "act"
+    ],
+    "tr": "Bir örnek"
+  },
+  "cast": [
+    "ismail",
+    "nima"
+  ],
+  "draft": true,
+  "gl": {
+    "akşam": {
+      "fa": "عصر",
+      "en": "evening"
+    },
+    "afiyet olsun": {
+      "fa": "نوش جان",
+      "en": "enjoy it"
+    },
+    "turuncu": {
+      "fa": "نارنجی",
+      "en": "orange (the colour)"
+    },
+    "elma": {
+      "fa": "سیب",
+      "en": "apple"
+    },
+    "güle güle": {
+      "fa": "خداحافظ (به کسی که می‌رود)",
+      "en": "goodbye (to someone leaving)"
+    },
+    "kaç": {
+      "fa": "چند تا",
+      "en": "how many"
+    }
+  },
+  "id": "s1e00",
+  "kind": "episode",
+  "lessons": [
+    "g_a1_2_var_yok"
+  ],
+  "level": "A1",
+  "place": "bakkal",
+  "quiz": [
+    {
+      "a": 0,
+      "kind": "comp",
+      "options": [
+        "Portakal",
+        "Domates",
+        "Elma"
+      ],
+      "q": {
+        "tr": "Nima ne alıyor?",
+        "en": "What does Nima buy?",
+        "fa": "نیما چه می‌خرد؟"
+      },
+      "why": "Nima: “Üç portakal, lütfen.”"
+    },
+    {
+      "a": 1,
+      "kind": "comp",
+      "options": [
+        "Portakal",
+        "Elma",
+        "Domates"
+      ],
+      "q": {
+        "tr": "Bakkalda bugün ne yok?",
+        "en": "What is there not at the shop today?",
+        "fa": "امروز در بقالی چه نیست؟"
+      },
+      "why": "İsmail: “Ama bugün elma yok.”"
+    },
+    {
+      "a": 1,
+      "kind": "word",
+      "options": [
+        "var",
+        "yok",
+        "ne"
+      ],
+      "q": {
+        "tr": "Bugün elma ___.",
+        "en": "Fill in: today there are no apples.",
+        "fa": "کامل کنید: امروز سیب نیست."
+      },
+      "why": "İsmail: “Ama bugün elma yok.”"
+    }
+  ],
+  "ref": "A1_2",
+  "releaseDate": "2026-09-14",
+  "season": 1,
+  "steps": [
+    {
+      "at": {
+        "nima": "stand_l"
+      },
+      "kerim": "outside",
+      "scene": "metro_m11",
+      "time": "golden"
+    },
+    {
+      "en": "Evening. Nima is on the metro.",
+      "fa": "عصر است. نیما در متروست.",
+      "link": {
+        "metro": "obj:tren"
+      },
+      "narr": true,
+      "tr": "Akşam. Nima metroda.",
+      "who": "kerim"
+    },
+    {
+      "do": "think",
+      "emo": "curious",
+      "en": "Is there fruit at home? No, there isn't.",
+      "fa": "خانه میوه هست؟ نه، نیست.",
+      "tr": "Evde meyve var mı? Yok.",
+      "who": "nima"
+    },
+    {
+      "at": {
+        "ismail": "counter"
+      },
+      "kerim": "ledge",
+      "scene": "bakkal",
+      "time": "dusk"
+    },
+    {
+      "do": "welcome",
+      "emo": "happy",
+      "en": "Good evening! Come in.",
+      "fa": "عصر بخیر! بفرمایید.",
+      "move": {
+        "how": "enter",
+        "to": "customer",
+        "who": "nima"
+      },
+      "sfx": {
+        "id": "doorbell",
+        "word": "çın çın"
+      },
+      "to": "nima",
+      "tr": "İyi akşamlar! Buyrun.",
+      "who": "ismail"
+    },
+    {
+      "at": "obj:portakal",
+      "do": "look",
+      "emo": "curious",
+      "en": "Are there oranges?",
+      "fa": "پرتقال هست؟",
+      "link": {
+        "portakal": "obj:portakal"
+      },
+      "tr": "Portakal var mı?",
+      "who": "nima"
+    },
+    {
+      "at": "obj:portakal",
+      "do": "point",
+      "en": "There are. These oranges are very good.",
+      "fa": "هست. این پرتقال‌ها خیلی خوب‌اند.",
+      "link": {
+        "portakallar": "obj:portakal"
+      },
+      "react": {
+        "nima": {
+          "at": "obj:portakal",
+          "do": "look"
+        }
+      },
+      "tr": "Var. Bu portakallar çok güzel.",
+      "who": "ismail"
+    },
+    {
+      "act": {
+        "expect": "obj:portakal",
+        "id": "which_fruit",
+        "kind": "tap",
+        "prompt": {
+          "en": "Which one is the orange?",
+          "fa": "پرتقال کدام است؟",
+          "tr": "Hangisi portakal?"
+        },
+        "react": {
+          "ok": {
+            "ismail": {
+              "do": "nod",
+              "emo": "happy"
+            }
+          },
+          "other": {
+            "ismail": "confused"
+          }
+        },
+        "targets": [
+          "obj:portakal",
+          "obj:domates"
+        ],
+        "to": "ismail"
+      }
+    },
+    {
+      "at": "obj:domates",
+      "do": "shrug",
+      "emo": "sorry",
+      "en": "But there are no apples today.",
+      "fa": "ولی امروز سیب نیست.",
+      "tr": "Ama bugün elma yok.",
+      "who": "ismail"
+    },
+    {
+      "spot": {
+        "en": "var: there is. yok: there isn't. Oranges, yes; apples, no.",
+        "ex": "Ama bugün elma yok.",
+        "fa": "var یعنی هست، yok یعنی نیست. پرتقال هست؛ سیب نیست.",
+        "lesson": "g_a1_2_var_yok",
+        "show": "var_yok"
+      }
+    },
+    {
+      "emo": "happy",
+      "en": "No problem. Oranges are fine!",
+      "fa": "مشکلی نیست. پرتقال خوب است!",
+      "tr": "Sorun yok. Portakal iyi!",
+      "who": "nima"
+    },
+    {
+      "do": "explain",
+      "emo": "curious",
+      "en": "How many oranges?",
+      "fa": "چند تا پرتقال؟",
+      "link": {
+        "portakal": "obj:portakal"
+      },
+      "to": "nima",
+      "tr": "Kaç portakal?",
+      "who": "ismail"
+    },
+    {
+      "choice": {
+        "id": "buy",
+        "kind": "polite",
+        "options": [
+          {
+            "do": "count",
+            "en": "Three oranges, please.",
+            "fa": "سه تا پرتقال، لطفاً.",
+            "link": {
+              "portakal": "obj:portakal"
+            },
+            "n": 3,
+            "ok": true,
+            "react": {
+              "ismail": {
+                "do": "nod",
+                "emo": "happy"
+              }
+            },
+            "reply": [
+              {
+                "emo": "happy",
+                "en": "Here you are! Enjoy them!",
+                "fa": "بفرمایید! نوش جان!",
+                "obj": [
+                  {
+                    "id": "portakal",
+                    "n": 3,
+                    "op": "give",
+                    "to": "nima"
+                  }
+                ],
+                "tr": "Buyrun! Afiyet olsun!",
+                "who": "ismail"
+              }
+            ],
+            "tone": "polite",
+            "tr": "Üç portakal, lütfen."
+          },
+          {
+            "do": "count",
+            "en": "Give three oranges.",
+            "fa": "سه تا پرتقال بده.",
+            "link": {
+              "portakal": "obj:portakal"
+            },
+            "n": 3,
+            "react": {
+              "ismail": {
+                "emo": "confused"
+              }
+            },
+            "reply": [
+              {
+                "beat": {
+                  "wait": 900
+                }
+              },
+              {
+                "en": "…Here you are.",
+                "fa": "…بفرمایید.",
+                "obj": [
+                  {
+                    "id": "portakal",
+                    "n": 3,
+                    "op": "give",
+                    "to": "nima"
+                  }
+                ],
+                "tr": "…Buyrun.",
+                "who": "ismail"
+              }
+            ],
+            "tone": "blunt",
+            "tr": "Üç portakal ver."
+          }
+        ],
+        "to": "ismail"
+      }
+    },
+    {
+      "do": "wave",
+      "emo": "happy",
+      "en": "Good evening, Nima! Goodbye!",
+      "fa": "عصر بخیر، نیما! خداحافظ!",
+      "to": "nima",
+      "tr": "İyi akşamlar, Nima! Güle güle!",
+      "who": "ismail"
+    },
+    {
+      "en": "Oranges are orange. Of course!",
+      "fa": "پرتقال نارنجی است. معلوم است!",
+      "narr": true,
+      "tr": "Portakal turuncu. Tabii!",
+      "who": "kerim"
+    }
+  ],
+  "summary": {
+    "en": "A sample story for Sahne: Nima rides the metro home in the evening, then buys oranges at İsmail's corner shop.",
+    "fa": "یک داستان نمونه برای Sahne: نیما عصر با مترو به خانه می‌رود و از بقالیِ اسماعیل پرتقال می‌خرد."
+  },
+  "title": {
+    "tr": "Portakal var mı?",
+    "en": "Are there oranges?",
+    "fa": "پرتقال هست؟"
+  },
+  "words": [
+    "a1-w-portakal",
+    "a1-w-meyve",
+    "a1-w-var",
+    "a1-w-yok",
+    "a1-w-domates"
+  ]
+}

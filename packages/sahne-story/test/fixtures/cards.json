@@ -1,0 +1,8 @@
+{
+  "a1-w-ekmek": {"tr": "ekmek", "en": "bread", "level": "A1"},
+  "a1-w-kapi": {"tr": "kapı", "en": "door", "level": "A1"},
+  "a1-w-saat": {"tr": "saat", "en": "clock; hour", "level": "A1"},
+  "a1-w-sut": {"tr": "süt", "en": "milk", "level": "A1"},
+  "a1-w-taksi": {"tr": "taksi", "en": "taxi", "level": "A1", "retired": true},
+  "a1-w-telefon": {"tr": "telefon", "en": "telephone", "level": "A1"}
+}

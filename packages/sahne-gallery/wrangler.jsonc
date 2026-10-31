@@ -1,0 +1,11 @@
+// The live demo on Cloudflare: the static site build.mjs writes (dist/site/), served as a Worker's static
+// assets at https://sahne.shab.boo (a custom domain: Cloudflare makes its DNS record and certificate).
+// Deploy with `pnpm sahne deploy` (a fresh build, then wrangler).
+{
+  "$schema": "https://unpkg.com/wrangler@4/config-schema.json",
+  "name": "sahne",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./dist/site" },
+  "routes": [{ "pattern": "sahne.shab.boo", "custom_domain": true }],
+  "workers_dev": false
+}

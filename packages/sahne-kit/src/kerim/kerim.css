@@ -1,0 +1,67 @@
+/* ---------- Kerim the kumru (sahne-kit/kerim.css, for an app's Kerim component): no badge, her own figure; colours, paper rims and the head's shadow are in the art ---------- */
+@layer features {
+.kerim{display:inline-block;flex:none;position:relative;width:52px;height:52px;vertical-align:middle}
+.kerim svg{width:100%;height:100%;display:block;overflow:visible;filter:drop-shadow(var(--k-shadow))}
+.kerim.pose-hero{width:130px;height:130px}
+/* pivots in the art's 100x100 units (the head crop shares them); lids, calm lids, brows, smile and blush turn on their own box */
+.kerim .k-bird,.kerim .k-head,.kerim .k-eye,.kerim .k-eye2,.kerim .k-wing,.kerim .k-wingFar,.kerim .k-tail,.kerim .k-beak-lo,.kerim .k-body,.kerim .k-legs,.kerim .k-fx path,.chr .k-beak-lo{transform-box:view-box}
+.kerim .k-bird{transform-origin:55px 87px}.kerim .k-head{transform-origin:57px 48px}.kerim .k-eye{transform-origin:55.4px 33px}.kerim .k-eye2{transform-origin:71.9px 32.2px}
+.kerim .k-wing{transform-origin:47.5px 53px}.kerim .k-wingFar{transform-origin:66px 51px}.kerim .k-tail{transform-origin:42px 73px}
+.kerim .k-body{transform-origin:55px 86px}.kerim .k-legs{transform-origin:55px 83px}.kerim .k-beak-lo,.chr .k-beak-lo{transform-origin:66.6px 41.5px}.kerim .k-fx path{transform-origin:82px 16px}
+.kerim .k-lid,.chr .k-lid,.kerim .k-calm,.kerim .k-brow,.kerim .k-smile,.kerim .k-blush{transform-box:fill-box;transform-origin:50% 50%}
+.kerim .k-lid,.chr .k-lid{transform-origin:50% 0;transform:scaleY(0)}
+.kerim .k-pupil,.kerim .k-eye,.kerim .k-eye2{transition:transform .3s}
+.kerim .k-wing,.kerim .k-wingFar{filter:drop-shadow(.3px .6px .5px rgba(40,24,16,.24))}
+/* static poses: each mood reads without motion, with its own eyes. Calm (default: idle, talk) - smaller eyes under a relaxed
+   lid; happy - the lid lifts and the eyes open 1.25x, big and sparkly; cheer - ^ ^; greet - a wink; sad - big, watery, looking
+   down; think - glancing up and aside, the near lid lowered; sleepy - lids shut on curved lash lines; flying - bright, focused */
+.kerim.happy .k-calm,.kerim.greet .k-calm,.kerim.sad .k-calm,.kerim.sleepy .k-calm,.kerim.pose-flying .k-calm{opacity:0}
+.kerim.happy .k-eye,.kerim.happy .k-eye2,.kerim.greet .k-eye2{transform:scale(1.25)}
+.kerim.happy .k-head{transform:rotate(-6deg)}.kerim.happy .k-beak-lo{transform:rotate(16deg)}.kerim.happy .k-brow{opacity:1;transform:translateY(-2.4px)}
+.kerim.happy .k-blush,.kerim.cheer .k-blush{transform:scale(1.2)}.kerim.happy .k-body{transform:scale(1.03)}.kerim.happy .k-tail{transform:rotate(6deg)}.kerim.happy .k-note{opacity:1}
+.kerim.cheer .k-eye,.kerim.cheer .k-eye2{opacity:0}.kerim.cheer .k-joy{opacity:1}.kerim.cheer .k-beak-lo{transform:rotate(24deg)}.kerim.cheer .k-head{transform:rotate(-6deg)}
+.kerim.cheer .k-wing{transform:rotate(8deg)}.kerim.cheer .k-wingFar{transform:rotate(-8deg)}.kerim.cheer .k-spark{opacity:1}.kerim.cheer .k-bird{transform:translateY(-3px)}
+.kerim.sad .k-eye,.kerim.sad .k-eye2{transform:scale(1.15)}.kerim.sad .k-wet{opacity:.85}.kerim.sad .k-pupil{transform:translate(-.3px,1px)}
+.kerim.sad .k-head{transform:translateY(1.5px) rotate(16deg)}.kerim.sad .k-brow,.kerim.sad .k-tear{opacity:1}
+.kerim.sad .k-brow{transform:translate(.6px,.2px) rotate(-22deg)}.kerim.sad .k-brow2{transform:translate(-.4px,.2px) rotate(24deg)}.kerim.sad .k-smile{transform:scaleY(-1)}
+.kerim.sad .k-tail{transform:rotate(-7deg)}.kerim.sad .k-wing{transform:rotate(-4deg)}.kerim.sad .k-body{transform:scale(1.02,.97)}
+.kerim.think .k-head{transform:rotate(-11deg)}.kerim.think .k-eye .k-calm{transform:translateY(1.9px)}.kerim.think .k-eye2 .k-calm{transform:translateY(-.8px)}
+.kerim.think .k-pupil{transform:translate(1px,-1.1px)}.kerim.think .k-brow2{opacity:1;transform:translateY(-1.8px) rotate(-6deg)}.kerim.think .k-smile{transform:scale(.7,.4)}.kerim.think .k-q{opacity:1}
+.kerim.sleepy .k-head{transform:rotate(10deg) translateY(1px)}.kerim.sleepy .k-lid{transform:scaleY(1)}.kerim.sleepy .k-z{opacity:1}.kerim.sleepy .k-body{transform:scale(1.03,.97)}
+.kerim.greet .k-eye{opacity:0}.kerim.greet .k-joy:not(.k-joy2){opacity:1}.kerim.greet .k-wing{transform:rotate(16deg)}.kerim.greet .k-head{transform:rotate(-5deg)}.kerim.greet .k-beak-lo{transform:rotate(12deg)}
+.kerim.cheer .k-fold,.kerim.greet .k-fold,.kerim.pose-flying .k-fold{display:none}
+.kerim.cheer .k-spread,.kerim.cheer .k-wingFar,.kerim.greet .k-spread,.kerim.pose-flying .k-spread,.kerim.pose-flying .k-wingFar{display:inline}
+.kerim.pose-flying .k-ledge,.kerim.pose-flying .k-legs{display:none}
+.kerim.pose-flying .k-eye,.kerim.pose-flying .k-eye2{transform:scale(1.1)}.kerim.pose-flying .k-pupil{transform:translateX(.7px)}
+.kerim.pose-flying .k-bird{transform:translateY(-7px) rotate(5deg)}.kerim.pose-flying .k-head{transform:rotate(-4deg)}
+.kerim.pose-flying .k-tail{transform:rotate(165deg) scaleY(1.6) rotate(-155deg)}/* the tail fans: a stretch across its own 155deg axis */
+.kerim.talk .k-beak-lo{transform:rotate(22deg)}/* talking reads in still mode too: the beak stands a little open */@media (prefers-reduced-motion:no-preference){.kerim .k-body{animation:k-breathe 3.4s ease-in-out infinite}.kerim:not(.sleepy) .k-lid,.chr .k-lid{animation:k-blink 4.8s infinite}.kerim.idle .k-head{animation:k-bob 3s ease-in-out infinite}.kerim.idle .k-wing{animation:k-ruffle 7s ease-in-out infinite 1.5s}.kerim.happy:not(.pose-flying) .k-tail{animation:k-wag .9s ease-in-out infinite alternate}.kerim.happy .k-head{animation:k-bob 1.8s ease-in-out infinite}.kerim.happy .k-note{animation:k-note 2.4s ease-out infinite}.kerim.cheer .k-bird{animation:k-hop .62s var(--ease-spring) 2}.kerim.cheer .k-wing{animation:k-flutter .14s ease-in-out 8 alternate}.kerim.cheer .k-wingFar{animation:k-flutterfar .14s ease-in-out 8 alternate}.kerim.cheer .k-spark{animation:k-spark .9s var(--ease-soft) both}.kerim.cheer .k-spark:nth-child(2){animation-delay:.15s}.kerim.cheer .k-spark:nth-child(3){animation-delay:.3s}.kerim.sad .k-head{animation:k-droop 2.6s ease-in-out infinite alternate}.kerim.sad .k-tear{animation:k-tear 1.8s ease-in infinite .3s}.kerim.think .k-head{animation:k-tilt 2.4s ease-in-out infinite alternate}.kerim.sleepy .k-body{animation-duration:5.5s}.kerim.sleepy .k-z{animation:k-z 3s ease-out infinite}.kerim.greet .k-wing{animation:k-wave 1.6s ease-in-out both}.kerim.greet .k-head{animation:k-tilt 1.6s ease-in-out}.kerim.talk .k-beak-lo,.chr.talk .k-beak-lo{animation:k-beak .2s ease-in-out infinite alternate}.kerim.talk .k-head{animation:k-nod .42s ease-in-out infinite alternate}.kerim.pose-flying .k-wing{animation:k-flap .46s ease-in-out infinite alternate}.kerim.pose-flying .k-wingFar{animation:k-flapfar .46s ease-in-out infinite alternate}.kerim.pose-flying .k-bird{animation:k-glide 2.2s ease-in-out infinite alternate}.kerim.enter-land .k-bird{animation:k-land 1.1s var(--ease-soft) both}.kerim.enter-land .k-wingFar{display:inline;animation:k-flapfar .18s ease-in-out 6 alternate}.kerim.enter-land .k-wing{animation:k-flap .18s ease-in-out 6 alternate}.kerim.enter-land .k-legs{animation:k-legs 1.1s both}.kerim.enter-land .k-fold{display:none}.kerim.enter-land .k-spread{display:inline}.kerim.enter-land .k-calm{opacity:0}.bubble.pop,.pupline .bubble{animation:b-pop .35s var(--ease-spring)}}
+@keyframes k-breathe{0%,100%{transform:none}50%{transform:scale(1.012,1.03)}}
+@keyframes k-blink{0%,93%,100%{transform:scaleY(0)}96%{transform:scaleY(1)}}
+@keyframes k-bob{0%,100%{transform:none}30%{transform:rotate(-3deg)}60%{transform:translate(.8px,.4px) rotate(2deg)}}
+@keyframes k-ruffle{0%,86%,100%{transform:none}89%{transform:rotate(-7deg)}92%{transform:rotate(3deg)}95%{transform:rotate(-4deg)}}
+@keyframes k-wag{from{transform:rotate(-5deg)}to{transform:rotate(7deg)}}
+@keyframes k-hop{0%,100%{transform:none}15%{transform:scale(1.06,.92)}45%{transform:translateY(-10px) scale(.97,1.04)}80%{transform:scale(1.04,.95)}}
+@keyframes k-flutter{from{transform:rotate(8deg)}to{transform:rotate(-18deg)}}
+@keyframes k-flutterfar{from{transform:rotate(-8deg)}to{transform:rotate(18deg)}}
+@keyframes k-spark{0%{opacity:0;transform:scale(.2) rotate(-40deg)}50%{opacity:1;transform:scale(1.25)}100%{opacity:1;transform:none}}
+@keyframes k-note{0%{opacity:0;transform:translate(-2px,3px)}20%,70%{opacity:1}100%{opacity:0;transform:translate(2px,-5px)}}
+@keyframes k-droop{from{transform:translateY(1.5px) rotate(12deg)}to{transform:translateY(2px) rotate(17deg)}}
+@keyframes k-tear{0%{opacity:0;transform:none}20%{opacity:1}100%{opacity:0;transform:translateY(7px)}}
+@keyframes k-tilt{0%{transform:rotate(-11deg)}100%{transform:rotate(-4deg)}}
+@keyframes k-z{0%{opacity:0;transform:translate(-4px,4px) scale(.6)}30%{opacity:1}100%{opacity:0;transform:translate(3px,-6px) scale(1.1)}}
+@keyframes k-wave{0%,100%{transform:rotate(16deg)}25%,75%{transform:rotate(30deg)}50%{transform:rotate(6deg)}}
+@keyframes k-beak{from{transform:none}to{transform:rotate(22deg)}}
+@keyframes k-nod{from{transform:rotate(-2deg)}to{transform:rotate(3deg) translateY(.5px)}}
+@keyframes k-flap{from{transform:rotate(14deg)}to{transform:rotate(-62deg)}}
+@keyframes k-flapfar{from{transform:rotate(-14deg)}to{transform:rotate(62deg)}}
+@keyframes k-glide{from{transform:translateY(-9px) rotate(3deg)}to{transform:translateY(-4.5px) rotate(7deg)}}
+@keyframes k-land{0%{opacity:0;transform:translate(-80px,-62px) rotate(-16deg) scale(.72)}12%{opacity:1}68%{transform:translate(0,-7px) rotate(-5deg)}80%{transform:scale(1.08,.88)}91%{transform:scale(.97,1.04)}100%{transform:none}}
+@keyframes k-legs{0%,62%{opacity:0;transform:scaleY(.3)}78%,100%{opacity:1;transform:none}}
+@keyframes b-pop{from{transform:scale(.85);opacity:0}}
+.bubble{position:relative;background:var(--surface);border:0;border-radius:20px;padding:12px 16px;display:grid;gap:4px;max-width:280px;box-shadow:var(--shadow-float);transform-origin:bottom left}
+.bubble .b-tr{font-weight:400;font-size:16px;line-height:1.4}.bubble .b-fa{font-size:14px;color:var(--muted);line-height:1.6}
+.pupline{display:flex;align-items:center;gap:8px;margin-top:4px}
+.empty>.kerim{display:block;margin:0 auto 10px}
+.pupline .bubble{max-width:none;padding:8px 12px;border-bottom-left-radius:6px}.pupline .b-tr{font-size:14px}.pupline .b-fa{font-size:13px}
+}

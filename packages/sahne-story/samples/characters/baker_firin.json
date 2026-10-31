@@ -1,0 +1,77 @@
+{
+  "avatar": {
+    "body": {
+      "build": "adult",
+      "height": 0.17,
+      "shape": "slim"
+    },
+    "face": {
+      "brows": "arched",
+      "ears": "large",
+      "eyeColor": "eye_hazel",
+      "eyes": "small",
+      "mouth": "small",
+      "nose": "broad",
+      "shape": "long"
+    },
+    "facialHair": {
+      "style": "beard_short"
+    },
+    "hair": {
+      "color": "hair_06",
+      "style": "hair_buzz"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "colors": [
+          "fab_21"
+        ],
+        "id": "bottom_trousers"
+      },
+      "shoes": {
+        "colors": [
+          "fab_21"
+        ],
+        "id": "shoes_clogs_work"
+      },
+      "top": {
+        "colors": [
+          "fab_01"
+        ],
+        "id": "top_tee"
+      }
+    },
+    "skin": "skin_03",
+    "v": 1,
+    "wear": {
+      "waist": {
+        "colors": [
+          "fab_01"
+        ],
+        "id": "apron_shop"
+      }
+    }
+  },
+  "bio": {
+    "en": "Hands out the warm loaves when the bread comes out at four.",
+    "fa": "ساعتِ چهار که نان از تنور درمی‌آید، نان‌های گرم را می‌دهد."
+  },
+  "color": "#8A8580",
+  "id": "baker_firin",
+  "kind": "extra",
+  "level": "A1",
+  "name": {
+    "fa": "نانوا",
+    "tr": "Fırıncı"
+  },
+  "order": 104,
+  "places": [
+    "firin",
+    "ferikoy"
+  ],
+  "role": {
+    "en": "The baker at the corner bakery in Feriköy",
+    "fa": "نانوای نانواییِ سرِ کوچه در فری‌کؤی"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "v": 1,
+  "id": "samples",
+  "title": {
+    "tr": "Sahne örnekleri",
+    "en": "Sahne samples",
+    "fa": "نمونه‌های صحنه"
+  },
+  "summary": {
+    "en": "The sample series: one short story, its cast and three places, for the gallery, the tests and the editor.",
+    "fa": "مجموعهٔ نمونه: یک داستان کوتاه، شخصیت‌ها و سه مکانش، برای گالری، تست‌ها و ویرایشگر."
+  },
+  "languages": {
+    "main": "tr",
+    "translations": ["en", "fa"]
+  },
+  "narrator": "kerim",
+  "standin": "nima"
+}

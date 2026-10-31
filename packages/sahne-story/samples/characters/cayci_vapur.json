@@ -1,0 +1,76 @@
+{
+  "avatar": {
+    "body": {
+      "build": "adult",
+      "height": 0.24,
+      "shape": "average"
+    },
+    "face": {
+      "brows": "straight",
+      "ears": "small",
+      "eyes": "almond",
+      "mouth": "full",
+      "nose": "small",
+      "shape": "diamond"
+    },
+    "facialHair": {
+      "style": "moustache"
+    },
+    "hair": {
+      "color": "hair_10",
+      "style": "hair_messy_short"
+    },
+    "kit": "sahne-kit@1",
+    "outfit": {
+      "bottom": {
+        "colors": [
+          "fab_22"
+        ],
+        "id": "bottom_trousers"
+      },
+      "shoes": {
+        "colors": [
+          "fab_56",
+          "fab_22"
+        ],
+        "id": "shoes_leather"
+      },
+      "top": {
+        "colors": [
+          "fab_01"
+        ],
+        "id": "top_shirt"
+      }
+    },
+    "skin": "skin_04",
+    "v": 1,
+    "wear": {
+      "waist": {
+        "colors": [
+          "fab_04"
+        ],
+        "id": "apron_cafe"
+      }
+    }
+  },
+  "bio": {
+    "en": "Comes round the deck with a tray of tea glasses.",
+    "fa": "با سینیِ استکان‌های چای روی عرشه می‌چرخد."
+  },
+  "color": "#8A8580",
+  "id": "cayci_vapur",
+  "kind": "extra",
+  "level": "A1",
+  "name": {
+    "fa": "چای‌فروش",
+    "tr": "Çaycı"
+  },
+  "order": 103,
+  "places": [
+    "vapur_deck"
+  ],
+  "role": {
+    "en": "The çaycı on the ferry",
+    "fa": "چای‌فروشِ کشتی"
+  }
+}

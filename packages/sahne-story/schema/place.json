@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "place.json",
+  "title": "A place document (STORIES_SCHEMA.md §6; a Sahne PlaceDoc with a three-language name)",
+  "type": "object",
+  "required": ["v", "id", "name", "size", "pieces", "marks"],
+  "properties": {
+    "v": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "name": { "type": "object", "minProperties": 1, "propertyNames": { "pattern": "^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$" }, "additionalProperties": { "type": "string", "minLength": 1 } },
+    "district": { "type": "string" },
+    "site": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "placeholder": { "type": "string" },
+    "outdoor": { "type": "boolean" },
+    "size": { "type": "object", "required": ["w", "d"], "properties": { "w": { "type": "number", "exclusiveMinimum": 0 }, "d": { "type": "number", "exclusiveMinimum": 0 } } },
+    "pieces": { "type": "array", "items": { "type": "object", "required": ["kit", "x", "z"] } },
+    "marks": { "type": "object", "additionalProperties": { "type": "object", "required": ["x", "z"], "properties": { "x": { "type": "number" }, "z": { "type": "number" } } } },
+    "props": { "type": "object", "additionalProperties": { "type": "object", "required": ["kit", "at"] } },
+    "times": { "type": "array", "items": { "enum": ["dawn", "day", "golden", "dusk", "night", "overcast"] } },
+    "states": { "type": "object", "additionalProperties": { "type": "object", "properties": { "group": { "type": "string" }, "default": { "const": true }, "cold": { "const": true } }, "additionalProperties": false } },
+    "perch": { "type": "string" },
+    "camera": { "type": "object" },
+    "life": { "const": "run" },
+    "stops": { "type": "object", "required": ["stations"] },
+    "ambience": { "type": "array", "items": { "type": "string" } },
+    "motif": { "type": "string" },
+    "surface": { "enum": ["stone", "wood", "tile", "carpet"] }
+  },
+  "additionalProperties": false
+}
