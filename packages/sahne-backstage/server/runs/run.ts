@@ -13,7 +13,7 @@ import { HumanMessage } from "@langchain/core/messages";
 import type { Store } from "./store.ts";
 import { NodeSqliteSaver } from "./saver.ts";
 import type { Events } from "../events.ts";
-import type { Kind } from "../content.ts";
+import { listing, type Kind } from "../content.ts";
 import type { AgentEdits, McpOptions } from "../mcp.ts";
 import { systemPrompt, usageSummary, type AssistantEvent } from "../assistant.ts";
 import { agentGraph } from "../agent/graph.ts";
@@ -383,7 +383,10 @@ export class Runs {
         run: async c => {
           if (c.name === "propose_plan" && s.kind === "plan") {
             const v = c.input as { brief?: unknown; steps?: unknown };
-            const bad = this.setPlan(run, { brief: String(v.brief ?? ""), steps: Array.isArray(v.steps) ? v.steps as PlanStep[] : [] });
+            const steps = Array.isArray(v.steps) ? v.steps as PlanStep[] : [];
+            // a retired character id is never made again: say so before any step finds out
+            const retired = new Set(listing().retired), gone = steps.flatMap(x => x.owns ?? []).filter(o => o.kind === "character" && retired.has(o.id)).map(o => o.id);
+            const bad = gone.length ? gone.map(id => `the character id ${id} is retired (a character that was deleted): pick another id, and use it everywhere in the brief`) : this.setPlan(run, { brief: String(v.brief ?? ""), steps });
             if (bad.length) return { text: `The plan is not set; fix this and propose it again:\n${bad.map(b => `- ${b}`).join("\n")}`, isError: true };
             s.summary = `The plan: ${run.steps.filter(x => x.kind !== "plan").map(x => x.title).join("; ")}.`;
             this.changed(run);

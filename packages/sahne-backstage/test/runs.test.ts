@@ -240,3 +240,11 @@ test("turning a step's proposal down: it and the finished steps built on it need
   await r.idle();
   assert.equal(run.status, "done");
 });
+
+test("a plan that would make a retired character id is refused, with why", async () => {
+  const { r } = runs(scripted({ plan: [{ calls: [{ name: "propose_plan", args: { brief: "b", steps: [{ id: "cast_z", kind: "character", title: "Zeynep", brief: "z", owns: [{ kind: "character", id: "zeynep" }] }] } }] }, { text: "stuck" }] }));
+  const run = r.create({ goal: "g" });
+  await r.idle();
+  assert.match(JSON.stringify(r.log(run.id, "plan")), /the character id zeynep is retired/);
+  assert.deepEqual(run.steps.map(s => s.id), ["plan"]);
+});
