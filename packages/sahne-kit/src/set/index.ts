@@ -41,6 +41,7 @@ export const FAMILIES: Record<string, () => Promise<Family>> = {
   houses: () => import("./houses.ts"),
   transit: () => import("./transit.ts"),
   bakery: () => import("./bakery.ts"),
+  festival: () => import("./festival.ts"),
 };
 
 /** What a place document names: its pieces' and props' kit ids. */

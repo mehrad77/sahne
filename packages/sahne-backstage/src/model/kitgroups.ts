@@ -14,6 +14,7 @@ export const PROP_SHELVES: readonly Shelf[] = [
   { id: "paper", label: "Paper & school", tags: ["paper", "school", "stationery", "desk", "print", "reading", "words"] },
   { id: "tech", label: "Tech & tools", tags: ["tech", "phone", "gadget", "machine", "hardware", "tool"] },
   { id: "health", label: "Health & care", tags: ["medicine", "pharmacy", "health", "care"] },
+  { id: "festival", label: "Festivals", tags: ["festival", "christmas", "easter", "carnival", "spring", "folk", "fair"] },
   { id: "play", label: "Play & events", tags: ["toy", "party", "game", "music", "instrument", "art", "sport", "outing", "event"] },
 ];
 
@@ -27,6 +28,7 @@ export const SET_SHELVES: readonly Shelf[] = [
   { id: "shop", label: "Shops & food", tags: ["shop", "food", "vendor", "kitchen"] },
   { id: "furniture", label: "Furniture & seating", tags: ["seating", "furniture", "rug", "home", "tech", "machine", "appliance"] },
   { id: "signs", label: "Lights & signs", tags: ["light", "sign", "hung", "clock", "picture", "flag", "paper"] },
+  { id: "festival", label: "Festivals", tags: ["festival", "christmas", "easter", "carnival", "spring", "folk", "fair"] },
   { id: "life", label: "People & animals", tags: ["people", "animal"] },
 ];
 
