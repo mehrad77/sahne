@@ -180,20 +180,6 @@ export function estimate(req: AssistantRequest, p: Provider): { usd: number; tok
   return { usd: costOf(p.id, p.model, u), tokens: u.input + u.output, why: `${/draft|write/i.test(text) ? "drafting" : "reviewing"} ${count} episode${count > 1 ? "s" : ""}${n ? ` of season ${n}` : ""} reads and writes about ${Math.round((u.input + u.output) / 1000)}k tokens on ${p.model}` };
 }
 
-/**
- * The pictures of every tool result but the last one that has any, as a line saying one was there (the Messages API's
- * shape: a user message of tool_result blocks whose content holds image blocks).
- */
-export function dropOldPictures(messages: unknown[]): void {
-  type Block = { type: string; content?: unknown };
-  const withPics = (m: unknown) => Array.isArray((m as { content?: unknown }).content) && ((m as { content: Block[] }).content).some(b => b.type === "tool_result" && Array.isArray(b.content) && (b.content as Block[]).some(c => c.type === "image"));
-  const last = messages.map(withPics).lastIndexOf(true);
-  messages.forEach((m, i) => {
-    if (i === last || !withPics(m)) return;
-    for (const b of (m as { content: Block[] }).content) if (b.type === "tool_result" && Array.isArray(b.content)) b.content = (b.content as Block[]).map(c => (c.type === "image" ? { type: "text", text: "[a picture, looked at earlier]" } : c));
-  });
-}
-
 const summaryOf = (texts: string[]) => (texts[0] ?? "").split("\n")[0].slice(0, 240);
 /** How much of a tool's result the editor gets, to show when a call is opened. */
 const DETAIL = 4000;
@@ -336,7 +322,6 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
       }
       messages.push(...p.results(results));
       // only the newest pictures go out again: each round resends the whole conversation, and a picture costs about a thousand tokens
-      if (results.some(x => x.images?.length)) dropOldPictures(messages);
       // a question for the person ends the turn: their answer is the next message
       if (asked) break;
     }

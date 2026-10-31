@@ -168,13 +168,13 @@ test("ask_person: a card for the person ends the turn; set_review in proposals m
   assert.deepEqual(rv.find(e => e.type === "ask")!.review, { id: "s1e00", status: "reviewed" });
 });
 
-test("only the newest picture is sent again", async () => {
-  const { dropOldPictures } = await import("../server/assistant.ts");
-  const pic = (id: string) => ({ role: "user", content: [{ type: "tool_result", tool_use_id: id, content: [{ type: "text", text: id }, { type: "image", source: { type: "base64", media_type: "image/png", data: "AAAA" } }] }] });
-  const ms: any[] = [{ role: "user", content: "hi" }, pic("a"), { role: "assistant", content: [] }, pic("b")];
-  dropOldPictures(ms);
-  assert.deepEqual(ms[1].content[0].content[1], { type: "text", text: "[a picture, looked at earlier]" });
-  assert.equal(ms[3].content[0].content[1].type, "image");
+test("the conversation goes back as it was: an earlier tool's picture is not rewritten", async () => {
+  // Claude signs its thinking against everything before it, and the request is cached: changing an earlier message breaks both
+  answers(toolTurn("toolu_p1", "read_look", { id: "ismail" }), toolTurn("toolu_p2", "read_look", { id: "ismail", section: "hair" }), textTurn("Looked."));
+  await ask("Look at İsmail twice");
+  const last = sent.at(-1)!.body.messages as { content: unknown }[];
+  const images = JSON.stringify(last).split('"type":"image"').length - 1;
+  assert.equal(images, 2, "both pictures are still there");
 });
 
 test("the web on Claude: Anthropic's search runs on its side; a paused turn goes on; the pages found are shown, and each search is priced", async () => {
