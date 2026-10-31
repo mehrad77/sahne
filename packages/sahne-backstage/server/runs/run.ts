@@ -12,6 +12,7 @@ import { Command } from "@langchain/langgraph";
 import { HumanMessage } from "@langchain/core/messages";
 import type { Store } from "./store.ts";
 import { NodeSqliteSaver } from "./saver.ts";
+import { Journal, type Undone, type Written } from "./journal.ts";
 import type { Events } from "../events.ts";
 import { listing, type Kind } from "../content.ts";
 import type { AgentEdits, McpOptions } from "../mcp.ts";
@@ -27,7 +28,7 @@ import { readSettings, type Settings } from "../settings.ts";
 export type StepKind = "plan" | "season" | "character" | "place" | "episode" | "review" | "task";
 /** The steps that come before the cast-and-places gate. */
 const FIRST: StepKind[] = ["season", "character", "place"];
-export type StepStatus = "waiting" | "running" | "asking" | "done" | "failed" | "stopped" | "stale" | "skipped";
+export type StepStatus = "waiting" | "running" | "asking" | "done" | "failed" | "stopped" | "stale" | "skipped" | "undone";
 export interface Owned { kind: Kind; id: string }
 export interface PlanStep { id: string; kind: StepKind; title: string; brief: string; needs?: string[]; owns?: Owned[]; model?: string }
 export interface Plan { brief: string; steps: PlanStep[] }
@@ -146,6 +147,7 @@ const stepOf = (p: PlanStep): Step => ({ id: p.id, kind: p.kind, title: p.title,
 export class Runs {
   private readonly o: RunsOptions;
   private readonly saver: NodeSqliteSaver;
+  readonly journal: Journal;
   private list: Run[];
   private n: number;
   private readonly live = new Map<string, AbortController>();
@@ -154,6 +156,7 @@ export class Runs {
   constructor(o: RunsOptions) {
     this.o = o;
     this.saver = new NodeSqliteSaver(o.store.db);
+    this.journal = new Journal(o.store);
     o.store.db.exec("CREATE TABLE IF NOT EXISTS run_log (run TEXT NOT NULL, step TEXT NOT NULL, seq INTEGER NOT NULL, event TEXT NOT NULL, PRIMARY KEY (run, step, seq))");
     const kept = o.store.get<{ n: number; runs: Run[] }>("runs", { n: 0, runs: [] });
     this.n = kept.n; this.list = kept.runs;
@@ -241,6 +244,34 @@ export class Runs {
     }
   }
 
+  /**
+   * Undo what a run wrote: everything, newest first, or these documents with what the steps after theirs built on them
+   * (undoing a character undoes the episodes that use her). A document someone changed since the run is kept. The steps
+   * whose writes are all undone are `undone`, and may be done again.
+   */
+  undo(id: string, items?: { kind: Kind; id: string }[]): { run: Run; undone: Undone[]; kept: Written[] } {
+    const run = this.need(id), all = this.journal.of(run.id);
+    if (run.steps.some(s => s.status === "running" || s.status === "asking")) throw new Error("stop the run first: its steps are still working");
+    let which = all;
+    if (items) {
+      // the documents named, and everything the steps after theirs wrote (they built on them)
+      const named = (w: Written) => items.some(it => it.kind === w.kind && it.id === w.id), later = new Set<string>();
+      for (const it of items) {
+        const w = all.find(x => x.kind === it.kind && x.id === it.id);
+        if (!w) throw new Error(`run ${id} wrote no ${it.kind} ${it.id} that is still there to undo`);
+        for (const x of this.after(run, w.step)) later.add(x.id);
+      }
+      which = all.filter(w => named(w) || later.has(w.step));
+    }
+    const r = this.journal.undo(which);
+    for (const u of r.undone) this.o.events.emit("doc", { kind: u.kind, id: u.id, mtime: u.mtime ?? 0, by: run.by, ...(u.removed ? { removed: true } : {}) });
+    // a step none of whose writes are left is undone; it may be done again
+    const left = this.journal.of(run.id);
+    for (const s of run.steps) if (s.status === "done" && which.some(w => w.step === s.id) && !left.some(w => w.step === s.id)) s.status = "undone";
+    this.changed(run);
+    return { run, ...r };
+  }
+
   /** The person's answer at a gate (go on, or stop), or new gates. */
   act(id: string, a: { action: "continue" } | { action: "stop" } | { action: "gates"; gates: Partial<Gates> } | { action: "budget"; maxUsd: number } | { action: "plan"; plan: Plan }): Run {
     const run = this.need(id);
@@ -314,7 +345,7 @@ export class Runs {
   private tick(run: Run): void {
     if (run.status === "done" || run.status === "stopped" || run.status === "paused") return;
     const steps = run.steps, done = (id: string) => steps.find(s => s.id === id)?.status === "done";
-    if (steps.every(s => s.status === "done" || s.status === "skipped")) { run.status = "done"; delete run.gate; this.changed(run); return; }
+    if (steps.every(s => s.status === "done" || s.status === "skipped" || s.status === "undone")) { run.status = "done"; delete run.gate; this.changed(run); return; }
     // a run that plans itself runs its planner first; then the plan waits at its gate
     const planning = steps.some(s => s.kind === "plan" && s.status !== "done" && s.status !== "skipped");
     if (!planning && run.gates.plan && !run.passed.includes("plan")) { if (run.status !== "gate") { run.status = "gate"; run.gate = "plan"; this.changed(run); } return; }
@@ -373,7 +404,7 @@ export class Runs {
     let bs: Awaited<ReturnType<typeof backstage>> | null = null, failed: string | undefined;
     try {
       const st = this.settings(), model = this.modelOf(run, s);
-      bs = await backstage({ write: this.o.write, agentEdits: run.agentEdits, shareCards: this.o.shareCards, events: this.o.events, by: run.by, onCall: this.o.onCall, step: { id: s.id, owns: s.owns } }, run.by);
+      bs = await backstage({ write: this.o.write, agentEdits: run.agentEdits, shareCards: this.o.shareCards, events: this.o.events, by: run.by, onCall: this.o.onCall, step: { id: s.id, owns: s.owns }, journal: (before, saved) => this.journal.record(run.id, s.id, before, saved) }, run.by);
       const mcp = bs.client;
       const system = `${systemPrompt({ agentEdits: run.agentEdits, writable: this.o.write, shareCards: this.o.shareCards, web: null, notes: readMemory() })}\n\nYou are one step of a run: a long task split into steps, each done by its own agent with a fresh context. Do your step well and only your step; the person reviews the run's work by step.`;
       const graph = agentGraph({

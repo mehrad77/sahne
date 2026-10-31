@@ -22,7 +22,7 @@ import { rng } from "../../sahne/src/core/rng.ts";
 import { IS_SAMPLES } from "../../sahne-story/paths.ts";
 import { arcId } from "../../sahne-story/check/rules.ts";
 import { allLanguages, langFor, languagesOf, seasonOf, suggest, textOf, type Languages, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
-import { allProblems, check, refuse, usesOf, exists, forget, idsOf, kit as kitOf, listing, oldShape, readDoc, save, searchCards, type Edit, type Kind, type Problem } from "./content.ts";
+import { allProblems, check, refuse, usesOf, exists, forget, idsOf, kit as kitOf, listing, oldShape, readDoc, save, searchCards, type Before, type Edit, type Kind, type Problem } from "./content.ts";
 import { readReview, standingFor, STATUSES, writeReview, type EpisodeReview } from "./review.ts";
 import { fail, ok, Refusal, type Result } from "./result.ts";
 import { pieceRows, registerKitTools } from "./kittools.ts";
@@ -63,6 +63,8 @@ export interface McpOptions {
   onCall?(c: Call): void;
   /** A step of a run (runs/run.ts): its id, on each proposal it makes, and the documents it may create or change. */
   step?: { id: string; owns: { kind: Kind; id: string }[] };
+  /** Told of each direct save: what the files were before, and their new mtimes (a run's journal, runs/journal.ts). */
+  journal?(before: Before[], saved: Record<string, number>): void;
 }
 
 /** What any step of a run may edit, one at a time (`inTurn`): the season and the series, and kit drawings (new ids each). */
@@ -284,7 +286,9 @@ export function createMcp(o: McpOptions): McpServer {
     if (step) for (const e of list) if (!SHARED.has(e.kind) && !step.owns.some(x => x.kind === e.kind && x.id === e.id))
       return fail(`not ${o.agentEdits === "direct" ? "saved" : "proposed"}: ${e.kind} ${e.id} is not this step's to ${e.create ? "create" : "change"}. This step makes ${step.owns.map(x => `${x.kind} ${x.id}`).join(", ") || "nothing of its own"}; say in finish_step what ${e.id} needs instead`);
     if (o.agentEdits === "direct") {
-      const r = save(list, { write: o.write });
+      let before: Before[] = [];
+      const r = save(list, { write: o.write, before: b => { before = b; } });
+      if (r.status === 200) o.journal?.(before, r.saved ?? {});
       if (r.status !== 200) {
         const errs = (r.problems ?? []).filter(p => p.new && p.level === "error");
         return fail(`not saved (${r.status}): ${r.message ?? ""}${errs.length ? `\n${errs.map(fmt).join("\n")}` : ""}`);

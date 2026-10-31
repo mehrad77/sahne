@@ -176,7 +176,9 @@ export async function serve(o: Options): Promise<Running> {
     }
     if (route === "runs") {
       const [, id, sub, step, what] = path;
-      if (!id && m === "GET") return json(res, 200, { runs: runs.all() });
+      // each run with the documents it wrote and can still undo (runs/journal.ts)
+      const withMade = (r: ReturnType<Runs["all"]>[number]) => ({ ...r, made: runs.journal.made(r.id) });
+      if (!id && m === "GET") return json(res, 200, { runs: runs.all().map(withMade) });
       if (!o.write && m === "POST") throw new Fail(403, "read-only: start backstage with --write");
       try {
         if (!id && m === "POST") {
@@ -186,8 +188,12 @@ export async function serve(o: Options): Promise<Running> {
         }
         const run = runs.get(id);
         if (!run) throw new Fail(404, `there is no run ${id}`);
-        if (!sub && m === "GET") return json(res, 200, { run });
-        if (!sub && m === "POST") return json(res, 200, { run: runs.act(id, await body(req) as Parameters<Runs["act"]>[1]) });
+        if (!sub && m === "GET") return json(res, 200, { run: withMade(run) });
+        if (!sub && m === "POST") {
+          const v = await body(req) as { action?: string; items?: { kind: Kind; id: string }[] };
+          if (v?.action === "undo") { const r = runs.undo(id, Array.isArray(v.items) ? v.items : undefined); return json(res, 200, { run: withMade(r.run), undone: r.undone, kept: r.kept.map(({ before: _b, ...w }) => w) }); }
+          return json(res, 200, { run: withMade(runs.act(id, v as Parameters<Runs["act"]>[1])) });
+        }
         if (sub === "steps" && step && what === "log" && m === "GET") return json(res, 200, { events: runs.log(id, step, Number(new URL(req.url ?? "", "http://x").searchParams.get("after") ?? 0)) });
         if (sub === "steps" && step && !what && m === "POST") return json(res, 200, { run: await runs.step(id, step, await body(req) as Parameters<Runs["step"]>[2]) });
       } catch (e) { if (e instanceof Fail) throw e; throw new Fail(400, (e as Error).message); }

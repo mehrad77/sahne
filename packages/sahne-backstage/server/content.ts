@@ -273,8 +273,14 @@ export function refuse(e: Edit): string | null {
   return null;
 }
 
-/** Save a set of documents: refused whole when one is refused, changed on disk since it was read (409), or brings an error (422). */
-export function save(edits: Edit[], o: { write: boolean }): SaveResult {
+/** A document as it was just before a save wrote it: its file's text, or null when the save created it (a run's journal). */
+export interface Before { kind: Kind; id: string; text: string | null }
+
+/**
+ * Save a set of documents: refused whole when one is refused, changed on disk since it was read (409), or brings an error
+ * (422). `before` is told what each file was, once nothing can refuse the save any more and before anything is written.
+ */
+export function save(edits: Edit[], o: { write: boolean; before?: (b: Before[]) => void }): SaveResult {
   if (!o.write) return { status: 403, message: IS_SAMPLES ? "the samples are read-only: start backstage with --write to edit them" : "this backstage is read-only (no --write)" };
   if (oldShape().length) return { status: 403, message: `the content root is in the old language shape (${oldShape().length} files): run node packages/sahne-story/convert/languages.ts on it first` };
   if (!edits.length) return { status: 400, message: "nothing to save" };
@@ -283,6 +289,7 @@ export function save(edits: Edit[], o: { write: boolean }): SaveResult {
   const problems = check(edits);
   if (problems.some(p => p.new && p.level === "error")) return { status: 422, problems, message: "the edit brings errors" };
   const saved: Record<string, number> = {};
+  o.before?.(edits.map(e => { const u = fileOf(e.kind, e.id); return { kind: e.kind, id: e.id, text: existsSync(u) ? readFile(u).text : null }; }));
   for (const e of edits) { const u = fileOf(e.kind, e.id); saved[`${e.kind}:${e.id}`] = writeAtomic(u, textFor(u, e.doc)); }
   forget();
   return { status: 200, saved, problems };
