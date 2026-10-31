@@ -7,6 +7,7 @@
 import { arcPoints, band, ellipse, groupBounds, mul, Path, poly, rect, rotate, rrect, rng, smooth, tone, translate, mix, type Affine, type FlatMotion, type FlatReact, type FlatSpec, type LightSpec, type PieceDef, type Rng, type Shape, type TextSpec, type Vec2 } from "sahne";
 import { hex, S, P, L, num, str, flip, holed, copies, ridge, goes, glowOnly, litByTurns, solidLine, type Pt, timetable, stopsParam } from "./draw.ts";
 import { person, personFlats, type Pose } from "./people.ts";
+import { COUNTRIES, countryOf, flagCloth, flagWidth } from "../flags.ts";
 
 /** Most people one crowd piece draws near the camera (DESIGN.md §12: atlas memory). */
 export const CROWD_MAX = 24;
@@ -38,7 +39,7 @@ function farStrip(r: Rng, per: number, lo: number, hi: number, mute: number): Sh
  */
 const crowd: PieceDef = { draw(p, r) {
   const kind = str(p.kind, "walk"), n = Math.max(0, Math.min(CROWD_MAX, Math.round(num(p.n, 8)))), x0 = num(p.x0, -500), x1 = num(p.x1, 500), dir0 = Math.sign(num(p.dir, 0));
-  const mute = num(p.mute, 0.3), night = num(p.night, 0.4), flagState = str(p.flagState, "flags");
+  const mute = num(p.mute, 0.3), night = num(p.night, 0.4), flagState = str(p.flagState, "flags"), flagCountry = countryOf(p.flagCountry);
   const who = () => person(r, { cold: !!p.cold, flags: num(p.flags, 0.5), umbrellas: num(p.umbrellas, 0.7) });
   const late = () => r.chance(night) ? undefined : { time: NOT_NIGHT };
   const flats: FlatSpec[] = [];
@@ -59,10 +60,10 @@ const crowd: PieceDef = { draw(p, r) {
       const ms = len / v * 1000, from = d > 0 ? Math.min(x0, x1) : Math.max(x0, x1), to = d > 0 ? Math.max(x0, x1) : Math.min(x0, x1);
       const move: FlatMotion = { path: { pts: [[from, 0, 0], [to, 0, 0]], ms, wait: r.range(0, ms * 0.35), hide: true }, sway: { dy: 1.4, rot: 0.01, ms: step * 2 }, phase: (i + r.range(0, 0.7)) / n };
       const pp = who(), w = late();
-      flats.push(...personFlats(pp, "walk", { dir: d, at: [0, dz], mute, move, step, when: w, flagState }));
+      flats.push(...personFlats(pp, "walk", { dir: d, at: [0, dz], mute, move, step, when: w, flagState, flagCountry }));
       // now and then a child walks beside a grown-up
       if (pp.build !== "child" && r.chance(0.12) && i < n - 1) {
-        flats.push(...personFlats(person(r, { build: "child", flags: num(p.flags, 0.5), umbrellas: 0.2 }), "walk", { dir: d, at: [0, dz + 18], mute, move: { ...move, path: { ...move.path!, pts: move.path!.pts.map(([a, b, c]) => [a + d * 34, b, c] as [number, number, number]) } }, step: step * 0.85, when: w, flagState }));
+        flats.push(...personFlats(person(r, { build: "child", flags: num(p.flags, 0.5), umbrellas: 0.2 }), "walk", { dir: d, at: [0, dz + 18], mute, move: { ...move, path: { ...move.path!, pts: move.path!.pts.map(([a, b, c]) => [a + d * 34, b, c] as [number, number, number]) } }, step: step * 0.85, when: w, flagState, flagCountry }));
         i++;
       }
     }
@@ -80,7 +81,7 @@ const crowd: PieceDef = { draw(p, r) {
     } else if (kind === "sit") { d = dir0 || 1; at = [lo + i * (p.gap !== undefined ? num(p.gap, 60) : r.range(56, 64)), 0]; pose = p.front ? "sit_front" : "sit"; }
     else { d = dir0 || 1; at = [(d > 0 ? hi : lo) - d * i * r.range(64, 76), r.range(-6, 6)]; }
     const move: FlatMotion = { sway: { rot: 0.008, dy: 0.5, ms: r.range(2600, 4200) }, phase: r() };
-    flats.push(...personFlats(pp, pose, { dir: d, at, mute, move, when: w, flagState, seat: num(p.seat, 45) }));
+    flats.push(...personFlats(pp, pose, { dir: d, at, mute, move, when: w, flagState, flagCountry, seat: num(p.seat, 45) }));
   }
   return { flats };
 }, variants: { walk: { kind: "walk" }, stand: { kind: "stand" }, queue: { kind: "queue" }, sit: { kind: "sit" }, far: { kind: "far" } },
@@ -100,6 +101,7 @@ const crowd: PieceDef = { draw(p, r) {
       umbrellas: { type: "num", min: 0, max: 1, default: 0.7, about: "share with an umbrella in the rain" },
       flags: { type: "num", min: 0, max: 1, default: 0.5, about: "share carrying a little flag in the flag state" },
       flagState: { type: "text", default: "flags", about: "the place state their flags show in" },
+      flagCountry: { type: "enum", values: COUNTRIES, default: "tr", about: "whose little flags they carry" },
       seat: { type: "num", default: 45, about: "seat height for sit, cm" },
     },
     states: ["flags"],
@@ -487,42 +489,25 @@ const archPath = (x: number, w: number, spring: number) => poly([[x - w / 2, 0],
 /** The Turkish flag's red (the flag law's). */
 const TR = "#E30A17";
 
-/**
- * A Turkish flag's cloth `h` cm high, its hoist at x = 0 from y = 0 down to `h`, 1.5 h to the fly, rippling by
- * `amp` (of h) from phase `ph`. The flag law's measures: the crescent's outer circle h/2 across, centred h/2 from
- * the hoist; the inner one 0.4 h across, h/16 further; the star in a circle h/4 across, h/3 beyond the inner
- * circle's near edge (its centre 0.82 h from the hoist), one point towards the hoist.
- */
-export function flagCloth(h: number, amp = 0, ph = 0): Shape[] {
-  const Lf = h * 1.5, wv = (x: number) => amp * h * Math.sin(x / Lf * 5 + ph) * x / Lf, top: Pt[] = [], bot: Pt[] = [];
-  for (let i = 0; i <= 10; i++) { const x = Lf * i / 10, e = i % 10 !== 0; top.push(e ? [x, wv(x)] : [x, wv(x), 0]); bot.unshift(e ? [x, h + wv(x)] : [x, h + wv(x), 0]); }
-  const cloth = smooth([...top, ...bot], true, 1), at = (k: number): Vec2 => [h * k, h / 2 + wv(h * k)], [sx, sy] = at(0.8208);
-  const star: Pt[] = Array.from({ length: 10 }, (_, i) => { const a = Math.PI + i * Math.PI / 5, q = h / 8 * (i % 2 ? 0.382 : 1); return [sx + Math.cos(a) * q, sy + Math.sin(a) * q, 0]; });
-  const out: Shape[] = [S(cloth, TR), S(ellipse(...at(0.5), h / 4), "#FFFFFF", { flat: true }), S(ellipse(...at(0.5625), h * 0.2), TR, { flat: true }), S(smooth(star, true, 1), "#FFFFFF", { flat: true })];
-  // the ripple's troughs in shade, its crests catching the light (the fly moves most)
-  if (amp) for (let i = 0; i < 10; i++) { const c = Math.cos((i + 0.5) / 2 + ph); out.push(S(rect(Lf * i / 10, -h, Lf / 10 + 0.3, h * 3), tone(TR, c < 0 ? "deep" : "light"), { flat: true, opacity: Math.abs(c) * 0.3 * (i + 2) / 11, clip: cloth })); }
-  return out;
-}
-
 /** A string of small flags from (`xa`, `ya`) to (`xb`, `yb`) sagging `sag` cm, each `fh` high, about every `gap` cm, hung by the top edge. */
-function garland(r: Rng, xa: number, ya: number, xb: number, yb: number, sag: number, fh: number, gap: number): Shape[] {
+function garland(r: Rng, xa: number, ya: number, xb: number, yb: number, sag: number, fh: number, gap: number, cs: string[] = ["tr"]): Shape[] {
   const y = (t: number) => ya + (yb - ya) * t + sag * 4 * t * (1 - t), n = Math.max(1, Math.round(Math.hypot(xb - xa, yb - ya) / gap));
   const out: Shape[] = [L(Array.from({ length: 17 }, (_, i): Vec2 => [xa + (xb - xa) * i / 16, y(i / 16)]), "#EDE6D6", Math.max(0.5, fh * 0.05), 0.95)];
   for (let i = 0; i < n; i++) {
     const t = (i + 0.5) / n, a = Math.atan2(y(t + 0.01) - y(t - 0.01), (xb - xa) * 0.02) * 0.7 + r.range(-0.05, 0.05);
-    out.push(...tf(flagCloth(fh, 0.05, r.range(0, 6)), mul(translate(xa + (xb - xa) * t, y(t)), mul(rotate(a), translate(-fh * 0.75, 0)))));
+    { const cc = cs[i % cs.length]; out.push(...tf(flagCloth(fh, 0.05, r.range(0, 6), cc), mul(translate(xa + (xb - xa) * t, y(t)), mul(rotate(a), translate(-flagWidth(fh, cc) / 2, 0))))); }
   }
   return out;
 }
 
 /** A small flag on a stick `len` cm above its grip (the stick goes on 8 cm below it), the cloth `fh` high. */
-const stickFlag = (r: Rng, fh: number, len: number, wd: number): Shape[] => [
+const stickFlag = (r: Rng, fh: number, len: number, wd: number, country = "tr"): Shape[] => [
   { path: smooth([[0, 8], [0, -len]], false, 1), stroke: { color: "#B98A57", width: wd, cap: "round" } }, S(ellipse(0, -len - wd * 0.4, wd * 0.8), "#E0B03C"),
-  ...tf(flagCloth(fh, 0.07, r.range(0, 6)), translate(wd * 0.4, -len + wd * 0.3)),
+  ...tf(flagCloth(fh, 0.07, r.range(0, 6), country), translate(wd * 0.4, -len + wd * 0.3)),
 ];
 
 /**
- * A Turkish flag (red #E30A17, the crescent and the star by the flag law's measures), `kind`:
+ * A flag, Turkey's by default (red #E30A17, the crescent and the star by the flag law's measures), or the `country`'s from `../flags.ts`; `kind`:
  * - `pole`: on a flagpole `h` cm tall (default 600) with a gilt ball, on a stone foot; the flag a fifth of the
  *   pole, swaying gently from its hoist; `n` poles in a row;
  * - `hand`: a small flag on a stick (20 × 30 cm), `n` of them fanned; held, the stick stands up out of the fist;
@@ -531,20 +516,21 @@ const stickFlag = (r: Rng, fh: number, len: number, wd: number): Shape[] => [
  * Held, a pole flag is one carried on a 2 m pole, and bunting a short string hanging from the hand.
  */
 const flag: PieceDef = { draw(p, r) {
-  const kind = str(p.kind, "pole"), n = Math.max(1, Math.min(8, Math.round(num(p.n, 1)))), flats: FlatSpec[] = [];
+  const kind = str(p.kind, "pole"), n = Math.max(1, Math.min(8, Math.round(num(p.n, 1)))), flats: FlatSpec[] = [], cn = countryOf(p.country);
+  const cl = Array.isArray(p.countries) && p.countries.length ? p.countries.map(countryOf) : [cn];
   if (p.held || kind === "hand") {
     let sh: Shape[];
-    if (kind === "pole" && p.held) sh = stickFlag(r, 60, 130, 3.2).map(s => s.stroke ? { ...s, path: smooth([[0, 60], [0, -130]], false, 1) } : s);
-    else if (kind === "bunting" && p.held) sh = garland(r, 0, 0, 70, -6, 18, 10, 17);
+    if (kind === "pole" && p.held) sh = stickFlag(r, 60, 130, 3.2, cn).map(s => s.stroke ? { ...s, path: smooth([[0, 60], [0, -130]], false, 1) } : s);
+    else if (kind === "bunting" && p.held) sh = garland(r, 0, 0, 70, -6, 18, 10, 17, cl);
     else {
       sh = [];
-      for (let i = 0; i < n; i++) sh.push(...tf(stickFlag(r, 20, 46, 1.3), mul(translate((i - (n - 1) / 2) * (p.held ? 3 : 26), p.held ? 0 : -8), rotate(p.held ? (i - (n - 1) / 2) * 0.22 : r.range(-0.04, 0.04)))));
+      for (let i = 0; i < n; i++) sh.push(...tf(stickFlag(r, 20, 46, 1.3, cn), mul(translate((i - (n - 1) / 2) * (p.held ? 3 : 26), p.held ? 0 : -8), rotate(p.held ? (i - (n - 1) / 2) * 0.22 : r.range(-0.04, 0.04)))));
     }
     return { flats: [{ group: { shapes: sh, edge: 0.4 }, ppcm: 5, id: "flag", ...(p.held ? {} : { move: { sway: { rot: 0.05, ms: r.range(1800, 2600) }, phase: r() } }) }] };
   }
   if (kind === "bunting") {
     const w = num(p.w, 600), h = num(p.h, 300), sag = num(p.sag, w * 0.06);
-    for (let k = 0; k < n; k++) flats.push({ group: { shapes: garland(r, -w / 2, -h - k * 40, w / 2, -h - k * 40 + r.range(-15, 15), sag * (1 + k * 0.35), 22, 46), edge: 0.4 }, z: -k * 20, ppcm: Math.min(3, 1900 / (w + 40)), pick: k ? false : undefined, ...(k ? {} : { id: "flag" }), move: { sway: { rot: 0.004, dy: 2.5, ms: r.range(2600, 3400) }, phase: r() } });
+    for (let k = 0; k < n; k++) flats.push({ group: { shapes: garland(r, -w / 2, -h - k * 40, w / 2, -h - k * 40 + r.range(-15, 15), sag * (1 + k * 0.35), 22, 46, cl), edge: 0.4 }, z: -k * 20, ppcm: Math.min(3, 1900 / (w + 40)), pick: k ? false : undefined, ...(k ? {} : { id: "flag" }), move: { sway: { rot: 0.004, dy: 2.5, ms: r.range(2600, 3400) }, phase: r() } });
     return { flats };
   }
   const h = num(p.h, 600), fh = h * 0.2, pole = "#DADDDE";
@@ -555,20 +541,22 @@ const flag: PieceDef = { draw(p, r) {
       P([[x - 4.5, -24, 0], [x + 4.5, -24, 0], [x + 2.4, -h, 0], [x - 2.4, -h, 0]], pole), S(rect(x + 0.6, -h, 1.8, h - 26), tone(pole, "shade"), { flat: true, opacity: 0.6 }),
       L([[x + 3.4, -h + 4], [x + 4, -40]], "#8E8A84", 0.5, 0.7), S(rect(x - 3, -42, 9, 3), "#8E8A84"), S(ellipse(x, -h - 6, 6.5), "#D9A72E"), S(ellipse(x - 2, -h - 8, 2.2), "#F6DB8A", { flat: true }),
     ], edge: 0.6 }, ppcm: Math.min(1.6, 1900 / h), ...(i ? {} : { id: "flag" }) });
-    flats.push({ group: { shapes: flagCloth(fh, 0.09, r.range(0, 6)), edge: 0.6 }, x: x + 3, y: h - 6, z: 1, ppcm: Math.min(3, 1900 / (fh * 1.6)), move: { sway: { rot: 0.05, dy: 0.8, ms: r.range(2200, 3000) }, phase: r() } });
+    flats.push({ group: { shapes: flagCloth(fh, 0.09, r.range(0, 6), cn), edge: 0.6 }, x: x + 3, y: h - 6, z: 1, ppcm: Math.min(3, 1900 / (fh * 1.6)), move: { sway: { rot: 0.05, dy: 0.8, ms: r.range(2200, 3000) }, phase: r() } });
   }
   return { flats };
 }, variants: { pole: { kind: "pole" }, hand: { kind: "hand" }, bunting: { kind: "bunting" } },
   meta: {
-    about: "A Turkish flag by the flag law's measures: on a flagpole, a small one on a stick, or bunting strung across.",
+    about: "A flag of Turkey (by the flag law's measures) or of any country of Europe, the EU and the nations of the UK: on a flagpole, a small one on a stick, or bunting strung across, which can mix countries.",
     params: {
       kind: { type: "enum", values: ["pole", "hand", "bunting"], default: "pole" },
+      country: { type: "enum", values: COUNTRIES, default: "tr", about: "whose flag: an ISO 3166 lowercase id, eu, gb_eng, gb_sct or gb_wls" },
+      countries: { type: "list", about: "bunting: the countries of its flags in turn, a mixed string" },
       n: { type: "int", min: 1, max: 8, default: 1, about: "poles, hand flags fanned, or strings of bunting" },
       h: { type: "num", min: 0, about: "pole height, or bunting's hanging height, cm (600 or 300)" },
       w: { type: "num", min: 0, default: 600, about: "bunting's span, cm" },
       sag: { type: "num", min: 0, about: "bunting's sag, cm; default 6% of w" },
     },
-    terms: ["bayrak"],
+    terms: ["bayrak", "flag"],
     tags: ["flag"],
   } };
 
