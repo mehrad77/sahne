@@ -78,8 +78,7 @@ export function SettingsPage() {
       <p class="note">${a.web ? html`In effect: <b>${a.web === "tavily" ? "Tavily" : "Anthropic's search"}</b>. ` : "In effect: no web. "}Automatic takes Tavily when <code>TAVILY_API_KEY</code> is set${a.keys.tavily ? " (it is)" : ""}, else Anthropic's own search on Claude (a cent a search), and none with a local model and no Tavily key. Keys come from backstage's environment, never a file.</p>
     </div>
     <${Memory} />
-    <div class="step-card fields"><h3>Suggestions and agents</h3>
-      <p class="note">How the assistant's and other agents' edits land, and how to connect an agent over MCP, are on the <a href="#/agents">Agents</a> page.</p>
+    <div class="step-card fields"><h3>Staging suggestions</h3>
       <label class="row"><input type="checkbox" style="width:auto" checked=${!!s.applySuggestions} onChange=${(e: Event) => put("applySuggestions", (e.target as HTMLInputElement).checked)} /> Take the rules' staging suggestions as I leave each line</label>
     </div>
     <div class="row"><span class="grow"></span><button class="primary" onClick=${() => void save()}>Save the settings</button></div>
