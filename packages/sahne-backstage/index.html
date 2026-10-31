@@ -100,6 +100,13 @@ pre.json { font: 12px/1.4 ui-monospace, monospace; white-space: pre-wrap; margin
 :root[data-theme="dark"] { --lockup: url(/brand/lockup-dark.svg); }
 .topbar .brand { display: flex; align-items: center; flex: none; }
 .topbar .brand .lockup { display: block; height: 34px; aspect-ratio: 722 / 112; background: var(--lockup) left center / contain no-repeat; }
+/* on a narrow screen the tab hangs under the word, so the top bar's buttons keep their room */
+@media (max-width: 760px) {
+  :root { --lockup: url(/brand/lockup-stacked.svg); }
+  :root[data-theme="dark"] { --lockup: url(/brand/lockup-stacked-dark.svg); }
+  .topbar .brand .lockup { height: 40px; aspect-ratio: 467 / 146; }
+}
+@media (max-width: 760px) and (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --lockup: url(/brand/lockup-stacked-dark.svg); } }
 .topbar .series { color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 22vw; }
 .season-tabs { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin: 0 0 10px; border-bottom: 1px solid var(--line); }
 .season-tabs a { padding: 6px 12px 7px; text-decoration: none; color: var(--mute); font-size: 13.5px; border-bottom: 2px solid transparent; margin-bottom: -1px; }

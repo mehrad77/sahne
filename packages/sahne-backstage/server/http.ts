@@ -269,6 +269,8 @@ export async function serve(o: Options): Promise<Running> {
     "/favicon.svg": [new URL("favicon.svg", HERE), "image/svg+xml"],
     "/brand/lockup.svg": [new URL("../../assets/brand/sahne-backstage-header.svg", HERE), "image/svg+xml"],
     "/brand/lockup-dark.svg": [new URL("../../assets/brand/sahne-backstage-header-dark.svg", HERE), "image/svg+xml"],
+    "/brand/lockup-stacked.svg": [new URL("../../assets/brand/sahne-backstage-header-stacked.svg", HERE), "image/svg+xml"],
+    "/brand/lockup-stacked-dark.svg": [new URL("../../assets/brand/sahne-backstage-header-stacked-dark.svg", HERE), "image/svg+xml"],
     "/fonts/comic-neue-400.woff2": [new URL("comic-neue-latin-400-normal.woff2", FONTS), "font/woff2"],
     "/fonts/comic-neue-700.woff2": [new URL("comic-neue-latin-700-normal.woff2", FONTS), "font/woff2"],
   };

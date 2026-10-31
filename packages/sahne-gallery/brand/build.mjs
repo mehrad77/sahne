@@ -8,6 +8,8 @@
 // - assets/brand/<id>-header.svg and -header-dark.svg: the lockup, "sahne" and the package's name on a tab in its
 //   colour, for light and dark pages; the top of the package's README.md shows it (a marked block, rewritten
 //   here; a package without a README gets one from its package.json description);
+// - assets/brand/<id>-header-stacked.svg and -stacked-dark.svg, for a package with a web app: the lockup with its tab
+//   under the word, for a narrow screen's top bar;
 // - assets/brand/<id>-favicon.svg: the flat mark (the window in the package's colour, no ebru), and the same as
 //   favicon.svg beside the index.html of a package that has a web app, which must link it.
 // The words are outlined from Fraunces Black and Inter Semibold (@fontsource, OFL), so they look the same in an
@@ -110,8 +112,8 @@ const svg = (w, h, label, body, extra = "") =>
 export const mark = id => svg(100, 100, `${id} mark`, markBody(id));
 
 /** The lockup: the mark, "sahne" in Fraunces Black standing on the stage floor, and the package's name in Inter
- * Semibold capitals on a tab in its colour, centred on the x-height. */
-export function lockup(id, dark = false) {
+ * Semibold capitals on a tab in its colour, centred on the x-height; stacked, the tab hangs under the word instead. */
+export function lockup(id, dark = false, stacked = false) {
   const ink = dark ? PERDE : INK, s = 1.12, H = 112, base = 86 * s;
   const upm = FRAUNCES.unitsPerEm;
   const hTop = FRAUNCES.charToGlyph("h").getBoundingBox().y2 / upm;
@@ -125,10 +127,11 @@ export function lockup(id, dark = false) {
     const c = colours(id), xh = (FRAUNCES.tables.os2.sxHeight / upm) * size, mid = base - xh / 2;
     const tabH = xh * 0.82, cap = INTER.tables.os2.sCapHeight / INTER.unitsPerEm;
     const ls = (0.46 * tabH) / cap, track = 0.12 * ls, pad = 0.42 * tabH;
-    const tx = x0 + word.width + 0.2 * size;
-    const text = words(INTER, label, tx + pad, mid + (cap * ls) / 2, ls, track);
-    body += `<rect x="${n(tx)}" y="${n(mid - tabH / 2)}" width="${n(text.width + 2 * pad)}" height="${n(tabH)}" rx="${n(0.07 * tabH)}" fill="${c.key}"/><path d="${text.d}" fill="${tabInk(c.key)}"/>`;
-    w = tx + text.width + 2 * pad + 2;
+    const tx = stacked ? x0 : x0 + word.width + 0.2 * size, ty = stacked ? base + 0.1 * tabH : mid - tabH / 2;
+    const text = words(INTER, label, tx + pad, ty + tabH / 2 + (cap * ls) / 2, ls, track);
+    body += `<rect x="${n(tx)}" y="${n(ty)}" width="${n(text.width + 2 * pad)}" height="${n(tabH)}" rx="${n(0.07 * tabH)}" fill="${c.key}"/><path d="${text.d}" fill="${tabInk(c.key)}"/>`;
+    w = stacked ? Math.max(w, tx + text.width + 2 * pad + 2) : tx + text.width + 2 * pad + 2;
+    if (stacked) return svg(w, ty + tabH + 2, `sahne ${label}`, body);
   }
   return svg(w, H, label ? `sahne ${label}` : "sahne", body);
 }
@@ -191,7 +194,13 @@ export function outputs() {
     files.set(`assets/brand/${id}-header-dark.svg`, lockup(id, true));
     files.set(`assets/brand/${id}-favicon.svg`, favicon(id));
     files.set(`packages/${id}/README.md`, readme(id));
-    if (existsSync(new URL(`${id}/index.html`, PACKAGES_DIR))) files.set(`packages/${id}/favicon.svg`, favicon(id));
+    if (existsSync(new URL(`${id}/index.html`, PACKAGES_DIR))) {
+      files.set(`packages/${id}/favicon.svg`, favicon(id));
+      if (tabLabel(id)) {
+        files.set(`assets/brand/${id}-header-stacked.svg`, lockup(id, false, true));
+        files.set(`assets/brand/${id}-header-stacked-dark.svg`, lockup(id, true, true));
+      }
+    }
   }
   files.set("assets/brand/sahne-wordmark.svg", wordmark());
   files.set("assets/brand/sahne-wordmark-dark.svg", wordmark(true));
