@@ -8,7 +8,7 @@ import { fold, type Part } from "./ui/assistant.ts";
 
 export type StepStatus = "waiting" | "running" | "asking" | "done" | "failed" | "stopped" | "stale" | "skipped" | "undone";
 export interface RunStep {
-  id: string; kind: string; title: string; brief: string; needs: string[]; owns: { kind: Kind; id: string }[]; model?: string;
+  id: string; kind: string; title: string; brief: string; about?: string; needs: string[]; owns: { kind: Kind; id: string }[]; model?: string;
   status: StepStatus; summary?: string; question?: { question: string; options?: string[] }; error?: string; budget?: boolean; usd: number; attempts: number; proposals: string[];
 }
 /** A document a run wrote and can still undo (server/runs/journal.ts). */

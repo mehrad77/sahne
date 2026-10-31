@@ -194,7 +194,7 @@ test("after a restart, a step that was running goes on", async () => {
 });
 
 test("a run from its goal alone plans itself: the planner proposes, the plan waits at its gate with an estimate, and the person may change it", async () => {
-  const proposed = { brief: "Derya at the library.", steps: [PLAN.steps[0], { ...PLAN.steps[1], needs: [] }, PLAN.steps[2]] };
+  const proposed = { brief: "Derya at the library.", steps: [{ ...PLAN.steps[0], about: "Makes Derya, a new student." }, { ...PLAN.steps[1], needs: [] }, PLAN.steps[2]] };
   const { r } = runs(scripted({
     plan: [{ calls: [{ name: "propose_plan", args: { brief: "x", steps: [{ id: "a", kind: "task", title: "A", brief: "a", needs: ["b"] }] } }] }, { calls: [{ name: "propose_plan", args: proposed }] }],
   }));
@@ -207,6 +207,7 @@ test("a run from its goal alone plans itself: the planner proposes, the plan wai
   assert.deepEqual(run.steps.map(s => s.id), ["plan", "cast_derya", "place_library", "ep_books"]);
   assert.ok(run.steps.slice(1).every(s => s.needs.includes("plan")));
   assert.equal(run.brief, "Derya at the library.");
+  assert.deepEqual(run.steps.map(s => s.about), [undefined, "Makes Derya, a new student.", undefined, undefined], "each step's plain line for the person");
   assert.equal(run.estimateUsd, 0.25 + 0.3 + 0.8);
   assert.ok(Math.abs(run.maxUsd - (Math.max(2, 1.35 * 3) + run.usd)) < 1e-6, "three times the estimate");
   // at the gate the person drops the episode

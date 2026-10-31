@@ -32,11 +32,11 @@ export type StepKind = "plan" | "season" | "character" | "place" | "episode" | "
 const FIRST: StepKind[] = ["season", "character", "place"];
 export type StepStatus = "waiting" | "running" | "asking" | "done" | "failed" | "stopped" | "stale" | "skipped" | "undone";
 export interface Owned { kind: Kind; id: string }
-export interface PlanStep { id: string; kind: StepKind; title: string; brief: string; needs?: string[]; owns?: Owned[]; model?: string }
+export interface PlanStep { id: string; kind: StepKind; title: string; brief: string; /** One plain sentence for the person: what the step makes, without ids or tools. */ about?: string; needs?: string[]; owns?: Owned[]; model?: string }
 export interface Plan { brief: string; steps: PlanStep[] }
 export interface Question { question: string; options?: string[]; save?: string[] }
 export interface Step {
-  id: string; kind: StepKind; title: string; brief: string; needs: string[]; owns: Owned[]; model?: string;
+  id: string; kind: StepKind; title: string; brief: string; about?: string; needs: string[]; owns: Owned[]; model?: string;
   status: StepStatus;
   /** Its report for the steps after it (finish_step), or its last words. */
   summary?: string;
@@ -98,9 +98,10 @@ const PLAN_STEPS = { type: "array", items: { type: "object", properties: {
   id: { type: "string", description: "a-z, 0-9, _: cast_derya, place_library, ep_s2e01, review" },
   kind: { type: "string", enum: ["season", "character", "place", "episode", "review", "task"] },
   title: { type: "string" }, brief: { type: "string", description: "What this step makes, in enough detail for an agent who has read only this and the run's brief" },
+  about: { type: "string", description: "The same for the person, in one plain sentence they read at the plan gate: what it makes and why, no ids, tools or staging terms (\"Writes the episode where Nima buys bread from Selma, with a polite or blunt way to ask\")" },
   needs: { type: "array", items: { type: "string" }, description: "The steps it must wait for (an episode: the cast and places it uses, and the season)" },
   owns: { type: "array", items: { type: "object", properties: { kind: { type: "string", enum: ["season", "character", "place", "story", "kit_piece", "kit_variant"] }, id: { type: "string" } }, required: ["kind", "id"] }, description: "The documents it creates or changes, by their new ids" },
-}, required: ["id", "kind", "title", "brief"] } };
+}, required: ["id", "kind", "title", "brief", "about"] } };
 const PROPOSE_PLAN: ToolDef = { name: "propose_plan", description: "Set this run's plan, once you have read what it needs: a brief every step reads (the story, the people and their names, the places, what each episode teaches and how they connect) and the steps. One step for each new season, character and place, one for each episode (owning its story id, and needing the cast, places and season it uses), and a review step at the end that needs every episode. Ids must be new. The person sees the plan before any step runs, unless they turned that off.", schema: { type: "object", properties: { brief: { type: "string" }, steps: PLAN_STEPS }, required: ["brief", "steps"] } };
 /** The planner's own brief. */
 const PLANNING = "Plan this run. Read the series first (series_overview), the season it goes in, and the cast and places there are (kit_search characters, places), so the plan reuses what exists and makes only what is missing. Pick the new ids (free ones: a character's from its name, episodes the season's next numbers). Then call propose_plan. If something is a real choice for the person (names, which season, what the episodes teach), ask_person before you propose.";
@@ -151,7 +152,7 @@ function stepPrompt(run: Run, s: Step): string {
   ].filter(Boolean).join("\n\n");
 }
 
-const stepOf = (p: PlanStep): Step => ({ id: p.id, kind: p.kind, title: p.title, brief: p.brief, needs: p.needs ?? [], owns: p.owns ?? [], ...(p.model ? { model: p.model } : {}), status: "waiting", usd: 0, attempts: 0, proposals: [] });
+const stepOf = (p: PlanStep): Step => ({ id: p.id, kind: p.kind, title: p.title, brief: p.brief, ...(typeof p.about === "string" && p.about.trim() ? { about: p.about.trim().slice(0, 400) } : {}), needs: p.needs ?? [], owns: p.owns ?? [], ...(p.model ? { model: p.model } : {}), status: "waiting", usd: 0, attempts: 0, proposals: [] });
 
 export class Runs {
   private readonly o: RunsOptions;
