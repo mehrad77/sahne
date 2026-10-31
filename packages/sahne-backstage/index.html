@@ -477,6 +477,9 @@ select.tone { width: auto; font-size: 12px; padding: 0 4px; }
 .menu button { display: grid; text-align: left; border: 0; background: none; padding: 6px 8px; border-radius: 8px; }
 .menu button:hover, .menu button:focus-visible { background: var(--accent-soft); }
 .menu small { color: var(--mute); font-size: 12px; }
+.ask-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.ask-chip { display: grid; gap: 1px; text-align: left; padding: 6px 11px; border: 1px solid var(--line); border-radius: 10px; background: none; color: var(--ink); font-size: 13px; line-height: 1.3; transition: border-color .15s, background .15s; }
+.ask-chip:not(:disabled):hover { border-color: var(--accent); background: var(--accent-soft); } .ask-chip:disabled { opacity: .4; } .ask-chip small { color: var(--mute); font-size: 11.5px; }
 .section-block { margin-top: 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: grid; gap: 10px; }
 .section-block h3 { display: flex; gap: 6px; align-items: center; margin: 0; }
 .quiz-item { display: grid; gap: 6px; padding: 8px 0; border-top: 1px solid var(--line); }

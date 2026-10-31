@@ -216,12 +216,16 @@ export function ask(id: string) {
 }
 
 /** The asks as a menu (where you work). */
-export function AskMenu(p: { onDone?(): void }) {
+export function AskMenu(p: { onDone?(): void; chips?: boolean }) {
   const w = world.value!;
   if (!w.ai) return html`<p class="note">The assistant is off: set it up in <a href="#/settings">Settings</a>.</p>`;
   const hasBlock = !!contextNow().path, asks = asksHere();
   if (!asks.length) return null;
-  return html`<div class="menu">${asks.map(a => html`<button disabled=${a.on === "block" && !hasBlock} onClick=${() => { ask(a.id); p.onDone?.(); }}><b>${a.label}</b><small>${a.on === "block" ? "the selected block" : a.on === "episode" ? "the whole episode" : ABOUT[pageNow()] ?? "this page"}${a.fresh ? ", in a new conversation" : ""}</small></button>`)}</div>`;
+  const about = (a: (typeof asks)[number]) => `${a.on === "block" ? "the selected block" : a.on === "episode" ? "the whole episode" : ABOUT[pageNow()] ?? "this page"}${a.fresh ? ", in a new conversation" : ""}`;
+  // in the empty chat, the asks are chips; in the Ask menu, rows
+  if (p.chips) return html`<div class="ask-chips">${asks.map(a => html`<button type="button" class="ask-chip" disabled=${a.on === "block" && !hasBlock}
+    title=${a.on === "block" && !hasBlock ? "Select a block in the script first" : undefined} onClick=${() => { ask(a.id); p.onDone?.(); }}><span>${a.label}</span><small>${about(a)}</small></button>`)}</div>`;
+  return html`<div class="menu">${asks.map(a => html`<button disabled=${a.on === "block" && !hasBlock} onClick=${() => { ask(a.id); p.onDone?.(); }}><b>${a.label}</b><small>${about(a)}</small></button>`)}</div>`;
 }
 
 const fmtUsd = (n: number) => `$${n < 0.1 ? n.toFixed(3) : n.toFixed(2)}`;
@@ -336,7 +340,7 @@ export function AssistantChat() {
     ${w.ai && about && !empty && html`<${Abilities} open />`}
     ${!w.ai ? html`<p>The assistant is off. Set up Claude (an API key) or a local model (LM Studio, Ollama) in <a href="#/settings">Settings</a>.</p>` : html`
     <div class="chat">
-      ${empty && html`<div class="note">Ask anything about the series, or pick an ask. It sees ${ctx.id ? html`${ctx.kind === "season" ? "season " : ctx.kind === "place" ? "the place " : ctx.kind === "character" ? "the character " : ""}<b>${ctx.id}</b>${(ctx as { path?: Path }).path ? html` at <b>${(ctx as { path: Path }).path.slice(1).join(".")}</b>` : ""}` : `the ${ctx.page} page`}.<${Abilities} /><${AskMenu} /></div>`}
+      ${empty && html`<div class="note">Ask anything about the series, or pick an ask. It sees ${ctx.id ? html`${ctx.kind === "season" ? "season " : ctx.kind === "place" ? "the place " : ctx.kind === "character" ? "the character " : ""}<b>${ctx.id}</b>${(ctx as { path?: Path }).path ? html` at <b>${(ctx as { path: Path }).path.slice(1).join(".")}</b>` : ""}` : `the ${ctx.page} page`}.<${Abilities} /><${AskMenu} chips /></div>`}
       ${turns.value.map((t, i) => html`<div class=${`turn ${t.role}${t.fresh ? " fresh" : ""}`}>
         ${t.role === "user" ? html`${t.files?.length ? html`<div class="files">${t.files.map(f => html`<span class="chip">📎 ${f}</span>`)}</div>` : ""}${t.files?.length ? t.content.replace(/\n\nFile [\s\S]*$/, "") : t.content}` : html`<${Answer} turn=${t} live=${busy.value && i === turns.value.length - 1} />`}
       </div>`)}
