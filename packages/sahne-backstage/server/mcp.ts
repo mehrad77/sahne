@@ -719,16 +719,42 @@ export function createMcp(o: McpOptions): McpServer {
   server.registerTool("set_review", {
     title: "Set where an episode stands",
     description: o.agentEdits === "proposals"
-      ? "Not available in proposals mode: a person decides whether an episode is reviewed or approved. Leave a comment instead."
+      ? `Ask the person to set an episode's review status (${STATUSES.join(", ")}): in proposals mode a person decides where an episode stands${o.by === "assistant" ? ", with one click on the card this puts in the conversation" : ", on the Review page; tell them what you suggest and why"}.`
       : `Set an episode's review status: ${STATUSES.join(", ")}.`,
     inputSchema: { id: ID, status: z.enum(STATUSES as [string, ...string[]]) },
   }, run("set_review", async ({ id, status }) => {
-    if (o.agentEdits === "proposals") return fail("in proposals mode a person sets where an episode stands: leave a comment instead");
     if (!o.write) return fail(readOnly() ?? "read-only");
     if (!exists("story", id)) return absent(id, "it has a review status");
+    // proposals mode: the person decides; the assistant's conversation shows them a card to do it with one click
+    if (o.agentEdits === "proposals") return o.by === "assistant"
+      ? ok(`asked the person to mark ${id} ${status}: a card in the conversation does it when they click it`, { ask: { question: `Mark ${id} as ${status}?`, review: { id, status } } })
+      : ok(`not set: in proposals mode a person decides where an episode stands. Tell them you suggest ${status} for ${id}, and why; they set it on the Review page`);
     const cur: EpisodeReview = readReview().episodes[id] ?? {};
     writeReview({ id, review: { ...cur, status } });
     return ok(`${id} is ${status}`);
+  }));
+
+  server.registerTool("list_proposals", {
+    title: "The proposals",
+    description: "The proposals waiting for a person (yours and other agents'), and the latest answered ones: accepted, rejected, or withdrawn. Read it to know whether the person took or turned down what you proposed before you build on it.",
+    annotations: { readOnlyHint: true },
+  }, run("list_proposals", async () => {
+    const pending = await queue.pending(), done = await queue.resolved();
+    const me = by(), who = (b: string) => (b === me ? "you" : b);
+    const lines = [
+      pending.length ? `waiting (${pending.length}):\n${pending.map(p => `${p.id} · ${p.kind} ${p.doc} · ${who(p.by)}: ${p.summary}${p.after ? ` (built on ${p.after})` : ""}`).join("\n")}` : "nothing waits",
+      done.length ? `answered:\n${done.slice(0, 20).map(p => `${p.id} · ${p.outcome} · ${p.kind} ${p.doc} · ${who(p.by)}: ${p.summary}`).join("\n")}` : "none answered yet",
+    ];
+    return ok(lines.join("\n\n"), { pending: pending.map(p => ({ id: p.id, kind: p.kind, doc: p.doc, by: p.by, summary: p.summary, after: p.after })), resolved: done });
+  }));
+
+  server.registerTool("withdraw_proposal", {
+    title: "Take back a proposal",
+    description: "Take back a proposal of yours that is still waiting (and the ones you built on it), when it is wrong or a later one replaces it. Only your own: a person answers the others. Agents of the same client name share their proposals.",
+    inputSchema: { id: z.string().describe("A proposal id, like p4") },
+  }, run("withdraw_proposal", async ({ id }) => {
+    const gone = await queue.withdraw(id, by()).catch((e: Error) => { throw new Refusal(e.message); });
+    return ok(`withdrawn: ${gone.join(", ")}`, { withdrawn: gone });
   }));
 
   // ---- the editor ---------------------------------------------------------------------------------------------------------------

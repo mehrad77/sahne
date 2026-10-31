@@ -156,14 +156,18 @@ export async function serve(o: Options): Promise<Running> {
       events.selection = s;
       return json(res, 200, { ok: true });
     }
-    if (route === "proposals" && m === "GET" && !a) return json(res, 200, { proposals: proposals.all() });
+    if (route === "proposals" && m === "GET" && !a) return json(res, 200, { proposals: proposals.all(), resolved: await proposals.resolved() });
     if (route === "proposals" && m === "POST" && !a) {
       if (!writable()) throw new Fail(403, "this backstage is read-only: it takes no proposals");
       return json(res, 200, { proposal: await proposals.add(proposalOf(await body(req))) });
     }
     if (route === "proposals" && m === "POST" && a) {
-      const v = await body(req) as { accepted?: unknown };
-      if (typeof v?.accepted !== "boolean") throw new Fail(400, "expected { accepted: true | false }");
+      const v = await body(req) as { accepted?: unknown; withdraw?: unknown };
+      // an agent on stdio (--backstage) takes back its own proposal
+      if (typeof v?.withdraw === "string") {
+        try { return json(res, 200, { resolved: await proposals.withdraw(a, v.withdraw) }); } catch (e) { throw new Fail(400, (e as Error).message); }
+      }
+      if (typeof v?.accepted !== "boolean") throw new Fail(400, "expected { accepted: true | false } or { withdraw: <agent> }");
       const gone = proposals.resolve(a, v.accepted);
       if (!gone) throw new Fail(404, `no proposal ${a}`);
       return json(res, 200, { resolved: gone.map(p => p.id) });

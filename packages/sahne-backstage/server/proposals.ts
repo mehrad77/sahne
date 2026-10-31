@@ -44,17 +44,26 @@ export interface Proposal {
 }
 
 export type NewProposal = Omit<Proposal, "id" | "at">;
+/** An answered proposal, as an agent learns of it. */
+export interface Resolved { id: string; kind: Kind; doc: string; summary: string; by: string; at: number; outcome: "accepted" | "rejected" | "withdrawn" }
+/** How many answered proposals are kept. */
+const KEEP_RESOLVED = 50;
 
 /** Where proposals go: this process's queue, or a running backstage's (stdio mode with --backstage). */
 export interface Queue {
   pending(): Promise<Proposal[]>;
   add(p: NewProposal): Promise<Proposal>;
+  /** The latest answered proposals, newest first: accepted, rejected, or withdrawn by the agent that made them. */
+  resolved(): Promise<Resolved[]>;
+  /** Take back a pending proposal of `by` (and the ones built on it): the ids that left. */
+  withdraw(id: string, by: string): Promise<string[]>;
   /** Where a person sees them, for the agent's answer. */
   where: string;
 }
 
 export class Proposals implements Queue {
   private list = new Map<string, Proposal>();
+  private done: Resolved[] = [];
   private n = 0;
   readonly where: string;
   private readonly events: Events;
@@ -64,6 +73,7 @@ export class Proposals implements Queue {
   all(): Proposal[] { return [...this.list.values()]; }
   get(id: string): Proposal | undefined { return this.list.get(id); }
   async pending(): Promise<Proposal[]> { return this.all(); }
+  async resolved(): Promise<Resolved[]> { return [...this.done]; }
 
   async add(p: NewProposal): Promise<Proposal> {
     const out: Proposal = { ...p, id: `p${++this.n}`, at: Date.now() };
@@ -76,7 +86,7 @@ export class Proposals implements Queue {
    * A person's answer. Accepted: it and the proposals it was built on leave the queue (the browser applies its `next`,
    * which holds them). Rejected: it and the proposals built on it leave. Returns what left, or null for an unknown id.
    */
-  resolve(id: string, accepted: boolean): Proposal[] | null {
+  resolve(id: string, accepted: boolean, withdrawn = false): Proposal[] | null {
     const p = this.list.get(id);
     if (!p) return null;
     const gone: Proposal[] = [p];
@@ -92,9 +102,19 @@ export class Proposals implements Queue {
     }
     for (const g of gone) {
       this.list.delete(g.id);
-      this.events.emit("proposal", { action: "resolved", proposal: g, accepted, ...(g === p ? {} : { with: p.id }) });
+      this.done.unshift({ id: g.id, kind: g.kind, doc: g.doc, summary: g.summary, by: g.by, at: Date.now(), outcome: accepted ? "accepted" : withdrawn ? "withdrawn" : "rejected" });
+      this.events.emit("proposal", { action: "resolved", proposal: g, accepted, ...(withdrawn ? { withdrawn: true } : {}), ...(g === p ? {} : { with: p.id }) });
     }
+    this.done.length = Math.min(this.done.length, KEEP_RESOLVED);
     return gone;
+  }
+
+  /** An agent takes back its own proposal: it and the ones built on it leave, as a rejection would take them. */
+  async withdraw(id: string, by: string): Promise<string[]> {
+    const p = this.list.get(id);
+    if (!p) throw new Error(`no pending proposal ${id}`);
+    if (p.by !== by) throw new Error(`${id} was proposed by ${p.by}, not by you: only a person answers it`);
+    return (this.resolve(id, false, true) ?? []).map(x => x.id);
   }
 }
 
@@ -125,5 +145,7 @@ export function remoteQueue(base: string): Queue {
     where: `the backstage editor at ${u.href}`,
     pending: async () => ((await call("GET", "proposals")) as { proposals: Proposal[] }).proposals,
     add: async p => ((await call("POST", "proposals", p)) as { proposal: Proposal }).proposal,
+    resolved: async () => ((await call("GET", "proposals")) as { resolved?: Resolved[] }).resolved ?? [],
+    withdraw: async (id, by) => ((await call("POST", `proposals/${id}`, { withdraw: by })) as { resolved: string[] }).resolved,
   };
 }

@@ -142,6 +142,29 @@ test("read-only: every edit is refused, and says why", async () => {
   } finally { await close(); }
 });
 
+test("the proposals an agent sees: waiting and answered; it takes back only its own", async () => {
+  const events = new Events();
+  const a = await connect({ write: true, agentEdits: "proposals" }, events);
+  const q = proposalsOf(events);
+  try {
+    assert.ok(!(await call(a.client, "edit_doc", { kind: "season", id: "s1", path: "title", patch: { en: "One" } })).isError);
+    assert.ok(!(await call(a.client, "edit_doc", { kind: "place", id: "bakkal", path: "name", patch: { en: "The corner shop" } })).isError);
+    const [p1, p2] = q.all().slice(-2);
+    q.resolve(p1.id, false);
+    const l = await call(a.client, "list_proposals");
+    assert.match(l.text, new RegExp(`${p2.id} · place bakkal · you`));
+    assert.match(l.text, new RegExp(`${p1.id} · rejected · season s1`));
+    // another agent's proposal is not this one's to take back
+    q.add({ ...p2, by: "someone-else" } as never);
+    const other = q.all().at(-1)!;
+    assert.match((await call(a.client, "withdraw_proposal", { id: other.id })).text, /proposed by someone-else, not by you/);
+    const w = await call(a.client, "withdraw_proposal", { id: p2.id });
+    assert.ok(!w.isError, w.text);
+    assert.equal(json(await call(a.client, "list_proposals")).resolved[0].outcome, "withdrawn");
+    q.resolve(other.id, false);
+  } finally { await a.close(); }
+});
+
 test("the series, its seasons, places and characters: read, edited, themed, created, checked and refused as a save would be", async () => {
   const events = new Events();
   const { client, close } = await connect({ write: true, agentEdits: "proposals" }, events);
@@ -293,7 +316,10 @@ test("proposals mode: a checked proposal is queued, the file is untouched, and a
     const notes = JSON.parse(readFileSync(join(root, ".backstage", "review.json"), "utf8")).episodes.s1e00;
     assert.equal(notes.comments[0].at, "12.0");
     assert.equal(notes.comments[0].by, "test-agent");
-    assert.match((await call(client, "set_review", { id: "s1e00", status: "approved" })).text, /a person sets/);
+    // in proposals mode a person decides: another agent is told so, and nothing is written
+    const sr = await call(client, "set_review", { id: "s1e00", status: "approved" });
+    assert.match(sr.text, /not set: in proposals mode a person decides/);
+    assert.equal(JSON.parse(readFileSync(join(root, ".backstage", "review.json"), "utf8")).episodes.s1e00.status, undefined);
     // show reaches the listening editors
     const shown: unknown[] = [];
     events.on((name, data) => { if (name === "show") shown.push(data); });

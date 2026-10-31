@@ -10,7 +10,7 @@ import { textOf } from "sahne-story";
 import { diffWords } from "../model/diff.ts";
 import { get, type Path } from "../model/path.ts";
 import { pathWords } from "../model/tools.ts";
-import { accept, proposals, reject, type Proposal } from "../events.ts";
+import { accept, acceptAndSave, proposals, reject, type Proposal } from "../events.ts";
 import type { Kind } from "../api.ts";
 import { draftOf, go } from "../store.ts";
 import { inLang, useLangs } from "./lang.ts";
@@ -62,7 +62,8 @@ export function ProposalCard(p: { x: Proposal }) {
     ${(x.also ?? []).length > 0 && html`<p class="note">With it: ${x.also!.map(a => `${a.kind} ${a.doc}`).join(", ")}</p>`}
     <div class="row"><span class="grow"></span>
       <button disabled=${busy} onClick=${() => act(() => reject(firstOf(x)))}>Reject</button>
-      <button class="primary" disabled=${busy} onClick=${() => act(() => accept(x))}>Accept</button></div>
+      <button disabled=${busy} onClick=${() => act(() => accept(x))} title="Take it into the editor; you save it">Accept</button>
+      <button class="primary" disabled=${busy} onClick=${() => act(async () => { await acceptAndSave(x); })}>Accept and save</button></div>
   </div>`;
 }
 

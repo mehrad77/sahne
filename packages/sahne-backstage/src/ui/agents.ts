@@ -8,7 +8,7 @@ import { useEffect, useState } from "preact/hooks";
 import { api } from "../api.ts";
 import { say, world } from "../store.ts";
 import { openProposal } from "./proposed.ts";
-import { accept, activity, agentsTick, proposals, reject, type Call, type Proposal } from "../events.ts";
+import { accept, acceptAndSave, activity, agentsTick, proposals, reject, type Call, type Proposal } from "../events.ts";
 import { Chip, Icon } from "./kit/index.ts";
 
 type Mode = "proposals" | "direct";
@@ -98,7 +98,8 @@ export function Inbox(p: { limit?: number }) {
       ${errs > 0 && html`<${Chip} tone="bad">${errs} new error${errs > 1 ? "s" : ""}</${Chip}>`}
       <button class="small" onClick=${() => openProposal(x)}>Open</button>
       <button class="small" onClick=${() => void reject(x)}>Reject</button>
-      <button class="small primary" onClick=${() => void accept(x)}>Accept</button></div>`;
+      <button class="small" onClick=${() => void accept(x)}>Accept</button>
+      <button class="small primary" onClick=${() => void acceptAndSave(x)}>Accept and save</button></div>`;
   })}${p.limit && list.length > p.limit ? html`<p class="note">and ${list.length - p.limit} more on <a href="#/agents">the Agents page</a></p>` : ""}</div>`;
 }
 

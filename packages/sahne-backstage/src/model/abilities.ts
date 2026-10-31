@@ -41,17 +41,18 @@ export function abilities(o: AbilitiesOf): Abilities {
       "Move an episode to another date in the season's calendar.",
       "Change a season (its titles, launch day and week themes), the series, a place (its marks and props) or a character (name, role, bio), and add a season, a place or a character. An edit that breaks an episode is refused.",
       "Leave review comments on an episode or one of its steps.",
-      ...(proposing ? [] : ["Set where an episode stands (draft, reviewed, approved)."]),
+      proposing ? "Suggest where an episode stands (reviewed, approved): you set it with one click on its card." : "Set where an episode stands (draft, reviewed, approved).",
+      `Ask you to choose with buttons (two titles, which week)${proposing ? ", and offer its proposals to accept and save at once" : ""}.`,
+      "See which of its proposals you took or turned down, and take back one of its own.",
     ] : []),
     "Open an episode at a step in the editor, to show you what it means.",
   ];
   const cannot = [
-    ...(!o.writable ? ["Change anything: backstage is read-only, so it can read, check and advise only."] : proposing ? ["Save anything itself: you decide on each proposal, then save."] : []),
+    ...(!o.writable ? ["Change anything: backstage is read-only, so it can read, check and advise only."] : proposing ? ["Save without your click: each proposal waits for you (Accept and save does both at once)."] : []),
     ...here.cannot,
     "Change the kit: it cannot draw new art or add props, gestures or sounds.",
     "See the stage, pictures or hear sounds: it reads the documents only.",
     ...(o.cards && !o.shareCards ? ["See the words on the word cards, only their ids (the Agents tab can share them)."] : []),
-    ...(o.writable && proposing ? ["Say whether an episode is reviewed or approved: a person does."] : []),
     "Browse the web, or read files outside this content root.",
     "Remember other conversations: each starts from what is on screen and in the files.",
   ];

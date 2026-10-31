@@ -7,6 +7,8 @@
 // `POST /api/assistant` streams what happens as Server-Sent Events, each `data` a JSON object with its `type`:
 //   text { text } · thinking { text } (the model's thinking, as it streams, where the provider gives it)
 //   tool { id, name, input } · tool_result { id, name, ok, summary, detail, ms } (detail: the result, capped) · proposal { id }
+//   ask { question, options?, save?, review? }   a card for the person: buttons that answer, proposals to accept and
+//     save at once, or a review status to set; the answer comes as their next message (ask_person, set_review)
 //   confirm { estimateUsd, why }   a big ask (drafting or reviewing a season): nothing ran; re-send with confirm: true
 //   done { usage: { input, output, usd } } · error { message }
 // `fresh: true` is the second reader: a new conversation of the last message alone, never given the drafting history.
@@ -33,6 +35,7 @@ export type AssistantEvent =
   | { type: "tool"; id: string; name: string; input: unknown }
   | { type: "tool_result"; id: string; name: string; ok: boolean; summary: string; detail: string; ms: number }
   | { type: "proposal"; id: string }
+  | { type: "ask"; question: string; options?: string[]; save?: string[]; review?: { id: string; status: string } }
   | { type: "confirm"; estimateUsd: number; why: string }
   | { type: "done"; usage: { input: number; output: number; usd: number } }
   | { type: "error"; message: string };
@@ -50,6 +53,14 @@ export interface AssistantOptions {
   /** Told of every tool call (agents.ts). */
   onCall?: McpOptions["onCall"];
 }
+
+/**
+ * The assistant's own tools, beside backstage's (they need the conversation, so no other agent has them). ask_person
+ * shows the person a card and ends the turn: their click is their next message.
+ */
+const OWN: ToolDef[] = [
+  { name: "ask_person", description: "Ask the person to choose, with buttons, and end your turn: their click comes back as their next message. Use it for a real choice (two titles, which week, whether to go on), not for something you can decide. With save: the ids of your proposals, and the card offers to accept and save them at once.", schema: { type: "object", properties: { question: { type: "string" }, options: { type: "array", items: { type: "string" }, maxItems: 6, description: "The answers, as short as a button" }, save: { type: "array", items: { type: "string" }, description: "Proposal ids to offer to accept and save" } }, required: ["question"] } },
+];
 
 /** The longest tool loop of one ask. */
 const MAX_TURNS = 40;
@@ -147,7 +158,7 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
     const [a, b] = InMemoryTransport.createLinkedPair();
     client = new Client({ name: "assistant", version: "0.1.0" });
     await Promise.all([server.connect(a), client.connect(b)]);
-    const tools: ToolDef[] = (await client.listTools()).tools.map(t => ({ name: t.name, description: t.description ?? "", schema: t.inputSchema as Record<string, unknown> }));
+    const tools: ToolDef[] = (await client.listTools()).tools.map(t => ({ name: t.name, description: t.description ?? "", schema: t.inputSchema as Record<string, unknown> })).concat(OWN);
     const writable = !!JSON.parse(((await client.callTool({ name: "series_overview", arguments: {} })).content as { text: string }[]).at(-1)!.text).writable;
     const system = systemPrompt({ agentEdits, writable, shareCards: o.shareCards, fresh: req.fresh, context: req.context });
     const history = req.fresh ? [req.messages.at(-1)!] : req.messages;
@@ -164,6 +175,7 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
       messages.push(r.message);
       if (!r.calls.length) break;
       const results = [];
+      let asked = false;
       for (const c of r.calls) {
         // stopped: no further tool runs (in direct mode one would save)
         if (o.signal?.aborted) return;
@@ -172,6 +184,16 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
         if (c.bad !== undefined) {
           results.push({ id: c.id, name: c.name, text: JSON.stringify({ INVALID_JSON: c.bad }), isError: true });
           send({ type: "tool_result", id: c.id, name: c.name, ok: false, summary: "the call's input was not valid JSON", detail: c.bad.slice(0, DETAIL), ms: 0 });
+          continue;
+        }
+        if (c.name === "ask_person") {
+          const i = c.input as { question?: unknown; options?: unknown; save?: unknown };
+          const strs = (v: unknown, n: number) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, n) : []);
+          const options = strs(i.options, 6), save = strs(i.save, 20);
+          send({ type: "ask", question: String(i.question ?? "").slice(0, 500), ...(options.length ? { options } : {}), ...(save.length ? { save } : {}) });
+          asked = true;
+          results.push({ id: c.id, name: c.name, text: "Asked. The person's answer comes as their next message: end your turn now.", isError: false });
+          send({ type: "tool_result", id: c.id, name: c.name, ok: true, summary: "asked", detail: "", ms: Date.now() - t0 });
           continue;
         }
         let texts: string[], isError: boolean, images: { data: string; mimeType: string }[] = [];
@@ -183,11 +205,17 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
         } catch (err) { texts = [`the tool failed: ${(err as Error).message}`]; isError = true; }
         send({ type: "tool_result", id: c.id, name: c.name, ok: !isError, summary: summaryOf(texts), detail: detailOf(texts), ms: Date.now() - t0 });
         if (!isError) {
-          try { const id = JSON.parse(texts.at(-1) ?? "").proposal; if (typeof id === "string") send({ type: "proposal", id }); } catch { /* no proposal */ }
+          try {
+            const j = JSON.parse(texts.at(-1) ?? "");
+            if (typeof j.proposal === "string") send({ type: "proposal", id: j.proposal });
+            if (j.ask && typeof j.ask.question === "string") send({ type: "ask", ...j.ask });
+          } catch { /* no proposal */ }
         }
         results.push({ id: c.id, name: c.name, text: texts.join("\n\n"), isError, ...(images.length ? { images } : {}) });
       }
       messages.push(...p.results(results));
+      // a question for the person ends the turn: their answer is the next message
+      if (asked) break;
     }
     send({ type: "done", usage: { input: total.input, output: total.output, usd: Math.round(total.usd * 1e6) / 1e6 } });
   } catch (e) {
