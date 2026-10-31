@@ -157,6 +157,34 @@ export class Runs {
     o.store.db.exec("CREATE TABLE IF NOT EXISTS run_log (run TEXT NOT NULL, step TEXT NOT NULL, seq INTEGER NOT NULL, event TEXT NOT NULL, PRIMARY KEY (run, step, seq))");
     const kept = o.store.get<{ n: number; runs: Run[] }>("runs", { n: 0, runs: [] });
     this.n = kept.n; this.list = kept.runs;
+    // a person turning down a step's proposal: that step, and the finished steps built on it, need a redo
+    o.events.on((name, data) => {
+      const d = data as { action?: string; accepted?: boolean; withdrawn?: boolean; proposal?: { by: string; step?: string } };
+      if (name !== "proposal" || d.action !== "resolved" || d.accepted || d.withdrawn || !d.proposal?.step) return;
+      const run = this.list.find(r => r.by === d.proposal!.by);
+      if (run) this.rejected(run, d.proposal.step);
+    });
+  }
+
+  /** The steps that need `id`, through the steps they need. */
+  private after(run: Run, id: string): Step[] {
+    const out = new Set<Step>();
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const s of run.steps) if (!out.has(s) && s.needs.some(n => n === id || [...out].some(o => o.id === n))) { out.add(s); grew = true; }
+    }
+    return [...out];
+  }
+
+  private rejected(run: Run, stepId: string): void {
+    const s = run.steps.find(x => x.id === stepId);
+    if (!s || s.status === "stale") return;
+    s.status = "stale";
+    for (const x of this.after(run, stepId)) if (x.status === "done") x.status = "stale";
+    if (run.status === "done") run.status = "running";
+    this.changed(run);
+    this.tick(run);
   }
 
   all(): Run[] { return this.list; }
@@ -239,10 +267,18 @@ export class Runs {
   }
 
   /** The person answers a step's question, stops it, or has it try again. */
-  async step(id: string, stepId: string, a: { action: "answer"; answer: string } | { action: "stop" } | { action: "retry" }): Promise<Run> {
+  async step(id: string, stepId: string, a: { action: "answer"; answer: string } | { action: "stop" } | { action: "retry" } | { action: "redo"; note?: string }): Promise<Run> {
     const run = this.need(id), s = run.steps.find(x => x.id === stepId);
     if (!s) throw new Error(`run ${id} has no step ${stepId}`);
     if (a.action === "stop") { this.live.get(`${run.id}:${s.id}`)?.abort(); s.status = "stopped"; delete s.question; }
+    else if (a.action === "redo") {
+      // from its start again, with what the person said; its proposals still waiting are what it builds on
+      if (s.status === "running" || s.status === "asking") throw new Error(`step ${stepId} is ${s.status}: stop it first`);
+      await this.saver.deleteThread(`${run.by}:${s.id}`);
+      s.status = "waiting"; s.attempts = 0; delete s.error; delete s.summary; delete s.question;
+      if (a.note?.trim()) s.brief = `${s.brief}\n\nDone again, because: ${a.note.trim()}`;
+      if (run.status === "paused" || run.status === "done") { run.status = "running"; delete run.why; }
+    }
     else if (a.action === "retry") { if (s.status === "failed" || s.status === "stopped") { s.status = "waiting"; s.attempts = 0; delete s.error; if (run.status === "paused") { run.status = "running"; delete run.why; } } }
     else {
       if (s.status !== "asking") throw new Error(`step ${stepId} is not asking`);

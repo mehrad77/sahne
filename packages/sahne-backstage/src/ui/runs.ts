@@ -1,13 +1,15 @@
 // Runs (#/agents/runs, #/agents/runs/<id>): a long task the assistant does in steps (server/runs/run.ts). The list of
 // runs; and one run: where it stands (a gate to pass, a pause and why, what it cost), the plan's brief, and each step
 // with its status, what it makes, what it needs, its cost, its question when it asks you, and its work as it goes (its
-// log read as a conversation: the chat's own parts).
+// log read as a conversation: the chat's own parts), and its proposals to accept or turn down as one: accepting a step
+// accepts what it needs first (events.ts `neededFirst`), and turning one down marks it and the steps built on it for a redo.
 
 import { html } from "htm/preact";
 import { useEffect, useState } from "preact/hooks";
 import { route, say } from "../store.ts";
 import { act, actStep, loadLog, logs, runs, type Run, type RunStep } from "../runs.ts";
-import { proposals } from "../events.ts";
+import { accept, acceptAndSave, neededFirst, proposals, reject, turnedDown, type Proposal } from "../events.ts";
+import { openProposal } from "./proposed.ts";
 import { Answer } from "./assistant.ts";
 import { ago } from "./agents.ts";
 import { Chip, Icon } from "./kit/index.ts";
@@ -109,8 +111,10 @@ function StepRow(p: { run: Run; step: RunStep }) {
       ${s.error && html`<div class="chat-error"><span class="grow">${s.error}</span></div>`}
       ${log ? html`<div class="step-log"><${Answer} turn=${log} live=${s.status === "running"} /></div>` : html`<p class="note">Reading its work…</p>`}
       ${s.summary && s.status === "done" && html`<div class="step-summary"><b>Its report</b><${Markdown} text=${s.summary} /></div>`}
+      <${StepProposals} run=${run} step=${s} />
       <div class="row wrap">
         ${(s.status === "failed" || s.status === "stopped") && html`<button class="small primary" onClick=${() => void retry()}>Try again</button>`}
+        ${(s.status === "stale" || s.status === "done") && s.kind !== "plan" && html`<${Redo} run=${run} step=${s} />`}
         ${s.status === "running" && html`<button class="small" onClick=${() => void stop()}>Stop this step</button>`}
       </div></div>`}
   </li>`;
@@ -134,4 +138,35 @@ function StepQuestion(p: { run: Run; step: RunStep }) {
       <input placeholder="Or say it in your own words…" value=${text} onInput=${(e: Event) => setText((e.target as HTMLInputElement).value)} />
       <button class="primary" disabled=${busy || !text.trim()}>Answer</button></form>
   </div>`;
+}
+
+/** A step's proposals still waiting, to accept or turn down together; what accepting takes with it. */
+function StepProposals(p: { run: Run; step: RunStep }) {
+  const [busy, setBusy] = useState(false);
+  const mine = proposals.value.filter(x => x.by === p.run.by && x.step === p.step.id);
+  if (!mine.length) return null;
+  // each document's latest proposal holds the ones before it
+  const held = new Set(mine.map(x => x.after).filter(Boolean)), heads = mine.filter(x => !held.has(x.id));
+  const no = heads.flatMap(turnedDown), first = [...new Map(heads.flatMap(neededFirst).map(q => [q.id, q])).values()].filter(q => q.step !== p.step.id);
+  const all = async (fn: (x: Proposal) => Promise<unknown>) => { setBusy(true); try { for (const x of heads) if (proposals.value.some(q => q.id === x.id)) await fn(x); } finally { setBusy(false); } };
+  return html`<div class="step-proposals">
+    <b>Its proposals, waiting for you</b>
+    <ul>${mine.map(x => html`<li>${x.summary} <span class="note">(${x.kind} ${x.doc})</span> <button class="linkish" onClick=${() => openProposal(x)}>Open</button></li>`)}</ul>
+    ${no.length ? html`<p class="note bad">They need ${[...new Set(no)].join(", ")}, which you turned down: do that again first.</p>`
+      : first.length > 0 && html`<p class="note">Accepting them also accepts what they need: ${first.map(q => q.summary).join("; ")}.</p>`}
+    <div class="row wrap">
+      <button class="small" disabled=${busy} onClick=${() => void all(x => reject(x))}>Reject the step's</button>
+      <button class="small" disabled=${busy || no.length > 0} onClick=${() => void all(x => accept(x))}>Accept the step's</button>
+      <button class="small primary" disabled=${busy || no.length > 0} onClick=${() => void all(x => acceptAndSave(x))}>Accept and save</button></div>
+  </div>`;
+}
+
+/** Do a step again: from its start, with what the person says it should do differently. */
+function Redo(p: { run: Run; step: RunStep }) {
+  const [open, setOpen] = useState(p.step.status === "stale"), [note, setNote] = useState("");
+  const redo = async () => { const e = await actStep(p.run.id, p.step.id, { action: "redo", note }); if (e) say(e, true); else setNote(""); };
+  if (!open) return html`<button class="small" onClick=${() => setOpen(true)}>Do it again…</button>`;
+  return html`<form class="row redo" onSubmit=${(e: Event) => { e.preventDefault(); void redo(); }}>
+    <input placeholder=${p.step.status === "stale" ? "What it should do differently (you turned its work, or work it built on, down)" : "What it should do differently"} value=${note} onInput=${(e: Event) => setNote((e.target as HTMLInputElement).value)} />
+    <button class="primary small">Do it again</button></form>`;
 }

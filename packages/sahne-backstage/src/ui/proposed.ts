@@ -13,7 +13,7 @@ import { KIT } from "../stage.ts";
 import { diffWords } from "../model/diff.ts";
 import { get, type Path } from "../model/path.ts";
 import { pathWords } from "../model/tools.ts";
-import { accept, acceptAndSave, proposals, reject, type Proposal } from "../events.ts";
+import { accept, acceptAndSave, neededFirst, proposals, reject, turnedDown, type Proposal } from "../events.ts";
 import type { Kind } from "../api.ts";
 import { draftOf, go } from "../store.ts";
 import { inLang, useLangs } from "./lang.ts";
@@ -71,6 +71,13 @@ function LookDiff(p: { before: unknown; after: unknown }) {
   </div>`;
 }
 
+/** What accepting a run's proposal takes with it (what its step needs, still waiting), or why it cannot be accepted yet. */
+export function NeedsNote(p: { x: Proposal }) {
+  const no = turnedDown(p.x), first = neededFirst(p.x);
+  if (no.length) return html`<p class="note bad">It needs ${no.join(", ")}, which you turned down: do ${no.length > 1 ? "those steps" : "that step"} again on <a href=${`#/agents/runs/${p.x.by.slice(4)}`}>its run</a> first.</p>`;
+  return first.length ? html`<p class="note">Accepting this also accepts what it needs: ${first.map(q => q.summary).join("; ")}.</p>` : null;
+}
+
 /** One proposal of a season, the series, a place or a character: what it changes, place by place, with Accept and Reject. */
 export function ProposalCard(p: { x: Proposal }) {
   const { main } = useLangs();
@@ -95,10 +102,11 @@ export function ProposalCard(p: { x: Proposal }) {
     })}
     ${x.paths.length > 8 && html`<p class="note">and ${x.paths.length - 8} more places</p>`}
     ${(x.also ?? []).length > 0 && html`<p class="note">With it: ${x.also!.map(a => `${a.kind} ${a.doc}`).join(", ")}</p>`}
+    <${NeedsNote} x=${x} />
     <div class="row"><span class="grow"></span>
       <button disabled=${busy} onClick=${() => act(() => reject(firstOf(x)))}>Reject</button>
-      <button disabled=${busy} onClick=${() => act(() => accept(x))} title="Take it into the editor; you save it">Accept</button>
-      <button class="primary" disabled=${busy} onClick=${() => act(async () => { await acceptAndSave(x); })}>Accept and save</button></div>
+      <button disabled=${busy || turnedDown(x).length > 0} onClick=${() => act(() => accept(x))} title="Take it into the editor; you save it">Accept</button>
+      <button class="primary" disabled=${busy || turnedDown(x).length > 0} onClick=${() => act(async () => { await acceptAndSave(x); })}>Accept and save</button></div>
   </div>`;
 }
 

@@ -214,3 +214,29 @@ test("a run from its goal alone plans itself: the planner proposes, the plan wai
   assert.deepEqual(run.steps.map(s => s.id), ["plan", "cast_derya"]);
   assert.throws(() => r.act(run.id, { action: "plan", plan: { brief: "b", steps: [{ ...PLAN.steps[0], needs: ["ghost"] }] } }), /needs ghost/);
 });
+
+test("turning a step's proposal down: it and the finished steps built on it need a redo; done again, the run is done", async () => {
+  let made = 0;
+  const { r, events } = runs(scripted({
+    cast_derya: (m: BaseMessage[]): Turn => (m.filter(x => x.getType() === "ai").length === 0 ? { calls: [{ name: "create_character", args: { ...derya, id: "defne", bio: { en: `Version ${++made}.`, fa: "نسخه" } } }] } : finish(`defne v${made}`)),
+    place_library: [finish("no place")],
+    ep_books: [finish("read")],
+  }));
+  const plan = { brief: "b", steps: [{ ...PLAN.steps[0], owns: [{ kind: "character" as const, id: "defne" }] }, { ...PLAN.steps[1], owns: [] }, { ...PLAN.steps[2], owns: [] }] };
+  const run = r.create({ goal: "g", plan, gates: false });
+  await r.idle();
+  assert.equal(run.status, "done");
+  const q = proposalsOf(events), p = q.all().find(x => x.doc === "defne")!;
+  q.resolve(p.id, false);
+  await r.idle();
+  assert.deepEqual(run.steps.map(s => s.status), ["stale", "done", "stale"], "the episode was built on her");
+  assert.equal(run.status, "paused");
+  await r.step(run.id, "cast_derya", { action: "redo", note: "make her older" });
+  await r.idle();
+  assert.match(run.steps[0].brief, /Done again, because: make her older/);
+  assert.equal(run.steps[0].summary, "defne v2");
+  assert.equal(run.steps[2].status, "stale", "a step built on it waits for its own redo");
+  await r.step(run.id, "ep_books", { action: "redo" });
+  await r.idle();
+  assert.equal(run.status, "done");
+});

@@ -12,12 +12,14 @@ import * as H from "./model/history.ts";
 import { change, createDoc, drafts, go, keyOf, loadWorld, openDoc, saveDocs, say } from "./store.ts";
 import { loadKitDocs } from "./kitdocs.ts";
 import { answerLook, type LookAsk } from "./look.ts";
-import { heardRun, loadRuns } from "./runs.ts";
+import { heardRun, loadRuns, runs } from "./runs.ts";
 
 export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean; paths?: Path[] }
 export interface Proposal extends ProposalEdit {
   id: string; also?: ProposalEdit[]; paths: Path[]; summary: string; by: string; at: number;
   problems: { level: string; message: string; new?: boolean; step?: number }[]; after?: string;
+  /** The step of a run that made it (runs.ts). */
+  step?: string;
 }
 export interface Usage { today: { usd: number; tokens: number }; month: { usd: number; tokens: number }; caps: { dayUsd?: number; monthUsd?: number; dayTokens?: number; monthTokens?: number } }
 
@@ -88,14 +90,48 @@ async function applyEdit(e: ProposalEdit, paths: Path[], exact = false) {
   else change(e.kind, e.doc, doc => paths.reduce((x, p) => set(x, p, get(e.next, p)), doc), `proposal.${k}`);
 }
 
-/** Accept a proposal: applied as an edit (and the ones it was built on, which it holds), then answered. */
-export async function accept(p: Proposal) {
+/** The steps a run's step needs, through the steps they need. */
+function stepsBefore(p: Proposal): { needs: Set<string>; order: string[]; turnedDown: string[] } | null {
+  if (!p.step || !p.by.startsWith("run:")) return null;
+  const run = runs.value.find(r => r.by === p.by);
+  if (!run) return null;
+  const needs = new Set<string>();
+  const add = (id: string) => { for (const n of run.steps.find(s => s.id === id)?.needs ?? []) if (!needs.has(n)) { needs.add(n); add(n); } };
+  add(p.step);
+  return { needs, order: run.steps.map(s => s.id), turnedDown: run.steps.filter(s => needs.has(s.id) && s.status === "stale").map(s => s.title) };
+}
+
+/**
+ * A run's proposal needs what the steps before it made (an episode, its new character and place): those of them still
+ * waiting are accepted first, oldest step first, so its save never meets a character that is not there. Each document's
+ * latest proposal holds the ones before it, so only that one is taken.
+ */
+export function neededFirst(p: Proposal): Proposal[] {
+  const b = stepsBefore(p);
+  if (!b) return [];
+  const mine = proposals.value.filter(q => q.id !== p.id && q.by === p.by && q.step && b.needs.has(q.step));
+  const held = new Set(mine.map(q => q.after).filter(Boolean));
+  return mine.filter(q => !held.has(q.id)).sort((x, y) => b.order.indexOf(x.step!) - b.order.indexOf(y.step!) || x.at - y.at);
+}
+/** The steps it needs whose work was turned down: it cannot be accepted until they are done again. */
+export const turnedDown = (p: Proposal): string[] => stepsBefore(p)?.turnedDown ?? [];
+
+async function acceptOne(p: Proposal) {
   await applyEdit(p, p.paths);
   // a document carried along changes only where the proposal says, when it says
   for (const a of p.also ?? []) await applyEdit(a, a.paths ?? [], !!a.paths?.length);
   await api.post(`proposals/${p.id}`, { accepted: true });
+}
+
+/** Accept a proposal: applied as an edit (and the ones it was built on, which it holds), then answered; first what it needs. */
+export async function accept(p: Proposal) {
+  const no = turnedDown(p);
+  if (no.length) { say(`not taken: it needs ${no.join(", ")}, which you turned down. Do ${no.length > 1 ? "those steps" : "that step"} again first.`, true); return; }
+  const first = neededFirst(p);
+  for (const q of first) await acceptOne(q);
+  await acceptOne(p);
   await refresh();
-  say(`taken: ${p.summary}. Save to write it.`);
+  say(`taken: ${p.summary}${first.length ? `, with ${first.length} it needs (${first.map(q => q.doc).join(", ")})` : ""}. Save to write ${first.length ? "them" : "it"}.`);
 }
 
 /**
@@ -103,11 +139,12 @@ export async function accept(p: Proposal) {
  * saved with them, so that is asked first; no, and nothing happens.
  */
 export async function acceptAndSave(p: Proposal): Promise<boolean> {
-  const keys = [p, ...(p.also ?? [])].map(e => keyOf(e.kind, e.doc));
+  const keys = [...neededFirst(p), p].flatMap(q => [q, ...(q.also ?? [])]).map(e => keyOf(e.kind, e.doc));
   const theirs = keys.filter(k => drafts.value[k] && H.dirty(drafts.value[k]));
   if (theirs.length && !confirm(`This also saves your own unsaved edits to ${theirs.map(k => k.replace(":", " ")).join(", ")}. Go on?`)) return false;
+  if (turnedDown(p).length) { await accept(p); return false; }
   await accept(p);
-  return saveDocs(keys);
+  return saveDocs([...new Set(keys)]);
 }
 
 export async function reject(p: Proposal) {

@@ -8,10 +8,11 @@ import { textOf, type StoryDoc } from "sahne-story";
 import { diffWords } from "../../model/diff.ts";
 import { get, type Path } from "../../model/path.ts";
 import { rows } from "../../model/steps.ts";
-import { accept, acceptAndSave, proposals, reject, type Proposal } from "../../events.ts";
+import { accept, acceptAndSave, proposals, reject, turnedDown, type Proposal } from "../../events.ts";
 import { world } from "../../store.ts";
 import { inLang, useLangs } from "../lang.ts";
 import { who } from "../../model/who.ts";
+import { NeedsNote } from "../proposed.ts";
 
 /** The words of a place in a document, in a language (a step's text, a title), or its JSON. */
 const wordsAt = (doc: unknown, path: Path, lang: string): string => {
@@ -36,7 +37,8 @@ export function ProposalsBar(p: { list: Proposal[]; story: StoryDoc; select(path
             ${diffWords(was, now).map(d => (d.op === "=" ? d.text : d.op === "-" ? html`<del>${d.text}</del>` : html`<ins>${d.text}</ins>`))}</div>`;
         })}
         ${x.paths.length > 6 && html`<p class="note">and ${x.paths.length - 6} more places</p>`}
-        <div class="row"><span class="grow"></span><button onClick=${() => void reject(x)}>Reject</button><button onClick=${() => void accept(x)} title="Take it into the script; you save it">Accept</button><button class="primary" onClick=${() => void acceptAndSave(x)}>Accept and save</button></div>
+        <${NeedsNote} x=${x} />
+        <div class="row"><span class="grow"></span><button onClick=${() => void reject(x)}>Reject</button><button disabled=${turnedDown(x).length > 0} onClick=${() => void accept(x)} title="Take it into the script; you save it">Accept</button><button class="primary" onClick=${() => void acceptAndSave(x)}>Accept and save</button></div>
       </div>`;
     })}
   </div>`;
@@ -62,8 +64,9 @@ export function ProposedEpisode(p: { x: Proposal }) {
       <div class="grow"><h2 style="margin:0"><span class="note">${p.x.doc}</span> <span ...${inLang(main)}>${textOf(doc.title, main) ?? p.x.doc}</span></h2>
         <span class="note">A new episode ${who(p.x.by, true)} proposes${gloss && textOf(doc.title, gloss) ? html` · <span ...${inLang(gloss)}>${textOf(doc.title, gloss)}</span>` : ""}</span></div>
       <button disabled=${busy} onClick=${() => { setBusy(true); void reject(firstOf(p.x)).then(() => history.back()); }}>Reject</button>
-      <button class="primary" disabled=${busy} onClick=${() => { setBusy(true); void accept(p.x); }}>Accept and open</button>
+      <button class="primary" disabled=${busy || turnedDown(p.x).length > 0} onClick=${() => { setBusy(true); void accept(p.x); }}>Accept and open</button>
     </div>
+    <${NeedsNote} x=${p.x} />
     <p class="banner">Not written yet: nothing changes until you accept it, and then it is a new, unsaved episode you can edit before you save.</p>
     <div class="proposed-facts">
       <span><b>Place</b> ${doc.place ? textOf(w.places[doc.place]?.name, main) ?? doc.place : "—"}</span>
