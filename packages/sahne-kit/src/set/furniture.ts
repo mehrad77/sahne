@@ -201,6 +201,27 @@ function cafeChair(c: string): ChairArt {
   };
 }
 
+/** The rattan bistro chair of a pavement terrace: bent cane legs with knuckles, a round woven seat in a loop, a tall oval back of two-tone weave. */
+function bistroChair(c: string): ChairArt {
+  const wv = "#D2A869", T = 90, D = 40;
+  const weave: O = { tile: { w: 2.2, h: 2.2, shapes: [L([[0, 0], [2.2, 2.2]], sd(wv), 0.4, 0.8), L([[2.2, 0], [0, 2.2]], lt(wv), 0.4, 0.8)] } };
+  const knuckles = (x0: number, y0: number, x1: number, y1: number): Sh => [0.3, 0.62].map(t => RR(x0 + (x1 - x0) * t - 2.4, y0 + (y1 - y0) * t - 1, 4.8, 2.2, 1, dk(c)));
+  const leg: Leg = (x, y0, y1, near) => [bar(x, y0, x * 1.18, y1, 2.6, near ? c : sd(c), 2.1), ...(near ? knuckles(x, y0, x * 1.18, y1) : [])];
+  const seat = (_t: Path, a: number): Sh => { const y = -SEAT - DEEP / 2, top = ellipse(0, y, a - 1, DEEP / 2 + 1.5); return [{ path: ellipse(0, -18, a - 4, 3), stroke: { color: c, width: 1.8 } }, E(0, y + 2.6, a, DEEP / 2 + 2.4, c), S(top, wv), S(top, wv, weave)]; };
+  const rest = (xb: number, yb: number, yt: number): Sh => {
+    const cy = yt + 22, o = ellipse(0, cy, xb - 2, 22), inner = ellipse(0, cy, xb - 5.4, 19);
+    return [...[-1, 1].map(s => bar(s * (xb - 5), yb, s * (xb - 3.5), cy, 2.6, c)), S(o, c), S(inner, wv), S(inner, wv, weave), { path: ellipse(0, cy, xb - 9, 15), stroke: { color: sd(wv), width: 0.7 }, flat: true, opacity: 0.8 }, RR(-xb + 3, cy + 19, 2 * xb - 6, 3, 1.4, c)];
+  };
+  return {
+    w: 46, front: back => chair4(44, T, back, leg, seat, rest),
+    side: () => [
+      bar(-D / 2 + 4, -2, -D / 2 + 7, -SEAT, 2.4, dk(c)), bar(D / 2 - 2, -2, D / 2 - 5, -SEAT, 2.4, dk(c)), bar(-D / 2, 0, -D / 2 + 4, -SEAT, 2.8, c, 2.2), bar(D / 2 + 3, 0, D / 2 - 3, -SEAT, 2.8, c, 2.2), ...knuckles(-D / 2, 0, -D / 2 + 4, -SEAT), ...knuckles(D / 2 + 3, 0, D / 2 - 3, -SEAT),
+      { path: ellipse(0, -18, D / 2 - 2, 1.6), stroke: { color: c, width: 1.6 } }, RR(-D / 2 + 1, -SEAT - 3.5, D - 2, 4, 2, c), R(-D / 2 + 2, -SEAT - 4.2, D - 4, 1.4, wv),
+      S(band([[-D / 2 + 4, -SEAT - 2], [-D / 2 + 1, -SEAT - 24], [-D / 2 - 4, -T + 12], [-D / 2 - 2, -T + 2]], [3]), wv), S(band([[-D / 2 + 4, -SEAT - 2], [-D / 2 + 1, -SEAT - 24], [-D / 2 - 4, -T + 12], [-D / 2 - 2, -T + 2]], [1.6]), c),
+    ],
+  };
+}
+
 function waitRow(c: string, seats: number): ChairArt {
   const sw = 50, Lw = seats * sw, m = "#9AA0A6";
   return {
@@ -228,7 +249,7 @@ function waitRow(c: string, seats: number): ChairArt {
  * A chair, `kind`: `plain` (a kitchen or dining chair: a slatted, ladder or padded back, seeded), `school` (a metal
  * frame, a plywood seat and back), `office` (a swivel chair on castors), `cafe` (a bentwood bistro chair with a cane
  * seat), `folding` (a folding chair, slatted or plain, for rows in a park), `deck` (a deckchair in striped canvas) or
- * `waiting` (`seats` moulded seats joined on a beam, default 3). `color` is its wood, frame, fabric, canvas or shell
+ * `waiting` (`seats` moulded seats joined on a beam, default 3) or `bistro` (a rattan terrace chair with a woven oval back). `color` is its wood, frame, fabric, canvas or shell
  * (a palette id or a hex; seeded when left out); `cushion` a plain chair's seat fabric (`false`: none). `facing`:
  * `front` (default), `back` (from behind: its back in front of the sitter), `l` or `r` (side on, the sitter facing
  * that way). The seat is at 45 cm. `n` chairs stand in a row `gap` cm apart; `held`, it hangs from the hand by
@@ -243,6 +264,7 @@ const chair: PieceDef = { draw(p, r) {
   else if (kind === "deck") art = deckChair(col(c0, FABRIC[r.pick(["fab_14", "fab_06", "fab_04", "fab_11", "fab_05", "fab_49"])]));
   else if (kind === "waiting") art = waitRow(col(c0, r.pick(["#3C6E9E", "#D18A1C", "#5A6470", "#2F8C88", "#B8443A"])), Math.max(1, Math.min(8, Math.round(num(p.seats, 3)))));
   else if (kind === "cafe") art = cafeChair(col(c0, r.pick(["#4A2E22", "#2A2624", "#6B4A35"])));
+  else if (kind === "bistro") art = bistroChair(col(c0, r.pick(["#7A4A2A", "#5A3A22", "#9A6A3A"])));
   else {
     const style = r.int(0, 2), wood = col(c0, r.pick(WOODS));
     const f = p.cushion === false ? null : typeof p.cushion === "string" ? col(p.cushion, FABRIC.fab_12) : style === 2 || r.chance(0.3) ? FABRIC[r.pick(SOFT)] : null;
@@ -251,11 +273,11 @@ const chair: PieceDef = { draw(p, r) {
   const one = () => facing === "l" ? mirror(art.side()) : facing === "r" ? art.side() : art.front(facing === "back");
   const held = () => { if (art.fold) return art.fold(); const s = art.side(), [x0, y0] = groupBounds({ shapes: s, edge: 0 }); return mv(s, -x0 - 4, -y0); };
   return { flats: [propFlat("chair", p, one, num(p.gap, art.w + 16), held, 2.5)] };
-}, variants: { school: { kind: "school" }, office: { kind: "office" }, cafe: { kind: "cafe" }, folding: { kind: "folding" }, deck: { kind: "deck" }, waiting_row: { kind: "waiting" } },
+}, variants: { school: { kind: "school" }, office: { kind: "office" }, cafe: { kind: "cafe" }, folding: { kind: "folding" }, deck: { kind: "deck" }, waiting_row: { kind: "waiting" }, bistro: { kind: "bistro" } },
   meta: {
-    about: "A chair or a row of them: plain, school, office, café, folding, deck or a waiting row of joined seats.",
+    about: "A chair or a row of them: plain, school, office, café, folding, deck, a waiting row of joined seats or a rattan bistro chair.",
     params: {
-      kind: { type: "enum", values: ["plain", "school", "office", "cafe", "folding", "deck", "waiting"], default: "plain", about: "which chair" },
+      kind: { type: "enum", values: ["plain", "school", "office", "cafe", "folding", "deck", "waiting", "bistro"], default: "plain", about: "which chair" },
       color: { type: "color", about: "its wood, frame, fabric, canvas or shell; a fabric or set palette id, or a hex; default seeded" },
       cushion: { type: ["color", "bool"], about: "a plain chair's seat fabric, or false for none; default seeded" },
       facing: { type: "enum", values: ["front", "back", "l", "r"], default: "front", about: "back: from behind; l, r: side on" },
