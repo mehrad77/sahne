@@ -15,7 +15,7 @@ import { estimateTokens, ProviderError, type Picture, type ToolDef } from "../ai
 
 export interface Call { id: string; name: string; input: Record<string, unknown> }
 /** What a tool answered: its text, any pictures (base64), and what the editor is told after its result (a proposal, a card). */
-export interface Outcome { text: string; isError: boolean; images?: { data: string; mimeType: string }[]; summary?: string; detail?: string; after?: AssistantEvent[] }
+export interface Outcome { text: string; isError: boolean; images?: { data: string; mimeType: string }[]; summary?: string; detail?: string; after?: AssistantEvent[]; /** The agent's work is over (a step's finish_step): no more turns. */ end?: boolean }
 
 export interface Agent {
   model: Model;
@@ -110,6 +110,7 @@ export function agentGraph(a: Agent, checkpointer?: BaseCheckpointSaver) {
 
   async function tools(s: S, config: LangGraphRunnableConfig) {
     const t = lastTurn(s)!, out: ToolMessage[] = [];
+    let end = false;
     for (const c of t.tool_calls ?? []) {
       if (c.name === "ask_person") continue;
       // stopped: no further tool runs (in direct mode one would save)
@@ -120,6 +121,7 @@ export function agentGraph(a: Agent, checkpointer?: BaseCheckpointSaver) {
       emit(config, { type: "tool_result", id: call.id, name: call.name, ok: !o.isError, summary: o.summary ?? summaryOf(o.text), detail: o.detail ?? detailOf(o.text), ms: Date.now() - t0 });
       for (const e of o.after ?? []) emit(config, e);
       out.push(answer(a.model, call.id, o));
+      if (o.end) end = true;
     }
     for (const c of t.invalid_tool_calls ?? []) {
       const id = c.id ?? `bad_${out.length}`, name = c.name ?? "?", raw = String(c.args ?? "");
@@ -127,7 +129,7 @@ export function agentGraph(a: Agent, checkpointer?: BaseCheckpointSaver) {
       emit(config, { type: "tool_result", id, name, ok: false, summary: "the call's input was not valid JSON", detail: raw.slice(0, DETAIL), ms: 0 });
       out.push(answer(a.model, id, { text: JSON.stringify({ INVALID_JSON: raw }), isError: true }));
     }
-    return { messages: out };
+    return end ? { messages: out, stopped: "finished" } : { messages: out };
   }
 
   async function ask(s: S, config: LangGraphRunnableConfig) {
@@ -151,7 +153,7 @@ export function agentGraph(a: Agent, checkpointer?: BaseCheckpointSaver) {
     .addNode("ask", ask)
     .addEdge(START, "model")
     .addConditionalEdges("model", s => (s.stopped || !(lastTurn(s)?.tool_calls?.length || lastTurn(s)?.invalid_tool_calls?.length) ? END : (lastTurn(s)!.tool_calls ?? []).some(c => c.name !== "ask_person") || lastTurn(s)!.invalid_tool_calls?.length ? "tools" : "ask"), ["tools", "ask", END])
-    .addConditionalEdges("tools", s => (asked(lastTurn(s)) ? "ask" : "model"), ["ask", "model"])
+    .addConditionalEdges("tools", s => (s.stopped ? END : asked(lastTurn(s)) ? "ask" : "model"), ["ask", "model", END])
     .addConditionalEdges("ask", s => (s.stopped ? END : "model"), ["model", END])
     .compile(checkpointer ? { checkpointer } : {});
 }

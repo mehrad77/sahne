@@ -6,12 +6,13 @@
 //   show      { id, step }                                              an agent asks the open editors to go there
 //   usage     { today, month, caps }                                    after each AI call (ai/budget.ts)
 //   activity  { at, by, tool, ok, ms, summary } | null                  an agent's tool call, or null when one connects or goes (agents.ts)
+//   run       { run } | { id, step, seq, event }                         a run changed (a step, a gate, a question), or one of its steps did something (runs/run.ts)
 // The editor also tells backstage what it has open (`POST /api/selection`), for an agent to read as a resource.
 
 import type http from "node:http";
 
-export type EventName = "proposal" | "doc" | "show" | "usage" | "activity" | "look";
-export const EVENT_NAMES: EventName[] = ["proposal", "doc", "show", "usage", "activity", "look"];
+export type EventName = "proposal" | "doc" | "show" | "usage" | "activity" | "look" | "run";
+export const EVENT_NAMES: EventName[] = ["proposal", "doc", "show", "usage", "activity", "look", "run"];
 
 /** What the open editor shows: its page, and the document and step selected there. */
 export interface Selection { page: string; kind?: string; id?: string; path?: (string | number)[]; at: number }

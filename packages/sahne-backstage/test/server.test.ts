@@ -285,3 +285,18 @@ test("the root's own kit items: served, saved as documents, checked against the 
   assert.equal((await save([{ kind: "kit_variant", id: "x_tin.x_pair", doc: { ...v, name: "x_other" } }])).status, 400);
   assert.equal((await call(ro.url, "POST", "save", { edits: [{ kind: "kit_piece", id: "x_ro", doc: { ...tin, id: "x_ro" }, create: true }] })).status, 403);
 });
+
+test("runs: started from a plan, held at the plan's gate, stopped; a bad plan or a read-only backstage refused", async () => {
+  assert.deepEqual((await call(rw.url, "GET", "runs")).body, { runs: [] });
+  const plan = { brief: "b", steps: [{ id: "cast_x", kind: "character", title: "X", brief: "Make x.", owns: [{ kind: "character", id: "x_person" }] }] };
+  assert.equal((await call(ro.url, "POST", "runs", { goal: "g", plan })).status, 403);
+  const bad = await call(rw.url, "POST", "runs", { goal: "g", plan: { brief: "b", steps: [{ ...plan.steps[0], needs: ["nope"] }] } });
+  assert.equal(bad.status, 400);
+  assert.match(bad.body.message, /the plan: step cast_x needs nope/);
+  const { run } = (await call(rw.url, "POST", "runs", { goal: "g", plan })).body;
+  assert.deepEqual([run.id, run.status, run.gate, run.by], ["r1", "gate", "plan", "run:r1"]);
+  assert.equal((await call(rw.url, "GET", `runs/${run.id}`)).body.run.steps[0].status, "waiting");
+  assert.deepEqual((await call(rw.url, "GET", `runs/${run.id}/steps/cast_x/log`)).body, { events: [] });
+  assert.equal((await call(rw.url, "POST", `runs/${run.id}`, { action: "stop" })).body.run.status, "stopped");
+  assert.equal((await call(rw.url, "GET", "runs/r9")).status, 404);
+});

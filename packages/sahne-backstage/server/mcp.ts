@@ -61,7 +61,12 @@ export interface McpOptions {
   backstage?: URL | null;
   /** Told of every tool call, for the editor's Agents page (agents.ts). */
   onCall?(c: Call): void;
+  /** A step of a run (runs/run.ts): its id, on each proposal it makes, and the documents it may create or change. */
+  step?: { id: string; owns: { kind: Kind; id: string }[] };
 }
+
+/** What any step of a run may edit, one at a time (`inTurn`): the season and the series, and kit drawings (new ids each). */
+const SHARED = new Set<Kind>(["season", "series", "kit_piece", "kit_variant"]);
 
 const FORMAT = new URL("../../sahne-story/README.md", import.meta.url);
 
@@ -274,6 +279,10 @@ export function createMcp(o: McpOptions): McpServer {
     const why = readOnly();
     if (why) return fail(why);
     const list: Edit[] = edits.map(e => ({ kind: e.kind, id: e.doc, doc: e.next, mtime: e.base, create: e.create }));
+    // a step of a run makes what the plan gave it, and no other step's documents
+    const step = o.step;
+    if (step) for (const e of list) if (!SHARED.has(e.kind) && !step.owns.some(x => x.kind === e.kind && x.id === e.id))
+      return fail(`not ${o.agentEdits === "direct" ? "saved" : "proposed"}: ${e.kind} ${e.id} is not this step's to ${e.create ? "create" : "change"}. This step makes ${step.owns.map(x => `${x.kind} ${x.id}`).join(", ") || "nothing of its own"}; say in finish_step what ${e.id} needs instead`);
     if (o.agentEdits === "direct") {
       const r = save(list, { write: o.write });
       if (r.status !== 200) {
@@ -296,7 +305,7 @@ export function createMcp(o: McpOptions): McpServer {
     const [main, ...also] = edits;
     const p = await queue.add({
       kind: main.kind, doc: main.doc, next: main.next, ...(main.base !== undefined ? { base: main.base } : {}), ...(main.create ? { create: true } : {}),
-      ...(also.length ? { also } : {}), paths: m.paths, summary: m.summary, by: by(), problems, ...(m.after ? { after: m.after } : {}),
+      ...(also.length ? { also } : {}), paths: m.paths, summary: m.summary, by: by(), problems, ...(m.after ? { after: m.after } : {}), ...(step ? { step: step.id } : {}),
     });
     return ok(`proposal ${p.id} is waiting in ${queue.where}: ${m.summary}. A person accepts or rejects it; nothing is saved until they accept.${m.after ? ` It holds your earlier proposal ${m.after} on this document too.` : ""}`, { proposal: p.id, newProblems: problems.filter(x => x.new).map(fmt) });
   }

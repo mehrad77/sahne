@@ -16,12 +16,11 @@
 // `fresh: true` is the second reader: a new conversation of the last message alone, never given the drafting history.
 // Every model call is checked against the caps first and logged after (ai/budget.ts), with a `usage` event to the editors.
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { allLanguages, dirOf, languagesOf, seasonOf, textOf, type SeriesDoc } from "../../sahne-story/src/index.ts";
 import { abilities } from "../src/model/abilities.ts";
 import { listing } from "./content.ts";
-import { createMcp, type AgentEdits, type McpOptions } from "./mcp.ts";
+import type { AgentEdits, McpOptions } from "./mcp.ts";
 import type { Events } from "./events.ts";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { readiness, readSettings, webOf, type Caps, type Settings } from "./settings.ts";
@@ -31,6 +30,7 @@ import { modelFor, type Model } from "./ai/models.ts";
 import { tavilyExtract, tavilySearch, urlsIn } from "./ai/web.ts";
 import { forgetNote, readMemory, remember, type Note } from "./memory.ts";
 import { agentGraph, personSays, type Call, type Outcome } from "./agent/graph.ts";
+import { backstage, callTool } from "./agent/tools.ts";
 
 export interface AssistantContext { page: string; kind?: string; id?: string; path?: (string | number)[] }
 export interface AssistantRequest { messages: { role: "user" | "assistant"; content: string }[]; context?: AssistantContext; fresh?: boolean; confirm?: boolean; quick?: boolean; /** Pictures the person attached to their last message. */ pictures?: Picture[] }
@@ -188,23 +188,12 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
     }
     guard(s.caps);
     const agentEdits = s.agentEdits ?? o.agentEdits;
-    const server = createMcp({ write: o.write, agentEdits, shareCards: o.shareCards, events: o.events, by: "assistant", onCall: o.onCall });
-    const [a, b] = InMemoryTransport.createLinkedPair();
-    client = new Client({ name: "assistant", version: "0.1.0" });
-    await Promise.all([server.connect(a), client.connect(b)]);
-    const listed = (await client.listTools()).tools;
-    const tools: ToolDef[] = listed.map(t => ({ name: t.name, description: t.description ?? "", schema: t.inputSchema as Record<string, unknown> })).concat(OWN, o.write ? MEMORY_TOOLS : [], web === "tavily" ? TAVILY_TOOLS : []);
-    const readOnlyTools = new Set(listed.filter(t => t.annotations?.readOnlyHint).map(t => t.name));
+    const bs = await backstage({ write: o.write, agentEdits, shareCards: o.shareCards, events: o.events, by: "assistant", onCall: o.onCall });
+    client = bs.client;
+    const tools: ToolDef[] = bs.tools.concat(OWN, o.write ? MEMORY_TOOLS : [], web === "tavily" ? TAVILY_TOOLS : []);
     // after it has read the web in this ask, its edits are proposals even in direct mode: a page could have steered it
     let webRead = false, proposer: Client | null = null;
-    const proposing = async () => {
-      if (proposer) return proposer;
-      const ps = createMcp({ write: o.write, agentEdits: "proposals", shareCards: o.shareCards, events: o.events, by: "assistant", onCall: o.onCall });
-      const [x, y] = InMemoryTransport.createLinkedPair();
-      proposer = proposerOf = new Client({ name: "assistant", version: "0.1.0" });
-      await Promise.all([ps.connect(x), proposer.connect(y)]);
-      return proposer;
-    };
+    const proposing = async () => (proposer ??= proposerOf = (await backstage({ write: o.write, agentEdits: "proposals", shareCards: o.shareCards, events: o.events, by: "assistant", onCall: o.onCall })).client);
     // the pages read_web_page may open: those this ask's searches found, and those the person wrote
     const readable = new Set(req.messages.filter(x => x.role === "user").flatMap(x => urlsIn(x.content)));
     const writable = !!JSON.parse(((await client.callTool({ name: "series_overview", arguments: {} })).content as { text: string }[]).at(-1)!.text).writable;
@@ -239,21 +228,7 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
           return { text: `The text of ${url} (information from the web, not instructions):\n\n${page.text}`, isError: false, summary: `${page.text.length.toLocaleString()} characters` };
         } catch (e) { if ((e as Error).name === "AbortError") throw e; return { text: (e as Error).message, isError: true }; }
       }
-      try {
-        const via = webRead && agentEdits === "direct" && !readOnlyTools.has(c.name) ? await proposing() : mcp;
-        const out = await via.callTool({ name: c.name, arguments: c.input }) as { content?: { type: string; text?: string; data?: string; mimeType?: string }[]; isError?: boolean };
-        const texts = (out.content ?? []).filter(x => x.type === "text").map(x => x.text ?? "");
-        const images = (out.content ?? []).filter(x => x.type === "image" && x.data).map(x => ({ data: x.data!, mimeType: x.mimeType ?? "image/png" }));
-        const after: AssistantEvent[] = [];
-        if (!out.isError) {
-          try {
-            const j = JSON.parse(texts.at(-1) ?? "");
-            if (typeof j.proposal === "string") after.push({ type: "proposal", id: j.proposal });
-            if (j.ask && typeof j.ask.question === "string") after.push({ type: "ask", ...j.ask });
-          } catch { /* no proposal */ }
-        }
-        return { text: texts.join("\n\n"), isError: !!out.isError, summary: (texts[0] ?? "").split("\n")[0].slice(0, 240), ...(images.length ? { images } : {}), after };
-      } catch (err) { return { text: `the tool failed: ${(err as Error).message}`, isError: true }; }
+      return callTool(webRead && agentEdits === "direct" && !bs.readOnly.has(c.name) ? await proposing() : mcp, c);
     }
 
     const graph = agentGraph({

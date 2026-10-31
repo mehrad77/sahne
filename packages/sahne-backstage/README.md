@@ -483,6 +483,30 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 | `GET /api/usage` | `{ today: { usd, tokens }, month: { usd, tokens }, caps }` |
 | `GET /api/world` | Also `ai`: `false` when the assistant cannot run, else `{ ready: true, provider, model }`. It is ready with Anthropic when `ANTHROPIC_API_KEY` is set, and with OpenAI-compatible when a base URL is set. The network is never probed for it |
 
+## Runs: long tasks as steps (`server/runs/`)
+
+A run is a long task (a week of episodes, with the new cast and places they need) as a plan of steps. Each step is done by a sub-agent with a fresh context: the agent graph (`server/agent/graph.ts`) on a LangGraph thread of its own, checkpointed in the store.
+- **A plan** is `{ brief, steps: [{ id, kind, title, brief, needs?, owns?, model? }] }`. `kind` is `plan`, `season`, `character`, `place`, `episode`, `review` or `task`. `needs` names the steps whose reports it reads first. `owns` is the documents it creates or changes (`{ kind, id }`). `planProblems` refuses ids that are not `a-z0-9_` or are there twice, needs that are not steps or make a cycle, and a document two steps would make.
+- **One author.** Every step edits as `run:<id>`, so each builds on the run's pending proposals, and each proposal names its `step`. A step creates or changes only what it `owns`; a season, the series and kit drawings are shared, one call at a time (`inTurn`). Anything else is refused with what the step makes.
+- **A step starts fresh**: the run's goal and the plan's brief, its own brief, what it makes, and the reports of the steps it needs. It ends with `finish_step { summary }`, its report for the steps after it, which ends its graph. It may `ask_person`: the step waits for the answer (a LangGraph `interrupt`), and the others go on.
+- **The scheduler** (`Runs`, `server/runs/run.ts`) starts every step whose needs are done, up to `concurrency` at once (3 on Claude, 1 on a local model), as soon as it can. It does not wait for a batch.
+- **Gates** wait for the person: `plan`, before any step runs, and `castAndPlaces`, after the season, character and place steps and before the rest. Either can be off (`gates: false`, or one of them). With them off the run goes straight through, and the later steps build on the earlier ones' pending proposals.
+- **Failures stay small.** A step that fails tries once more from its last checkpoint, then waits for *Try again*. A stopped step waits too. The run is paused, saying which steps need the person, while nothing else can go on. `maxUsd` (default $10) pauses the run when it is spent, until it is raised.
+- **It outlives a closed tab and a restart.** The runs, each step's log (its text, thinking, tool calls and results; `run_log`) and the checkpoints are in the store. When backstage starts, a step that was running goes on from its last checkpoint, and the dedupe of proposals keeps a step that starts over from proposing twice.
+- **The checkpoints** (`server/runs/saver.ts`, a port of `@langchain/langgraph-checkpoint-sqlite` onto `node:sqlite`) keep only a thread's latest checkpoint and the one before it, since a checkpoint carries the step's whole conversation, its pictures included. A finished step's thread is deleted.
+- **Models**: Opus 5.5 for `plan` and `review` steps, Sonnet 5.5 for the rest (a step's `model` names another), or the local model.
+- **The routes** (`server/http.ts`; a POST needs `--write`):
+
+| Request | Answer |
+|---|---|
+| `GET /api/runs` | `{ runs }` |
+| `POST /api/runs` `{ goal, plan, gates?, maxUsd?, concurrency? }` | `{ run }`, started; 400 with the plan's problems |
+| `GET /api/runs/<id>` | `{ run }`: `{ id, goal, by, status (running, gate, paused, done, stopped), gate?, why?, gates, passed, maxUsd, usd, concurrency, agentEdits, brief, steps }` |
+| `POST /api/runs/<id>` `{ action: "continue" \| "stop" }`, `{ action: "gates", gates }`, `{ action: "budget", maxUsd }` | `{ run }`: past a gate or a pause, stopped, its gates or its budget changed |
+| `POST /api/runs/<id>/steps/<step>` `{ action: "answer", answer }`, `{ action: "stop" }`, `{ action: "retry" }` | `{ run }` |
+| `GET /api/runs/<id>/steps/<step>/log?after=<seq>` | `{ events: [{ seq, event }] }`: the step's log, as the assistant's events |
+
+The editors get each change as a `run` event: `{ run }`, or `{ id, step, seq, event }` for what a step does.
 
 ## The API (`server/http.ts`)
 
@@ -512,8 +536,8 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `content.ts` (kinds, files, checks, saves);
   - `git.ts`;
   - `review.ts`;
-  - `mcp.ts` (the MCP server: its tools and resources), `kittools.ts` (its kit tools: search, read, render, draft and save kit items), `result.ts` (what a tool answers: text, pictures, data), `render.ts` (SVG to PNG), `call.ts` (any tool from the shell, with sessions), `proposals.ts` (agents' edits waiting for a person), `runs/store.ts` (what lasts across a restart), `events.ts` (the editors' event stream and selection) and `agents.ts` (the connected agents and their calls);
-  - `assistant.ts` (the assistant and its system prompt), `agent/graph.ts` (an agent as a LangGraph graph), `settings.ts` (the person's AI settings), and `ai/`: `models.ts` (the LangChain chat models, the local server's models), `provider.ts` (tools, pictures, errors, the network), `web.ts` (Tavily) and `budget.ts` (the prices, the caps and the usage log).
+  - `mcp.ts` (the MCP server: its tools and resources), `kittools.ts` (its kit tools: search, read, render, draft and save kit items), `result.ts` (what a tool answers: text, pictures, data), `render.ts` (SVG to PNG), `call.ts` (any tool from the shell, with sessions), `proposals.ts` (agents' edits waiting for a person), `runs/` (`store.ts`: what lasts across a restart; `run.ts`: runs and their scheduler; `saver.ts`: their checkpoints), `events.ts` (the editors' event stream and selection) and `agents.ts` (the connected agents and their calls);
+  - `assistant.ts` (the assistant and its system prompt), `agent/graph.ts` (an agent as a LangGraph graph), `agent/tools.ts` (its backstage tools), `settings.ts` (the person's AI settings), and `ai/`: `models.ts` (the LangChain chat models, the local server's models), `provider.ts` (tools, pictures, errors, the network), `web.ts` (Tavily) and `budget.ts` (the prices, the caps and the usage log).
 - The server reads sahne-story's Node-only files (`paths.ts`, `check/`, `load.ts`) by path. The package exports only `"."`.
 - **`src/`** is the browser side (the studio's shared parts in `src/ui/kit/`: icons, chips, drawers, popovers, the palette; the theme in `src/ui/theme.ts`), built with Preact and htm tagged templates (no JSX, so the source stays erasable TypeScript). It contains:
   - `index.ts`;

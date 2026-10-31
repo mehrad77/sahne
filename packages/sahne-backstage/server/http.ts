@@ -27,6 +27,7 @@ import { createMcp, type AgentEdits } from "./mcp.ts";
 import { proposalsOf, type NewProposal, type ProposalEdit } from "./proposals.ts";
 import { looksOf } from "./look.ts";
 import { Store } from "./runs/store.ts";
+import { Runs, type Gates, type Plan } from "./runs/run.ts";
 import { DOCS } from "./guides.ts";
 import { forgetNote, readMemory, remember } from "./memory.ts";
 
@@ -81,6 +82,9 @@ export async function serve(o: Options): Promise<Running> {
   const store = new Store();
   const events = new Events(), proposals = proposalsOf(events, store), agents = new Agents(events), looks = looksOf(events);
   const writable = () => o.write && !oldShape().length;
+  // runs of the assistant (runs/run.ts): in the store, and those that were going go on
+  const runs = new Runs({ store, events, write: o.write, shareCards, onCall: c => agents.record(c) });
+  runs.resume();
   /** The assistant, as `GET /api/world` gives it: false when it cannot run, so a plain truthiness check still works. */
   const aiOf = () => {
     const r = readiness();
@@ -169,6 +173,25 @@ export async function serve(o: Options): Promise<Running> {
       if (!s) throw new Fail(400, "expected { page, kind?, id?, path? }");
       events.selection = s;
       return json(res, 200, { ok: true });
+    }
+    if (route === "runs") {
+      const [, id, sub, step, what] = path;
+      if (!id && m === "GET") return json(res, 200, { runs: runs.all() });
+      if (!o.write && m === "POST") throw new Fail(403, "read-only: start backstage with --write");
+      try {
+        if (!id && m === "POST") {
+          const v = await body(req) as { goal?: unknown; plan?: Plan; gates?: Partial<Gates> | false; maxUsd?: unknown; concurrency?: unknown };
+          if (typeof v?.goal !== "string" || !v.goal.trim()) throw new Fail(400, "expected { goal, plan: { brief, steps }, gates?, maxUsd?, concurrency? }");
+          return json(res, 200, { run: runs.create({ goal: v.goal, plan: v.plan as Plan, gates: v.gates, ...(typeof v.maxUsd === "number" ? { maxUsd: v.maxUsd } : {}), ...(typeof v.concurrency === "number" ? { concurrency: Math.max(1, Math.min(6, v.concurrency)) } : {}) }) });
+        }
+        const run = runs.get(id);
+        if (!run) throw new Fail(404, `there is no run ${id}`);
+        if (!sub && m === "GET") return json(res, 200, { run });
+        if (!sub && m === "POST") return json(res, 200, { run: runs.act(id, await body(req) as Parameters<Runs["act"]>[1]) });
+        if (sub === "steps" && step && what === "log" && m === "GET") return json(res, 200, { events: runs.log(id, step, Number(new URL(req.url ?? "", "http://x").searchParams.get("after") ?? 0)) });
+        if (sub === "steps" && step && !what && m === "POST") return json(res, 200, { run: await runs.step(id, step, await body(req) as Parameters<Runs["step"]>[2]) });
+      } catch (e) { if (e instanceof Fail) throw e; throw new Fail(400, (e as Error).message); }
+      throw new Fail(404, "not found");
     }
     if (route === "proposals" && m === "GET" && !a) return json(res, 200, { proposals: proposals.all(), resolved: await proposals.resolved() });
     if (route === "proposals" && m === "POST" && !a) {
