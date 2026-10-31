@@ -38,6 +38,7 @@ import { CastPage, CharacterPage } from "./cast.ts";
 import { PlacePage, PlacesPage } from "./places.ts";
 import { NewEpisode } from "./new.ts";
 import { KitPage } from "./kitpage.ts";
+import { waiting as runsWaiting } from "../runs.ts";
 
 /** The places to work, in the rail; after the gap, the ones about the work. */
 const RAIL: [string, string, string][] = [["board", "board", "Board"], ["cast", "cast", "Cast"], ["places", "places", "Places"], ["kit", "hand", "Kit"], ["review", "review", "Review"]];
@@ -66,6 +67,7 @@ export function App() {
       ${w.writable ? html`<span class=${`state${dirty ? " dirty" : ""}`} title=${dirty ? dirtyKeys.value.map(k => k.replace(":", " ")).join(", ") : ""}>${dirty ? `${dirty} unsaved` : "All saved"}</span>`
         : html`<button class="state ro" onClick=${() => { readOnlyHelp.value = true; }} title="Nothing is saved here. Click for why, and how to save.">${w.oldShape ? "Read-only: convert the root" : w.samples ? "Samples · read-only" : "Read-only"} <span aria-hidden="true">ⓘ</span></button>`}
       ${proposals.value.length > 0 && html`<a class="chip warn" href=${hrefOf(proposals.value[0].kind, proposals.value[0].doc)} title=${proposals.value.map(x => `${x.doc}: ${x.summary}`).join("\n")}>${proposals.value.length} proposed edit${proposals.value.length > 1 ? "s" : ""}</a>`}
+      ${runsWaiting.value.length > 0 && html`<a class="chip warn" href=${`#/agents/runs/${runsWaiting.value[0].id}`} title=${runsWaiting.value.map(x => `${x.id}: ${x.goal}`).join("\n")}>${runsWaiting.value.length > 1 ? `${runsWaiting.value.length} runs wait for you` : "A run waits for you"}</a>`}
       <${Meter} />
       <button class="iconbtn" aria-pressed=${open && sideTab.value === "assistant"} onClick=${() => toggleSide("assistant")} title="The assistant" aria-label="The assistant"><${Icon} name="spark" /></button>
       <button class="iconbtn help" aria-pressed=${open && sideTab.value === "docs"} onClick=${() => toggleSide("docs")} title="Help about this page" aria-label="Help about this page">?</button>

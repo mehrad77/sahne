@@ -304,10 +304,11 @@ export class Runs {
       this.o.store.db.prepare("UPDATE run_log SET event = ? WHERE run = ? AND step = ? AND seq = ?").run(JSON.stringify(grown), run.id, s.id, at.seq);
     } else {
       at.seq++;
-      this.o.store.db.prepare("INSERT INTO run_log (run, step, seq, event) VALUES (?, ?, ?, ?)").run(run.id, s.id, at.seq, JSON.stringify(e));
+      // each row says when it came, so a log read later shows how long each thought and call took
+      this.o.store.db.prepare("INSERT INTO run_log (run, step, seq, event) VALUES (?, ?, ?, ?)").run(run.id, s.id, at.seq, JSON.stringify({ ...e, at: Date.now() }));
     }
     at.type = e.type;
-    this.o.events.emit("run", { id: run.id, step: s.id, seq: at.seq, event: e });
+    this.o.events.emit("run", { id: run.id, step: s.id, seq: at.seq, event: { ...e, at: Date.now() } });
   }
 
   private modelOf(run: Run, s: Step): Model {

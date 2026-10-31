@@ -1,4 +1,5 @@
-// Agents (#/agents): three tabs. The assistant, its conversation in full view (#/agents, the side panel's ⤢ opens it);
+// Agents (#/agents): four tabs. The assistant, its conversation in full view (#/agents, the side panel's ⤢ opens it); its
+// runs, long tasks in steps (#/agents/runs: ui/runs.ts);
 // Activity (#/agents/activity; the side panel's Agents tab holds its essentials) and Connect (#/agents/mcp). Together: how to connect one over MCP (the commands to copy, for Claude
 // Code over HTTP or stdio and for any other client), how their edits land (proposals or written, switched here for the
 // agents that connect next), who is connected, every proposal waiting across the episodes, what agents did lately
@@ -13,6 +14,8 @@ import { openProposal } from "./proposed.ts";
 import { accept, acceptAndSave, activity, agentsTick, proposals, reject, type Call, type Proposal } from "../events.ts";
 import { Chip, Icon } from "./kit/index.ts";
 import { who } from "../model/who.ts";
+import { RunsTab } from "./runs.ts";
+import { waiting as runsWaiting } from "../runs.ts";
 
 type Mode = "proposals" | "direct";
 interface Session { id: string; client: string; version?: string; agentEdits: Mode; since: number; lastAt?: number; calls: number }
@@ -133,14 +136,14 @@ function Tools(p: { v: AgentsView }) {
 
 /** The Agents page: the assistant in full view, or the agents over MCP. */
 export function AgentsPage() {
-  const sub = route.value[1], tab = sub === "mcp" ? "connect" : sub === "activity" ? "activity" : "assistant", n = proposals.value.length;
+  const sub = route.value[1], tab = sub === "mcp" ? "connect" : sub === "activity" ? "activity" : sub === "runs" ? "runs" : "assistant", n = proposals.value.length, r = runsWaiting.value.length;
   // the page shows what the side panel would, so the panel closes on the way in
   useEffect(() => { assistantOpen.value = false; }, []);
   const link = (href: string, id: string, label: unknown) => html`<a href=${href} aria-current=${tab === id ? "page" : undefined}>${label}</a>`;
   return html`<section class=${`agents${tab === "assistant" ? " agents-assistant" : ""}`}>
     <div class="pagehead"><h2 class="grow">Agents</h2>${tab === "assistant" && html`<${AboutButton} />`}</div>
-    <nav class="season-tabs" aria-label="Agents">${link("#/agents", "assistant", "Assistant")}${link("#/agents/activity", "activity", html`Activity${n ? html` <span class="badge">${n}</span>` : ""}`)}${link("#/agents/mcp", "connect", "Connect")}</nav>
-    ${tab === "assistant" ? html`<div class="assistant-page"><${AssistantChat} /></div>` : tab === "activity" ? html`<${ActivityTab} />` : html`<${ConnectTab} />`}
+    <nav class="season-tabs" aria-label="Agents">${link("#/agents", "assistant", "Assistant")}${link("#/agents/runs", "runs", html`Runs${r ? html` <span class="badge" title=${`${r} run${r > 1 ? "s" : ""} waiting for you`}>${r}</span>` : ""}`)}${link("#/agents/activity", "activity", html`Activity${n ? html` <span class="badge">${n}</span>` : ""}`)}${link("#/agents/mcp", "connect", "Connect")}</nav>
+    ${tab === "assistant" ? html`<div class="assistant-page"><${AssistantChat} /></div>` : tab === "runs" ? html`<${RunsTab} />` : tab === "activity" ? html`<${ActivityTab} />` : html`<${ConnectTab} />`}
   </section>`;
 }
 

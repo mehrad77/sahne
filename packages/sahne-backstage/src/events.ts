@@ -3,7 +3,7 @@
 // the check, Save): its whole document where the editor has no unsaved edits of it, else only the places it changes, so
 // nothing typed is lost. A direct write reloads a document that has no unsaved edits; one that has them is marked in
 // conflict instead of being overwritten. The editor's selection goes back to the server for the agents' `selection`.
-// Each agent's tool call (`activity`) is kept for the Agents page, newest first.
+// Each agent's tool call (`activity`) is kept for the Agents page, newest first, and runs (`run`) for their view (runs.ts).
 
 import { signal } from "@preact/signals";
 import { api, type Kind } from "./api.ts";
@@ -12,6 +12,7 @@ import * as H from "./model/history.ts";
 import { change, createDoc, drafts, go, keyOf, loadWorld, openDoc, saveDocs, say } from "./store.ts";
 import { loadKitDocs } from "./kitdocs.ts";
 import { answerLook, type LookAsk } from "./look.ts";
+import { heardRun, loadRuns } from "./runs.ts";
 
 export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean; paths?: Path[] }
 export interface Proposal extends ProposalEdit {
@@ -72,6 +73,9 @@ export function connectEvents() {
     agentsTick.value++;
   });
   source.addEventListener("usage", e => { usage.value = JSON.parse((e as MessageEvent).data) as Usage; });
+  // runs (runs.ts): read once, then each change and each step's work as it comes
+  void loadRuns();
+  source.addEventListener("run", e => heardRun(JSON.parse((e as MessageEvent).data)));
 }
 
 /** Put one proposed document into the editor: whole, or only its changed places over unsaved edits (always only those, `exact`). */

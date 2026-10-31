@@ -182,7 +182,7 @@ export async function serve(o: Options): Promise<Running> {
         if (!id && m === "POST") {
           const v = await body(req) as { goal?: unknown; plan?: Plan; gates?: Partial<Gates> | false; maxUsd?: unknown; concurrency?: unknown };
           if (typeof v?.goal !== "string" || !v.goal.trim()) throw new Fail(400, "expected { goal, plan: { brief, steps }, gates?, maxUsd?, concurrency? }");
-          return json(res, 200, { run: runs.create({ goal: v.goal, plan: v.plan as Plan, gates: v.gates, ...(typeof v.maxUsd === "number" ? { maxUsd: v.maxUsd } : {}), ...(typeof v.concurrency === "number" ? { concurrency: Math.max(1, Math.min(6, v.concurrency)) } : {}) }) });
+          return json(res, 200, { run: runs.create({ goal: v.goal, plan: v.plan as Plan, gates: v.gates, agentEdits, ...(typeof v.maxUsd === "number" ? { maxUsd: v.maxUsd } : {}), ...(typeof v.concurrency === "number" ? { concurrency: Math.max(1, Math.min(6, v.concurrency)) } : {}) }) });
         }
         const run = runs.get(id);
         if (!run) throw new Fail(404, `there is no run ${id}`);

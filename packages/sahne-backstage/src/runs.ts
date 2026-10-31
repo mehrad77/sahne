@@ -1,0 +1,78 @@
+// The runs as the editor knows them (server/runs/run.ts): read once, then kept up to date by the server's `run` events
+// (events.ts). A step's log is read when it is first shown and grows as the step works, folded into an answer's parts as
+// the chat's are (ui/assistant.ts `fold`), so a run's step reads like a conversation.
+
+import { computed, effect, signal } from "@preact/signals";
+import { api, type Kind } from "./api.ts";
+import { fold, type Part } from "./ui/assistant.ts";
+
+export type StepStatus = "waiting" | "running" | "asking" | "done" | "failed" | "stopped" | "stale" | "skipped";
+export interface RunStep {
+  id: string; kind: string; title: string; brief: string; needs: string[]; owns: { kind: Kind; id: string }[]; model?: string;
+  status: StepStatus; summary?: string; question?: { question: string; options?: string[] }; error?: string; usd: number; attempts: number; proposals: string[];
+}
+export interface Run {
+  id: string; goal: string; by: string; status: "running" | "gate" | "paused" | "done" | "stopped"; gate?: "plan" | "castAndPlaces"; why?: string;
+  gates: { plan: boolean; castAndPlaces: boolean }; passed: string[]; maxUsd: number; usd: number; concurrency: number; agentEdits: string;
+  brief: string; steps: RunStep[]; estimateUsd?: number; at: number;
+}
+/** A step's log as an answer: its parts, and the last row read. */
+export interface Log { content: string; parts: Part[]; seq: number }
+
+export const runs = signal<Run[]>([]);
+export const logs = signal<Record<string, Log>>({});
+let read = false;
+
+/** The runs that wait for the person: at a gate, or with a step that asks. */
+export const waiting = computed(() => runs.value.filter(r => r.status === "gate" || (r.status !== "stopped" && r.steps.some(s => s.status === "asking"))));
+
+// the tab says so while a run waits for the person
+if (typeof document !== "undefined") { const base = document.title; effect(() => { document.title = waiting.value.length ? `● ${base}` : base; }); }
+
+export async function loadRuns(): Promise<void> {
+  const r = await api.get<{ runs: Run[] }>("runs");
+  if (r.status === 200) { runs.value = r.runs; read = true; }
+}
+export const runsRead = () => read;
+
+const keyOf = (run: string, step: string) => `${run}:${step}`;
+
+/** A step's log, read once (then the events grow it). */
+export async function loadLog(run: string, step: string): Promise<void> {
+  const k = keyOf(run, step);
+  if (logs.value[k]) return;
+  const r = await api.get<{ events: { seq: number; event: { type: string } }[] }>(`runs/${run}/steps/${step}/log`);
+  if (r.status !== 200) return;
+  const log: Log = { content: "", parts: [], seq: 0 };
+  for (const e of r.events) { fold(log, e.event); log.seq = e.seq; }
+  logs.value = { ...logs.value, [k]: log };
+}
+
+/** A `run` event: a run changed, or one of its steps did something. */
+export function heardRun(d: { run?: Run; id?: string; step?: string; seq?: number; event?: { type: string } }): void {
+  if (d.run) {
+    const i = runs.value.findIndex(r => r.id === d.run!.id);
+    runs.value = i < 0 ? [...runs.value, d.run] : runs.value.map((r, j) => (j === i ? d.run! : r));
+    return;
+  }
+  if (!d.id || !d.step || !d.event || d.seq === undefined) return;
+  const k = keyOf(d.id, d.step), log = logs.value[k];
+  // a log not read yet is read whole when it is shown; one read already grows (a row that grows has the same seq)
+  if (!log || d.seq < log.seq) return;
+  fold(log, d.event);
+  log.seq = d.seq;
+  logs.value = { ...logs.value, [k]: { ...log, parts: [...log.parts] } };
+}
+
+export async function act(id: string, body: unknown): Promise<string | null> {
+  const r = await api.post<{ run: Run; message?: string }>(`runs/${id}`, body);
+  if (r.status !== 200) return r.message ?? `backstage answered ${r.status}`;
+  heardRun({ run: r.run });
+  return null;
+}
+export async function actStep(id: string, step: string, body: unknown): Promise<string | null> {
+  const r = await api.post<{ run: Run; message?: string }>(`runs/${id}/steps/${step}`, body);
+  if (r.status !== 200) return r.message ?? `backstage answered ${r.status}`;
+  heardRun({ run: r.run });
+  return null;
+}

@@ -18,7 +18,7 @@ import { signal } from "@preact/signals";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Path } from "../model/path.ts";
 import { api } from "../api.ts";
-import { loadWorld, route, say, setReview, world } from "../store.ts";
+import { go, loadWorld, route, say, setReview, world } from "../store.ts";
 import { acceptAndSave, proposals, selection, usage } from "../events.ts";
 import { abilities } from "../model/abilities.ts";
 import { Icon, Popover } from "./kit/index.ts";
@@ -27,7 +27,7 @@ import { hrefOf } from "./proposed.ts";
 import { hostOf } from "../model/tools.ts";
 import { liveLine, scrollerOf, ThinkingBlock, tick, ToolGroup, useStickToBottom, type Thinking, type ToolPart } from "./chat/parts.ts";
 
-type Part = { type: "text"; text: string } | Thinking | ToolPart | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number } | { type: "stopped" } | AskPart | { type: "sources"; list: { url: string; title?: string }[] } | { type: "remembered"; id: string; text: string; undone?: boolean };
+export type Part = { type: "start_run"; goal: string; started?: string } | { type: "text"; text: string } | Thinking | ToolPart | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number } | { type: "stopped" } | AskPart | { type: "sources"; list: { url: string; title?: string }[] } | { type: "remembered"; id: string; text: string; undone?: boolean };
 /** A question the assistant put to the person (ask_person, set_review): buttons that answer, proposals to accept and save, a status to set. */
 type AskPart = { type: "ask"; question: string; options?: string[]; save?: string[]; review?: { id: string; status: string }; remember?: string; answered?: string };
 interface Turn { role: "user" | "assistant"; content: string; parts?: Part[]; fresh?: boolean; at?: number; /** The files the person attached (their names; the pictures are not kept). */ files?: string[] }
@@ -110,6 +110,7 @@ export const ASKS: { id: string; label: string; prompt: string; on: "block" | "e
   { id: "draft", label: "Draft this episode from its brief", prompt: "This episode is a draft. Write its steps and quiz from its title, premise, cast, place, target words and lessons, in the series' languages, using the place's marks. Propose the result.", on: "episode", pages: ["episode"] },
   { id: "second", label: "Second reader", prompt: "Review this episode as a careful second reader who did not write it: the main language, the translations against it, the quiz, the staging. List what must be fixed, most important first. Propose fixes for clear mistakes.", on: "episode", pages: ["episode"], fresh: true },
   { id: "season-needs", label: "What needs work this season", prompt: "Look at this season: its weeks and their themes, its episodes, their check results and review notes. Tell me briefly what needs work first, most important first. Change nothing.", on: "page", pages: ["board", "season"] },
+  { id: "season-week", label: "Plan a week of episodes", prompt: "Plan the next week of this season that has no episodes yet: its episodes, one for each free weekday, fitting the week's theme and the episodes around it, with any new people and places they need. It is a long task: offer it to me as a run with start_run, with the whole goal written out.", on: "page", pages: ["board", "season"] },
   { id: "season-next", label: "Propose an episode for the next free day", prompt: "Propose one new episode for the first free weekday of this season, in a week that has an arc, fitting that week's theme and the episodes around it, with a place and cast that exist. Draft its steps and quiz, check it, and tell me what you proposed.", on: "page", pages: ["board", "season"] },
   { id: "place-uses", label: "Which episodes are set here", prompt: "Which episodes are set in this place, and which of its marks and props do they use? Say which marks and props no episode uses yet. Change nothing.", on: "page", pages: ["place"] },
   { id: "place-ideas", label: "Scene ideas for this place", prompt: "Suggest three short scene ideas for this place at the series' level, each naming the marks people stand on and the props they use. Change nothing.", on: "page", pages: ["place"] },
@@ -157,8 +158,6 @@ export async function send(content: string, o: { fresh?: boolean; confirm?: bool
   const reply: Turn = { role: "assistant", content: "", parts: [], fresh: o.fresh, at: Date.now() };
   turns.value = [...turns.value, reply];
   const update = (fn: (t: Turn) => void) => { fn(reply); turns.value = [...turns.value.slice(0, -1), { ...reply, parts: [...(reply.parts ?? [])] }]; };
-  /** The thinking before this part is over: how long it took. */
-  const endThinking = (t: Turn) => { const th = t.parts!.at(-1); if (th?.type === "thinking" && th.ms === undefined) th.ms = Date.now() - (th.at ?? Date.now()); };
   busy.value = true;
   tick(true);
   stopper = new AbortController();
@@ -177,28 +176,57 @@ export async function send(content: string, o: { fresh?: boolean; confirm?: bool
         const data = block.split("\n").filter(l => l.startsWith("data:")).map(l => l.slice(5).trimStart()).join("\n");
         if (!data) continue;
         const e = JSON.parse(data) as { type: string; [k: string]: any };
-        update(t => {
-          const parts = t.parts!, last = parts.at(-1);
-          if (e.type === "thinking") { if (last?.type === "thinking" && last.ms === undefined) last.text += e.text; else parts.push({ type: "thinking", text: e.text, at: Date.now() }); return; }
-          if (e.type !== "tool_result" && e.type !== "proposal") endThinking(t);
-          if (e.type === "text") { t.content += e.text; if (last?.type === "text") last.text += e.text; else parts.push({ type: "text", text: e.text }); }
-          else if (e.type === "tool") parts.push({ type: "tool", id: e.id, name: e.name, input: e.input, at: Date.now() });
-          else if (e.type === "tool_result") {
-            const tool = [...parts].reverse().find((p): p is ToolPart => p.type === "tool" && (e.id ? p.id === e.id : p.name === e.name && p.ok === undefined));
-            if (tool) Object.assign(tool, { ok: e.ok, summary: e.summary, detail: e.detail, ms: e.ms ?? (tool.at ? Date.now() - tool.at : undefined) });
-          } else if (e.type === "proposal") {
-            // shown under the call that made it
-            const tool = [...parts].reverse().find((p): p is ToolPart => p.type === "tool");
-            if (tool && !tool.proposal) tool.proposal = e.id; else parts.push({ type: "proposal", id: e.id });
-          } else if (e.type === "done") parts.push({ type: "done", usd: e.usage?.usd });
-          else parts.push(e as Part);
-        });
+        update(t => fold(t, e));
       }
     }
   } catch (e) {
     if ((e as Error).name === "AbortError") update(t => { endThinking(t); t.parts!.push({ type: "stopped" }); });
     else update(t => t.parts!.push({ type: "error", message: (e as Error).message }));
   } finally { busy.value = false; stopper = null; tick(false); }
+}
+
+/** The thinking before this part is over: how long it took. */
+const endThinking = (t: { parts?: Part[] }, now = Date.now()) => { const th = t.parts!.at(-1); if (th?.type === "thinking" && th.ms === undefined) th.ms = now - (th.at ?? now); };
+
+/** One of the assistant's events into an answer's parts (the chat's, and a run step's log: runs.ts). */
+export function fold(t: { content: string; parts?: Part[] }, e: { type: string; [k: string]: any }): void {
+  // a logged event says when it came (a run's); a live one is now
+  const parts = (t.parts ??= []), last = parts.at(-1), at: number = typeof e.at === "number" ? e.at : Date.now();
+  if (e.type === "thinking") { if (last?.type === "thinking" && last.ms === undefined) last.text += e.text; else parts.push({ type: "thinking", text: e.text, at }); return; }
+  if (e.type !== "tool_result" && e.type !== "proposal") endThinking(t, at);
+  if (e.type === "text") { t.content += e.text; if (last?.type === "text") last.text += e.text; else parts.push({ type: "text", text: e.text }); }
+  else if (e.type === "tool") parts.push({ type: "tool", id: e.id, name: e.name, input: e.input, at });
+  else if (e.type === "tool_result") {
+    const tool = [...parts].reverse().find((p): p is ToolPart => p.type === "tool" && (e.id ? p.id === e.id : p.name === e.name && p.ok === undefined));
+    if (tool) Object.assign(tool, { ok: e.ok, summary: e.summary, detail: e.detail, ms: e.ms ?? (tool.at ? at - tool.at : undefined) });
+  } else if (e.type === "proposal") {
+    // shown under the call that made it
+    const tool = [...parts].reverse().find((p): p is ToolPart => p.type === "tool");
+    if (tool && !tool.proposal) tool.proposal = e.id; else parts.push({ type: "proposal", id: e.id });
+  } else if (e.type === "done") parts.push({ type: "done", usd: e.usage?.usd });
+  else { const { at: _at, ...rest } = e; parts.push(rest as Part); }
+}
+
+/** A run the assistant offers for a long task: its goal, its gates, and the person's click that starts it. */
+function StartRunCard(p: { part: Extract<Part, { type: "start_run" }> }) {
+  const [plan, setPlan] = useState(true), [cast, setCast] = useState(true), [busy2, setBusy2] = useState(false);
+  const x = p.part;
+  const start = async () => {
+    setBusy2(true);
+    const r = await api.post<{ run: { id: string } }>("runs", { goal: x.goal, gates: { plan, castAndPlaces: cast } });
+    setBusy2(false);
+    if (r.status !== 200) { say((r as { message?: string }).message ?? "the run did not start", true); return; }
+    x.started = r.run.id; turns.value = [...turns.value];
+    go("agents", "runs", r.run.id);
+  };
+  return html`<div class="ask-card start-run" role="group" aria-label="A run the assistant offers">
+    <b>A run for this</b><blockquote>${x.goal}</blockquote>
+    <p class="note">It plans itself first, then each step (a character, a place, an episode, a review) is done by its own agent, while this editor may be closed. Nothing is saved until you accept it.</p>
+    ${x.started ? html`<a class="button" href=${`#/agents/runs/${x.started}`}>Open run ${x.started}</a>` : html`
+      <label class="row"><input type="checkbox" style="width:auto" checked=${plan} onChange=${(e: Event) => setPlan((e.target as HTMLInputElement).checked)} /> Show me the plan before it starts</label>
+      <label class="row"><input type="checkbox" style="width:auto" checked=${cast} onChange=${(e: Event) => setCast((e.target as HTMLInputElement).checked)} /> Stop after the new cast and places, for me to look</label>
+      <div class="row"><button class="primary" disabled=${busy2} onClick=${() => void start()}>Start the run</button></div>`}
+  </div>`;
 }
 
 /** Ask again after an error: the failed exchange is replaced, not added to. */
@@ -285,7 +313,7 @@ function AskCard(p: { part: AskPart; latest: boolean }) {
 }
 
 /** An answer, its parts in order: thinking, runs of tool calls (one group each), words, cards. */
-function Answer(p: { turn: Turn; live: boolean }) {
+export function Answer(p: { turn: { content: string; parts?: Part[] }; live: boolean }) {
   const parts = p.turn.parts ?? [];
   const stopped = parts.some(x => x.type === "stopped");
   // the answer proper: the words after the last tool call, once it is done
@@ -307,6 +335,7 @@ function Answer(p: { turn: Turn; live: boolean }) {
     else if (x.type === "remembered") out.push(html`<div class="tool ok remembered">${x.undone ? html`Forgot: ${x.text}` : html`Remembered for later conversations: ${x.text} <button type="button" class="linkish" onClick=${async () => { const r = await fetch(`/api/memory/${x.id}`, { method: "DELETE" }); if (r.ok) { x.undone = true; turns.value = [...turns.value]; } }}>Undo</button>`}</div>`);
     else if (x.type === "sources") out.push(html`<div class="sources" aria-label="Sources">${x.list.map(s => html`<a class="chip" href=${s.url} target="_blank" rel="noreferrer" title=${s.title ?? s.url}>${hostOf(s.url)}</a>`)}</div>`);
     else if (x.type === "ask") out.push(html`<${AskCard} part=${x} latest=${p.turn === turns.value.at(-1)} />`);
+    else if (x.type === "start_run") out.push(html`<${StartRunCard} part=${x} />`);
     else if (x.type === "stopped") out.push(html`<div class="note">Stopped. Nothing more ran after that.</div>`);
     else if (x.type === "done" && x.usd !== undefined) out.push(html`<div class="note cost">${fmtUsd(x.usd)}</div>`);
   }
