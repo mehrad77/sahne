@@ -8,7 +8,7 @@ export const PROP_SHELVES: readonly Shelf[] = [
   { id: "food", label: "Food & drink", tags: ["food", "drink", "sweet", "snack", "fruit", "vegetable", "pantry", "bottle", "dish", "cookware", "cutlery", "kitchen", "stove"] },
   { id: "home", label: "Home", tags: ["home", "furniture", "bed", "rug", "linen", "cleaning", "laundry", "toiletry", "bathroom", "sewing", "light", "door", "window", "floor", "box", "appliance", "fire", "seating"] },
   { id: "nature", label: "Animals & nature", tags: ["animal", "bird", "pet", "farm", "insect", "zoo", "nature", "plant", "garden"] },
-  { id: "transport", label: "Transport & travel", tags: ["vehicle", "metro", "airport", "transport", "travel", "ticket", "pass"] },
+  { id: "transport", label: "Transport & travel", tags: ["vehicle", "bike", "metro", "airport", "transport", "travel", "ticket", "pass"] },
   { id: "street", label: "Shops & street", tags: ["shop", "market", "vendor", "street", "sign", "flag", "building", "city", "money", "cash", "lira", "card", "id"] },
   { id: "wear", label: "Clothes & carry", tags: ["clothes", "bag", "shoes", "jewellery", "pocket", "cloth", "charm", "souvenir", "turkey", "carry"] },
   { id: "paper", label: "Paper & school", tags: ["paper", "school", "stationery", "desk", "print", "reading", "words"] },
@@ -18,6 +18,7 @@ export const PROP_SHELVES: readonly Shelf[] = [
 ];
 
 export const SET_SHELVES: readonly Shelf[] = [
+  { id: "transport", label: "Transport", tags: ["bus", "train", "boat", "bike", "taxi", "canal", "scooter"] },
   { id: "transit", label: "Airport & metro", tags: ["airport", "metro", "station", "vehicle", "rail", "gate"] },
   { id: "room", label: "Rooms & walls", tags: ["wall", "floor", "room", "window", "door", "barrier"] },
   { id: "outside", label: "Streets & buildings", tags: ["street", "building", "landmark", "city", "park", "market"] },

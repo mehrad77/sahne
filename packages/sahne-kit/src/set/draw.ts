@@ -2,7 +2,7 @@
 // per file). Not the same as `../draw/shapes.ts`, the avatar parts' helpers, whose `S` and `P` mean
 // the other way round: here `S` takes a path and `P` takes points.
 
-import { groupBounds, rect, smooth, poly, TIMETABLE, type FlatMotion, type FlatSpec, type Path, type Rng, type Shape, type SolidLine, type Vec2 } from "sahne";
+import { ellipse, groupBounds, rect, rrect, smooth, poly, TIMETABLE, type FlatMotion, type FlatSpec, type Path, type Rng, type Shape, type SolidLine, type TextSpec, type Vec2 } from "sahne";
 import { SET, FABRIC, METAL, SKIN, HAIR } from "../palette.ts";
 
 /** A point; a third value 0 makes it a corner in `smooth`. */
@@ -91,3 +91,20 @@ export const AT_STOP = { open: [400, 1100], shut: [1400, 700], off: [1100, 1900,
 export const doorTimes = (t: Timetable) => [0, t.run + AT_STOP.open[0], t.run + AT_STOP.open[1], t.ms - AT_STOP.shut[0], t.ms - AT_STOP.shut[1]].map(x => x / t.ms);
 /** The `stops` param's declaration. */
 export const stopsParam = { type: ["bool", "object"] as const, about: "the vehicle's timetable: true, or {ms, run, ease} (TIMETABLE)" };
+
+/** Shapes scaled by `k` about the origin and mirrored when `dir` is -1, their clips and strokes too. */
+export function fit(ss: Shape[], k: number, dir: number, dx = 0, dy = 0): Shape[] {
+  const m: [number, number, number, number, number, number] = [dir * k, 0, 0, k, dx, dy], f = (q: Path) => q.transform(m);
+  return ss.map(s => ({ ...s, path: f(s.path), ...(s.clip ? { clip: f(s.clip as Path) } : {}), ...(s.stroke ? { stroke: { ...s.stroke, width: s.stroke.width * k } } : {}) }));
+}
+/** Text boxes the same way (the words themselves are never mirrored). */
+export const fitText = (t: TextSpec[], k: number, dir: number, dx = 0): TextSpec[] => t.map(s => ({ ...s, x: (dir < 0 ? -s.x - s.w : s.x) * k + dx, y: s.y * k, w: s.w * k, h: s.h * k, ...(s.size ? { size: s.size * k } : {}) }));
+
+/** A faceless rider in a window, head and shoulders, standing on `y` at `x`, `k` times the size; some in a headscarf. */
+export function rider(r: Rng, x: number, y: number, k = 1): Shape[] {
+  const sk = r.pick(["#E8B98F", "#C98E62", "#8D5A3B", "#F1CBA5", "#B4936A"]), cl = r.pick(["#2E5E8C", "#7A3E6E", "#3E7A3A", "#B3261E", "#4A4A4A", "#C9A227"]), o = { flat: true, opacity: 0.85 };
+  const out = [S(rrect(x - 17 * k, y - 26 * k, 34 * k, 26 * k, [12 * k, 12 * k, 0, 0]), cl, o)];
+  if (r.chance(0.3)) out.push(S(ellipse(x, y - 36 * k, 12.5 * k, 14 * k), r.pick(["#7A3E6E", "#2E5E8C", "#C4553A", "#E0D6C2"]), o), S(ellipse(x + k, y - 35 * k, 7 * k, 8.5 * k), sk, o));
+  else out.push(S(ellipse(x, y - 36 * k, 10 * k, 11 * k), sk, o), S(ellipse(x, y - 43 * k, 10.5 * k, 6 * k), r.pick(["#2B2420", "#5B3A29", "#A0522D", "#8E8E8E"]), o));
+  return out;
+}

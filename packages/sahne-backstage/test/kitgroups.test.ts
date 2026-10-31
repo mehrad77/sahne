@@ -30,3 +30,8 @@ test("shelvesWith counts and keeps the order, Other last, empty shelves out", ()
   const got = shelvesWith(SOUND_SHELVES, ["ambience", "other", "ambience"], x => x);
   assert.deepEqual(got.map(g => [g.shelf.id, g.n]), [["ambience", 2], ["other", 1]]);
 });
+
+test("every transit piece lands on the Transport shelf", () => {
+  for (const id of ["double_decker", "city_bus", "train", "black_cab", "gondola", "canal_boat", "bike", "vespa"])
+    assert.equal(shelfOf(SET_SHELVES, full.set[id]?.meta?.tags).id, "transport", id);
+});
