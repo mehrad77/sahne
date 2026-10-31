@@ -54,7 +54,7 @@ const nameOf = (doc: unknown, id: string, main: string) => { const d = doc as { 
 const KIND_NAME: Record<string, string> = { character: "person", place: "place", season: "season", story: "episode", kit_piece: "set piece", kit_variant: "look" };
 
 /** Undo one document a task made, with what was built on it, after saying so. */
-async function undoDoc(run: Run, kind: Kind2, id: string, name: string, step: RunStep): Promise<void> {
+export async function undoDoc(run: Run, kind: Kind2, id: string, name: string, step: RunStep): Promise<void> {
   const after = stepsAfter(run, step.id).flatMap(s => s.owns.map(o => o.id)).filter(x => x !== id);
   if (!confirm(`Undo ${name}?${after.length ? ` This also undoes what was built on it: ${after.join(", ")}.` : ""}`)) return;
   const r = await undo(run.id, [{ kind, id }]);
@@ -180,7 +180,7 @@ function Finished(p: { run: Run }) {
   return html`<div class="run-finished"><${Icon} name="check" size=${16} /><b class="grow">${said}</b>${made.length > 0 && html`<button class="small" onClick=${() => void all()}><${Icon} name="undo" size=${14} /> Undo all of it</button>`}</div>`;
 }
 
-type Kind2 = "character" | "place" | "season" | "story";
+export type Kind2 = "character" | "place" | "season" | "story";
 const GROUPS: [Kind2, string][] = [["character", "People"], ["place", "Places"], ["season", "Season"], ["story", "Episodes"]];
 /** Each kind of document's icon, as the rail shows it. */
 const KIND_ICON: Record<string, string> = { character: "cast", place: "places", season: "calendar", story: "film", kit_piece: "box", kit_variant: "face" };

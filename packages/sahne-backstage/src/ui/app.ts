@@ -38,7 +38,7 @@ import { CastPage, CharacterPage } from "./cast.ts";
 import { PlacePage, PlacesPage } from "./places.ts";
 import { NewEpisode } from "./new.ts";
 import { KitPage } from "./kitpage.ts";
-import { waiting as runsWaiting } from "../runs.ts";
+import { waiting as runsWaiting, working } from "../runs.ts";
 
 /** The places to work, in the rail; after the gap, the ones about the work. */
 const RAIL: [string, string, string][] = [["board", "board", "Board"], ["cast", "cast", "Cast"], ["places", "places", "Places"], ["kit", "hand", "Kit"], ["review", "review", "Review"]];
@@ -58,7 +58,7 @@ export function App() {
   const dirty = dirtyKeys.value.length;
   const area = page === "board" || page === "season" || page === "new" || page === "episode" ? "board" : page === "character" ? "cast" : page === "place" ? "places" : page === "review" ? "review" : page === "cast" || page === "places" || page === "kit" || page === "settings" || page === "agents" || page === "docs" ? page : "";
   const open = assistantOpen.value, waiting = proposals.value.length;
-  const link = ([path, icon, label]: [string, string, string]) => html`<a href=${`#/${path}`} aria-current=${area === path ? "page" : undefined}><${Icon} name=${icon} size=${22} />${label}${path === "agents" && waiting ? html`<span class="badge" title=${`${waiting} proposed edit${waiting > 1 ? "s" : ""} waiting`}>${waiting}</span>` : ""}</a>`;
+  const link = ([path, icon, label]: [string, string, string]) => html`<a href=${`#/${path}`} aria-current=${area === path ? "page" : undefined}><${Icon} name=${icon} size=${22} />${label}${path === "agents" && waiting ? html`<span class="badge" title=${`${waiting} proposed edit${waiting > 1 ? "s" : ""} waiting`}>${waiting}</span>` : ""}${path === "agents" && working.value.length ? html`<span class="live-dot" title="A task is working"></span>` : ""}</a>`;
   return html`<div class="studio">
     <header class="topbar">
       <a class="brand" href="#/" aria-label="sahne backstage"><span class="lockup"></span></a>
@@ -67,7 +67,11 @@ export function App() {
       ${w.writable ? html`<span class=${`state${dirty ? " dirty" : ""}`} title=${dirty ? dirtyKeys.value.map(k => k.replace(":", " ")).join(", ") : ""}>${dirty ? `${dirty} unsaved` : "All saved"}</span>`
         : html`<button class="state ro" onClick=${() => { readOnlyHelp.value = true; }} title="Nothing is saved here. Click for why, and how to save.">${w.oldShape ? "Read-only: convert the root" : w.samples ? "Samples · read-only" : "Read-only"} <span aria-hidden="true">ⓘ</span></button>`}
       ${proposals.value.length > 0 && html`<a class="chip warn" href=${hrefOf(proposals.value[0].kind, proposals.value[0].doc)} title=${proposals.value.map(x => `${x.doc}: ${x.summary}`).join("\n")}>${proposals.value.length} proposed edit${proposals.value.length > 1 ? "s" : ""}</a>`}
-      ${runsWaiting.value.length > 0 && html`<a class="chip warn" href=${`#/agents/tasks/${runsWaiting.value[0].id}`} title=${runsWaiting.value.map(x => `${x.id}: ${x.goal}`).join("\n")}>${runsWaiting.value.length > 1 ? `${runsWaiting.value.length} tasks wait for you` : "A task waits for you"}</a>`}
+      ${runsWaiting.value.length > 0 && html`<a class="chip warn" href=${`#/agents/tasks/${runsWaiting.value[0].id}`} title=${runsWaiting.value.map(x => `${x.id}: ${x.goal}`).join("\n")}><${Icon} name="hand" size=${13} /> ${runsWaiting.value.length > 1 ? `${runsWaiting.value.length} tasks wait for you` : "A task waits for you"}</a>`}
+      ${!runsWaiting.value.length && working.value.length > 0 && (() => {
+        const t = working.value[0], now = t.steps.find(s => s.status === "running")?.title;
+        return html`<a class="chip ok live" href=${`#/agents/tasks/${t.id}`} title=${working.value.map(x => x.goal).join("\n")}>${working.value.length > 1 ? `${working.value.length} tasks are working` : `A task is working${now ? ` · ${now}` : ""}`}</a>`;
+      })()}
       <${Meter} />
       <button class="iconbtn" aria-pressed=${open && sideTab.value === "assistant"} onClick=${() => toggleSide("assistant")} title="The assistant" aria-label="The assistant"><${Icon} name="spark" /></button>
       <button class="iconbtn help" aria-pressed=${open && sideTab.value === "docs"} onClick=${() => toggleSide("docs")} title="Help about this page" aria-label="Help about this page">?</button>

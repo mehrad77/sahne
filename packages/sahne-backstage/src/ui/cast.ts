@@ -27,6 +27,7 @@ import { characterItems } from "./galleries.ts";
 import { inSeries, Texts, useLangs } from "./lang.ts";
 import { Json } from "./staging.ts";
 import { SaveButton } from "./readonly.ts";
+import { MadeByTask } from "./madeby.ts";
 
 const svg = (doc: unknown, size = 120, framing: "head" | "bust" | "full" = "bust") => {
   try { return portrait(doc, KIT, { framing, size, trusted: true }); } catch { return ""; }
@@ -165,7 +166,7 @@ export function CharacterPage(p: { id?: string }) {
   const proposed = proposedNew("character", id);
   if (!d && proposed) return html`<${ProposedDoc} x=${proposed} />`;
   if (!ready || !d) return html`<p>Opening ${id}…</p>`;
-  return html`<${Character} key=${id} id=${id} />`;
+  return html`<${MadeByTask} kind="character" id=${id} /><${Character} key=${id} id=${id} />`;
 }
 
 function Character(p: { id: string }) {

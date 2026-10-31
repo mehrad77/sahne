@@ -740,6 +740,7 @@ button.link { border: 0; background: none; padding: 0; color: var(--accent, inhe
 .rail a { position: relative; }
 .badge { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 99px; background: var(--warn); color: #1f1b17; font-size: 10.5px; font-weight: 700; }
 .rail a .badge { position: absolute; top: 2px; right: 6px; }
+.rail a .live-dot { position: absolute; top: 6px; left: 9px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); color: var(--accent); animation: breathe 1.6s ease-out infinite; }
 .drawer > header .side-tabs { margin: -4px 0 -11px; border-bottom: 0; font-weight: 400; }
 .drawer > header .side-tabs button { display: inline-flex; align-items: center; gap: 5px; padding: 8px 10px; }
 .iconbtn.help { font-weight: 700; font-size: 15px; }
@@ -891,6 +892,22 @@ button.link { border: 0; background: none; padding: 0; color: var(--accent, inhe
 .run-finished svg { color: var(--accent); flex: none; }
 .run-did time { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 12.5px; min-width: 42px; }
 .run-did .decided { flex-basis: 100%; margin-left: 50px; }
+.topbar .chip { display: inline-flex; align-items: center; gap: 5px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+.chip.agent { display: inline-flex; align-items: center; gap: 3px; }
+.tilebadge.ok { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.tilebadge.live { display: inline-flex; align-items: center; gap: 5px; }
+.tilebadge.live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: breathe 1.6s ease-out infinite; }
+.tile.being-made { position: relative; overflow: hidden; }
+.tile.being-made::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 35%, var(--accent-soft) 50%, transparent 65%) no-repeat; background-size: 300% 100%; animation: sweep 2.8s ease-in-out infinite; }
+.tile.ghost { border-style: dashed; }
+.tile.ghost .art { background: repeating-linear-gradient(135deg, var(--chip) 0 10px, transparent 10px 20px); }
+.made-by { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 10px; padding: 6px 12px; border-radius: 10px; background: var(--accent-soft); }
+.made-by > svg { color: var(--accent); flex: none; }
+.made-by .warn { flex-basis: 100%; margin: 0; color: var(--warn); }
+.made-by-decided { flex-basis: 100%; font-size: 13px; } .made-by-decided summary { cursor: pointer; color: var(--mute); } .made-by-decided ul { margin: 2px 0; padding-left: 18px; }
+.made-by.live { position: relative; overflow: hidden; }
+.made-by.live::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 35%, var(--accent-soft) 50%, transparent 65%) no-repeat; background-size: 300% 100%; animation: sweep 2.8s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .rail a .live-dot, .tilebadge.live::before, .tile.being-made::after, .made-by.live::after { animation: none; } }
 @media (prefers-reduced-motion: reduce) { .chip.live::before, .run-progress .bar .doing, .run-progress .bar.live::after, .run-step.running::after, .result-card.being-made::after, .run-step.asking, .result-card, .needs-you, .run-step.just { animation: none; } }
 .start-run blockquote { margin: 6px 0; }
 .start-run-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0; }

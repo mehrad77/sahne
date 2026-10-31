@@ -9,6 +9,7 @@ import { CHARACTERS, PLACES, storyFile } from "../../sahne-story/paths.ts";
 import { adaptStory, type CharacterDoc, type StoryDoc } from "../../sahne-story/src/index.ts";
 import { cueOf, cuePath, get, insert, move, same, set, within } from "../src/model/path.ts";
 import * as H from "../src/model/history.ts";
+import { marksOf } from "../src/model/marks.ts";
 import { flagsIn, kindOf, rows, wordsOnly } from "../src/model/steps.ts";
 
 const json = (u: URL) => JSON.parse(readFileSync(u, "utf8"));
@@ -339,4 +340,20 @@ test("step diff: inserted, moved, restaged and reworded steps, and when it is a 
   assert.equal(stepDiff(null, was, o).preview, true);
   assert.equal(stepDiff(was, { steps: [s[0], s[1], s[2], L("ali", "Çok iyi."), L("ayse", "Güle güle.")] } as never, o).preview, false);
   assert.equal(stepDiff(was, { steps: [s[0], s[1], L("ayse", "Kahve?"), L("ali", "Çok iyi."), L("ayse", "Güle güle.")] } as never, o).preview, true);
+});
+
+test("marks: what tasks make now and made, by document; newer wins, working wins, undone and stopped go", () => {
+  const step = (id: string, status: string, owns: { kind: string; id: string }[], more = {}) => ({ id, title: id, status, owns, ...more });
+  const marks = marksOf([
+    { id: "r2", status: "running", at: 2, made: [{ kind: "character", id: "selma", step: "cast", created: false }],
+      steps: [step("cast", "done", [{ kind: "character", id: "selma" }], { about: "Makes Selma", decided: ["Named her Selma"] }), step("ep", "running", [{ kind: "story", id: "s1e09" }, { kind: "season", id: "s1" }])] },
+    { id: "r1", status: "done", at: 1, made: [{ kind: "character", id: "selma", step: "a", created: true }, { kind: "place", id: "firin", step: "b", created: true }, { kind: "season", id: "s1", step: "a", created: false }],
+      steps: [step("a", "done", []), step("b", "undone", [])] },
+    { id: "r3", status: "stopped", at: 3, steps: [step("x", "running", [{ kind: "place", id: "park" }])] },
+  ]);
+  assert.deepEqual(marks.get("character:selma"), { task: "r2", step: "cast", title: "cast", about: "Makes Selma", decided: ["Named her Selma"], created: false, live: false }, "the newer task's");
+  assert.deepEqual(marks.get("story:s1e09"), { task: "r2", step: "ep", title: "ep", live: true }, "being made, no file yet");
+  assert.deepEqual(marks.get("season:s1"), { task: "r2", step: "ep", title: "ep", created: false, live: true }, "a working step over what an older task made");
+  assert.equal(marks.has("place:firin"), false, "an undone step's");
+  assert.equal(marks.has("place:park"), false, "a stopped task makes nothing now");
 });

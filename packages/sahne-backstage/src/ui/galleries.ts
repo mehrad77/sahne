@@ -18,6 +18,7 @@ import { world } from "../store.ts";
 import { Gallery, type Item } from "./kit/gallery.ts";
 import { Popover } from "./kit/index.ts";
 import { useLangs } from "./lang.ts";
+import { marks } from "../runs.ts";
 
 const svgOf = (f: () => string) => { try { return f(); } catch { return ""; } };
 /** A character's bust (or head) as SVG; "" for one with no avatar (a puppet). */
@@ -30,21 +31,32 @@ export const model = (): AvatarDoc | undefined => {
   return (w?.characters[w.series?.standin ?? "nima"] ?? Object.values(w?.characters ?? {}).find(c => c.avatar))?.avatar;
 };
 
+/** On a page's list (`href`): a task's mark on what it makes or made, and a ghost card for what it is making that is not there yet. */
+function taskMark(kind: string, id: string): Partial<Item> {
+  const m = marks.value.get(`${kind}:${id}`);
+  return !m ? {} : m.live ? { badge: "being made", badgeTone: "ok", live: true, cls: "being-made" } : { badge: "✦ by a task", badgeTone: "ok" };
+}
+function ghosts(kind: string, there: Record<string, unknown>, tags: string[]): Item[] {
+  return [...marks.value].filter(([k, m]) => m.live && k.startsWith(`${kind}:`) && !there[k.slice(kind.length + 1)])
+    .map(([k, m]) => ({ id: k.slice(kind.length + 1), label: m.title, sub: "being made by a task", tags, keywords: m.title, art: null, href: `#/agents/tasks/${m.task}`, cls: "ghost being-made", badge: "being made", badgeTone: "ok" as const, live: true }));
+}
+
 export function characterItems(o: { main: string; ids?: string[]; href?: boolean; faded?: (c: CharacterDoc) => boolean } = { main: "tr" }): Item[] {
-  const all = Object.values(world.value?.characters ?? {}).filter(c => !o.ids || o.ids.includes(c.id)).sort((a, b) => Number(a.order ?? 999) - Number(b.order ?? 999));
-  return all.map(c => ({
+  const chars = world.value?.characters ?? {};
+  const all = Object.values(chars).filter(c => !o.ids || o.ids.includes(c.id)).sort((a, b) => Number(a.order ?? 999) - Number(b.order ?? 999));
+  return [...all.map(c => ({
     id: c.id, label: textOf(c.name, o.main) ?? c.id, sub: textOf(c.role, "en") ?? c.kind, tags: [c.kind === "extra" ? "extras" : c.kind === "cast" ? "cast" : c.kind],
-    keywords: `${c.id} ${Object.values(c.name ?? {}).join(" ")}`, art: portraitOf(c) || null, ...(o.href ? { href: `#/character/${c.id}` } : {}), faded: o.faded?.(c),
-  }));
+    keywords: `${c.id} ${Object.values(c.name ?? {}).join(" ")}`, art: portraitOf(c) || null, ...(o.href ? { href: `#/character/${c.id}`, ...taskMark("character", c.id) } : {}), faded: o.faded?.(c),
+  })), ...(o.href && !o.ids ? ghosts("character", chars, ["cast"]) : [])];
 }
 
 export function placeItems(o: { href?: boolean } = {}): Item[] {
   const w = world.value;
   const l = languagesOf(w?.series);
-  return Object.entries(w?.places ?? {}).map(([id, p]: [string, StoryPlace]) => ({
+  return Object.entries(w?.places ?? {}).map(([id, p]: [string, StoryPlace]): Item => ({
     id, label: textOf(p.name, l.main, ...l.translations) ?? id, sub: `${l.translations.length ? `${textOf(p.name, ...l.translations) ?? ""} · ` : ""}${w!.episodes.filter(e => e.place === id).length} episodes`, keywords: `${id} ${Object.values(p.name ?? {}).join(" ")} ${p.district ?? ""}`,
-    tags: [p.outdoor ? "outdoors" : "indoors"], art: () => placeThumb(p), ...(o.href ? { href: `#/place/${id}` } : {}),
-  }));
+    tags: [p.outdoor ? "outdoors" : "indoors"], art: () => placeThumb(p), ...(o.href ? { href: `#/place/${id}`, ...taskMark("place", id) } : {}),
+  })).concat(o.href ? ghosts("place", w?.places ?? {}, []) : []);
 }
 
 /** The kit's props (or set pieces) as sketches; one with several kinds says how many (model/kinds.ts). */

@@ -5,6 +5,7 @@
 import { computed, effect, signal } from "@preact/signals";
 import { api, type Kind } from "./api.ts";
 import { fold, type Part } from "./ui/assistant.ts";
+import { marksOf } from "./model/marks.ts";
 
 export type StepStatus = "waiting" | "running" | "asking" | "done" | "failed" | "stopped" | "stale" | "skipped" | "undone";
 export interface RunStep {
@@ -29,6 +30,11 @@ let read = false;
 
 /** The runs that wait for the person: at a gate, or with a step that asks. */
 export const waiting = computed(() => runs.value.filter(r => r.status === "gate" || (r.status !== "stopped" && r.steps.some(s => s.status === "asking"))));
+
+/** The tasks at work that don't wait for the person: the top bar and the rail say so. */
+export const working = computed(() => runs.value.filter(r => r.status === "running" && !waiting.value.includes(r)));
+/** What each task is making now, or made and can still undo, by `kind:id` (model/marks.ts). */
+export const marks = computed(() => marksOf(runs.value));
 
 // the tab says so while a run waits for the person
 if (typeof document !== "undefined") { const base = document.title; effect(() => { document.title = waiting.value.length ? `● ${base}` : base; }); }

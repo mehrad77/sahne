@@ -37,6 +37,7 @@ import { ProposalsBar, ProposedEpisode } from "./proposals.ts";
 import { conflicts, postSelection, proposals, proposalsRead, shown as agentShown } from "../../events.ts";
 import { ghostsOf, suggestionsOf, taken, type Suggest } from "../../model/autostage.ts";
 import { get, set } from "../../model/path.ts";
+import { MadeByTask } from "../madeby.ts";
 
 declare global { interface Window { backstage?: { preview: Preview; select(path: Path | null): void } } }
 
@@ -52,7 +53,7 @@ export function Episode(p: { id?: string }) {
   // a proposal's link to read it as a whole (studio/proposals.ts)
   const [, , sub, pid] = route.value, whole = sub === "proposal" ? proposals.value.find(x => x.id === pid && x.kind === "story" && x.doc === id) : undefined;
   if (whole) return html`<${ProposedEpisode} x=${whole} />`;
-  if (d) return html`<${Studio} key=${id} id=${id} />`;
+  if (d) return html`<${MadeByTask} kind="story" id=${id} /><${Studio} key=${id} id=${id} />`;
   if (proposed) return html`<${ProposedEpisode} x=${proposed} />`;
   return html`<p class="note">${missing ? html`There is no episode ${id}. <a href="#/board">Back to the board</a>` : `Opening ${id}…`}</p>`;
 }

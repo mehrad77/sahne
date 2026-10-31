@@ -24,6 +24,7 @@ import { inLang, Texts, useLangs } from "./lang.ts";
 import { NewSeason, SeasonSettings, SeriesSettings } from "./seasons.ts";
 import { ProposalsStrip } from "./proposed.ts";
 import { SaveButton } from "./readonly.ts";
+import { marks } from "../runs.ts";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MECHANICS = ["say", "explore", "act", "aloud", "unlocks"] as const;
@@ -192,12 +193,14 @@ function EpisodeCard(p: { e: Episode; story?: StoryDoc; mark?: "proposed" | "uns
     <${Badges} e=${p.e} story=${p.story} mark=${p.mark} /></a>`;
 }
 
-/** An episode's state: proposed or unsaved, else its review status; a draft; its errors and warnings. */
+/** An episode's state: a task making it or that made it; proposed or unsaved, else its review status; a draft; its errors and warnings. */
 function Badges(p: { e: Episode; story?: StoryDoc; mark?: "proposed" | "unsaved" }) {
   const status = review.value[p.e.id]?.status ?? "draft";
   const probs = (allProblems.value ?? []).filter(x => x.story === p.e.id);
   const errors = probs.filter(x => x.level === "error").length, warnings = probs.filter(x => x.level === "warning").length;
+  const task = marks.value.get(`story:${p.e.id}`);
   return html`<span class="badges">
+    ${task && html`<span class=${`chip ok${task.live ? " live" : " agent"}`} title=${task.about ?? task.title}>${task.live ? "being made" : html`<${Icon} name="spark" size=${11} /> by a task`}</span>`}
     ${p.mark ? html`<span class=${`chip ${p.mark === "proposed" ? "suggest" : "warn"}`}>${p.mark}</span>`
       : html`<span class=${`chip ${status === "approved" ? "ok" : status === "reviewed" ? "" : "warn"}`}>${status === "draft" ? "to review" : status}</span>`}
     ${(p.story?.draft ?? p.e.draft) && html`<span class="chip">draft</span>`}

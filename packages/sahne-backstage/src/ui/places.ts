@@ -32,6 +32,7 @@ import { PlaceSource } from "./place/source.ts";
 import { PlaceStage, type Drop } from "./place/stage.ts";
 import { placeStyles } from "./place/style.ts";
 import { SaveButton } from "./readonly.ts";
+import { MadeByTask } from "./madeby.ts";
 
 const bytesOf = (doc: unknown) => new TextEncoder().encode(JSON.stringify(doc)).length;
 const typing = (e: KeyboardEvent) => { const t = e.target as HTMLElement | null; return !!t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)); };
@@ -67,7 +68,7 @@ export function PlacePage(p: { id?: string }) {
   const proposed = proposedNew("place", id);
   if (!draftOf("place", id) && proposed) return html`<${ProposedDoc} x=${proposed} />`;
   if (!ready || !draftOf("place", id)) return html`<p>Opening ${id}…</p>`;
-  return html`<${Place} key=${id} id=${id} />`;
+  return html`<${MadeByTask} kind="place" id=${id} /><${Place} key=${id} id=${id} />`;
 }
 
 function Place(p: { id: string }) {
