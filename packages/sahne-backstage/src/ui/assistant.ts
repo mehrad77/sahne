@@ -335,9 +335,14 @@ const CLAUDE = [
 ];
 const modelName = (ai: { provider: string; model?: string }) => ai.provider === "anthropic" ? CLAUDE.find(m => m.id === (ai.model ?? CLAUDE[0]!.id))?.name ?? ai.model! : ai.model ?? "A local model";
 
-/** The model, in the composer: a pick saves it in the settings. */
+interface LocalModel { id: string; loaded?: boolean; context?: number; kind?: string }
+const ctxText = (n?: number) => (n ? `up to ${n >= 1000 ? `${Math.round(n / 1000)}k` : n} context` : "");
+
+/** The model, in the composer: a pick saves it in the settings. A local server's models are listed (LM Studio's, loaded or not: it loads one when asked). */
 function ModelPicker(p: { ai: { provider: string; model?: string } }) {
   const [at, toggle, close] = usePop();
+  const [local, setLocal] = useState<LocalModel[] | null>(null);
+  useEffect(() => { if (at && p.ai.provider !== "anthropic") void api.get<{ models: LocalModel[] }>("models").then(r => setLocal(r.status === 200 ? r.models : [])); }, [!!at]);
   const now = p.ai.model ?? (p.ai.provider === "anthropic" ? CLAUDE[0]!.id : "");
   const pick = async (id: string) => {
     close();
@@ -351,8 +356,12 @@ function ModelPicker(p: { ai: { provider: string; model?: string } }) {
     ${at && html`<${Popover} above x=${at.x} y=${at.y} label="The assistant's model" onClose=${close}><div class="model-menu" role="menu">
       ${p.ai.provider === "anthropic" ? CLAUDE.map(m => html`<button type="button" role="menuitemradio" aria-checked=${m.id === now} onClick=${() => void pick(m.id)}>
         <span><b>${m.name}</b><small>${m.note}</small></span>${m.id === now && html`<${Icon} name="check" size=${16} />`}</button>`)
-        : html`<form class="model-local" onSubmit=${(e: Event) => { e.preventDefault(); const v = ((e.currentTarget as HTMLFormElement).elements.namedItem("m") as HTMLInputElement).value.trim(); if (v) void pick(v); }}>
-          <label for="model-id">The model's id on the local server</label><input id="model-id" name="m" value=${p.ai.model ?? ""} placeholder="qwen3-coder, llama3.1…" autofocus /></form>`}
+        : html`${local === null ? html`<p class="note model-wait">Asking the local server for its models…</p>`
+            : local.length ? html`<div class="model-list">${[...local].sort((a, b) => Number(!!b.loaded) - Number(!!a.loaded) || a.id.localeCompare(b.id)).map(m => html`<button type="button" role="menuitemradio" aria-checked=${m.id === now} onClick=${() => void pick(m.id)}>
+                <span><b>${m.id}</b><small>${[m.loaded ? "loaded" : m.loaded === false ? "loads when first asked" : "", ctxText(m.context), m.kind === "vlm" ? "sees pictures" : ""].filter(Boolean).join(" · ")}</small></span>${m.id === now && html`<${Icon} name="check" size=${16} />`}</button>`)}</div>`
+            : html`<p class="note model-wait">The local server listed no models: is it running?</p>`}
+          <form class="model-local" onSubmit=${(e: Event) => { e.preventDefault(); const v = ((e.currentTarget as HTMLFormElement).elements.namedItem("m") as HTMLInputElement).value.trim(); if (v) void pick(v); }}>
+          <label for="model-id">Or a model's id</label><input id="model-id" name="m" value=${local?.some(m => m.id === now) ? "" : p.ai.model ?? ""} placeholder="qwen3-coder, llama3.1…" /></form>`}
       <a class="model-more" href="#/settings" onClick=${close}><${Icon} name="settings" size=${14} /> Another provider, and the budget</a></div></${Popover}>`}`;
 }
 

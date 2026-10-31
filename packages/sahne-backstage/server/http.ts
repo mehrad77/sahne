@@ -20,6 +20,7 @@ import { headOf } from "./git.ts";
 import { readReview, writeReview } from "./review.ts";
 import { requestOf, runAssistant, usageSummary } from "./assistant.ts";
 import { MODELS } from "./ai/providers/anthropic.ts";
+import { localModels } from "./ai/providers/openai.ts";
 import { overrides, readiness, readSettings, settingsFile, writeSettings, webOf } from "./settings.ts";
 import { Events, selectionOf } from "./events.ts";
 import { Agents, callOf } from "./agents.ts";
@@ -230,6 +231,8 @@ export async function serve(o: Options): Promise<Running> {
     if (route === "settings" && m === "GET") return json(res, 200, settingsView());
     if (route === "settings" && m === "POST") { const s = writeSettings(await body(req)); if (s.agentEdits) agentEdits = s.agentEdits; return json(res, 200, settingsView()); }
     if (route === "agents" && m === "GET") return json(res, 200, await agentsView(req));
+    // the local server's models, for the composer's picker (none for Claude, whose models the editor knows)
+    if (route === "models" && m === "GET") { const s = readSettings(); return json(res, 200, { models: s.provider === "openai" ? await localModels(s.baseUrl) : [] }); }
     if (route === "agents" && m === "POST") {
       const v = await body(req) as { agentEdits?: unknown };
       if (v?.agentEdits !== "proposals" && v?.agentEdits !== "direct") throw new Fail(400, "expected { agentEdits: \"proposals\" | \"direct\" }");

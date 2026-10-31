@@ -3,7 +3,7 @@
 // `tools` and `tool_calls`; OPENAI_API_KEY is sent as a bearer token when the environment has one. A local server may
 // report no usage: the tokens are then estimated (about four characters a token), so the token caps still bind. A
 // reasoning model's thinking (`reasoning_content` deltas, or <think>…</think> in the text, as DeepSeek and Qwen write it)
-// goes to `onThinking`, never into the answer.
+// goes to `onThinking`, never into the answer. `localModels` lists the server's models for the editor's picker.
 
 import { estimateTokens, net, ProviderError, readSse, schemaFor, type Provider, type ToolResult, type Turn, type TurnOptions } from "../provider.ts";
 import { LOCAL_BASE } from "../../settings.ts";
@@ -80,6 +80,22 @@ export function openai(o: { baseUrl?: string; model?: string } = {}): Provider {
  * Text with <think>…</think> in it, split as it streams: the thinking to `thinking`, the rest to `text`. A tag cut across
  * two chunks is held back until the next one says what it is.
  */
+/** A model the server can run: its id, and on LM Studio whether it is loaded and how long a context it takes. */
+export interface LocalModel { id: string; loaded?: boolean; context?: number; kind?: string }
+
+/**
+ * The models of the server at `baseUrl` that can chat: LM Studio's own list (every downloaded model, loaded or not, the
+ * embedding ones left out) when it answers, else the OpenAI-compatible `/models`. Nothing when the server is down.
+ */
+export async function localModels(baseUrl: string = LOCAL_BASE): Promise<LocalModel[]> {
+  const base = baseUrl.replace(/\/+$/, "");
+  const get = async (u: string) => { try { const r = await fetch(u, { signal: AbortSignal.timeout(2500) }); return r.ok ? await r.json() as { data?: Record<string, unknown>[] } : null; } catch { return null; } };
+  const lms = await get(`${base.replace(/\/v1$/, "")}/api/v0/models`);
+  if (lms?.data) return lms.data.filter(m => m.type !== "embeddings").map(m => ({ id: String(m.id), loaded: m.state === "loaded", ...(typeof m.max_context_length === "number" ? { context: m.max_context_length } : {}), ...(typeof m.type === "string" ? { kind: m.type } : {}) }));
+  const plain = await get(`${base}/models`);
+  return (plain?.data ?? []).map(m => ({ id: String(m.id) })).filter(m => !/embed/i.test(m.id));
+}
+
 export function thinkSplitter(text: (s: string) => void, thinking: (s: string) => void) {
   let inside = false, held = "";
   const emit = (s: string) => { if (s) (inside ? thinking : text)(s); };
