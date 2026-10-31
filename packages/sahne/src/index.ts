@@ -5,7 +5,7 @@ export * from "./core/color.ts";
 export * from "./core/rng.ts";
 export type * from "./core/types.ts";
 export type * from "./core/kit.ts";
-export { withVariant, EMIT_KINDS, MOTION_KINDS, TIMETABLE } from "./core/kit.ts";
+export { withVariant, pieceOf, EMIT_KINDS, MOTION_KINDS, TIMETABLE } from "./core/kit.ts";
 export * from "./core/lang.ts";
 export * from "./core/linematch.ts";
 export * from "./art/path.ts";

@@ -20,7 +20,7 @@
 // and the owner's review are the gallery's (#/places/<id>, shots.mjs --camera).
 
 import { allLanguages, DEFAULT_LANGUAGES, type Languages } from "./texts.ts";
-import { drawPieces, withVariant, placeSolids, placeState, route, rng, cellSize, fitsAtlas, ATLAS_MAX, TIMES, TIMETABLE, type Kit, type FlatSpec, type Group, type ParamSpec, type PieceDef } from "sahne";
+import { drawPieces, withVariant, pieceOf, placeSolids, placeState, route, rng, cellSize, fitsAtlas, ATLAS_MAX, TIMES, TIMETABLE, type Kit, type FlatSpec, type Group, type ParamSpec, type PieceDef } from "sahne";
 import { cardProblem, isA1, type CardIndex } from "./cards.ts";
 import { needsOf, type Needs } from "./needs.ts";
 import type { StoryPlace } from "./types.ts";
@@ -129,12 +129,17 @@ export function lintPlace(doc: StoryPlace, o: PlaceLintOptions): PlaceProblem[] 
   const top = doc.camera?.wide?.y1 ?? 2.45;
   for (const [id, m] of Object.entries(doc.marks)) if ((id === doc.perch || m.air) && (m.y ?? 0) > top + 0.3) add("valid", `${id === doc.perch ? "perch" : "air mark"} ${id} at ${m.y} m is above the wide shot's height band (camera.wide.y1 ${top}): raise y1`, "warning");
   for (const p of doc.pieces) if (typeof p.x !== "number" || typeof p.z !== "number") add("valid", `set piece ${p.kit}${p.id ? ` #${p.id}` : ""} has no x or z: it is not placed`);
-  for (const p of doc.pieces) if (!Object.hasOwn(o.kit.set, p.kit)) add("valid", `set piece ${p.kit} is not in the kit`);
-  else if (p.variant !== undefined && !Object.hasOwn(o.kit.set[p.kit].variants ?? {}, p.variant)) add("valid", `set piece ${p.kit} has no variant ${p.variant}`);
-  else for (const m of paramProblems(o.kit.set[p.kit], p, PIECE_FIELDS)) add("valid", `set piece ${p.kit}${p.id ? ` #${p.id}` : ""}: ${m.message}`, m.level === "error" ? level : "warning");
-  for (const [id, p] of Object.entries(doc.props ?? {})) if (!Object.hasOwn(o.kit.props, p.kit)) add("valid", `prop ${id}: ${p.kit} is not in the kit`);
-  else if (p.variant !== undefined && !Object.hasOwn(o.kit.props[p.kit].variants ?? {}, p.variant)) add("valid", `prop ${id}: ${p.kit} has no variant ${p.variant}`);
-  else for (const m of paramProblems(o.kit.props[p.kit], p, PROP_FIELDS)) add("valid", `prop ${id}: ${m.message}`, m.level === "error" ? level : "warning");
+  // a kit id after `kit.aliases` (an item promoted from a content root keeps answering to its old x_ id)
+  for (const p of doc.pieces) { const def = pieceOf(o.kit, "set", p.kit);
+    if (!def) add("valid", `set piece ${p.kit} is not in the kit`);
+    else if (p.variant !== undefined && !Object.hasOwn(def.variants ?? {}, p.variant)) add("valid", `set piece ${p.kit} has no variant ${p.variant}`);
+    else for (const m of paramProblems(def, p, PIECE_FIELDS)) add("valid", `set piece ${p.kit}${p.id ? ` #${p.id}` : ""}: ${m.message}`, m.level === "error" ? level : "warning");
+  }
+  for (const [id, p] of Object.entries(doc.props ?? {})) { const def = pieceOf(o.kit, "props", p.kit);
+    if (!def) add("valid", `prop ${id}: ${p.kit} is not in the kit`);
+    else if (p.variant !== undefined && !Object.hasOwn(def.variants ?? {}, p.variant)) add("valid", `prop ${id}: ${p.kit} has no variant ${p.variant}`);
+    else for (const m of paramProblems(def, p, PROP_FIELDS)) add("valid", `prop ${id}: ${m.message}`, m.level === "error" ? level : "warning");
+  }
   const { w, d } = doc.size;
   for (const [id, m] of Object.entries(doc.marks)) {
     if (!m.air && (Math.abs(m.x) > w / 2 || m.z < -d || m.z > 1)) add("valid", `mark ${id} (${m.x}, ${m.z}) is outside the place (${w} × ${d} m)`);
@@ -262,7 +267,7 @@ export function lintPlace(doc: StoryPlace, o: PlaceLintOptions): PlaceProblem[] 
   };
   for (const { p, out } of drawPieces(doc, o.kit)) for (const f of out.flats) big(`piece ${p.id ?? p.kit}`, f);
   for (const [id, p] of Object.entries(doc.props ?? {})) {
-    const def = o.kit.props[p.kit];
+    const def = pieceOf(o.kit, "props", p.kit);
     if (!def) continue;
     const params = Object.fromEntries(Object.entries(p).filter(([k]) => !PROP_FIELDS.includes(k) || k === "variant" || k === "n"));
     for (const f of def.draw(withVariant(def, params), rng(id), o.kit).flats) big(`prop ${id}`, f);

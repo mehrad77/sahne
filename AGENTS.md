@@ -7,7 +7,7 @@ Sahne is a paper-theatre stage engine and its kits ([README.md](README.md)). Thi
 ```text
 packages/
   sahne/          the engine                                    → packages/sahne/README.md, DESIGN.md
-  sahne-kit/      the first kit: people, set pieces, props, sounds, music, Kerim → STYLE.md, CATALOGUE.md, SET.md
+  sahne-kit/      the first kit: people, set pieces, props, sounds, music, Kerim; drawn items (drawing/, src/set/drawn/) → STYLE.md, DRAWING.md, CATALOGUE.md, SET.md
   sahne-tr/       the Turkish plugin                            → packages/sahne-tr/README.md
   sahne-en/       the English plugin                            → packages/sahne-en/README.md
   sahne-de/       the German plugin                             → packages/sahne-de/README.md
@@ -28,6 +28,7 @@ assets/                        the README's poster and scene pictures, and brand
 |---|---|
 | The engine | [packages/sahne/README.md](packages/sahne/README.md) and [DESIGN.md](packages/sahne/DESIGN.md) |
 | Kit art (people, set, props) | [STYLE.md](packages/sahne-kit/STYLE.md), [CATALOGUE.md](packages/sahne-kit/CATALOGUE.md), [SET.md](packages/sahne-kit/SET.md), `src/curation.ts` |
+| A kit item drawn as data over MCP, or promoted into the kit with its author's credit | [DRAWING.md](packages/sahne-kit/DRAWING.md) (*Promoting*), [CONTRIBUTING.md](CONTRIBUTING.md) (*Contributing art*) |
 | Stories, places, the content root | [packages/sahne-story/README.md](packages/sahne-story/README.md) |
 | The editor (backstage), its MCP server and assistant | [packages/sahne-backstage/README.md](packages/sahne-backstage/README.md), then the story README's Series and Languages sections |
 | A series in another language, or a language's lints | [packages/sahne-story/README.md](packages/sahne-story/README.md) (Languages, the story language) |
@@ -63,8 +64,8 @@ assets/                        the README's poster and scene pictures, and brand
 
 ## Rules for every change
 
-- **Every generator has `--check`.** Generated files have exactly one script that writes them, and a `--check` that fails when they are stale. That covers `CATALOGUE.md` (`catalogue/build.ts`), `SET.md` and `src/set/families.gen.ts` (`set/build.ts`), `src/kerim/art.gen.ts` (`kerim/build.ts`), the sounds (`sounds/build.ts`), the extras (`sahne-story/cast/extras.ts`), the thumbnails (`sahne-gallery/thumbs.mjs`) and the brand files (`sahne-gallery/brand/build.mjs`: `assets/brand/`, each package's favicon and the brand block atop its README). A new generator gets one too.
-- **Ids are permanent.** Never rename a part, set piece, prop, sound, gesture or place id that a document may use. Add the new id, and map the old one through the kit's `aliases`.
+- **Every generator has `--check`.** Generated files have exactly one script that writes them, and a `--check` that fails when they are stale. That covers `CATALOGUE.md` (`catalogue/build.ts`), `SET.md` and `src/set/families.gen.ts` (`set/build.ts`), the promoted drawings' `src/set/drawn/<family>.gen.ts`, `aliases.gen.ts` and `CREDITS.json` (`drawing/promote.ts --regenerate`, `--check`), `src/kerim/art.gen.ts` (`kerim/build.ts`), the sounds (`sounds/build.ts`), the extras (`sahne-story/cast/extras.ts`), the thumbnails (`sahne-gallery/thumbs.mjs`) and the brand files (`sahne-gallery/brand/build.mjs`: `assets/brand/`, each package's favicon and the brand block atop its README). A new generator gets one too.
+- **Ids are permanent.** Never rename a part, set piece, prop, sound, gesture or place id that a document may use. Add the new id, and map the old one through the kit's `aliases` (parts, and set pieces and props too: the engine's `pieceOf`, `familiesOf` and `lintPlace` follow it). A content id (`x_…`) appears in the kit only as an alias key, where a promoted item replaced it.
 - **Docs follow the code.** One fact lives in one place and is linked from elsewhere. Update the area's doc in the same commit as the change. Never renumber a section that code or other docs cite (`DESIGN.md §12`).
 - **The size budgets bind** (README, `size.mjs`). A bundle over budget fails the gate.
 - **No story data that is not ours.** The samples are original. Never add text we don't hold the rights to, card or lesson data, or another project's characters to this repo.

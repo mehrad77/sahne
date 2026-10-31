@@ -122,7 +122,9 @@ test("a content root's pieces and variants are added to a kit, never over its id
 });
 
 test("no id of the kit starts with x_: that prefix is the content's", () => {
-  const ids: string[] = [...Object.keys(kit.set), ...Object.keys(kit.props), ...Object.keys(kit.parts), ...Object.keys(kit.aliases ?? {}), ...Object.values(kit.aliases ?? {})];
+  // the one place an x_ id may stand is a key of the kit's aliases: a promoted item's old id, which leads to its kit id
+  const ids: string[] = [...Object.keys(kit.set), ...Object.keys(kit.props), ...Object.keys(kit.parts), ...Object.values(kit.aliases ?? {})];
   for (const d of [...Object.values(kit.set), ...Object.values(kit.props)]) ids.push(...Object.keys(d.variants ?? {}));
   assert.deepEqual(ids.filter(i => i.startsWith("x_")), []);
+  for (const [from, to] of Object.entries(kit.aliases ?? {})) if (from.startsWith("x_")) assert.ok(Object.hasOwn(kit.set, to) || Object.hasOwn(kit.props, to), `${from} leads to ${to}, which is not a set piece or prop of the kit`);
 });

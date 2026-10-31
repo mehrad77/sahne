@@ -6,7 +6,8 @@
 // A set piece or prop written in TypeScript is read when the process starts: `kit_render` and `kit_read` say so when its
 // source changed since; a client that starts a process per call always sees the current source.
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as z from "zod";
@@ -68,7 +69,9 @@ export function pieceRows(kit: Kit = kitOf()): Row[] {
 
 /** The row an id and a wanted use name: `as` picks when the id is in both maps with different generators. */
 function rowOf(id: string, as?: "set" | "prop", kit: Kit = kitOf()): Row {
-  const rows = pieceRows(kit).filter(r => r.id === id);
+  // an id a promoted item replaced (x_…) names that item, as a place's own lookup follows it
+  const all = pieceRows(kit), via = kit.aliases && Object.hasOwn(kit.aliases, id) && !all.some(r => r.id === id) ? kit.aliases[id] : id;
+  const rows = all.filter(r => r.id === via);
   if (!rows.length) throw new Refusal(`there is no set piece or prop ${id} (kit_search finds them)`);
   const pick = as ? rows.find(r => r.as === as || r.as === "both") : rows[0];
   if (!pick) throw new Refusal(`${id} is not a ${as}: it is a ${rows.map(r => r.as).join(" and ")}`);
@@ -83,6 +86,9 @@ const asOf = (r: Row, kit: Kit): As => ({ ids: [r.id], set: kit.set?.[r.id] === 
  *  above it to its end (`from`..`to`, 1-based), so an agent reads just that part of the file; never the text itself. */
 function sourceOf(r: Row): { file: string; line?: number; from?: number; to?: number } | null {
   if (!FAMILY.has(`${r.slot}:${r.id}`)) return null;
+  // a drawing promoted into the family is a document, not code
+  const drawn = join(SET_DIR, "drawn", r.family, `${r.id}.json`);
+  if (existsSync(drawn)) return { file: relative(KIT_ROOT, drawn) };
   const path = join(SET_DIR, `${r.family}.ts`), file = relative(KIT_ROOT, path), src = readFileSync(path, "utf8"), lines = src.split("\n");
   // the registry names the generator's variable: `{ food, tea, plate: plateP }` or `"x": f`
   const reg = new RegExp(`[{,]\\s*["']?${r.id}["']?\\s*(?::\\s*([A-Za-z_$][\\w$]*))?\\s*(?=[,}])`).exec(src);
@@ -586,5 +592,30 @@ export function registerKitTools(server: McpServer, k: KitToolsCtx): void {
     if (why) return fail(why);
     const { target: t, problems } = draftVariant(of, name, params);
     return save("kit_variant", `${of}.${name}`, { of, name, params }, mtime, () => checks(t, problems), "variant");
+  }));
+
+  server.registerTool("promote_kit_item", {
+    title: "Offer a drawing to Sahne",
+    description: "Step 7 of the loop: offer a drawing saved in this content root (kit/pieces/x_….json) to become official Sahne art, credited to its author. It checks the drawing as the kit's own items are checked (the official rules on top of draft_kit_item's: an unused snake_case id, the family and its size, shelved tags, a real `about`, words as text with a language, set pieces at 3 px/cm or less) and returns the problems with the review sheet and the family comparison as pictures. Without `pr` it writes nothing anywhere. With `pr: true`, a write mode and `gh` signed in, it opens a pull request on GitHub from a temporary clone (a branch art/<id>, your person's fork when they cannot write), else leaves a .patch and the pull request text and says what to do. YOU MUST ASK YOUR PERSON for `by` (their name as they want it shown), `contact` (github:name or an address) and `consent`: consent is theirs to give, never yours. It means they release the drawing under CC BY 4.0 (the kit's art licence, LICENSE-ART) and say it is their own work, not traced or copied. Never pass consent: true unless they said so in this conversation. Promotion refuses without it. The old x_ id stays working: the kit's aliases answer to it.",
+    inputSchema: {
+      kitId: z.string().describe("The drawing's id in this content root, x_…"),
+      id: z.string().describe("The id it takes in the kit, for good: lowercase snake_case, never x_ (ids are permanent)"),
+      family: z.string().describe("The kit family it joins (kit_read shows each item's family; bakery takes drawn items)"),
+      by: z.string().describe("The author's name as they want it shown: ask your person"),
+      contact: z.string().describe("How to reach the author: github:name or an address: ask your person"),
+      consent: z.boolean().describe("true only when your person agreed in this conversation to release it under CC BY 4.0 as their own work: ask them, never assume"),
+      story: z.string().optional().describe("Where it was used, like \"kumru s2e04\""),
+      pr: z.boolean().optional().describe("Open the pull request (needs a write mode and gh); default false: check and draw only"),
+    },
+    annotations: { destructiveHint: false, openWorldHint: true },
+  }, run("promote_kit_item", async ({ kitId, id, family, by, contact, consent, story, pr }) => {
+    if (!exists("kit_piece", kitId)) throw new Refusal(`there is no drawing ${kitId} in this content root (kit_search lists this series' items)`);
+    if (pr) { const why = k.readOnly(); if (why) return fail(why); }
+    const { promote } = await import("../../sahne-kit/drawing/promote.ts");
+    const out = mkdtempSync(join(tmpdir(), "sahne-promote-")), doc = readDoc("kit_piece", kitId).doc as DrawingDoc;
+    const r = await promote({ source: doc, id, family, by, contact, consent, story, pr, dry: !pr, out });
+    const text = [`${kitId} → ${id} (${family}): ${r.ok ? (pr ? "offered" : "ready to offer") : "not ready"}`, ...r.lines].join("\n");
+    const res = ok(text, { ok: r.ok, problems: r.problems, ...(r.pr ? { pr: r.pr } : {}), ...(r.patch ? { patch: r.patch } : {}) }, r.images.map(f => readFileSync(f)));
+    return r.ok ? res : { ...res, isError: true };
   }));
 }

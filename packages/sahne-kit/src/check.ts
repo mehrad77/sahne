@@ -10,11 +10,15 @@
 //   text     words inside their art, never empty, with a language tag
 //
 // An error fails the gate; a warning is advice (a piece rasterised finer than 3 px/cm).
+//
+// `officialProblems` holds a drawing to be promoted into the kit (`drawing/promote.ts`) to the stricter rules of an official item.
 
-import { cellSize, fitsAtlas, groupBounds, moveAt, rng, type Kit, type PieceDef, type PieceOut, type ParamSpec, type ParamType } from "sahne";
+import { Path, cellSize, fitsAtlas, groupBounds, moveAt, rng, tone, type Kit, type PieceDef, type PieceOut, type ParamSpec, type ParamType, type Tone } from "sahne";
+import { compileDrawing, KIT_ID, DRAWING_LIMITS, type DrawingDoc, type DrawingFill } from "./drawing.ts";
+import { FABRIC, HAIR, METAL, SET, SKIN } from "./palette.ts";
 
 /** Which rule a problem breaks (the header above). */
-export type Rule = "meta" | "variants" | "reads" | "flats" | "motion" | "text";
+export type Rule = "meta" | "variants" | "reads" | "flats" | "motion" | "text" | "official";
 export interface Problem { level: "error" | "warn"; rule: Rule; id: string; msg: string }
 
 /** Params the engine gives every piece or prop, which no generator declares: its named look and whether it is in a hand. */
@@ -195,3 +199,121 @@ export function checkKit(kit: Kit): Problem[] {
 
 /** A problem as one line. */
 export const problemLine = (p: Problem) => `${p.level === "warn" ? "warning: " : ""}${p.id}: ${p.msg}`;
+
+// ---- an official item ------------------------------------------------------------------------------------------------------
+
+/** What `officialProblems` needs to know of the kit it joins (the caller reads it; the checks are pure). */
+export interface OfficialContext {
+  /** The kit as it is, with every family loaded: its set pieces, props, parts and aliases. */
+  kit: Pick<Kit, "set" | "props" | "parts" | "aliases" | "color">;
+  /** The family it goes into, and the families that exist. */
+  family: string; families: readonly string[];
+  /** Whether that family's file takes drawn items (it imports `drawn/<family>.gen.ts`). */
+  wired: boolean;
+  /** The tags on the backstage kit page's shelves (`model/kitgroups.ts`), for props and for set pieces. */
+  shelfTags: { props: ReadonlySet<string>; set: ReadonlySet<string> };
+  /** The family chunk's size once the item is in, and its budget, both gzip bytes (promote.ts measures them). */
+  size?: { gzip: number; budget: number };
+}
+
+/** The most a set piece's ppcm may be, and a prop's: the kit's own, which `checkPiece` only warns about for a piece. */
+const OFFICIAL_PPCM = { set: 3, prop: 16 };
+
+/** Every colour the kit names, so a hex that is not one of them (or a step of one) can be told. */
+function kitColours(): Set<string> {
+  const out = new Set<string>();
+  for (const pal of [SET, FABRIC, METAL, SKIN, HAIR]) for (const c of Object.values(pal)) for (const t of ["base", "shade", "deep", "light", "edge"] as Tone[]) out.add(tone(c, t).toUpperCase());
+  return out;
+}
+
+/** Every plain `#hex` a drawing names (a `$param` or palette id is not one; a `{tone}` names its base). */
+function hexesOf(doc: DrawingDoc): Set<string> {
+  const out = new Set<string>(), add = (f: DrawingFill | undefined) => { const c = typeof f === "object" ? f?.tone : f; if (typeof c === "string" && /^#[0-9a-f]{6}$/i.test(c)) out.add(c.toUpperCase()); };
+  for (const k of Object.values(doc.kinds ?? {})) for (const f of k.flats ?? []) {
+    for (const s of [...(f.shapes ?? []), ...(f.glow ?? [])]) { add(s.fill); add(s.stroke?.color); }
+    for (const t of f.text ?? []) add(t.color);
+  }
+  for (const p of Object.values(doc.params ?? {})) if (p.type === "color" && typeof p.default === "string") add(p.default);
+  return out;
+}
+
+/** Runs of small, letter-like shapes standing in a row on one baseline: words drawn as shapes (a heuristic: text is `text`, which the page sets in a font). */
+function wordLike(doc: DrawingDoc): string[] {
+  const out: string[] = [];
+  for (const [kn, k] of Object.entries(doc.kinds ?? {})) k.flats?.forEach((f, fi) => {
+    const boxes: { x0: number; x1: number; y0: number; y1: number }[] = [];
+    for (const s of f.shapes ?? []) {
+      try { const [x0, y0, x1, y1] = Path.fromSvg(s.d).bounds(); if (x1 - x0 <= (y1 - y0) * 1.4 && y1 - y0 >= 0.5) boxes.push({ x0, x1, y0, y1 }); } catch { /* compileDrawing reports the path */ }
+    }
+    boxes.sort((a, b) => a.x0 - b.x0);
+    let run = 1;
+    for (let i = 1; i <= boxes.length; i++) {
+      const a = boxes[i - 1], b = boxes[i], h = a.y1 - a.y0;
+      const next = b && Math.abs((b.y1 - b.y0) - h) <= h * 0.25 && Math.abs(b.y1 - a.y1) <= h * 0.25 && b.x0 - a.x1 >= -0.01 && b.x0 - a.x1 <= h * 0.8;
+      if (next) run++; else { if (run >= 5) out.push(`kind ${kn} flat ${fi}: ${run} small letter-like shapes stand in a row (words drawn as shapes?): words are \`text\`, set in the page's font`); run = 1; }
+    }
+  });
+  return out;
+}
+
+const SENTENCE = /^\p{Lu}.{14,}[.!?]$/u;
+
+/**
+ * Everything wrong with a drawing about to join the kit under its new id, with its `credit` (the document `promote.ts` would
+ * write): the content rules (`compileDrawing`, `checkPiece`) and the official ones. The id is unused, not `x_`, snake_case and
+ * not a past alias; the family exists, takes drawn items and stays in budget; every tag is on a shelf; `about` is a sentence;
+ * text has a `lang`; a piece is drawn at 3 px/cm or less; colours are the kit's or the tone ramp's (a stray hex is a warning);
+ * no words drawn as shapes (a warning); the caps; and the credit is whole, with consent.
+ */
+export function officialProblems(doc: DrawingDoc, c: OfficialContext): Problem[] {
+  const out: Problem[] = [], id = doc?.id ?? "?";
+  const err = (msg: string) => out.push({ level: "error", rule: "official", id, msg }), warn = (msg: string) => out.push({ level: "warn", rule: "official", id, msg });
+  const taken = (m?: Record<string, unknown>) => !!m && Object.hasOwn(m, id);
+  // the id
+  if (!KIT_ID.test(id)) err(`id ${JSON.stringify(id)}: a kit id is lowercase letters and digits in snake_case, and never starts with x_`);
+  else {
+    if (taken(c.kit.set) || taken(c.kit.props) || taken(c.kit.parts)) err(`id ${id} is taken by a set piece, prop or part of the kit: ids are permanent, pick another`);
+    if (c.kit.aliases && (Object.hasOwn(c.kit.aliases, id) || Object.values(c.kit.aliases).includes(id))) err(`id ${id} is a past alias or what one leads to: pick another`);
+  }
+  // the family
+  if (!c.families.includes(c.family)) err(`family ${JSON.stringify(c.family)} does not exist (${c.families.join(", ")})`);
+  else if (!c.wired) err(`family ${c.family} does not take drawn items yet: its file (src/set/${c.family}.ts) imports \`DRAWN\` from "./drawn/${c.family}.gen.ts", runs it through \`drawnFamily\` (sahne-kit/drawing) and spreads the result into its set and props (see bakery.ts)`);
+  if (c.size && c.size.gzip > c.size.budget) err(`family ${c.family} would be ${(c.size.gzip / 1024).toFixed(1)} KB gzip, over its ${(c.size.budget / 1024).toFixed(0)} KB budget`);
+  // the content rules, with the new id
+  const { def, problems } = compileDrawing(doc, true);
+  for (const m of problems) err(m);
+  // tags, about, lang, ppcm, caps
+  const shelves = doc.as === "prop" ? [c.shelfTags.props] : doc.as === "set" ? [c.shelfTags.set] : [c.shelfTags.props, c.shelfTags.set];
+  if (!doc.tags?.length) err("tags: at least one, from the kit page's shelves (model/kitgroups.ts), so the item can be found");
+  for (const t of doc.tags ?? []) if (!shelves.every(s => s.has(t))) err(`tag ${JSON.stringify(t)} is on no shelf of the kit page (${doc.as === "set" ? "set piece" : doc.as === "prop" ? "prop" : "prop and set piece"} shelves in model/kitgroups.ts): use one that is, or add the shelf`);
+  if (!SENTENCE.test((doc.about ?? "").trim())) err("about: say what it draws in a sentence (a capital letter, a full stop, at least 15 characters)");
+  for (const [kn, k] of Object.entries(doc.kinds ?? {})) {
+    for (const [fi, f] of (k.flats ?? []).entries()) for (const t of f.text ?? []) if (!t.lang) err(`kind ${kn} flat ${fi}: text "${t.text}" has no lang`);
+    const ppcm = k.ppcm ?? (doc.as === "set" ? 1.6 : 5);
+    if (doc.as !== "prop" && ppcm > OFFICIAL_PPCM.set) err(`kind ${kn}: ppcm ${ppcm}: a set piece is drawn at ${OFFICIAL_PPCM.set} px/cm or less`);
+    if (ppcm > OFFICIAL_PPCM.prop) err(`kind ${kn}: ppcm ${ppcm}: at most ${OFFICIAL_PPCM.prop}`);
+  }
+  if (JSON.stringify({ ...doc, credit: undefined }).length > DRAWING_LIMITS.bytes) err(`over ${DRAWING_LIMITS.bytes / 1024} KB`);
+  // colours
+  const known = kitColours(), stray = [...hexesOf(doc)].filter(h => !known.has(h));
+  if (stray.length) warn(`${stray.length} colour${stray.length === 1 ? "" : "s"} outside the kit's (SET and the palettes, or a tone of one): ${stray.slice(0, 6).join(" ")}${stray.length > 6 ? " …" : ""}; a material of its own is fine, a near miss of a kit colour is not`);
+  for (const m of wordLike(doc)) warn(m);
+  // the credit
+  const cr = doc.credit;
+  if (!cr) err("credit: who drew it, how to reach them, and their consent");
+  else {
+    if (!(typeof cr.by === "string" && cr.by.trim())) err("credit.by: the author's name, as they want it shown");
+    if (!(typeof cr.contact === "string" && cr.contact.trim())) err("credit.contact: how to reach the author (github:name, an address)");
+    if (cr.consent !== true) err("credit.consent: the author must agree to release the art under CC BY 4.0 (LICENSE-ART) and say it is their own work, not traced or copied");
+    if (cr.licence !== "CC-BY-4.0") err("credit.licence: CC-BY-4.0");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(cr.date ?? "")) err("credit.date: YYYY-MM-DD");
+    if (!/^x_[a-z0-9_]+$/.test(cr.from ?? "")) err("credit.from: the content id it had (x_…)");
+    else if (c.kit.aliases && Object.hasOwn(c.kit.aliases, cr.from)) err(`credit.from ${cr.from} is already an alias (of ${c.kit.aliases[cr.from]}): two stories may use one x_ id, but only one item can be its successor`);
+  }
+  // the compiled generator, as a place would draw it
+  if (!problems.length) {
+    const prop = doc.as !== "set", set = doc.as !== "prop", kit = { ...c.kit, set: { ...c.kit.set, ...(set ? { [id]: def } : {}) }, props: { ...c.kit.props, ...(prop ? { [id]: def } : {}) } } as Kit;
+    for (const q of checkPiece(def, { ids: [id], set, prop }, kit)) out.push(q);
+  }
+  return out;
+}

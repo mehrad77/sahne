@@ -4,7 +4,8 @@
 // - SET.md: the catalogue of every set piece and prop: its family, what it is, the params it reads
 //   with their values and defaults, the place states it answers to, its named variants, and the places
 //   that use it. All but the places come from each generator's `meta` (PieceDef.meta; test/meta.test.ts
-//   holds the meta to what the drawing reads).
+//   holds the meta to what the drawing reads). Its Credits section is src/set/drawn/CREDITS.json (written by
+//   drawing/promote.ts, which runs this after it promotes an item).
 //
 //   node packages/sahne-kit/set/build.ts           write them
 //   node packages/sahne-kit/set/build.ts --check   fail when either is stale (the kit's tests run this)
@@ -21,6 +22,7 @@ const OUT = new URL("../src/set/families.gen.ts", import.meta.url);
 const MD = new URL("../SET.md", import.meta.url);
 const SRC = new URL("../src/set/", import.meta.url);
 const PLAN = new URL("plan.json", import.meta.url);
+const CREDITS = new URL("../src/set/drawn/CREDITS.json", import.meta.url);
 
 /** A generator or variants still to draw (`set/plan.json`). */
 export interface Planned { family: string; as: "set" | "prop" | "both"; step: string; about: string; variants: string[]; built?: true }
@@ -82,6 +84,13 @@ export function renderMd(): string {
     }
     lines.push("");
   }
+  const credits = JSON.parse(readFileSync(CREDITS, "utf8")) as { id: string; family: string; by: string; contact: string; story?: string; date: string; licence: string; from: string }[];
+  lines.push("## Credits", "", "Items drawn by the stories that first needed them and promoted into the kit (`drawing/promote.ts`, CONTRIBUTING.md *Contributing art*). Each author released their drawing under CC BY 4.0 ([LICENSE-ART](../../LICENSE-ART)) and said it is their own work; the credit is kept for as long as the item is. The drawings are `src/set/drawn/<family>/<id>.json`.", "");
+  if (credits.length) {
+    lines.push("| id | family | drawn by | contact | story | date | was |", "|---|---|---|---|---|---|---|");
+    for (const c of credits) lines.push(`| \`${c.id}\` | ${c.family} | ${cell(c.by)} | ${cell(c.contact)} | ${cell(c.story ?? "–")} | ${c.date} | \`${c.from}\` |`);
+  } else lines.push("None yet.");
+  lines.push("");
   const planned = Object.entries(plan());
   lines.push("## Planned", "", "Still to draw (`set/plan.json`): new generators, and variants of built ones that a story's places already ask for; each leaves the plan when it is drawn.", "", "| id | family | step | kind | what it is | variants |", "|---|---|---|---|---|---|");
   for (const [id, p] of planned.sort(([, a], [, b]) => a.step < b.step ? -1 : a.step > b.step ? 1 : 0)) lines.push(`| \`${id}\`${p.built ? " (more variants)" : ""} | ${p.family} | ${p.step} | ${p.as === "both" ? "piece, prop" : p.as === "set" ? "piece" : "prop"} | ${cell(p.about)} | ${p.variants.map(v => `\`${v}\``).join(" ") || "–"} |`);

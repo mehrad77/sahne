@@ -46,6 +46,8 @@ export async function render(host: HTMLElement, ctx: Ctx, id: string) {
   const h = head(g.id, meta?.about ?? "(no meta: SET.md and the controls need one)");
   h.querySelector("h2")!.append(" ", chip(g.family), " ", chip(g.kind === "both" ? "piece and prop" : g.kind));
   title.append(link("← every piece", "#/kit/set"), h);
+  // an item promoted from a story is credited to its author (SET.md's Credits, CREDITS.json)
+  if (g.credit) title.append($("p", "note", `Drawn by ${g.credit.by} (${g.credit.contact}), ${g.credit.date}${g.credit.story ? `, for ${g.credit.story}` : ""}. CC BY 4.0. A story's old id ${g.credit.from} still leads here.`));
   host.append(title);
 
   // ---- the stage ----

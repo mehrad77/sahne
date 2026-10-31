@@ -48,6 +48,7 @@ const TOOLS: Record<string, { kind: ToolKind; label: (i: In) => string }> = {
   draft_variant: { kind: "look", label: i => `Tried the variant ${str(i.of)}.${str(i.name)}` },
   save_kit_item: { kind: "create", label: i => `Saved the drawing ${str((i.doc as In | undefined)?.id)}` },
   save_variant: { kind: "create", label: i => `Saved the variant ${str(i.of)}.${str(i.name)}` },
+  promote_kit_item: { kind: "create", label: i => `${i.pr ? "Offered" : "Checked offering"} ${str(i.kitId)} to Sahne as ${str(i.id)}` },
   search_words: { kind: "search", label: i => `Searched the word cards: “${str(i.query)}”` },
   search_lines: { kind: "search", label: i => `Searched the lines: “${str(i.query)}”` },
   find_uses: { kind: "search", label: i => `Found where ${str(i.kind)} ${str(i.id)}${i.part ? ` · ${str(i.part)}` : ""} is used` },

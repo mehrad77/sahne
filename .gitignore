@@ -29,3 +29,6 @@ packages/sahne-kit/sounds/library/
 # Playwright output
 test-results/
 playwright-report/
+
+# Promotion output (sahne-kit/drawing/promote.ts: sheets, patch, pull request text)
+promote-out/

@@ -5,6 +5,8 @@
 
 import { Path, arcPoints, ellipse, rect, rrect, poly, smooth, tone, mul, rotate, translate, groupBounds, type Affine, type EmitSpec, type ParamSpec, type PieceDef, type Rng, type Shape, type Vec2 } from "sahne";
 import { S, P, num, str, hex } from "./draw.ts";
+import { drawnFamily } from "../drawing.ts";
+import { DRAWN } from "./drawn/bakery.gen.ts";
 
 const PI = Math.PI, WHITE = "#FBF8F2", STEEL = "#B8BEC4", DARK = "#2E2F35", WOOD = "#8A5A3C", CREAM = "#F3E6C4", LEMON = "#EFD04A", RED = "#C23B2B";
 // Separate materials, each with its own ramp: chocolate, jam, custard, cheese rind, mustard, a pan, the greens.
@@ -253,5 +255,7 @@ const deli = gen({
   terms: [], tags: ["food", "deli", "bakery", "cheese"],
 });
 
-export const set: Record<string, PieceDef> = {};
-export const props: Record<string, PieceDef> = { pastry, plated, cafe_drink: cafe, deli };
+// the items promoted from stories into this family are drawings, not code (drawing/promote.ts; DRAWING.md *Promoting*)
+const drawn = drawnFamily(DRAWN);
+export const set: Record<string, PieceDef> = { ...drawn.set };
+export const props: Record<string, PieceDef> = { pastry, plated, cafe_drink: cafe, deli, ...drawn.props };

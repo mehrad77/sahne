@@ -20,9 +20,21 @@ export interface DrawingFlat {
 }
 export interface DrawingKind { size: [number, number]; ppcm?: number; grip?: [number, number]; flats: DrawingFlat[]; lights?: LightSpec[]; emitters?: EmitSpec[] }
 export interface DrawingParam { type: "enum" | "int" | "num" | "bool" | "text" | "color"; default?: unknown; values?: string[]; min?: number; max?: number; about?: string }
+/** Who drew a promoted item and on what terms (sahne-kit/drawing/promote.ts adds it; CONTRIBUTING.md *Contributing art*). */
+export interface Credit {
+  by: string; contact: string; story?: string; date: string;
+  /** The kit's art licence (LICENSE-ART). */
+  licence: "CC-BY-4.0";
+  /** The author releases it under that licence and says it is their own work, not traced or copied. */
+  consent: true;
+  /** The content id it had in the story, which the kit's `aliases` still answer to. */
+  from: string;
+}
 /** A piece drawn as data. Units are cm from the bottom centre, y up negative, as in the kit. */
 export interface DrawingDoc {
-  id: string; as: "prop" | "set" | "both"; about: string; tags?: string[]; terms?: string[];
+  id: string;
+  /** Only an official item (`src/set/drawn/`) has one. */
+  credit?: Credit; as: "prop" | "set" | "both"; about: string; tags?: string[]; terms?: string[];
   params?: Record<string, DrawingParam>; kinds: Record<string, DrawingKind>;
   repeat?: { gap?: number }; variants?: Record<string, Record<string, unknown>>; solid?: SolidLine[] | null;
 }
@@ -34,6 +46,8 @@ export const DRAWING_LIMITS = { bytes: 64 * 1024, shapes: 400, commands: 20000, 
 
 /** A content id starts with `x_`: no id of the kit ever does, so the kit can never break a story that uses one. */
 export const CONTENT_ID = /^x_[a-z0-9_]+$/;
+/** An official item's id (`src/set/drawn/`): snake_case, never `x_`. */
+export const KIT_ID = /^(?!x_)[a-z][a-z0-9]*(_[a-z0-9]+)*$/;
 
 const PARAM_TYPES = ["enum", "int", "num", "bool", "text", "color"];
 const TONES = ["base", "shade", "deep", "light", "edge"];
@@ -44,13 +58,13 @@ interface CFlat { src: DrawingFlat; shapes: CShape[]; glow: CShape[] }
 interface CKind { src: DrawingKind; flats: CFlat[] }
 
 /** A document compiled: its generator, and what is wrong with it (the generator is only to be used when nothing is). */
-export function compileDrawing(doc: DrawingDoc): { def: PieceDef; problems: string[] } {
+export function compileDrawing(doc: DrawingDoc, official = false): { def: PieceDef; problems: string[] } {
   const problems: string[] = [], bad = (m: string) => { if (problems.length < 20) problems.push(m); };
   const params = doc && typeof doc.params === "object" && doc.params ? doc.params : {}, kinds: Record<string, CKind> = {};
   let shapes = 0, commands = 0;
   try {
     if (!doc || typeof doc !== "object") throw new Error("a drawing is an object");
-    if (!CONTENT_ID.test(doc.id ?? "")) bad(`id ${JSON.stringify(doc.id)}: a content id is x_ then lowercase letters, digits and _`);
+    if (official ? !KIT_ID.test(doc.id ?? "") : !CONTENT_ID.test(doc.id ?? "")) bad(official ? `id ${JSON.stringify(doc.id)}: a kit id is lowercase letters and digits in snake_case, never x_…` : `id ${JSON.stringify(doc.id)}: a content id is x_ then lowercase letters, digits and _`);
     if (!["prop", "set", "both"].includes(doc.as)) bad(`as ${JSON.stringify(doc.as)}: prop, set or both`);
     if (typeof doc.about !== "string" || doc.about.trim().length <= 8) bad("about: a line on what it draws");
     if (JSON.stringify(doc).length > DRAWING_LIMITS.bytes) bad(`over ${DRAWING_LIMITS.bytes / 1024} KB`);
@@ -163,6 +177,21 @@ export function fromDrawing(doc: DrawingDoc): PieceDef {
   const { def, problems } = compileDrawing(doc);
   if (problems.length) throw new Error(`drawing ${doc?.id}: ${problems.join("; ")}`);
   return def;
+}
+
+/**
+ * The set pieces and props of the official drawings a family keeps (`src/set/drawn/<family>.gen.ts`, written by
+ * `drawing/promote.ts`): each doc is a kit id, not an `x_` one. A family spreads the result into its own `set` and `props`.
+ */
+export function drawnFamily(docs: readonly DrawingDoc[]): { set: Record<string, PieceDef>; props: Record<string, PieceDef> } {
+  const set: Record<string, PieceDef> = {}, props: Record<string, PieceDef> = {};
+  for (const doc of docs) {
+    const { def, problems } = compileDrawing(doc, true);
+    if (problems.length) throw new Error(`drawing ${doc.id}: ${problems.join("; ")}`);
+    if (doc.as !== "prop") set[doc.id] = def;
+    if (doc.as !== "set") props[doc.id] = def;
+  }
+  return { set, props };
 }
 
 /**

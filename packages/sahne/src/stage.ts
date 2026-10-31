@@ -8,7 +8,7 @@
 import { peopleSamples, flights, fleeAt, lookToward, reactShows, type Sample, type Flight } from "./anim/react.ts";
 import type { EmitSpec, Kit, KitPuppet, Item, FlatSpec, FlatMotion, FlatReact, LightSpec, PieceOut, Side, Bus } from "./core/kit.ts";
 import { placeSolids } from "./director/route.ts";
-import { withVariant, TIMETABLE } from "./core/kit.ts";
+import { withVariant, pieceOf, TIMETABLE } from "./core/kit.ts";
 import type { AvatarDoc, PieceRef, PlaceDoc, PuppetRef } from "./core/types.ts";
 import { clamp, apply, ease, project, type Vec2, type Vec3, type Affine, type Mat4 } from "./core/math.ts";
 import { hexToRgb } from "./core/color.ts";
@@ -967,7 +967,7 @@ export class Stage {
   private propLook(s: PropState, pl: string): boolean {
     const key = artKey(s), had = this.propArt.get(key);
     if (had) { if (had.at.has(pl)) return false; had.at.add(pl); return true; }
-    const def = this.kit.props[s.kit];
+    const def = pieceOf(this.kit, "props", s.kit);
     if (!def) { console.warn("sahne: no prop", s.kit); return false; }
     const out = def.draw(withVariant(def, { ...s.params, n: s.n, held: !!s.holder }), rng(s.of), this.kit);
     // each flat with words is followed by its words' own flat (DESIGN.md §6.8)
@@ -1980,7 +1980,7 @@ export function pieceSeed(place: { id: string; site?: string }, p: PieceRef): st
 /** A place's pieces drawn by their kit generators, each on its own seed; a piece the kit lacks is skipped with a warning. */
 export function drawPieces(place: { id: string; site?: string; pieces: PieceRef[] }, kit: Kit): { p: PieceRef; out: PieceOut }[] {
   return place.pieces.flatMap(p => {
-    const def = kit.set[p.kit];
+    const def = pieceOf(kit, "set", p.kit);
     if (!def) { console.warn("sahne: no set piece", p.kit); return []; }
     return [{ p, out: def.draw(withVariant(def, p), rng(pieceSeed(place, p)), kit) }];
   });

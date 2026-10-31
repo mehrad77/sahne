@@ -484,6 +484,19 @@ export function withVariant(def: PieceDef, params: Record<string, unknown>): Rec
   return v ? { ...v, ...params } : params;
 }
 
+/**
+ * A kit's set piece or prop by id: its own entry, else the one `kit.aliases` leads to (a few hops at most), so an item promoted
+ * into the kit from a content root (`x_cafe_chalkboard` → `chalkboard`) still answers to the id a story used. The kit's own
+ * entry wins, so a content root's drawing of the same id is used for as long as it is there. Undefined when there is none.
+ */
+export function pieceOf(kit: Pick<Kit, "aliases"> & Partial<Pick<Kit, "set" | "props">>, slot: "set" | "props", id: string): PieceDef | undefined {
+  const table = kit[slot];
+  if (!table) return undefined;
+  let k = id;
+  for (let i = 0; i < 4 && !Object.hasOwn(table, k) && kit.aliases && Object.hasOwn(kit.aliases, k); i++) k = kit.aliases[k];
+  return Object.hasOwn(table, k) ? table[k] : undefined;
+}
+
 export interface FaceStyle {
   skin: string;
   eyes: string;

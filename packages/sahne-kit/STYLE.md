@@ -50,7 +50,7 @@ What to draw comes from the catalogue: [`CATALOGUE.md`](CATALOGUE.md) lists ever
 - Things that glow at night (windows across the street, bulbs) go in the piece's `emissive` group. Lit windows come on by turns (`litByTurns` in `src/set/draw.ts`, `glowAt`), never all at once; a far city's lights last. The sky's flats are `sky: true` and `switch: false`.
 - Signs and labels with words are HTML overlays (DESIGN.md §6.8), never drawn into the art. A text's `lang` is its language tag (`fr` on a boulangerie's sign); left out, it is Turkish. A prop puts them in its flat's `text` (a box in the flat's centimetres), and the page's `propText` lays them out; `sign_board` and `phone` are the examples.
 
-- **Pieces drawn as data.** A set piece or prop may be a JSON document, not code (`sahne-kit/drawing`): the same rules, in [DRAWING.md](DRAWING.md), which is the one place the format is described. Its id starts with `x_`.
+- **Pieces drawn as data.** A set piece or prop may be a JSON document, not code (`sahne-kit/drawing`): the same rules, in [DRAWING.md](DRAWING.md), which is the one place the format is described. Its id starts with `x_`. A good one can be promoted into a family as official art, credited to its author ([DRAWING.md](DRAWING.md) *Promoting*, `src/set/drawn/`); its words are `text`, never shapes.
 
 ## Sound
 

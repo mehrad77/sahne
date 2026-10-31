@@ -8,6 +8,7 @@
 import type { Kit, PieceDef } from "sahne";
 import type { Family } from "./all.ts";
 import { SET_FAMILY, PROP_FAMILY } from "./families.gen.ts";
+import { DRAWN_ALIASES } from "./drawn/aliases.gen.ts";
 
 export type { Family };
 
@@ -47,12 +48,13 @@ export const FAMILIES: Record<string, () => Promise<Family>> = {
 /** What a place document names: its pieces' and props' kit ids. */
 export interface PlaceLike { pieces?: { kit: string }[]; props?: Record<string, { kit: string }> }
 
-/** The families these places use (ids not in the set kit are left out: the place lint reports them). */
+/** The families these places use (ids not in the set kit are left out: the place lint reports them). An id a promoted item has replaced (`DRAWN_ALIASES`, `kit.aliases`) counts as its new id. */
 export function familiesOf(places: Iterable<PlaceLike>): string[] {
   const out = new Set<string>();
+  const id = (k: string) => (Object.hasOwn(DRAWN_ALIASES, k) ? DRAWN_ALIASES[k] : k);
   for (const pl of places) {
-    for (const p of pl.pieces ?? []) if (Object.hasOwn(SET_FAMILY, p.kit)) out.add(SET_FAMILY[p.kit]);
-    for (const p of Object.values(pl.props ?? {})) if (Object.hasOwn(PROP_FAMILY, p.kit)) out.add(PROP_FAMILY[p.kit]);
+    for (const p of pl.pieces ?? []) if (Object.hasOwn(SET_FAMILY, id(p.kit))) out.add(SET_FAMILY[id(p.kit)]);
+    for (const p of Object.values(pl.props ?? {})) if (Object.hasOwn(PROP_FAMILY, id(p.kit))) out.add(PROP_FAMILY[id(p.kit)]);
   }
   return [...out].sort();
 }
@@ -81,4 +83,4 @@ export async function loadSet(what: Iterable<PlaceLike> | string[] | "all"): Pro
 /** The kit with these set pieces and props added to what it has. */
 export const withSet = (kit: Kit, loaded: Pick<LoadedSet, "set" | "props">): Kit => ({ ...kit, set: { ...kit.set, ...loaded.set }, props: { ...kit.props, ...loaded.props } });
 
-export { SET_FAMILY, PROP_FAMILY };
+export { SET_FAMILY, PROP_FAMILY, DRAWN_ALIASES };

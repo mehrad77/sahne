@@ -3,6 +3,9 @@
 //
 //   node size.mjs          the sizes and the budgets
 //   node size.mjs --json   the same as JSON (for an app's build to read)
+//   node size.mjs --json --family bakery [--gen <file>]
+//                          only that set family, with <file> in place of its drawn/<family>.gen.ts (sahne-kit/drawing/promote.ts
+//                          measures a family with an item added before it writes anything)
 
 import { build } from "esbuild";
 import { gzipSync } from "node:zlib";
@@ -41,25 +44,33 @@ BUNDLES.push({ name: `the whole set (${families.length} families)`, entries: ["s
 const SET_PATH = new URL("../sahne-kit/src/set/", import.meta.url).pathname;
 const SHARED = { name: "shared", setup(b) { b.onResolve({ filter: /^\.\.\// }, a => a.importer.startsWith(SET_PATH) ? { path: a.path, external: true } : undefined); } };
 
+const flag = n => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : undefined; };
+const only = flag("--family"), gen = flag("--gen");
+if (only && !families.includes(`${only}.ts`)) { console.error(`no set family ${only}`); process.exit(2); }
+// the family's drawn items, read from another file
+const GEN = { name: "gen", setup(b) { b.onResolve({ filter: /drawn\/[a-z_]+\.gen\.ts$/ }, a => a.path.endsWith(`/${only}.gen.ts`) && gen ? { path: gen } : undefined); } };
+
 const out = [];
-for (const b of BUNDLES) {
+for (const b of only ? BUNDLES.filter(b => b.name === `set family ${only}`) : BUNDLES) {
   const r = await build({
     stdin: { contents: b.code ?? b.entries.map(e => `export * from ${JSON.stringify(ROOT + e)};`).join("\n"), resolveDir: ROOT, loader: "ts" },
     bundle: true, minify: true, format: "esm", write: false, logLevel: "error",
     // each budget counts its own code: the kit is measured without the engine it imports
     external: b.external ?? (b.entries?.some(e => e.startsWith("sahne-kit")) ? ["sahne"] : []),
-    plugins: b.shared ? [SHARED] : [],
+    plugins: [...(b.shared ? [SHARED] : []), ...(only && gen ? [GEN] : [])],
   });
   const js = r.outputFiles[0].contents, gz = gzipSync(js, { level: 9 }).length;
   out.push({ name: b.name, minified: js.length, gzip: gz, budget: b.budget ? b.budget * 1024 : null, ok: !b.budget || gz <= b.budget * 1024, warn: !!b.warn });
 }
 
+if (!only) {
 // the place documents (PLACES in sahne-story/paths.ts): all of them together, minified, as the
 // app ships them; each one's own 5 KB is checked by lintPlace
 const placeJson = readdirSync(PLACES).filter(f => f.endsWith(".json") && f !== "needs.json")
   .map(f => JSON.stringify(JSON.parse(readFileSync(new URL(f, PLACES), "utf8")))).join("\n");
 const placeGz = gzipSync(placeJson, { level: 9 }).length;
 out.push({ name: `places (${placeJson ? placeJson.split("\n").length : 0} documents)`, minified: placeJson.length, gzip: placeGz, budget: 100 * 1024, ok: placeGz <= 100 * 1024, warn: false });
+}
 
 if (process.argv.includes("--json")) console.log(JSON.stringify(out));
 else for (const o of out) console.log(`${o.budget === null ? "info" : o.ok ? "ok  " : o.warn ? "warn" : "OVER"} ${o.name}: ${(o.gzip / 1024).toFixed(1)} KB gzip (${o.budget === null ? "no budget" : `budget ${o.budget / 1024} KB`}), ${(o.minified / 1024).toFixed(0)} KB minified`);

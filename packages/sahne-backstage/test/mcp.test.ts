@@ -745,6 +745,42 @@ test("save_kit_item and save_variant: a proposal in proposals mode, a file in di
   } finally { await d.close(); rmSync(kitFile(), { recursive: true, force: true }); forget(); }
 });
 
+test("promote_kit_item: the agent asks its person for consent; it checks the drawing as the kit's own, draws the sheets, and writes nothing without pr", async () => {
+  const d = await connect({ write: true, agentEdits: "direct" });
+  const official = fileURLToPath(new URL("../../sahne-kit/src/set/drawn/bakery/chalkboard.json", import.meta.url));
+  try {
+    forget();
+    const tool = (await d.client.listTools()).tools.find(t => t.name === "promote_kit_item")!;
+    assert.match(tool.description!, /ASK YOUR PERSON/);
+    for (const k of ["by", "contact", "consent"]) assert.match(tool.description!, new RegExp(k), k);
+    assert.deepEqual(Object.keys((tool.inputSchema as { properties: object }).properties).sort(), ["by", "consent", "contact", "family", "id", "kitId", "pr", "story"]);
+    assert.ok(!(await call(d.client, "save_kit_item", { doc: chalkboard() })).isError);
+    const args = { kitId: "x_cafe_chalkboard", id: "chalkboard", family: "bakery", by: "Ada L.", contact: "github:ada", consent: true };
+    // consent is the person's: without it nothing is checked
+    const no = await call(d.client, "promote_kit_item", { ...args, consent: false });
+    assert.ok(no.isError);
+    assert.match(no.text, /needs the author's consent/);
+    assert.equal(no.images.length, 0);
+    // consented: the problems, the review sheet and the family comparison, and nothing written
+    const yes = await call(d.client, "promote_kit_item", args);
+    assert.ok(!yes.isError, yes.text);
+    assert.match(yes.text, /ready to offer/);
+    assert.equal(yes.images.length, 2);
+    assert.ok(yes.images.every(isPng));
+    assert.equal(json(yes).ok, true);
+    assert.ok(Array.isArray(json(yes).problems));
+    assert.ok(!existsSync(official), "without pr nothing is written to the kit");
+    // the kit's rules: a taken id, an x_ id, a family that cannot take drawn items, an unknown drawing
+    assert.match((await call(d.client, "promote_kit_item", { ...args, id: "pastry" })).text, /taken/);
+    assert.match((await call(d.client, "promote_kit_item", { ...args, id: "x_chalkboard" })).text, /never x_|never starts with x_/);
+    assert.match((await call(d.client, "promote_kit_item", { ...args, family: "food" })).text, /does not take drawn items yet/);
+    assert.match((await call(d.client, "promote_kit_item", { ...args, kitId: "x_nothing" })).text, /no drawing x_nothing/);
+  } finally { await d.close(); rmSync(kitFile(), { recursive: true, force: true }); forget(); }
+  // a pull request is a write: a read-only server refuses it
+  const ro = await connect({ write: false, agentEdits: "direct" });
+  try { assert.match((await call(ro.client, "promote_kit_item", { kitId: "x_cafe_chalkboard", id: "chalkboard", family: "bakery", by: "A", contact: "b", consent: true, pr: true })).text, /read-only|no drawing/); } finally { await ro.close(); }
+});
+
 test("read-only: saving a kit item is refused, and says why", async () => {
   const { client, close } = await connect({ write: false, agentEdits: "direct" });
   try {
