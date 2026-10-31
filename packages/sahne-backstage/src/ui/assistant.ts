@@ -25,7 +25,7 @@ import { Icon, Popover } from "./kit/index.ts";
 import { Markdown } from "./md.ts";
 import { hrefOf } from "./proposed.ts";
 import { hostOf } from "../model/tools.ts";
-import { liveLine, ThinkingBlock, tick, ToolGroup, type Thinking, type ToolPart } from "./chat/parts.ts";
+import { liveLine, scrollerOf, ThinkingBlock, tick, ToolGroup, useStickToBottom, type Thinking, type ToolPart } from "./chat/parts.ts";
 
 type Part = { type: "text"; text: string } | Thinking | ToolPart | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number } | { type: "stopped" } | AskPart | { type: "sources"; list: { url: string; title?: string }[] } | { type: "remembered"; id: string; text: string; undone?: boolean };
 /** A question the assistant put to the person (ask_person, set_review): buttons that answer, proposals to accept and save, a status to set. */
@@ -390,8 +390,8 @@ export function AssistantChat() {
     }
     setFiles(fs => [...fs, ...got].filter((f, i, all) => f.text !== undefined || all.slice(0, i + 1).filter(x => x.text === undefined).length <= 4));
   };
-  const end = useRef<HTMLDivElement>(null);
-  useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [turns.value]);
+  // the panel follows the answer while the person is at its bottom; scrolled up, it stays where they read
+  const end = useStickToBottom<HTMLDivElement>(turns.value, scrollerOf);
   const ai = typeof w.ai === "object" ? w.ai : null;
   const ctx = contextNow();
   const empty = !turns.value.length;

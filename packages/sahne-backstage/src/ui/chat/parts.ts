@@ -2,11 +2,12 @@
 // that streams open and folds to "Thought for 12s" once the answer moves on, and its tool calls as one group per run of
 // calls, a line saying what they did ("Read 3 things · 2 edits"), open while they run, then folded. Each call is a row in
 // plain words (model/tools.ts) with its icon, a spinner turning to ✓ or ✕, and its time; opened, it shows what it was
-// given and what came back. A proposal a call made shows under its group, folded or not.
+// given and what came back. A proposal a call made shows under its group, folded or not. `useStickToBottom` keeps a
+// scroller on its newest line while it grows, until the person scrolls up (and again once they scroll back down).
 
 import { html } from "htm/preact";
 import { signal } from "@preact/signals";
-import { useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { groupSummary, pathWords, toolLabel, type ToolKind } from "../../model/tools.ts";
 import { Icon } from "../kit/index.ts";
 import { Markdown } from "../md.ts";
@@ -28,12 +29,44 @@ export const secs = (ms: number) => (ms < 1000 ? `${Math.max(0, Math.round(ms))}
 const ICON: Record<ToolKind, string> = { read: "book", search: "search", check: "check", edit: "note", create: "plus", comment: "chat", show: "play", look: "camera", web: "globe", memory: "box", ask: "chat" };
 
 /** The model's thinking: open while it streams (unless folded by hand), folded after. */
+/** How near the bottom (px) still counts as at it. */
+const NEAR = 48;
+
+/**
+ * Keep `scroller()` at its bottom as `grows` changes, while the person is there: scrolling up lets it be, scrolling back to
+ * the bottom sticks again. Returns the ref to put on an element inside it (the scroller is found from it).
+ */
+export function useStickToBottom<T extends HTMLElement>(grows: unknown, scroller: (el: T) => HTMLElement | null = el => el) {
+  const ref = useRef<T>(null), stuck = useRef(true), seen = useRef<{ el: HTMLElement; off(): void } | null>(null);
+  useEffect(() => {
+    const s = ref.current && scroller(ref.current);
+    // the scroller can come later (a box that opens): listen to whichever is there now
+    if (s && seen.current?.el !== s) {
+      seen.current?.off();
+      const on = () => { stuck.current = s.scrollHeight - s.scrollTop - s.clientHeight < NEAR; };
+      s.addEventListener("scroll", on, { passive: true });
+      seen.current = { el: s, off: () => s.removeEventListener("scroll", on) };
+    }
+    if (s && stuck.current) s.scrollTop = s.scrollHeight;
+  }, [grows]);
+  useEffect(() => () => seen.current?.off(), []);
+  return ref;
+}
+
+/** The nearest ancestor that scrolls (or would, once it overflows). */
+export const scrollerOf = (el: HTMLElement): HTMLElement | null => {
+  for (let e = el.parentElement; e; e = e.parentElement) { const o = getComputedStyle(e).overflowY; if (o === "auto" || o === "scroll") return e; }
+  return null;
+};
+
 export function ThinkingBlock(p: { part: Thinking; live: boolean }) {
   const [open, setOpen] = useState<boolean | null>(null);
   const t = p.part, shown = open ?? p.live;
+  // while it streams, its box shows the newest thought (unless the person scrolled up in it)
+  const box = useStickToBottom<HTMLDivElement>(t.text, el => el.querySelector<HTMLElement>(".think-text"));
   const took = t.ms ?? (p.live && t.at ? now.value - t.at : undefined);
   const label = p.live ? `Thinking${took !== undefined ? ` · ${Math.round(took / 1000)} s` : "…"}` : `Thought${took !== undefined ? ` for ${Math.max(1, Math.round(took / 1000))} s` : ""}`;
-  return html`<div class=${`think${p.live ? " live" : ""}${shown ? " open" : ""}`}>
+  return html`<div ref=${box} class=${`think${p.live ? " live" : ""}${shown ? " open" : ""}`}>
     <button type="button" class="think-head" aria-expanded=${shown} onClick=${() => setOpen(!shown)}><span class="caret" aria-hidden="true">›</span>${label}</button>
     ${shown && (t.text.trim() ? html`<${Markdown} class="think-text" text=${t.text} />` : html`<div class="think-text note">The model thought without showing its thinking.</div>`)}
   </div>`;
