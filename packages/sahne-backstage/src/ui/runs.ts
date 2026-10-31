@@ -65,7 +65,7 @@ function RunView(p: { id: string }) {
       ${run.status !== "done" && run.status !== "stopped" && html`<button class="small" onClick=${() => void stop()}><${Icon} name="stop" size=${14} /> Stop</button>`}
     </div>
     <${NeedsYou} run=${run} />
-    ${auto(run) && run.status === "done" && html`<${Finished} run=${run} />`}
+    ${auto(run) && run.status !== "running" && run.status !== "gate" && ((run.made ?? []).length > 0 || run.status === "done") && html`<${Finished} run=${run} />`}
     <${Results} run=${run} />
     <details class="run-work" open=${work2} onToggle=${(e: Event) => setWork((e.target as HTMLDetailsElement).open)}><summary>Show the work: ${run.steps.length} steps, their reports and logs</summary>
       ${run.brief && html`<details class="run-brief"><summary>The plan's brief</summary><${Markdown} text=${run.brief} /></details>`}
@@ -133,7 +133,8 @@ function Finished(p: { run: Run }) {
     const r = await undo(run.id);
     if (typeof r === "string") say(r, true); else say(`undone: ${r.undone.length}${r.kept.length ? `; kept, as it changed after the run: ${r.kept.map(k => k.id).join(", ")}` : ""}`);
   };
-  return html`<div class="run-finished"><b class="grow">Done. Here is what it made.</b>${made.length > 0 && html`<button class="small" onClick=${() => void all()}>Undo all of it</button>`}</div>`;
+  const said = run.status === "done" ? "Done. Here is what it made." : run.status === "stopped" ? "Stopped. Here is what it made so far." : "Paused. Here is what it made so far.";
+  return html`<div class="run-finished"><b class="grow">${said}</b>${made.length > 0 && html`<button class="small" onClick=${() => void all()}>Undo all of it</button>`}</div>`;
 }
 
 type Kind2 = "character" | "place" | "season" | "story";
