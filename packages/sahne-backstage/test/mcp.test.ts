@@ -619,7 +619,7 @@ test("kit_render: vary draws a cell per value, t and frames mid-motion, focus a 
     const frontage = await cells({ id: "frontage", vary: { variant: "all" }, views: ["day"] });
     assert.equal(frontage.cells.length, 1 + Object.keys(fullKit.set.frontage.variants ?? {}).length, "the default and each variant");
     const both = await cells({ id: "money", vary: { kind: ["notes", "foreign"], currency: "all" }, views: ["day"] });
-    assert.equal(both.cells.length, 4, "every combination");
+    assert.equal(both.cells.length, 2 * (fullKit.props.money.meta!.params.currency.values ?? []).length, "every combination");
     // mid-motion: the motions and their periods, then a cell per time
     const flag = await cells({ items: ["flag"], frames: 4, views: ["day"] });
     assert.match(flag.r.text, /^motion: flag: sway (\d+) ms/m);
