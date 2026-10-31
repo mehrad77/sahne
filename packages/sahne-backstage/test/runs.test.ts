@@ -339,3 +339,22 @@ test("checking with the person: the plan waits, then it writes straight in, jour
   assert.equal(quiet.asks, "never");
   await r.idle();
 });
+
+test("a step says what it decided; the task's history lists its writes in order, and an undone one goes", async () => {
+  const { r } = runs(scripted({
+    plan: [{ calls: [{ name: "propose_plan", args: { brief: "b", steps: [{ id: "cast_x", kind: "character", title: "Defne", brief: "make her", owns: [{ kind: "character", id: "defne5" }] }, { id: "cast_y", kind: "character", title: "Ece", brief: "make her", needs: ["cast_x"], owns: [{ kind: "character", id: "ece5" }] }] } }] }],
+    cast_x: [{ calls: [{ name: "create_character", args: { ...derya, id: "defne5" } }] }, { calls: [{ name: "finish_step", args: { summary: "made", decided: ["Named her Defne, not Deniz", " ", 3] } }] }],
+    cast_y: [{ calls: [{ name: "create_character", args: { ...derya, id: "ece5" } }] }, finish("made")],
+  }));
+  const run = r.create({ goal: "two people", mode: "auto" });
+  await r.idle();
+  assert.equal(run.status, "done", JSON.stringify(run.steps.map(s => [s.id, s.status, s.error])));
+  assert.deepEqual(run.steps.find(s => s.id === "cast_x")!.decided, ["Named her Defne, not Deniz"]);
+  assert.equal(run.steps.find(s => s.id === "cast_y")!.decided, undefined);
+  const did = r.journal.history(run.id);
+  assert.deepEqual(did.map(d => [d.step, d.kind, d.id, d.created]), [["cast_x", "character", "defne5", true], ["cast_y", "character", "ece5", true]]);
+  assert.ok(did[0].at <= did[1].at);
+  r.undo(run.id, [{ kind: "character", id: "ece5" }]);
+  assert.deepEqual(r.journal.history(run.id).map(d => d.id), ["defne5"]);
+  r.undo(run.id);
+});

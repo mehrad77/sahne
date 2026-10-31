@@ -13,6 +13,8 @@ import { writeAtomic } from "../../../sahne-story/json.ts";
 
 export interface Written { seq: number; run: string; step: string; kind: Kind; id: string; before: string | null; after: number; hash: string | null; at: number }
 export interface Undone { kind: Kind; id: string; removed: boolean; mtime?: number }
+/** One write of a run, as a person reads it in its history. */
+export interface Did { step: string; kind: Kind; id: string; created: boolean; at: number }
 /** A document a run wrote, as a person sees it: who made it (its first step), whether the run created it, still there. */
 export interface Made { kind: Kind; id: string; step: string; created: boolean; steps: string[] }
 
@@ -50,6 +52,11 @@ export class Journal {
       else if (!m.steps.includes(w.step)) m.steps.push(w.step);
     }
     return [...out.values()];
+  }
+
+  /** What a run did, write by write, oldest first: which step wrote which document, whether it created it, and when. */
+  history(run: string): Did[] {
+    return this.of(run).map(w => ({ step: w.step, kind: w.kind, id: w.id, created: w.before === null, at: w.at }));
   }
 
   /** Take these writes back, document by document. What came back, and the writes kept (their document changed since). */

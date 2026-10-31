@@ -177,7 +177,7 @@ export async function serve(o: Options): Promise<Running> {
     if (route === "runs") {
       const [, id, sub, step, what] = path;
       // each run with the documents it wrote and can still undo (runs/journal.ts)
-      const withMade = (r: ReturnType<Runs["all"]>[number]) => ({ ...r, made: runs.journal.made(r.id) });
+      const withMade = (r: ReturnType<Runs["all"]>[number]) => ({ ...r, made: runs.journal.made(r.id), did: runs.journal.history(r.id) });
       if (!id && m === "GET") return json(res, 200, { runs: runs.all().map(withMade) });
       if (!o.write && m === "POST") throw new Fail(403, "read-only: start backstage with --write");
       try {

@@ -40,6 +40,8 @@ export interface Step {
   status: StepStatus;
   /** Its report for the steps after it (finish_step), or its last words. */
   summary?: string;
+  /** The choices it made that the goal left open, in a line each (finish_step), shown to the person beside what it made. */
+  decided?: string[];
   /** What it asks the person, while it is `asking`. */
   question?: Question;
   error?: string;
@@ -113,7 +115,10 @@ export function estimate(steps: Pick<Step, "kind" | "model">[], provider: string
   return Math.round(steps.reduce((t, s) => t + USD[s.kind] * (s.model && /opus/.test(s.model) && s.kind !== "plan" && s.kind !== "review" ? 2 : 1), 0) * 100) / 100;
 }
 
-const FINISH: ToolDef = { name: "finish_step", description: "End this step once its work is made and checked: a short report for the steps after it (the ids you made, names, marks, what they must know). Then end your turn.", schema: { type: "object", properties: { summary: { type: "string", maxLength: 2000 } }, required: ["summary"] } };
+const FINISH: ToolDef = { name: "finish_step", description: "End this step once its work is made and checked: a short report for the steps after it (the ids you made, names, marks, what they must know), and the choices you made yourself. Then end your turn.", schema: { type: "object", properties: {
+  summary: { type: "string", maxLength: 2000 },
+  decided: { type: "array", items: { type: "string", maxLength: 200 }, maxItems: 8, description: "Each choice you made that the goal left open, for the person, in one plain line (\"Chose a quiet library rather than a café\"); none when the goal fixed everything" },
+}, required: ["summary"] } };
 
 /** What is wrong with a plan, or nothing: ids new and unique, needs that exist and make no cycle, no document made twice. */
 export function planProblems(p: Plan): string[] {
@@ -148,7 +153,7 @@ function stepPrompt(run: Run, s: Step): string {
     s.owns.length ? `You make: ${s.owns.map(o => `${o.kind} ${o.id}`).join(", ")}. The task's other steps make the rest: read their documents, never change them. A season and the series are shared.` : "You make no document of your own: read, check and report.",
     before.length ? `What the steps before yours did:\n${before.map(x => `- ${x.title}: ${x.summary ?? "(no report)"}`).join("\n")}` : "",
     run.agentEdits === "direct" ? "What you make is saved as you make it, after the check; the person can undo any of it, so never ask whether to make or change something." : "Nothing a step proposes is saved until the person accepts it, but every step of this task sees the task's pending proposals as there.",
-    `When your work is made and checked, call finish_step with a short report for the steps after yours.${run.asks === "never" ? " Do not wait for the person: decide what is a choice yourself, and say in the report what you chose." : " If the person must decide something the goal leaves open, ask_person: you wait for the answer, and the other steps go on. Never ask to confirm what you make."}`,
+    `When your work is made and checked, call finish_step with a short report for the steps after yours.${run.asks === "never" ? " Do not wait for the person: decide what is a choice yourself, and list each choice you made in finish_step's decided, one plain line each." : " If the person must decide something the goal leaves open, ask_person: you wait for the answer, and the other steps go on. Never ask to confirm what you make. A smaller choice you made yourself goes in finish_step's decided, one plain line each."}`,
   ].filter(Boolean).join("\n\n");
 }
 
@@ -455,7 +460,12 @@ export class Runs {
             this.changed(run);
             return { text: `The plan is set: ${run.steps.length - 1} steps, about $${run.estimateUsd?.toFixed(2)}. ${run.gates.plan ? "The person sees it before any step runs." : "The steps start now."}`, isError: false, end: true };
           }
-          if (c.name === "finish_step") { s.summary = String((c.input as { summary?: unknown }).summary ?? "").slice(0, 2000); this.keep(); return { text: "Noted: your step is done.", isError: false, end: true }; }
+          if (c.name === "finish_step") {
+            const v = c.input as { summary?: unknown; decided?: unknown };
+            s.summary = String(v.summary ?? "").slice(0, 2000);
+            const decided = Array.isArray(v.decided) ? v.decided.filter((d): d is string => typeof d === "string" && !!d.trim()).map(d => d.trim().slice(0, 200)).slice(0, 8) : [];
+            if (decided.length) s.decided = decided; else delete s.decided;
+            this.keep(); return { text: "Noted: your step is done.", isError: false, end: true }; }
           return callTool(mcp, c);
         },
       }, this.saver);

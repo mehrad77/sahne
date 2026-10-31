@@ -9,12 +9,14 @@ import { fold, type Part } from "./ui/assistant.ts";
 export type StepStatus = "waiting" | "running" | "asking" | "done" | "failed" | "stopped" | "stale" | "skipped" | "undone";
 export interface RunStep {
   id: string; kind: string; title: string; brief: string; about?: string; needs: string[]; owns: { kind: Kind; id: string }[]; model?: string;
-  status: StepStatus; summary?: string; question?: { question: string; options?: string[] }; error?: string; budget?: boolean; usd: number; attempts: number; proposals: string[];
+  status: StepStatus; summary?: string; decided?: string[]; question?: { question: string; options?: string[] }; error?: string; budget?: boolean; usd: number; attempts: number; proposals: string[];
 }
 /** A document a run wrote and can still undo (server/runs/journal.ts). */
 export interface Made { kind: Kind; id: string; step: string; created: boolean; steps: string[] }
+/** One write of a run, oldest first: its history (Journal.history). */
+export interface Did { step: string; kind: Kind; id: string; created: boolean; at: number }
 export interface Run {
-  id: string; goal: string; mode?: "check" | "auto"; asks?: "choices" | "never"; made?: Made[]; by: string; status: "running" | "gate" | "paused" | "done" | "stopped"; gate?: "plan" | "castAndPlaces"; why?: string;
+  id: string; goal: string; mode?: "check" | "auto"; asks?: "choices" | "never"; made?: Made[]; did?: Did[]; by: string; status: "running" | "gate" | "paused" | "done" | "stopped"; gate?: "plan" | "castAndPlaces"; why?: string;
   gates: { plan: boolean; castAndPlaces: boolean }; passed: string[]; maxUsd: number; usd: number; concurrency: number; agentEdits: string;
   brief: string; steps: RunStep[]; estimateUsd?: number; at: number;
 }
@@ -54,8 +56,8 @@ export async function loadLog(run: string, step: string): Promise<void> {
 export function heardRun(d: { run?: Run; id?: string; step?: string; seq?: number; event?: { type: string } }): void {
   if (d.run) {
     const i = runs.value.findIndex(r => r.id === d.run!.id), old = runs.value[i];
-    // a change heard on the bus has no `made`: what it wrote is read again a moment later
-    const run = { ...d.run, made: d.run.made ?? old?.made };
+    // a change heard on the bus has no `made` or `did`: what it wrote is read again a moment later
+    const run = { ...d.run, made: d.run.made ?? old?.made, did: d.run.did ?? old?.did };
     runs.value = i < 0 ? [...runs.value, run] : runs.value.map((r, j) => (j === i ? run : r));
     if (!d.run.made) readMadeSoon(run.id);
     return;
