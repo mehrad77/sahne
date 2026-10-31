@@ -17,15 +17,17 @@ import { html } from "htm/preact";
 import { signal } from "@preact/signals";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Path } from "../model/path.ts";
-import { route, say, world } from "../store.ts";
-import { proposals, selection, usage } from "../events.ts";
+import { route, say, setReview, world } from "../store.ts";
+import { acceptAndSave, proposals, selection, usage } from "../events.ts";
 import { abilities } from "../model/abilities.ts";
 import { Icon } from "./kit/index.ts";
 import { Markdown } from "./md.ts";
 import { hrefOf } from "./proposed.ts";
 import { liveLine, ThinkingBlock, tick, ToolGroup, type Thinking, type ToolPart } from "./chat/parts.ts";
 
-type Part = { type: "text"; text: string } | Thinking | ToolPart | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number } | { type: "stopped" };
+type Part = { type: "text"; text: string } | Thinking | ToolPart | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number } | { type: "stopped" } | AskPart;
+/** A question the assistant put to the person (ask_person, set_review): buttons that answer, proposals to accept and save, a status to set. */
+type AskPart = { type: "ask"; question: string; options?: string[]; save?: string[]; review?: { id: string; status: string }; answered?: string };
 interface Turn { role: "user" | "assistant"; content: string; parts?: Part[]; fresh?: boolean; at?: number }
 
 /** The side panel is open (side.ts), and the tab it shows; an ask turns it to the assistant. */
@@ -234,7 +236,7 @@ function Abilities() {
   const a = abilities({ writable: w.writable, agentEdits: w.agentEdits ?? "proposals", shareCards: w.shareCards, cards: w.cards, page: pageNow() });
   return html`<div class="abilities">
     <div><b>It can</b><ul>${a.can.map(x => html`<li>${x}</li>`)}</ul></div>
-    <div><b>It cannot</b><ul>${a.cannot.map(x => html`<li>${x}</li>`)}</ul></div></div>`;
+    <div><b>It cannot</b><ul>${a.cannot.map(x => html`<li>${x}${/word cards/.test(x) ? html` <a href="#/agents">Share them</a>` : ""}</li>`)}</ul></div></div>`;
 }
 
 const KIND_WORD: Record<string, string> = { story: "episode", season: "season", series: "series", place: "place", character: "character" };
@@ -245,6 +247,24 @@ function Proposed(p: { id: string }) {
   const href = hrefOf(x.kind, x.doc), what = KIND_WORD[x.kind] ?? x.kind;
   if (x.create) return html`<div class="tool ok">${x.after ? `Updated the proposed new ${what}` : `Proposed a new ${what},`} <b>${x.doc}</b>. <a href=${href}>Open it</a> to accept or reject it; nothing is saved until you do.</div>`;
   return html`<div class="tool ok">Proposed an edit to the ${what} <b>${x.doc}</b>: <a href=${href}>accept or reject it</a> ${x.kind === "story" ? "above the script" : "on its page"}.</div>`;
+}
+
+/** A question for the person, as a card: its buttons answer it (the answer is sent as their message), save proposals, or set a status. */
+function AskCard(p: { part: AskPart; latest: boolean }) {
+  const [busy2, setBusy2] = useState(false);
+  const x = p.part, open = !x.answered && p.latest && !busy.value;
+  const answer = (said: string) => { x.answered = said; turns.value = [...turns.value]; };
+  const waiting = (x.save ?? []).map(id => proposals.value.find(q => q.id === id)).filter((q): q is NonNullable<typeof q> => !!q);
+  return html`<div class="ask-card" role="group" aria-label="The assistant asks">
+    <b>${x.question}</b>
+    ${x.save && html`<ul class="ask-list">${x.save.map(id => { const q = proposals.value.find(y => y.id === id); return html`<li>${q ? html`${q.summary} <span class="note">(${q.kind} ${q.doc})</span>` : html`<span class="note">${id}: answered already</span>`}</li>`; })}</ul>`}
+    ${x.answered ? html`<div class="note">${x.answered}</div>` : html`<div class="row wrap">
+      ${x.review && html`<button class="primary" disabled=${!p.latest || busy2} onClick=${() => { void setReview(x.review!.id, r => ({ ...r, status: x.review!.status as never })); answer(`Marked ${x.review!.id} ${x.review!.status}.`); }}>Mark ${x.review.status}</button>`}
+      ${waiting.length > 0 && html`<button class="primary" disabled=${busy2} onClick=${async () => { setBusy2(true); let n = 0; for (const q of waiting) if (await acceptAndSave(q)) n++; setBusy2(false); answer(n ? `Accepted and saved ${n} proposal${n > 1 ? "s" : ""}.` : "Nothing was saved."); }}>Accept and save ${waiting.length > 1 ? `all ${waiting.length}` : "it"}</button>`}
+      ${(x.options ?? []).map(o => html`<button disabled=${!open} onClick=${() => { answer(`You answered: ${o}`); void send(o); }}>${o}</button>`)}
+      ${(x.review || waiting.length > 0) && html`<button disabled=${!open} onClick=${() => answer("Not now.")}>Not now</button>`}
+    </div>`}
+  </div>`;
 }
 
 /** An answer, its parts in order: thinking, runs of tool calls (one group each), words, cards. */
@@ -267,6 +287,7 @@ function Answer(p: { turn: Turn; live: boolean }) {
     else if (x.type === "proposal") out.push(html`<${Proposed} id=${x.id} />`);
     else if (x.type === "confirm") out.push(html`<div class="confirm">${x.why} It would cost about ${fmtUsd(x.estimateUsd)}. <button class="small primary" onClick=${() => { const q = [...turns.value].reverse().find(y => y.role === "user"); if (q) void send(q.content, { confirm: true, fresh: q.fresh }); }}>Go ahead</button></div>`);
     else if (x.type === "error") out.push(html`<div class="chat-error"><span class="grow">${x.message}</span>${!p.live && p.turn === turns.value.at(-1) && html`<button type="button" class="small" onClick=${retry}>Try again</button>`}</div>`);
+    else if (x.type === "ask") out.push(html`<${AskCard} part=${x} latest=${p.turn === turns.value.at(-1)} />`);
     else if (x.type === "stopped") out.push(html`<div class="note">Stopped. Nothing more ran after that.</div>`);
     else if (x.type === "done" && x.usd !== undefined) out.push(html`<div class="note cost">${fmtUsd(x.usd)}</div>`);
   }

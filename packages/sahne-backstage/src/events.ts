@@ -9,7 +9,7 @@ import { signal } from "@preact/signals";
 import { api, type Kind } from "./api.ts";
 import { get, set, type Path } from "./model/path.ts";
 import * as H from "./model/history.ts";
-import { change, createDoc, drafts, go, keyOf, loadWorld, openDoc, say } from "./store.ts";
+import { change, createDoc, drafts, go, keyOf, loadWorld, openDoc, saveDocs, say } from "./store.ts";
 import { loadKitDocs } from "./kitdocs.ts";
 
 export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean; paths?: Path[] }
@@ -89,6 +89,18 @@ export async function accept(p: Proposal) {
   await api.post(`proposals/${p.id}`, { accepted: true });
   await refresh();
   say(`taken: ${p.summary}. Save to write it.`);
+}
+
+/**
+ * Accept a proposal and save what it changes, in one click. A document that already had the person's own unsaved edits is
+ * saved with them, so that is asked first; no, and nothing happens.
+ */
+export async function acceptAndSave(p: Proposal): Promise<boolean> {
+  const keys = [p, ...(p.also ?? [])].map(e => keyOf(e.kind, e.doc));
+  const theirs = keys.filter(k => drafts.value[k] && H.dirty(drafts.value[k]));
+  if (theirs.length && !confirm(`This also saves your own unsaved edits to ${theirs.map(k => k.replace(":", " ")).join(", ")}. Go on?`)) return false;
+  await accept(p);
+  return saveDocs(keys);
 }
 
 export async function reject(p: Proposal) {

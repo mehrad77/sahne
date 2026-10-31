@@ -8,7 +8,7 @@ import { textOf, type StoryDoc } from "sahne-story";
 import { diffWords } from "../../model/diff.ts";
 import { get, type Path } from "../../model/path.ts";
 import { rows } from "../../model/steps.ts";
-import { accept, proposals, reject, type Proposal } from "../../events.ts";
+import { accept, acceptAndSave, proposals, reject, type Proposal } from "../../events.ts";
 import { world } from "../../store.ts";
 import { inLang, useLangs } from "../lang.ts";
 
@@ -35,7 +35,7 @@ export function ProposalsBar(p: { list: Proposal[]; story: StoryDoc; select(path
             ${diffWords(was, now).map(d => (d.op === "=" ? d.text : d.op === "-" ? html`<del>${d.text}</del>` : html`<ins>${d.text}</ins>`))}</div>`;
         })}
         ${x.paths.length > 6 && html`<p class="note">and ${x.paths.length - 6} more places</p>`}
-        <div class="row"><span class="grow"></span><button onClick=${() => void reject(x)}>Reject</button><button class="primary" onClick=${() => void accept(x)}>Accept</button></div>
+        <div class="row"><span class="grow"></span><button onClick=${() => void reject(x)}>Reject</button><button onClick=${() => void accept(x)} title="Take it into the script; you save it">Accept</button><button class="primary" onClick=${() => void acceptAndSave(x)}>Accept and save</button></div>
       </div>`;
     })}
   </div>`;

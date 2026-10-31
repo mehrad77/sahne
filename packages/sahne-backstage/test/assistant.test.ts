@@ -154,6 +154,20 @@ test("stopped: no tool runs after the stop, and an answer with no words drops ou
   assert.equal(sent.length, 1);
 });
 
+test("ask_person: a card for the person ends the turn; set_review in proposals mode asks with a card too", async () => {
+  process.env.ANTHROPIC_API_KEY = "test-key";
+  answers(toolTurn("toolu_a", "ask_person", { question: "Which title?", options: ["Ekmek", "Su"] }));
+  const evs = await ask("Name it");
+  const card = evs.find(e => e.type === "ask")!;
+  assert.deepEqual({ q: card.question, o: card.options }, { q: "Which title?", o: ["Ekmek", "Su"] });
+  // the loop stops for the answer: one request, no second turn
+  assert.equal(sent.length, 1);
+  assert.ok(sent[0].body.tools.some((t: { name: string }) => t.name === "ask_person"));
+  answers(toolTurn("toolu_r", "set_review", { id: "s1e00", status: "reviewed" }), textTurn("Asked."));
+  const rv = await ask("Mark it reviewed");
+  assert.deepEqual(rv.find(e => e.type === "ask")!.review, { id: "s1e00", status: "reviewed" });
+});
+
 test("an edit by the assistant is a proposal, by \"assistant\"; a quick ask takes the faster model", async () => {
   const events = new Events();
   answers(toolTurn("toolu_2", "set_texts", { id: "s1e00", path: "steps/4", texts: { en: "Good evening! Come on in." } }), textTurn("I proposed a warmer line."));
