@@ -8,8 +8,9 @@ import { Icon } from "./icons.ts";
 
 export { Icon } from "./icons.ts";
 
-export const Chip = (p: { tone?: "bad" | "warn" | "ok" | ""; title?: string; children?: ComponentChildren }) =>
-  html`<span class=${`chip ${p.tone ?? ""}`} title=${p.title}>${p.children}</span>`;
+/** A small word in a pill; `live` gives it a breathing dot, for an agent at work (or, with "warn", waiting for you). */
+export const Chip = (p: { tone?: "bad" | "warn" | "ok" | ""; title?: string; live?: boolean; children?: ComponentChildren }) =>
+  html`<span class=${`chip ${p.tone ?? ""}${p.live ? " live" : ""}`} title=${p.title}>${p.children}</span>`;
 
 /** What a page shows when it has nothing yet, with the one thing to do about it. */
 export const Empty = (p: { icon?: string; title: string; children?: ComponentChildren }) => html`<div class="empty">

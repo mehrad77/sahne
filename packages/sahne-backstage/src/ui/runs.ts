@@ -5,13 +5,14 @@
 // that proposed its work, to accept and save or turn down; and its steps, logs and reports folded under "Show the work".
 
 import { html } from "htm/preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { textOf, type StoryPlace } from "sahne-story";
 import { route, say, world } from "../store.ts";
-import { act, actStep, loadLog, logs, runs, undo, type Run, type RunStep } from "../runs.ts";
+import { act, actStep, loadLog, logs, runs, undo, type Did, type Run, type RunStep } from "../runs.ts";
 import { acceptAndSave, neededFirst, proposals, reject, turnedDown, type Proposal } from "../events.ts";
 import { hrefOf, openProposal } from "./proposed.ts";
 import { Answer } from "./assistant.ts";
+import { doingNow } from "./chat/parts.ts";
 import { ago } from "./agents.ts";
 import { Chip, Icon } from "./kit/index.ts";
 import { Picture } from "./kit/gallery.ts";
@@ -30,6 +31,36 @@ const auto = (r: Run) => r.mode === "auto";
 /** It wrote straight in (journaled, to undo) rather than as proposals: every task now, but an older one may have proposed. */
 const direct = (r: Run) => r.agentEdits === "direct";
 
+/** True for a moment after `now` turns to `to`, not when it is so from the start: a step or card flashes once as it lands. */
+function useJust(now: string, to: string): boolean {
+  const was = useRef(now), [on, setOn] = useState(false);
+  useEffect(() => {
+    const turned = was.current !== now && now === to;
+    was.current = now;
+    if (!turned) return;
+    setOn(true);
+    const t = setTimeout(() => setOn(false), 1600);
+    return () => clearTimeout(t);
+  }, [now]);
+  return on;
+}
+
+/** A document the task makes, as it is now (or nothing yet), and its name in the main language. */
+function docOf(kind: string, id: string): unknown {
+  const w = world.value!;
+  return kind === "character" ? w.characters[id] : kind === "place" ? w.places[id] : kind === "season" ? w.seasons[id] : kind === "story" ? w.episodes.find(e => e.id === id) : undefined;
+}
+const nameOf = (doc: unknown, id: string, main: string) => { const d = doc as { name?: unknown; title?: unknown } | undefined; return textOf((d?.name ?? d?.title) as never, main) ?? id; };
+const KIND_NAME: Record<string, string> = { character: "person", place: "place", season: "season", story: "episode", kit_piece: "set piece", kit_variant: "look" };
+
+/** Undo one document a task made, with what was built on it, after saying so. */
+async function undoDoc(run: Run, kind: Kind2, id: string, name: string, step: RunStep): Promise<void> {
+  const after = stepsAfter(run, step.id).flatMap(s => s.owns.map(o => o.id)).filter(x => x !== id);
+  if (!confirm(`Undo ${name}?${after.length ? ` This also undoes what was built on it: ${after.join(", ")}.` : ""}`)) return;
+  const r = await undo(run.id, [{ kind, id }]);
+  if (typeof r === "string") say(r, true); else say(`undone: ${r.undone.map(u => u.id).join(", ") || "nothing"}${r.kept.length ? `; kept, as it changed after the task: ${r.kept.map(k => k.id).join(", ")}` : ""}`);
+}
+
 /** The steps that need `id`, through the steps they need (the browser's copy of the run's own). */
 function stepsAfter(run: Run, id: string): RunStep[] {
   const out = new Set<RunStep>();
@@ -47,7 +78,7 @@ export function RunsTab() {
   return html`<ol class="runs-list">${list.map(r => {
     const work = r.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done").length;
     return html`<li><a class="card run-card" href=${`#/agents/tasks/${r.id}`}>
-      <span class="row"><b class="grow">${r.goal.length > 140 ? `${r.goal.slice(0, 140)}…` : r.goal}</b><${Chip} tone=${waitsForYou(r) ? "warn" : r.status === "done" ? "ok" : r.status === "paused" ? "bad" : ""}>${waitsForYou(r) ? "waits for you" : RUN_WORD[r.status]}</${Chip}></span>
+      <span class="row"><b class="grow">${r.goal.length > 140 ? `${r.goal.slice(0, 140)}…` : r.goal}</b><${Chip} live=${r.status === "running" || waitsForYou(r)} tone=${waitsForYou(r) ? "warn" : r.status === "done" ? "ok" : r.status === "paused" ? "bad" : ""}>${waitsForYou(r) ? "waits for you" : RUN_WORD[r.status]}</${Chip}></span>
       <span class="note">${auto(r) ? "Just doing it" : "Checking with you"} · ${done} of ${work.length} done · ${usd(r.usd)} · ${ago(r.at)}</span></a></li>`;
   })}</ol>`;
 }
@@ -55,20 +86,23 @@ export function RunsTab() {
 function RunView(p: { id: string }) {
   const run = runs.value.find(r => r.id === p.id);
   if (!run) return html`<p class="note">There is no task ${p.id}. <a href="#/agents/tasks">All tasks</a></p>`;
-  const work = run.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done").length;
+  const work = run.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done").length, doing = work.filter(s => s.status === "running").length;
+  const share = (n: number) => `width:${work.length ? (n / work.length) * 100 : 0}%`;
   const stop = async () => { if (!confirm(`Stop this task? Its steps stop where they are${direct(run) ? "; what it made stays, and you can still undo it" : "; what they proposed stays for you to answer"}.`)) return; const e = await act(run.id, { action: "stop" }); if (e) say(e, true); };
   const [work2, setWork] = useState(false);
   return html`<div class="run">
     <p class="note"><a href="#/agents/tasks">All tasks</a></p>
     <div class="run-head">
       <div class="grow"><h3 class="run-goal" title=${run.goal}>${run.goal}</h3>
-        <div class="run-progress"><span class="bar"><span style=${`width:${work.length ? Math.round((done / work.length) * 100) : 0}%`}></span></span>
+        <div class="run-progress"><span class=${`bar${run.status === "running" ? " live" : ""}`}><span style=${share(done)}></span><span class="doing" style=${share(doing)}></span></span>
           <span class="note">${run.status === "done" ? "Done" : run.status === "stopped" ? "Stopped" : `${done} of ${work.length}`} · ${usd(run.usd)}${run.estimateUsd !== undefined ? ` of about ${usd(run.estimateUsd)}` : ""} · ${auto(run) ? "just doing it" : "checking with you"}</span></div></div>
       ${run.status !== "done" && run.status !== "stopped" && html`<button class="small" onClick=${() => void stop()}><${Icon} name="stop" size=${14} /> Stop</button>`}
     </div>
+    <${NowLines} run=${run} />
     <${NeedsYou} run=${run} />
     ${direct(run) && run.status !== "running" && run.status !== "gate" && ((run.made ?? []).length > 0 || run.status === "done") && html`<${Finished} run=${run} />`}
     <${Results} run=${run} />
+    <${History} run=${run} />
     <details class="run-work" open=${work2} onToggle=${(e: Event) => setWork((e.target as HTMLDetailsElement).open)}><summary>Show the work: ${run.steps.length} steps, their reports and logs</summary>
       ${run.brief && html`<details class="run-brief"><summary>The plan's brief</summary><${Markdown} text=${run.brief} /></details>`}
       <ol class="run-steps">${run.steps.map(s => html`<${StepRow} key=${s.id} run=${run} step=${s} />`)}</ol>
@@ -143,11 +177,13 @@ function Finished(p: { run: Run }) {
     if (typeof r === "string") say(r, true); else say(`undone: ${r.undone.length}${r.kept.length ? `; kept, as it changed after the task: ${r.kept.map(k => k.id).join(", ")}` : ""}`);
   };
   const said = run.status === "done" ? "Done. Here is what it made." : run.status === "stopped" ? "Stopped. Here is what it made so far." : "Paused. Here is what it made so far.";
-  return html`<div class="run-finished"><b class="grow">${said}</b>${made.length > 0 && html`<button class="small" onClick=${() => void all()}>Undo all of it</button>`}</div>`;
+  return html`<div class="run-finished"><${Icon} name="check" size=${16} /><b class="grow">${said}</b>${made.length > 0 && html`<button class="small" onClick=${() => void all()}><${Icon} name="undo" size=${14} /> Undo all of it</button>`}</div>`;
 }
 
 type Kind2 = "character" | "place" | "season" | "story";
 const GROUPS: [Kind2, string][] = [["character", "People"], ["place", "Places"], ["season", "Season"], ["story", "Episodes"]];
+/** Each kind of document's icon, as the rail shows it. */
+const KIND_ICON: Record<string, string> = { character: "cast", place: "places", season: "calendar", story: "film", kit_piece: "box", kit_variant: "face" };
 
 /** What the run makes, as cards: from what its steps make, with what it wrote (Auto) or proposed (check). */
 function Results(p: { run: Run }) {
@@ -156,7 +192,7 @@ function Results(p: { run: Run }) {
   if (!owned.length) return null;
   return html`<div class="run-results">${GROUPS.map(([kind, label]) => {
     const here = owned.filter(o => o.kind === kind);
-    return here.length ? html`<section><h4>${label}</h4><div class="result-cards">${here.map(o => html`<${ResultCard} key=${o.id} run=${run} kind=${kind} id=${o.id} step=${o.step} />`)}</div></section>` : null;
+    return here.length ? html`<section><h4><${Icon} name=${KIND_ICON[kind]} size=${14} /> ${label}</h4><div class="result-cards">${here.map(o => html`<${ResultCard} key=${o.id} run=${run} kind=${kind} id=${o.id} step=${o.step} />`)}</div></section>` : null;
   })}</div>`;
 }
 
@@ -165,39 +201,34 @@ function ResultCard(p: { run: Run; kind: Kind2; id: string; step: RunStep }) {
   const [busy, setBusy] = useState(false);
   const pending = proposals.value.filter(x => x.by === run.by && x.kind === kind && x.doc === id);
   const held = new Set(pending.map(x => x.after).filter(Boolean)), heads = pending.filter(x => !held.has(x.id));
-  const doc = (kind === "character" ? w.characters[id] : kind === "place" ? w.places[id] : kind === "season" ? w.seasons[id] : w.episodes.find(e => e.id === id)) ?? (heads.at(-1)?.next as never);
+  const doc = docOf(kind, id) ?? (heads.at(-1)?.next as never);
   const made = (run.made ?? []).find(m => m.kind === kind && m.id === id);
-  const name = (() => {
-    const d = doc as { name?: unknown; title?: unknown } | undefined;
-    return textOf((d?.name ?? d?.title) as never, main) ?? id;
-  })();
+  const name = nameOf(doc, id, main);
   const art = kind === "character" ? (doc ? portraitOf(doc as never, 140, "bust") : null)
     : kind === "place" ? (doc ? () => placeThumb(doc as StoryPlace) : null)
     : kind === "story" ? ((pl => (pl ? () => placeThumb(pl) : null))(w.places[(doc as { place?: string } | undefined)?.place ?? ""]))
     : null;
   const state = step.status === "running" ? "being made" : step.status === "asking" ? "asks you" : step.status === "undone" ? "undone"
     : heads.length ? "waits for you" : doc && (made || !direct(run)) ? "made" : step.status === "failed" || step.status === "stopped" ? "stopped" : "to come";
-  const after = stepsAfter(run, step.id).flatMap(s => s.owns.map(o => o.id)).filter(x => x !== id);
-  const undoIt = async () => {
-    if (!confirm(`Undo ${name}?${after.length ? ` This also undoes what was built on it: ${after.join(", ")}.` : ""}`)) return;
-    setBusy(true); const r = await undo(run.id, [{ kind, id }]); setBusy(false);
-    if (typeof r === "string") say(r, true); else say(`undone: ${r.undone.map(u => u.id).join(", ") || "nothing"}${r.kept.length ? `; kept, as it changed after the task: ${r.kept.map(k => k.id).join(", ")}` : ""}`);
-  };
+  const undoIt = async () => { setBusy(true); try { await undoDoc(run, kind, id, name, step); } finally { setBusy(false); } };
+  const just = useJust(state, "made");
   const redo = async () => { const e = await actStep(run.id, step.id, { action: "redo" }); if (e) say(e, true); };
   const answer = async (fn: (x: Proposal) => Promise<unknown>) => { setBusy(true); try { for (const x of heads) if (proposals.value.some(q => q.id === x.id)) await fn(x); } finally { setBusy(false); } };
   const blocked = heads.flatMap(turnedDown), first = [...new Map(heads.flatMap(neededFirst).map(q => [q.id, q])).values()];
-  return html`<div class=${`result-card ${state.replace(/ /g, "-")}`}>
+  return html`<div class=${`result-card ${state.replace(/ /g, "-")}${just ? " just" : ""}`}>
     ${kind !== "season" && html`<${Picture} art=${art} label=${name} />`}
     <div class="result-body">
-      <b>${name}</b><span class="note">${state}</span>
+      <b>${name}</b><span class="note">${state === "being made" ? html`<${Chip} tone="ok" live>being made</${Chip}>` : state}</span>
+      ${step.about && html`<span class="note why">${step.about}</span>`}
+      ${step.decided && html`<ul class="decided" aria-label="What it decided">${step.decided.map(d => html`<li>${d}</li>`)}</ul>`}
       ${first.length > 0 && heads.length > 0 && html`<span class="note">Accepting also saves ${first.map(q => q.doc).join(", ")}.</span>`}
       <div class="row wrap">
         ${doc && !heads.some(h => h.create) && html`<a class="button small" href=${hrefOf(kind, id)}>Open</a>`}
         ${heads.length > 0 && html`<button class="small" disabled=${busy} onClick=${() => openProposal(heads[0])}>Look</button>
           <button class="small primary" disabled=${busy || blocked.length > 0} onClick=${() => void answer(x => acceptAndSave(x))}>Accept and save</button>
           <button class="small" disabled=${busy} onClick=${() => void answer(x => reject(x))}>Reject</button>`}
-        ${direct(run) && made && step.status !== "running" && html`<button class="small" disabled=${busy} onClick=${() => void undoIt()}>Undo</button>`}
-        ${step.status === "undone" && html`<button class="small" onClick=${() => void redo()}>Make it again</button>`}
+        ${direct(run) && made && step.status !== "running" && html`<button class="small" disabled=${busy} onClick=${() => void undoIt()}><${Icon} name="undo" size=${14} /> Undo</button>`}
+        ${step.status === "undone" && html`<button class="small" onClick=${() => void redo()}><${Icon} name="redo" size=${14} /> Make it again</button>`}
       </div></div></div>`;
 }
 
@@ -211,9 +242,10 @@ function StepRow(p: { run: Run; step: RunStep }) {
   const retry = async () => { const e = await actStep(run.id, s.id, { action: "retry" }); if (e) say(e, true); };
   const stop = async () => { const e = await actStep(run.id, s.id, { action: "stop" }); if (e) say(e, true); };
   const needs = s.needs.filter(n => n !== "plan").map(n => run.steps.find(x => x.id === n)?.title ?? n);
-  return html`<li class=${`run-step ${s.status}`}>
+  const just = useJust(s.status, "done");
+  return html`<li class=${`run-step ${s.status}${just ? " just" : ""}`}>
     <div class="run-step-head" onClick=${() => setOpen(!open)}>
-      <${Chip} tone=${STEP_TONE[s.status]}>${STEP_WORD[s.status]}</${Chip}>
+      <${Chip} tone=${STEP_TONE[s.status]} live=${live}>${STEP_WORD[s.status]}</${Chip}>
       <b class="grow">${s.title}</b>
       <span class="note">${KIND_WORD[s.kind] ?? s.kind}${s.owns.length ? ` · makes ${s.owns.map(o => o.id).join(", ")}` : ""}${needs.length ? ` · after ${needs.join(", ")}` : ""}${s.usd ? ` · ${usd(s.usd)}` : ""}</span>
       <${Icon} name="down" size=${14} />
@@ -226,11 +258,42 @@ function StepRow(p: { run: Run; step: RunStep }) {
       ${s.summary && s.status === "done" && html`<div class="step-summary"><b>Its report</b><${Markdown} text=${s.summary} /></div>`}
       <${StepProposals} run=${run} step=${s} />
       <div class="row wrap">
-        ${(s.status === "failed" || s.status === "stopped") && html`<button class="small primary" onClick=${() => void retry()}>Try again</button>`}
+        ${(s.status === "failed" || s.status === "stopped") && html`<button class="small primary" onClick=${() => void retry()}><${Icon} name="redo" size=${14} /> Try again</button>`}
         ${(s.status === "stale" || s.status === "done") && s.kind !== "plan" && html`<${Redo} run=${run} step=${s} />`}
-        ${s.status === "running" && html`<button class="small" onClick=${() => void stop()}>Stop this step</button>`}
+        ${s.status === "running" && html`<button class="small" onClick=${() => void stop()}><${Icon} name="stop" size=${14} /> Stop this step</button>`}
       </div></div>`}
   </li>`;
+}
+
+/** What each working step does now, in a line: "Review s1e01 · Reading s1e01…". */
+function NowLines(p: { run: Run }) {
+  const live = p.run.steps.filter(s => s.status === "running");
+  useEffect(() => { for (const s of live) void loadLog(p.run.id, s.id); }, [live.map(s => s.id).join()]);
+  if (!live.length) return null;
+  return html`<ul class="run-now" aria-live="polite">${live.map(s => {
+    const log = logs.value[`${p.run.id}:${s.id}`];
+    return html`<li><span class="spin" aria-hidden="true"></span><b>${s.title}</b><span class="note">${log ? doingNow(log.parts) : "Starting"}…</span></li>`;
+  })}</ul>`;
+}
+
+/** What the task wrote, newest first: each document to open, or to undo while it can be; under a step's newest row, the choices it made. */
+function History(p: { run: Run }) {
+  const run = p.run, { main } = useLangs();
+  // a document a step wrote several times is one row, at its last write: made, if the first of them created it
+  const by = new Map<string, Did>();
+  for (const d of run.did ?? []) { const k = `${d.step}:${d.kind}:${d.id}`, was = by.get(k); by.delete(k); by.set(k, { ...d, created: d.created || !!was?.created }); }
+  const rows = [...by.values()].reverse();
+  if (!rows.length) return null;
+  const told = new Set<string>(), clock = (at: number) => new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return html`<details class="run-did" open><summary><${Icon} name="history" size=${14} /> What it did</summary><ol>${rows.map(d => {
+    const step = run.steps.find(s => s.id === d.step), name = nameOf(docOf(d.kind, d.id), d.id, main), first = !told.has(d.step);
+    told.add(d.step);
+    const made = (run.made ?? []).some(m => m.kind === d.kind && m.id === d.id);
+    return html`<li><time>${clock(d.at)}</time><${Icon} name=${KIND_ICON[d.kind] ?? "note"} size=${15} /><span class="grow">${d.created ? "Made" : "Changed"} ${KIND_NAME[d.kind] ?? d.kind} <b>${name}</b>${step && html` <span class="note">· ${step.title}</span>`}</span>
+      ${made && html`<a class="button small" href=${hrefOf(d.kind, d.id)}>Open</a>`}
+      ${made && step && direct(run) && step.status !== "running" && (d.kind === "character" || d.kind === "place" || d.kind === "season" || d.kind === "story") && html`<button class="small" onClick=${() => void undoDoc(run, d.kind as Kind2, d.id, name, step)}><${Icon} name="undo" size=${14} /> Undo</button>`}
+      ${first && step?.decided && html`<ul class="decided" aria-label="What it decided">${step.decided.map(x => html`<li>${x}</li>`)}</ul>`}</li>`;
+  })}</ol></details>`;
 }
 
 /** A step's question: its buttons, or the person's own words. */

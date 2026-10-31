@@ -117,8 +117,12 @@ function inputOf(input: unknown) {
 }
 
 /** What is happening now, in a few words, for the live line under the answer. */
-export function liveLine(parts: { type: string }[], since: number): string {
+/** What an agent is doing now, from its last part: "Thinking", "Writing", or its tool call in words ("Reading s1e01"). */
+export function doingNow(parts: { type: string }[]): string {
   const last = parts.at(-1) as (ToolPart | Thinking | { type: string }) | undefined;
-  const what = !last ? "Thinking" : last.type === "thinking" ? "Thinking" : last.type === "tool" && (last as ToolPart).ok === undefined ? toolLabel((last as ToolPart).name, (last as ToolPart).input).label : last.type === "text" ? "Writing" : "Thinking";
-  return `${what}… ${Math.round((now.value - since) / 1000)} s`;
+  return !last ? "Thinking" : last.type === "thinking" ? "Thinking" : last.type === "tool" && (last as ToolPart).ok === undefined ? toolLabel((last as ToolPart).name, (last as ToolPart).input).label : last.type === "text" ? "Writing" : "Thinking";
+}
+
+export function liveLine(parts: { type: string }[], since: number): string {
+  return `${doingNow(parts)}… ${Math.round((now.value - since) / 1000)} s`;
 }

@@ -227,14 +227,14 @@ function StartRunCard(p: { part: Extract<Part, { type: "start_run" }> }) {
     x.started = r.run.id; turns.value = [...turns.value];
     go("agents", "tasks", r.run.id);
   };
-  const choice = (mode: "check" | "auto", title: string, about: string) => html`<button class=${last === mode ? "primary" : ""} disabled=${busy2} onClick=${() => void start(mode)}><b>${title}</b><small>${about}</small></button>`;
+  const choice = (mode: "check" | "auto", icon: string, title: string, about: string) => html`<button class=${last === mode ? "primary" : ""} disabled=${busy2} onClick=${() => void start(mode)}><b><${Icon} name=${icon} size=${15} /> ${title}</b><small>${about}</small></button>`;
   return html`<div class="ask-card start-run" role="group" aria-label="A task the assistant offers">
-    <b>A task for this</b><blockquote>${x.goal}</blockquote>
-    ${x.started ? html`<a class="button" href=${`#/agents/tasks/${x.started}`}>Follow task ${x.started}</a>` : html`
+    <b><${Icon} name="list" size=${15} /> A task for this</b><blockquote>${x.goal}</blockquote>
+    ${x.started ? html`<a class="button" href=${`#/agents/tasks/${x.started}`}><${Icon} name="play" size=${14} /> Follow task ${x.started}</a>` : html`
       <p class="note">It plans itself, then each part (a person, a place, an episode, a check) is made by its own agent, while this editor may be closed. It saves as it goes, and you can undo anything it made, or all of it.</p>
       <div class="start-run-choices">
-        ${choice("check", "Check with me", "You see the plan first. After that it asks only when there is a real choice to make.")}
-        ${choice("auto", "Just do it", "No stops: it decides the choices itself and tells you what it chose.")}
+        ${choice("check", "hand", "Check with me", "You see the plan first. After that it asks only when there is a real choice to make.")}
+        ${choice("auto", "spark", "Just do it", "No stops: it decides the choices itself and tells you what it chose.")}
       </div>
       <label class="row">Up to $ <input type="number" min="1" step="1" style="max-width:80px" value=${budget} onInput=${(e: Event) => setBudget(Math.max(1, Number((e.target as HTMLInputElement).value) || 1))} /></label>`}
   </div>`;

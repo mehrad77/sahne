@@ -808,16 +808,17 @@ button.link { border: 0; background: none; padding: 0; color: var(--accent, inhe
 .run-goal { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .run-progress { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .run-progress .bar { flex: 0 1 220px; height: 6px; border-radius: 3px; background: var(--chip); overflow: hidden; }
+.run-progress .bar { display: flex; position: relative; }
 .run-progress .bar span { display: block; height: 100%; background: var(--accent); transition: width .4s; }
 .needs-you { border: 1px solid var(--warn); border-radius: 12px; padding: 8px 12px 2px; margin-bottom: 14px; background: var(--panel); }
 .needs-you h4 { margin: 0 0 6px; display: flex; gap: 6px; align-items: center; }
 .needs-you .ask-card { margin: 0 0 8px; }
 .run-finished { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); margin-bottom: 12px; }
 .run-results section { margin-bottom: 14px; }
-.run-results h4 { margin: 0 0 6px; color: var(--mute); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.run-results h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; color: var(--mute); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
 .result-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
 .result-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: grid; }
-.result-card .pic, .result-card img, .result-card svg { width: 100%; }
+.result-card .pic, .result-card .art img, .result-card .art svg { width: 100%; }
 .result-card.being-made { border-color: var(--accent); }
 .result-card.waits-for-you, .result-card.asks-you { border-color: var(--warn); }
 .result-card.undone { opacity: .55; }
@@ -858,9 +859,43 @@ button.link { border: 0; background: none; padding: 0; color: var(--accent, inhe
 .step-log { border-left: 2px solid var(--line); padding-left: 10px; min-width: 0; overflow-wrap: anywhere; }
 .step-summary { background: var(--accent-soft); border-radius: 8px; padding: 6px 10px; }
 .step-question { margin: 0 12px 10px; }
+/* a task at work: calm while agents work (a breathing dot, a striped part of the bar for steps in progress, a light sweeping
+   over what is being made, one flash as it lands); the only thing that pulses for attention is what waits for you */
+.chip.live { display: inline-flex; align-items: center; gap: 6px; }
+.chip.live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; animation: breathe 1.6s ease-out infinite; }
+@keyframes breathe { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 55%, transparent); } 80%, 100% { box-shadow: 0 0 0 6px transparent; } }
+.run-progress .bar .doing { background-color: color-mix(in srgb, var(--accent) 55%, transparent); background-image: linear-gradient(45deg, #ffffff40 25%, transparent 25% 50%, #ffffff40 50% 75%, transparent 75%); background-size: 12px 12px; animation: stripes .9s linear infinite; }
+@keyframes stripes { from { background-position: 12px 0; } to { background-position: 0 0; } }
+.run-progress .bar.live::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 18%, transparent), transparent); transform: translateX(-100%); animation: sheen 2.4s ease-in-out infinite; }
+@keyframes sheen { to { transform: translateX(100%); } }
+.run-step.running, .result-card.being-made { position: relative; }
+.run-step.running::after, .result-card.being-made::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(100deg, transparent 35%, var(--accent-soft) 50%, transparent 65%) no-repeat; background-size: 300% 100%; animation: sweep 2.8s ease-in-out infinite; }
+@keyframes sweep { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.run-step.asking, .result-card.asks-you, .result-card.waits-for-you, .needs-you { animation: waits 2.4s ease-in-out infinite; }
+@keyframes waits { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 25%, transparent); } }
+.result-card { animation: rise .35s ease-out both; }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+.run-step.just, .result-card.just { animation: landed 1.6s ease-out; }
+@keyframes landed { from { box-shadow: 0 0 0 3px var(--accent); background-color: var(--accent-soft); } }
+.run-now { list-style: none; margin: -2px 0 12px; padding: 0; display: grid; gap: 4px; }
+.run-now li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.run-now .note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.result-body .why { font-size: 12.5px; }
+.decided { margin: 2px 0 0; padding-left: 16px; font-size: 12.5px; color: var(--mute); }
+.run-did { margin: 4px 0 10px; }
+.run-did > summary { cursor: pointer; color: var(--mute); padding: 6px 0; }
+.run-did ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.run-did ol > li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--line); }
+.run-did ol > li > svg { color: var(--mute); flex: none; }
+.run-did > summary svg { vertical-align: -2px; }
+.run-finished svg { color: var(--accent); flex: none; }
+.run-did time { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 12.5px; min-width: 42px; }
+.run-did .decided { flex-basis: 100%; margin-left: 50px; }
+@media (prefers-reduced-motion: reduce) { .chip.live::before, .run-progress .bar .doing, .run-progress .bar.live::after, .run-step.running::after, .result-card.being-made::after, .run-step.asking, .result-card, .needs-you, .run-step.just { animation: none; } }
 .start-run blockquote { margin: 6px 0; }
 .start-run-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0; }
 .start-run-choices button { display: grid; gap: 3px; text-align: left; padding: 8px 10px; }
+.start-run-choices b { display: flex; align-items: center; gap: 6px; }
 .start-run-choices small { font-weight: 400; opacity: .85; }
 @media (max-width: 520px) { .start-run-choices { grid-template-columns: 1fr; } }
 .step-proposals { border: 1px dashed var(--line); border-radius: 8px; padding: 6px 10px; display: grid; gap: 4px; }
