@@ -12,9 +12,10 @@
 // process has no editor to accept a proposal), --share-cards, --out <dir>.
 //
 // --session <name> keeps one server process alive across calls (started on first use, on a unix socket in a private folder),
-// so the kit and resvg load once; it stops after 15 idle minutes, with `--session <name> --stop`, and restarts itself when a
-// TypeScript source of the kit, the engine, the story package or backstage changed, so an edit to a generator shows in the
-// next render. `--session <name> --status` says whether it runs. Drawings (kit/*.json) are read fresh on every call.
+// so the kit and resvg load once. A call that leaves out --content, --write, --agent-edits or --share-cards takes the running
+// session's; one that gives --write or another mode is served by the same process; another content root restarts it. It
+// stops after 15 idle minutes, with `--session <name> --stop`, and restarts itself when a TypeScript source of the kit, the
+// engine, the story package or backstage changed, so an edit to a generator shows in the next render. `--session <name> --status` says whether it runs. Drawings (kit/*.json) are read fresh on every call.
 // The socket, the session's log and the default --out live in a folder only this user can open (privateDir); a call waits
 // at most --timeout seconds (default 120, or SAHNE_CALL_TIMEOUT_MS) for its session to answer.
 
@@ -38,6 +39,17 @@ export const TIMEOUT_MS = 120_000;
 type Block = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
 interface Answer { isError: boolean; content: Block[] }
 interface Config { content: string; write: boolean; agentEdits: "direct" | "proposals"; shareCards: boolean }
+/** What a call asked for: the flags it gave (a session fills in the rest from its own). */
+type Want = Partial<Config>;
+
+/** A call's setup: what it gave over `base` (a running session's, or the defaults); --write alone makes edits direct, as a one-shot's are. */
+export function setupOf(want: Want, base: Config): Config {
+  const write = want.write ?? base.write;
+  const agentEdits = want.agentEdits ?? (want.write !== undefined && want.write !== base.write ? (write ? "direct" : "proposals") : base.agentEdits);
+  return { content: want.content ?? base.content, write, agentEdits, shareCards: want.shareCards ?? base.shareCards };
+}
+const DEFAULTS: Config = { content: "", write: false, agentEdits: "proposals", shareCards: false };
+const said = (c: Config) => `${c.content || "the samples"}${c.write ? ` (--write, ${c.agentEdits})` : ""}`;
 type Command = { kind: "tool"; name: string; args: Record<string, unknown> } | { kind: "list"; name?: string } | { kind: "read"; uri: string };
 
 // ---- the server, in this process --------------------------------------------------------------------------------------------
@@ -122,7 +134,10 @@ export function newest(dirs: string[] = (process.env.SAHNE_CALL_WATCH ? process.
 /** The session process: serves requests (one at a time) on the socket until idle or stopped. */
 async function serve(name: string, c: Config) {
   const path = sockOf(name), built = newest(), started = Date.now();
-  const client = await boot(c);
+  // a client per setup asked for (with or without --write, the mode): one process, one kit, one content root
+  const clients = new Map<string, Promise<Booted>>([[JSON.stringify(c), boot(c)]]);
+  const clientOf = (x: Config) => { const k = JSON.stringify(x); if (!clients.has(k)) clients.set(k, boot(x)); return clients.get(k)!; };
+  await clientOf(c);
   let idle: NodeJS.Timeout, chain: Promise<unknown> = Promise.resolve();
   const bye = (code = 0) => { try { unlinkSync(path); } catch {} process.exit(code); };
   const tick = () => { clearTimeout(idle); idle = setTimeout(() => bye(), Number(process.env.SAHNE_CALL_IDLE_MS) || IDLE_MS); };
@@ -143,12 +158,13 @@ async function serve(name: string, c: Config) {
     let reply: unknown;
     let exit = false;
     try {
-      const req = JSON.parse(line) as { op: "stop" | "status" | "run"; config?: Config; cmd?: Command };
+      const req = JSON.parse(line) as { op: "stop" | "status" | "run"; want?: Want; cmd?: Command };
+      const x = setupOf(req.want ?? {}, c);
       if (req.op === "stop") { reply = { stopped: true }; exit = true; }
       else if (req.op === "status") reply = { pid: process.pid, up: Math.round((Date.now() - started) / 1000), config: c, stale: newest() > built };
-      else if (JSON.stringify(req.config) !== JSON.stringify(c)) reply = { mismatch: `session ${name} serves ${c.content || "the samples"}${c.write ? " (--write)" : ""}: stop it first (--session ${name} --stop)` };
-      else if (newest() > built) { reply = { restart: true }; exit = true; }
-      else reply = await perform(client, req.cmd!);
+      else if (x.content !== c.content) reply = { mismatch: c };
+      else if (newest() > built) { reply = { restart: true, config: c }; exit = true; }
+      else reply = await perform(await clientOf(x), req.cmd!);
     } catch (e) { reply = { isError: true, content: [{ type: "text", text: `failed: ${(e as Error).message}` }] }; }
     if (exit) { try { unlinkSync(path); } catch {} }
     sock.end(`${JSON.stringify(reply)}\n`, () => { if (exit) process.exit(0); });
@@ -209,14 +225,27 @@ async function startSession(name: string, c: Config, flags: string[]) {
   throw new Error(notStarted(name, log));
 }
 
-/** The answer of a session process, starting or restarting it when it is not running or its source is stale. */
-async function viaSession(name: string, c: Config, flags: string[], cmd: Command, ms: number): Promise<Answer> {
+/** A session's start flags for a setup (the session process reads them as a call does). */
+const flagsOf = (c: Config) => ["--content", c.content, ...(c.write ? ["--write"] : []), "--agent-edits", c.agentEdits, ...(c.shareCards ? ["--share-cards"] : [])];
+
+/** The answer of a session process, starting or restarting it when it is not running, its source is stale, or it serves another content root. */
+async function viaSession(name: string, want: Want, cmd: Command, ms: number, home: Config): Promise<Answer> {
   const path = sockOf(name);
+  // the setup a new process starts with: the one a restarted process had (its source changed), else the defaults ($SAHNE_CONTENT's root)
+  let base = home;
   for (let attempt = 0; attempt < 3; attempt++) {
-    let r = await ask(path, { op: "run", config: c, cmd }, ms, name);
-    if (r === null) { await startSession(name, c, flags); r = await ask(path, { op: "run", config: c, cmd }, ms, name); }
-    if (r === null || r.restart) continue;
-    if (r.mismatch) throw new Error(String(r.mismatch));
+    let r = await ask(path, { op: "run", want, cmd }, ms, name);
+    if (r === null) { const c = setupOf(want, base); await startSession(name, c, flagsOf(c)); r = await ask(path, { op: "run", want, cmd }, ms, name); }
+    if (r?.restart) { base = (r.config as Config) ?? base; continue; }
+    if (r === null) continue;
+    if (r.mismatch) {
+      // another root: never with the old session's --write, only with this call's own
+      const next = setupOf(want, DEFAULTS);
+      console.error(`call.ts: session ${name} served ${said(r.mismatch as Config)}; restarted for ${said(next)}`);
+      await ask(path, { op: "stop" }, ms, name);
+      await startSession(name, next, flagsOf(next));
+      continue;
+    }
     return r as unknown as Answer;
   }
   throw new Error(`the session ${name} would not answer`);
@@ -271,25 +300,29 @@ async function main(): Promise<"serving" | void> {
   const { values: o, positionals: pos } = parseArgs({
     allowPositionals: true,
     options: {
-      content: { type: "string" }, write: { type: "boolean", default: false }, out: { type: "string" }, session: { type: "string" }, stop: { type: "boolean", default: false },
-      status: { type: "boolean", default: false }, serve: { type: "boolean", default: false }, "agent-edits": { type: "string" }, "share-cards": { type: "boolean", default: false },
+      content: { type: "string" }, write: { type: "boolean" }, out: { type: "string" }, session: { type: "string" }, stop: { type: "boolean", default: false },
+      status: { type: "boolean", default: false }, serve: { type: "boolean", default: false }, "agent-edits": { type: "string" }, "share-cards": { type: "boolean" },
       timeout: { type: "string" }, json: { type: "boolean", default: false },
     },
   });
-  const content = o.content ?? process.env.SAHNE_CONTENT ?? "";
-  if (content && !isAbsolute(content)) throw new Error(`--content is an absolute folder, not ${content}`);
-  const agentEdits = (o["agent-edits"] ?? (o.write ? "direct" : "proposals")) as "direct" | "proposals";
-  if (agentEdits !== "direct" && agentEdits !== "proposals") throw new Error("--agent-edits is direct or proposals");
-  const config: Config = { content: content ? resolve(content) : "", write: o.write, agentEdits, shareCards: o["share-cards"] };
-  // the flags a session process is started with (it reads the same ones)
-  const flags = [...(config.content ? ["--content", config.content] : []), ...(config.write ? ["--write"] : []), "--agent-edits", agentEdits, ...(config.shareCards ? ["--share-cards"] : [])];
+  // only --content asks for a root; $SAHNE_CONTENT is where a one-shot or a new session starts, never a reason to move a running one
+  const content = o.content, env = process.env.SAHNE_CONTENT;
+  for (const c of [content, env]) if (c && !isAbsolute(c)) throw new Error(`--content (or SAHNE_CONTENT) is an absolute folder, not ${c}`);
+  const home: Config = { ...DEFAULTS, content: env ? resolve(env) : "" };
+  if (o["agent-edits"] !== undefined && o["agent-edits"] !== "direct" && o["agent-edits"] !== "proposals") throw new Error("--agent-edits is direct or proposals");
+  // what this call asked for; a session fills in the rest from its own setup, a one-shot from the defaults
+  const want: Want = {
+    ...(content !== undefined ? { content: content ? resolve(content) : "" } : {}), ...(o.write !== undefined ? { write: o.write } : {}),
+    ...(o["agent-edits"] !== undefined ? { agentEdits: o["agent-edits"] as Config["agentEdits"] } : {}), ...(o["share-cards"] !== undefined ? { shareCards: o["share-cards"] } : {}),
+  };
+  const config = setupOf(want, home);
 
   const ms = timeoutOf(o.timeout);
   if (o.serve) { if (!o.session) throw new Error("--serve is for a session"); await serve(o.session, config); return "serving"; }
   if (o.session && (o.stop || o.status)) {
     const r = await ask(sockOf(o.session), { op: o.stop ? "stop" : "status" }, ms, o.session);
     if (o.stop) console.log(r ? `session ${o.session} stopped` : `session ${o.session} was not running`);
-    else console.log(r ? `session ${o.session}: pid ${r.pid}, up ${r.up} s, ${(r.config as Config).content || "the samples"}${(r.config as Config).write ? " (--write)" : ""}${r.stale ? ", its source changed (the next call restarts it)" : ""}` : `session ${o.session} is not running`);
+    else console.log(r ? `session ${o.session}: pid ${r.pid}, up ${r.up} s, ${said(r.config as Config)}${r.stale ? ", its source changed (the next call restarts it)" : ""}` : `session ${o.session} is not running`);
     return;
   }
   const [verb, ...rest] = pos;
@@ -300,7 +333,7 @@ async function main(): Promise<"serving" | void> {
   const cmd: Command = verb === "list" ? { kind: "list", name: rest[0] } : verb === "read" ? { kind: "read", uri: rest[0] ?? "sahne://kit-guide" } : { kind: "tool", name: verb, args: await argsOf(rest[0]) };
   // the default --out: a private folder (a session's own, kept; else a new one per call)
   const out = o.out ?? (o.session ? privateDir(join(callDir(), `out-${o.session.replace(/\W/g, "_")}`)) : mkdtempSync(join(callDir(), "out-")));
-  const a = o.session ? await viaSession(o.session, config, flags, cmd, ms) : await perform(await boot(config), cmd);
+  const a = o.session ? await viaSession(o.session, want, cmd, ms, home) : await perform(await boot(config), cmd);
   const { images, text } = emit(a, out, verb, o.json);
   // the pictures on stdout even with an error (a sheet with one bad item draws the rest); the error's text on stderr
   if (images) console.log(images);

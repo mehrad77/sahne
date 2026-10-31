@@ -11,7 +11,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ask, callDir, notStarted, pngName, privateDir, sockOf, timeoutOf } from "../server/call.ts";
+import { ask, callDir, notStarted, pngName, privateDir, setupOf, sockOf, timeoutOf } from "../server/call.ts";
 
 const SAMPLES = fileURLToPath(new URL("../../sahne-story/samples/", import.meta.url));
 const CALL = fileURLToPath(new URL("../server/call.ts", import.meta.url));
@@ -115,10 +115,12 @@ test("--session keeps one server process, restarts it when a watched source chan
   assert.ok(pid, "running after the first call");
   assert.equal(call("kit_render", args, "--session", NAME).status, 0);
   assert.equal(status(), pid, "the same process served the second call");
-  // a session serves one setup: asking for --write of a read-only one is refused, not served wrongly
-  const wrong = call("save_kit_item", JSON.stringify({ doc: doc("x_late_board", "Oui") }), "--session", NAME, "--write");
-  assert.equal(wrong.status, 1);
-  assert.match(wrong.stderr, /--stop/);
+  // --write on a read-only session is served by the same process, as asked; a call without it stays read-only
+  const late = JSON.stringify({ doc: doc("x_late_board", "Oui") });
+  assert.match(call("save_kit_item", late, "--session", NAME).stderr, /read-only/);
+  const written = call("save_kit_item", late, "--session", NAME, "--write");
+  assert.equal(written.status, 0, written.stderr);
+  assert.equal(status(), pid, "the same process served the --write call");
   // an edit to a watched TypeScript source starts a new process
   const later = new Date(Date.now() + 5000);
   utimesSync(join(watch, "gen.ts"), later, later);
@@ -128,6 +130,41 @@ test("--session keeps one server process, restarts it when a watched source chan
   assert.notEqual(status(), pid, "a new process drew it");
   assert.match(spawnSync(process.execPath, [CALL, "--session", NAME, "--stop"], { encoding: "utf8", env: ENV }).stdout, /stopped/);
   assert.equal(status(), undefined);
+});
+
+test("a session's setup sticks: a call without flags takes the running session's; another content root restarts it, saying so", () => {
+  const s = `${NAME}-s`, other = mkdtempSync(join(tmpdir(), "backstage-call-other-")), bare = (...a: string[]) => spawnSync(process.execPath, [CALL, ...a, "--out", out], { encoding: "utf8", env: ENV });
+  cpSync(SAMPLES, other, { recursive: true });
+  try {
+    assert.equal(call("kit_search", JSON.stringify({ query: "cup" }), "--session", s, "--write").status, 0);
+    // no --content, no --write: the session's root and --write
+    const saved = bare("save_kit_item", JSON.stringify({ doc: doc("x_sticky_board", "Oui") }), "--session", s);
+    assert.equal(saved.status, 0, saved.stderr);
+    assert.ok(existsSync(join(root, "kit", "pieces", "x_sticky_board.json")), "saved in the session's content root");
+    // a restart for a changed source keeps the setup
+    const later = new Date(Date.now() + 10_000);
+    utimesSync(join(watch, "gen.ts"), later, later);
+    const again = bare("save_kit_item", JSON.stringify({ doc: doc("x_sticky_board_2", "Non") }), "--session", s);
+    assert.equal(again.status, 0, again.stderr);
+    assert.ok(existsSync(join(root, "kit", "pieces", "x_sticky_board_2.json")), "the restarted session kept its root and --write");
+    // $SAHNE_CONTENT is where a session starts, never a reason to move a running one
+    const env = spawnSync(process.execPath, [CALL, "kit_search", JSON.stringify({ query: "cup" }), "--session", s, "--out", out], { encoding: "utf8", env: { ...ENV, SAHNE_CONTENT: other } });
+    assert.equal(env.status, 0, env.stderr);
+    assert.doesNotMatch(env.stderr, /restarted/);
+    assert.match(bare("--session", s, "--status").stdout, new RegExp(`${root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\(--write`), "still the first root, writing");
+    // --content asks for another root: the session restarts there, without the old --write
+    const moved = bare("save_kit_item", JSON.stringify({ doc: doc("x_moved_board", "Oui") }), "--session", s, "--content", other);
+    assert.equal(moved.status, 1);
+    assert.match(moved.stderr, /restarted for .*backstage-call-other-/);
+    assert.match(moved.stderr, /read-only/);
+    assert.ok(!existsSync(join(other, "kit", "pieces", "x_moved_board.json")), "nothing saved in the other root");
+    assert.doesNotMatch(bare("--session", s, "--status").stdout, /--write/);
+  } finally { spawnSync(process.execPath, [CALL, "--session", s, "--stop"], { env: ENV }); rmSync(other, { recursive: true, force: true }); }
+  // --write alone makes a one-shot's edits direct; a session's own mode stays unless the call changes --write
+  const base = { content: "/r", write: false, agentEdits: "proposals" as const, shareCards: false };
+  assert.equal(setupOf({ write: true }, base).agentEdits, "direct");
+  assert.deepEqual(setupOf({}, { ...base, write: true, agentEdits: "direct" }), { ...base, write: true, agentEdits: "direct" });
+  assert.equal(setupOf({ write: true, agentEdits: "proposals" }, base).agentEdits, "proposals");
 });
 
 test("a session that did not start says why: the last lines of its log", () => {

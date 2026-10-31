@@ -62,12 +62,12 @@ Every id a content root adds starts with `x_`, and `test/drawing.test.ts` assert
 Backstage's MCP tools (this file is its `sahne://kit-guide` resource) do the plumbing, so the effort goes to the drawing: `kit_search` for what exists, `kit_read` a neighbour, `draft_kit_item` and look at the sheet, revise until there are no problems, then `save_kit_item`. An agent with no MCP set up reaches the very same tools from the shell and reads the PNGs it prints:
 
 ```bash
-node packages/sahne-backstage/server/call.ts kit_read '{"id":"flag"}' --content <root> --session kit
-node packages/sahne-backstage/server/call.ts kit_render '{"id":"money","vary":{"value":"all"},"views":["day"]}' --content <root> --session kit
-node packages/sahne-backstage/server/call.ts draft_kit_item @doc.json --content <root> --session kit
+node packages/sahne-backstage/server/call.ts kit_read '{"id":"flag"}' --content <root> --write --session kit   # the first call sets the session up
+node packages/sahne-backstage/server/call.ts kit_render '{"id":"money","vary":{"value":"all"},"views":["day"]}' --session kit
+node packages/sahne-backstage/server/call.ts draft_kit_item @doc.json --session kit
 ```
 
-Each call prints the picture's path first (`image: <path>`, also `<out>/latest.png`), then the problems as lines and what each numbered cell shows.
+Each call prints the picture's path first (`image: <path>`, also `<out>/latest.png`), then the problems as lines and what each numbered cell shows. A later call needs only `--session kit`: it takes the session's content root and `--write`.
 
 - **Many at once.** `kit_render` and `draft_kit_item` take a list (`items`: ids or `{ id | doc, as?, variant?, params?, … }`; `docs`) and answer numbered cells, 24 to a picture, so a batch or a family is judged in one look. `vary` draws a cell per value instead of a call each: `{"vary": {"value": "all"}}` (an enum's values, a bool's two; also `variant`, `n`, `held`: `{"vary": {"held": "all"}}` shows every item of a list held).
 - **Params go under `params`.** `{"id": "money", "params": {"currency": "dollar"}}`, never beside the id: a key in the wrong place is refused with where it goes. A param that draws the same as without it is a `warning [inert]` naming the param it needs (`currency` shows only with `kind: foreign`). An enum's values are strings (`"20"`, not `20`).
