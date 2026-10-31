@@ -70,7 +70,7 @@ export async function startMcpStdio(o: McpStdioOptions = {}): Promise<void> {
   if (remote) {
     // the running backstage's editors see what this process does: `show`, the documents it writes in direct mode, and its tool calls
     events.on((name, data) => {
-      if (name !== "show" && name !== "doc" && name !== "activity") return;
+      if (name !== "show" && name !== "doc" && name !== "activity" && name !== "look") return;
       fetch(new URL("api/events", remote), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event: name, data }) })
         .catch(e => console.error(`sahne-backstage mcp: could not reach ${remote.href}: ${(e as Error).message}`));
     });
@@ -78,7 +78,7 @@ export async function startMcpStdio(o: McpStdioOptions = {}): Promise<void> {
   const selection = remote ? async () => {
     try { return ((await (await fetch(new URL("api/selection", remote))).json()) as { selection: null }).selection; } catch { return null; }
   } : undefined;
-  const server = createMcp({ write: o.write === true, agentEdits, shareCards: o.shareCards === true, events, queue, fresh: true, selection, onCall: c => events.emit("activity", c) });
+  const server = createMcp({ write: o.write === true, agentEdits, shareCards: o.shareCards === true, events, queue, fresh: true, selection, backstage: remote, onCall: c => events.emit("activity", c) });
   const transport = new StdioServerTransport();
   const done = new Promise<void>(r => { transport.onclose = () => r(); process.stdin.on("end", () => r()); });
   await server.connect(transport);

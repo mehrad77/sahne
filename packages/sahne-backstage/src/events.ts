@@ -11,6 +11,7 @@ import { get, set, type Path } from "./model/path.ts";
 import * as H from "./model/history.ts";
 import { change, createDoc, drafts, go, keyOf, loadWorld, openDoc, saveDocs, say } from "./store.ts";
 import { loadKitDocs } from "./kitdocs.ts";
+import { answerLook, type LookAsk } from "./look.ts";
 
 export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean; paths?: Path[] }
 export interface Proposal extends ProposalEdit {
@@ -63,6 +64,8 @@ export function connectEvents() {
     go("episode", d.id);
     shown.value = { id: d.id, step: d.step ?? null, n: (shown.value?.n ?? 0) + 1 };
   });
+  // an agent wants a picture of the stage: drawn here if this page is in view (look.ts)
+  source.addEventListener("look", e => { void answerLook(JSON.parse((e as MessageEvent).data) as LookAsk); });
   source.addEventListener("activity", e => {
     const c = JSON.parse((e as MessageEvent).data) as Call | null;
     if (c) activity.value = [c, ...activity.value].slice(0, 200);

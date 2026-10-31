@@ -25,6 +25,7 @@ import { Events, selectionOf } from "./events.ts";
 import { Agents, callOf } from "./agents.ts";
 import { createMcp, type AgentEdits } from "./mcp.ts";
 import { proposalsOf, type NewProposal, type ProposalEdit } from "./proposals.ts";
+import { looksOf } from "./look.ts";
 
 const HERE = new URL("../", import.meta.url);
 const CLI_PATH = fileURLToPath(new URL("cli.ts", import.meta.url));
@@ -77,7 +78,7 @@ export async function serve(o: Options): Promise<Running> {
   // how agents' edits land: --agent-edits, else the person's settings; changed on the Agents page for agents that connect after
   let agentEdits: AgentEdits = o.agentEdits ?? readSettings().agentEdits ?? "proposals";
   const shareCards = o.shareCards === true;
-  const events = new Events(), proposals = proposalsOf(events), agents = new Agents(events);
+  const events = new Events(), proposals = proposalsOf(events), agents = new Agents(events), looks = looksOf(events);
   const writable = () => o.write && !oldShape().length;
   /** The assistant, as `GET /api/world` gives it: false when it cannot run, so a plain truthiness check still works. */
   const aiOf = () => {
@@ -146,8 +147,20 @@ export async function serve(o: Options): Promise<Running> {
       const d = (e?.data ?? {}) as Record<string, unknown>;
       if (e?.event === "show" && typeof d.id === "string") { events.emit("show", { id: d.id, step: Array.isArray(d.step) ? d.step : null }); return json(res, 200, { ok: true }); }
       if (e?.event === "doc" && typeof d.kind === "string" && typeof d.id === "string") { forget(); events.emit("doc", { kind: d.kind, id: d.id, mtime: d.mtime, ...(typeof d.by === "string" ? { by: d.by } : {}) }); return json(res, 200, { ok: true }); }
+      if (e?.event === "look" && typeof d.rid === "string" && /^[0-9a-f]{16}$/.test(d.rid)) { looks.wait(d.rid); events.emit("look", d); return json(res, 200, { ok: true }); }
       if (e?.event === "activity") { const c = callOf(d); if (!c) throw new Fail(400, "an activity is { by, tool, ok, ms, summary }"); agents.record(c); return json(res, 200, { ok: true }); }
-      throw new Fail(400, "expected { event: \"show\" | \"doc\" | \"activity\", data }");
+      throw new Fail(400, "expected { event: \"show\" | \"doc\" | \"activity\" | \"look\", data }");
+    }
+    // a picture of the stage an agent asked for (look.ts): an editor posts it once; an agent on stdio waits for it here
+    if (route === "look" && a && m === "POST") {
+      const v = await body(req) as { image?: unknown };
+      if (!looks.answer(a, typeof v?.image === "string" ? v.image : null)) throw new Fail(404, `no open look ${a}: answered already, or never asked`);
+      return json(res, 200, { ok: true });
+    }
+    if (route === "look" && a && m === "GET") {
+      if (!/^[0-9a-f]{16}$/.test(a)) throw new Fail(400, "not a look id");
+      const png = await looks.wait(a).picture;
+      return json(res, 200, { image: png ? png.toString("base64") : null });
     }
     if (route === "selection" && m === "GET") return json(res, 200, { selection: events.selection });
     if (route === "selection" && m === "POST") {

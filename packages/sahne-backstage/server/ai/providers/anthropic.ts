@@ -18,6 +18,7 @@ export function anthropic(model: string = MODELS.full): Provider {
     id: "anthropic",
     model,
     message: (role, text) => ({ role, content: text }),
+    withPictures: (text, pics) => ({ role: "user", content: [...pics.map(p => ({ type: "image", source: { type: "base64", media_type: p.mediaType, data: p.data } })), { type: "text", text }] }),
     results: (r: ToolResult[]) => [{ role: "user", content: r.map(x => ({
       type: "tool_result", tool_use_id: x.id,
       content: x.images?.length ? [{ type: "text", text: x.text }, ...x.images.map(i => ({ type: "image", source: { type: "base64", media_type: i.mimeType, data: i.data } }))] : x.text,

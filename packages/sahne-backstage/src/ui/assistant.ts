@@ -28,7 +28,9 @@ import { liveLine, ThinkingBlock, tick, ToolGroup, type Thinking, type ToolPart 
 type Part = { type: "text"; text: string } | Thinking | ToolPart | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number } | { type: "stopped" } | AskPart;
 /** A question the assistant put to the person (ask_person, set_review): buttons that answer, proposals to accept and save, a status to set. */
 type AskPart = { type: "ask"; question: string; options?: string[]; save?: string[]; review?: { id: string; status: string }; answered?: string };
-interface Turn { role: "user" | "assistant"; content: string; parts?: Part[]; fresh?: boolean; at?: number }
+interface Turn { role: "user" | "assistant"; content: string; parts?: Part[]; fresh?: boolean; at?: number; /** The files the person attached (their names; the pictures are not kept). */ files?: string[] }
+/** A file attached to a message: a picture sent as it is, a text file as words in the message. */
+interface Attached { name: string; mediaType: string; data: string; text?: string }
 
 /** The side panel is open (side.ts), and the tab it shows; an ask turns it to the assistant. */
 export const assistantOpen = signal(false);
@@ -138,13 +140,16 @@ let stopper: AbortController | null = null;
 export function stop() { stopper?.abort(); }
 
 /** Send a message (or an ask), streaming the answer into the conversation. */
-export async function send(content: string, o: { fresh?: boolean; confirm?: boolean } = {}) {
+export async function send(content: string, o: { fresh?: boolean; confirm?: boolean; files?: Attached[] } = {}) {
   if (busy.value || !content.trim()) return;
   assistantOpen.value = true;
   sideTab.value = "assistant";
   // an answer with no words (only tools, or stopped) is not sent again
   const history = o.fresh ? [] : turns.value.filter(t => (!t.fresh || t.role === "user") && t.content.trim()).map(t => ({ role: t.role, content: t.content }));
-  if (!o.confirm) turns.value = [...turns.value, { role: "user", content, fresh: o.fresh }];
+  // a text file is part of the message; a picture goes beside it
+  const texts = (o.files ?? []).filter(f => f.text !== undefined), pictures = (o.files ?? []).filter(f => f.text === undefined);
+  if (texts.length) content = `${content}\n\n${texts.map(f => `File ${f.name}:\n\`\`\`\n${f.text}\n\`\`\``).join("\n\n")}`;
+  if (!o.confirm) turns.value = [...turns.value, { role: "user", content, fresh: o.fresh, ...(o.files?.length ? { files: o.files.map(f => f.name) } : {}) }];
   const reply: Turn = { role: "assistant", content: "", parts: [], fresh: o.fresh, at: Date.now() };
   turns.value = [...turns.value, reply];
   const update = (fn: (t: Turn) => void) => { fn(reply); turns.value = [...turns.value.slice(0, -1), { ...reply, parts: [...(reply.parts ?? [])] }]; };
@@ -154,7 +159,7 @@ export async function send(content: string, o: { fresh?: boolean; confirm?: bool
   tick(true);
   stopper = new AbortController();
   try {
-    const r = await fetch("/api/assistant", { method: "POST", signal: stopper.signal, headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: [...history, { role: "user", content }], context: contextNow(), fresh: !!o.fresh, confirm: !!o.confirm }) });
+    const r = await fetch("/api/assistant", { method: "POST", signal: stopper.signal, headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: [...history, { role: "user", content }], context: contextNow(), fresh: !!o.fresh, confirm: !!o.confirm, ...(pictures.length ? { pictures: pictures.map(({ name, mediaType, data }) => ({ name, mediaType, data })) } : {}) }) });
     if (!r.ok || !r.body) { const b = await r.json().catch(() => ({})) as { message?: string }; update(t => t.parts!.push({ type: "error", message: b.message ?? `the assistant answered ${r.status}` })); return; }
     const reader = r.body.pipeThrough(new TextDecoderStream()).getReader();
     let buf = "";
@@ -301,6 +306,18 @@ export function AssistantChat() {
   const [text, setText] = useState("");
   const [past, setPast] = useState(false);
   const [about, setAbout] = useState(false);
+  const [files, setFiles] = useState<Attached[]>([]);
+  const go = () => { if (!text.trim() && !files.length) return; void send(text.trim() || "Look at what I attached.", { files }); setText(""); setFiles([]); };
+  /** Read dropped or pasted files: pictures (up to 5 MB, four at most) and text files (up to 200 KB). */
+  const attach = async (list: FileList) => {
+    const got: Attached[] = [];
+    for (const f of [...list]) {
+      if (/^image\/(png|jpeg|webp|gif)$/.test(f.type) && f.size <= 5e6) got.push({ name: f.name || "picture", mediaType: f.type, data: await new Promise<string>(r => { const fr = new FileReader(); fr.onload = () => r(String(fr.result).split(",")[1] ?? ""); fr.readAsDataURL(f); }) });
+      else if ((f.type.startsWith("text/") || /\.(json|md|txt|csv)$/i.test(f.name)) && f.size <= 2e5) got.push({ name: f.name, mediaType: f.type || "text/plain", data: "", text: await f.text() });
+      else say(`${f.name}: only pictures (PNG, JPEG, WebP, GIF, up to 5 MB) and text files (up to 200 KB) can be attached`, true);
+    }
+    setFiles(fs => [...fs, ...got].filter((f, i, all) => f.text !== undefined || all.slice(0, i + 1).filter(x => x.text === undefined).length <= 4));
+  };
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [turns.value]);
   const ai = typeof w.ai === "object" ? w.ai : null;
@@ -313,17 +330,20 @@ export function AssistantChat() {
     <div class="chat">
       ${empty && html`<div class="note">Ask anything about the series, or pick an ask. It sees ${ctx.id ? html`${ctx.kind === "season" ? "season " : ctx.kind === "place" ? "the place " : ctx.kind === "character" ? "the character " : ""}<b>${ctx.id}</b>${(ctx as { path?: Path }).path ? html` at <b>${(ctx as { path: Path }).path.slice(1).join(".")}</b>` : ""}` : `the ${ctx.page} page`}.<${Abilities} /><${AskMenu} /></div>`}
       ${turns.value.map((t, i) => html`<div class=${`turn ${t.role}${t.fresh ? " fresh" : ""}`}>
-        ${t.role === "user" ? t.content : html`<${Answer} turn=${t} live=${busy.value && i === turns.value.length - 1} />`}
+        ${t.role === "user" ? html`${t.files?.length ? html`<div class="files">${t.files.map(f => html`<span class="chip">📎 ${f}</span>`)}</div>` : ""}${t.files?.length ? t.content.replace(/\n\nFile [\s\S]*$/, "") : t.content}` : html`<${Answer} turn=${t} live=${busy.value && i === turns.value.length - 1} />`}
       </div>`)}
       ${busy.value && html`<div class="live-line" role="status" aria-live="polite"><span class="spin" aria-hidden="true"></span>${liveLine(turns.value.at(-1)?.parts ?? [], turns.value.at(-1)?.at ?? Date.now())}</div>`}
       <div ref=${end}></div>
     </div>
-    <form class="chat-input" onSubmit=${(e: Event) => { e.preventDefault(); void send(text); setText(""); }}>
-      <textarea rows=${2} value=${text} placeholder="Ask the assistant…" aria-label="Message" onInput=${(e: Event) => setText((e.target as HTMLTextAreaElement).value)}
-        onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void send(text); setText(""); } }} />
+    <form class="chat-input" onSubmit=${(e: Event) => { e.preventDefault(); go(); }}
+      onDragOver=${(e: DragEvent) => { if (e.dataTransfer?.types.includes("Files")) e.preventDefault(); }} onDrop=${(e: DragEvent) => { if (e.dataTransfer?.files.length) { e.preventDefault(); void attach(e.dataTransfer.files); } }}>
+      ${files.length > 0 && html`<div class="files">${files.map((f, i) => html`<span class="chip">📎 ${f.name}<button type="button" class="linkish" aria-label=${`Remove ${f.name}`} onClick=${() => setFiles(files.filter((_, k) => k !== i))}>×</button></span>`)}</div>`}
+      <textarea rows=${2} value=${text} placeholder="Ask the assistant… (paste or drop a picture or a text file)" aria-label="Message" onInput=${(e: Event) => setText((e.target as HTMLTextAreaElement).value)}
+        onPaste=${(e: ClipboardEvent) => { if (e.clipboardData?.files.length) { e.preventDefault(); void attach(e.clipboardData.files); } }}
+        onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); go(); } }} />
       <div class="row"><button type="button" class="small" disabled=${busy.value || !turns.value.length} onClick=${() => { newChat(); setPast(false); }}>New conversation</button>
         <button type="button" class="small" aria-expanded=${past} disabled=${!chats.value.length} onClick=${() => setPast(!past)}>History${chats.value.length ? ` (${chats.value.length})` : ""}</button>
-        <span class="grow"></span>${busy.value ? html`<button type="button" class="stop" onClick=${stop} title="Stop the answer: nothing more runs">Stop</button>` : html`<button class="primary" disabled=${!text.trim()}>Send</button>`}</div>
+        <span class="grow"></span>${busy.value ? html`<button type="button" class="stop" onClick=${stop} title="Stop the answer: nothing more runs">Stop</button>` : html`<button class="primary" disabled=${!text.trim() && !files.length}>Send</button>`}</div>
       ${past && html`<div class="chat-history" role="list" aria-label="Past conversations">
         <p class="note">Kept in this browser only, the newest ${KEEP}.</p>
         ${chats.value.map(c => html`<div role="listitem" class=${`chat-past${c.id === chatId.value ? " on" : ""}`}>

@@ -10,8 +10,8 @@
 
 import type http from "node:http";
 
-export type EventName = "proposal" | "doc" | "show" | "usage" | "activity";
-export const EVENT_NAMES: EventName[] = ["proposal", "doc", "show", "usage", "activity"];
+export type EventName = "proposal" | "doc" | "show" | "usage" | "activity" | "look";
+export const EVENT_NAMES: EventName[] = ["proposal", "doc", "show", "usage", "activity", "look"];
 
 /** What the open editor shows: its page, and the document and step selected there. */
 export interface Selection { page: string; kind?: string; id?: string; path?: (string | number)[]; at: number }

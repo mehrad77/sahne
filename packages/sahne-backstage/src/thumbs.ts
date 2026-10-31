@@ -72,7 +72,7 @@ async function pump() {
 export const loadScene = (st: Stage, s: Scene) =>
   st.load({ v: 1, cues: s.cues }, { ...s.load, cast: s.cast, places: s.places ?? (s.place ? { [s.place.id]: s.place } : s.load?.places ?? {}), ...(s.names ? { names: s.names } : {}) });
 
-function bake(st: Stage, s: Scene): Promise<string | null> {
+function bake(st: Stage, s: Scene, el: HTMLElement = host!, type = "image/webp"): Promise<string | null> {
   loadScene(st, s);
   if (s.play) {
     st.show(Math.max(0, s.play.cue - 1));
@@ -85,10 +85,22 @@ function bake(st: Stage, s: Scene): Promise<string | null> {
     const timer = setTimeout(() => { off(); res(null); }, 5000);
     const off = st.onFrame(() => {
       off(); clearTimeout(timer);
-      res((host!.querySelector("canvas") as HTMLCanvasElement).toDataURL("image/webp", 0.8));
+      res((el.querySelector("canvas") as HTMLCanvasElement).toDataURL(type, 0.8));
     });
     st.poke();
   });
+}
+
+/**
+ * A scene drawn now, at a size, on a stage of its own (never kept): the picture an agent asked to look at (look.ts), as a
+ * PNG data URL; null when it cannot be drawn.
+ */
+export async function drawNow(s: Scene, w = 960, h = 600): Promise<string | null> {
+  const el = Object.assign(document.createElement("div"), { ariaHidden: "true" });
+  Object.assign(el.style, { position: "fixed", left: "0", bottom: "0", width: `${w}px`, height: `${h}px`, opacity: "0", pointerEvents: "none", zIndex: "-1" });
+  document.body.append(el);
+  const st = mountStage(el, { kit: KIT, lang: seriesLang(), bubbles: true, motion: "full", maxDpr: 1 });
+  try { return await bake(st, s, el, "image/png"); } catch (e) { console.warn(`backstage look: ${(e as Error).message}`); return null; } finally { st.destroy(); el.remove(); }
 }
 
 /** A place's wide shot at its first time. */

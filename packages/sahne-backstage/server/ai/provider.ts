@@ -5,6 +5,7 @@
 
 import type { Usage } from "./budget.ts";
 
+export interface Picture { name: string; mediaType: string; data: string }
 export interface ToolDef { name: string; description: string; schema: Record<string, unknown> }
 export interface Call { id: string; name: string; input: Record<string, unknown>; bad?: string }
 /** A tool's answer: its text, and any pictures (base64 PNG) a provider that can see sends on beside it. */
@@ -29,6 +30,8 @@ export interface Provider {
   turn(o: TurnOptions): Promise<Turn>;
   /** A plain message of the conversation. */
   message(role: "user" | "assistant", text: string): unknown;
+  /** The person's message with pictures they attached (PNG, JPEG, WebP or GIF, base64). */
+  withPictures(text: string, pictures: Picture[]): unknown;
   /** The messages that answer a turn's tool calls. */
   results(r: ToolResult[]): unknown[];
 }

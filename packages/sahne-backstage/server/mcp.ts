@@ -18,9 +18,10 @@
 import { readFileSync } from "node:fs";
 import * as z from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { rng } from "../../sahne/src/core/rng.ts";
 import { IS_SAMPLES } from "../../sahne-story/paths.ts";
 import { arcId } from "../../sahne-story/check/rules.ts";
-import { allLanguages, languagesOf, seasonOf, textOf, type Languages, type SeasonDoc, type SeriesDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
+import { allLanguages, langFor, languagesOf, seasonOf, suggest, textOf, type Languages, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
 import { allProblems, check, refuse, usesOf, exists, forget, idsOf, kit as kitOf, listing, oldShape, readDoc, save, searchCards, type Edit, type Kind, type Problem } from "./content.ts";
 import { readReview, STATUSES, writeReview, type EpisodeReview } from "./review.ts";
 import { fail, ok, Refusal, type Result } from "./result.ts";
@@ -30,6 +31,8 @@ import type { Events, Selection } from "./events.ts";
 import { latestOf, proposalsOf, type ProposalEdit, type Queue } from "./proposals.ts";
 import { get, insert, move, set, type Key } from "../src/model/path.ts";
 import { toolLabel } from "../src/model/tools.ts";
+import { lookAt } from "./look.ts";
+import { suggestionsOf } from "../src/model/autostage.ts";
 import { boardOf, datesOf, themed, weekOfArc } from "../src/model/board.ts";
 import { skeleton } from "../src/model/skeleton.ts";
 
@@ -51,6 +54,8 @@ export interface McpOptions {
   fresh?: boolean;
   /** The open editor's selection (default: the one posted to this process). */
   selection?: () => Promise<Selection | null> | Selection | null;
+  /** A running backstage whose editors draw `look`'s pictures (stdio mode with --backstage); default: this process's. */
+  backstage?: URL | null;
   /** Told of every tool call, for the editor's Agents page (agents.ts). */
   onCall?(c: Call): void;
 }
@@ -387,7 +392,12 @@ export function createMcp(o: McpOptions): McpServer {
       .map(r => ({ id: r.id, family: r.family, as: r.as, about: r.about, variants: r.variants, tags: r.tags }));
     else if (kind === "gestures") rows = Object.entries(kitOf().gestures ?? {}).map(([id, g]) => ({ id, about: `${Math.round(g.dur)} ms${g.needs?.length ? `, needs ${g.needs.join(" and ")}` : ""}${g.loop ? ", loops" : ""}` }));
     else if (kind === "emotions") rows = Object.keys(kitOf().face.emotions).map(id => ({ id, about: "a face" }));
-    else rows = Object.entries(kitOf().sounds ?? {}).map(([id, s]) => ({ id, about: `${s.bus}${s.loop ? " loop" : ""}${s.word ? `, written ${JSON.stringify(s.word[c.langs.main] ?? s.word.en ?? Object.values(s.word)[0])}` : ""}` }));
+    // a sound as words, since no model hears it: what it is, how long, how it varies, whether it is a recording
+    else rows = Object.entries(kitOf().sounds ?? {}).map(([id, s]) => {
+      let dur = "";
+      try { dur = `, ${s.patch({ rng: rng(id), take: 0, params: {} }).dur.toFixed(1)} s`; } catch { /* a patch that needs params */ }
+      return { id, about: `${s.bus === "ambience" ? "ambience" : "a sound effect"}${s.loop ? ", looping" : ""}${dur}${(s.takes ?? 1) > 1 ? `, ${s.takes} takes that vary` : ""}${s.recording ? ", a recording" : ", synthesised"}${s.word ? `, written ${JSON.stringify(s.word[c.langs.main] ?? s.word.en ?? Object.values(s.word)[0])}` : ""}` };
+    });
     const q = (query ?? "").trim().toLowerCase();
     const hits = rows.filter(r => !q || r.id.toLowerCase().includes(q) || r.about.toLowerCase().includes(q) || (Array.isArray(r.tags) && (r.tags as string[]).some(t => t.toLowerCase().includes(q))) || r.family === q).sort((a, b) => a.id.localeCompare(b.id));
     const max = limit ?? 80;
@@ -732,6 +742,33 @@ export function createMcp(o: McpOptions): McpServer {
     const cur: EpisodeReview = readReview().episodes[id] ?? {};
     writeReview({ id, review: { ...cur, status } });
     return ok(`${id} is ${status}`);
+  }));
+
+  server.registerTool("look", {
+    title: "Look at the stage",
+    description: "A picture of the stage: an episode at a step (mid-way through it by default, `at` 0 to 1), or a place's wide shot. In proposals mode it is the document as you would edit it, your pending proposal included, so you can see what you changed. An open editor draws it: with none open and in view, there is no picture. Look after staging a scene, and fix what looks wrong: who faces whom, where people stand, what is out of frame.",
+    inputSchema: { kind: z.enum(["story", "place"]).optional().describe("Default: story"), id: z.string(), step: PATH.optional().describe("An episode's step; default: its first scene"), at: z.number().min(0).max(1).optional() },
+    annotations: { readOnlyHint: true },
+  }, run("look", async ({ kind, id, step, at }) => {
+    const k = kind ?? "story", c = await current(k, id);
+    const png = await lookAt(o.events, { kind: k, id, doc: c.doc, ...(step !== undefined ? { step: pathOf(step) } : {}), at: at ?? 0.4 }, o.backstage);
+    if (!png) return fail("no picture: no backstage editor is open and in view to draw it. Ask the person to open backstage (any page) and try again");
+    return ok(`${k === "story" ? `${id}${step !== undefined ? ` at ${pathText(pathOf(step))}` : ""}` : `the place ${id}`}${c.after ? ` (with your pending proposal ${c.after})` : ""}`, undefined, [png]);
+  }));
+
+  server.registerTool("suggest_staging", {
+    title: "The rules' staging suggestions",
+    description: "The staging the editor's own rules suggest for an episode, line by line, with why: a gesture, a feeling, whom a line is said to, a prop to point at, a camera. The same suggestions a person reviews in the editor. Use them as a starting point; set the ones that fit with set_staging.",
+    inputSchema: { id: ID },
+    annotations: { readOnlyHint: true },
+  }, run("suggest_staging", async ({ id }) => {
+    const d = await seen(id), w = listing(), c = ctx(), k = kitOf();
+    const lang = langFor(c.langs.main);
+    const o = { places: w.places as Record<string, StoryPlace>, characters: w.characters, kit: k, lang };
+    const story = d.doc as unknown as StoryDoc;
+    const sugg = suggestionsOf(story, { lang, lints: suggest(story, o as never), gestures: Object.keys(k.gestures), emotions: Object.keys(k.face.emotions), narrator: (w.series as SeriesDoc | undefined)?.narrator ?? "kerim", standin: (w.series as SeriesDoc | undefined)?.standin ?? "nima" });
+    const rows = Object.entries(sugg).flatMap(([path, ss]) => ss.map(sg => ({ path, staging: sg.fix, why: sg.why, from: sg.from })));
+    return ok(rows.length ? `${rows.length} suggestion${rows.length > 1 ? "s" : ""} for ${id}:\n${rows.map(r => `${r.path}: ${JSON.stringify(r.staging)} (${r.why})`).join("\n")}` : `the rules suggest nothing more for ${id}`, rows);
   }));
 
   server.registerTool("list_proposals", {

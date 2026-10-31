@@ -34,7 +34,8 @@ export function abilities(o: AbilitiesOf): Abilities {
   const can = [
     ...here.can,
     "Read the series, its seasons and every episode, and look up the cast, the places (with their marks and props), gestures, feelings and sounds.",
-    "Run the story check on an episode and explain what it finds.",
+    "Run the story check on an episode and explain what it finds, and give the editor's own staging suggestions.",
+    "Look at the stage: an episode at a step, or a place, drawn by this editor (its own pending edits included), and see pictures you attach.",
     ...(o.writable ? [
       `Edit an episode: its lines and their translations, the staging, and its steps (add, delete, move). ${proposing ? "Each edit is a proposal you accept or reject." : "Each edit is saved at once, after the same check as your Save."}`,
       `Start a new episode from a brief, in a week its season has an arc for${proposing ? ", as a proposal: you open it to accept or reject it, and until then it can keep editing it" : ""}.`,
@@ -51,7 +52,7 @@ export function abilities(o: AbilitiesOf): Abilities {
     ...(!o.writable ? ["Change anything: backstage is read-only, so it can read, check and advise only."] : proposing ? ["Save without your click: each proposal waits for you (Accept and save does both at once)."] : []),
     ...here.cannot,
     "Change the kit: it cannot draw new art or add props, gestures or sounds.",
-    "See the stage, pictures or hear sounds: it reads the documents only.",
+    "Hear sounds: it reads what each sound is (its kind, length and word) instead.",
     ...(o.cards && !o.shareCards ? ["See the words on the word cards, only their ids (the Agents tab can share them)."] : []),
     "Browse the web, or read files outside this content root.",
     "Remember other conversations: each starts from what is on screen and in the files.",

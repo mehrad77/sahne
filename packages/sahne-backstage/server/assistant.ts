@@ -23,12 +23,12 @@ import { createMcp, type AgentEdits, type McpOptions } from "./mcp.ts";
 import type { Events } from "./events.ts";
 import { readiness, readSettings, type Caps, type Settings } from "./settings.ts";
 import { BudgetError, costOf, guard, record, totals, type Usage } from "./ai/budget.ts";
-import { ProviderError, type Provider, type ToolDef } from "./ai/provider.ts";
+import { ProviderError, type Picture, type Provider, type ToolDef } from "./ai/provider.ts";
 import { anthropic, MODELS } from "./ai/providers/anthropic.ts";
 import { openai } from "./ai/providers/openai.ts";
 
 export interface AssistantContext { page: string; kind?: string; id?: string; path?: (string | number)[] }
-export interface AssistantRequest { messages: { role: "user" | "assistant"; content: string }[]; context?: AssistantContext; fresh?: boolean; confirm?: boolean; quick?: boolean }
+export interface AssistantRequest { messages: { role: "user" | "assistant"; content: string }[]; context?: AssistantContext; fresh?: boolean; confirm?: boolean; quick?: boolean; /** Pictures the person attached to their last message. */ pictures?: Picture[] }
 export type AssistantEvent =
   | { type: "text"; text: string }
   | { type: "thinking"; text: string }
@@ -76,7 +76,9 @@ export function requestOf(v: unknown): AssistantRequest | string {
   if (messages.at(-1)!.role !== "user") return "the last message is the person's";
   const c = b.context as Partial<AssistantContext> | undefined;
   const context = c && typeof c.page === "string" ? { page: c.page.slice(0, 200), ...(typeof c.kind === "string" ? { kind: c.kind } : {}), ...(typeof c.id === "string" ? { id: c.id } : {}), ...(Array.isArray(c.path) ? { path: c.path.filter(k => typeof k === "string" || typeof k === "number").slice(0, 20) } : {}) } : undefined;
-  return { messages: messages as AssistantRequest["messages"], ...(context ? { context } : {}), fresh: b.fresh === true, confirm: b.confirm === true, quick: b.quick === true };
+  // pictures the person attached: at most 4, each an image of a kind the API takes, at most 5 MB
+  const pics = Array.isArray(b.pictures) ? b.pictures.filter(x => x && typeof x.data === "string" && /^image\/(png|jpeg|webp|gif)$/.test(String(x.mediaType)) && x.data.length <= 7_000_000 && /^[A-Za-z0-9+/=]+$/.test(x.data)).slice(0, 4).map(x => ({ name: String(x.name ?? "picture").slice(0, 80), mediaType: String(x.mediaType), data: x.data })) : [];
+  return { ...(pics.length ? { pictures: pics } : {}), messages: messages as AssistantRequest["messages"], ...(context ? { context } : {}), fresh: b.fresh === true, confirm: b.confirm === true, quick: b.quick === true };
 }
 
 /** The provider the settings name, with the model for this ask. */
@@ -108,6 +110,7 @@ export function systemPrompt(o: { agentEdits: AgentEdits; writable: boolean; sha
     `What you can do:\n${ab.can.map(x => `- ${x}`).join("\n")}\nWhat you cannot do:\n${ab.cannot.map(x => `- ${x}`).join("\n")}\nWhen the person asks for something you cannot do, say so plainly in one sentence and where in the editor they can do it themselves; never write as if you did it, and never promise to do it later. When a tool refuses, say what was refused and why in plain words.`,
     "A new document you propose (an episode, a season, a place, a character) exists only as your proposal until the person accepts it: you can read it and keep editing it, and every edit builds on your proposal. Tell the person to open it to accept or reject it. Pick a new episode's week from the season's arc weeks (series_overview); a week without a theme gets one with set_week_theme. Before you change or take away a place's mark or prop, or a character, see where it is used (find_uses).",
     "An edit that brings a new error is refused with the problems: fix them and try again. Answer briefly, in the language the person writes to you in.",
+    "After you stage a scene (who stands where, whom a line is said to, a move, a prop), look at it (look) and fix what looks wrong. The person can attach pictures to their message: look at them.",
     "The person sees each tool you call. Before a batch of tools, say in one short sentence what you are about to do; after the last one, give your answer.",
   ];
   if (o.fresh) parts.push("You are a second reader. You did not write this episode and have not seen how it was drafted. Read it fresh, as a careful reviewer would, and report what must be fixed: wrong or unnatural words, words above the level, translations that do not say what the line says, lines that do not fit the scene, quiz answers that do not hold, staging that contradicts the words. Leave a comment on each step that needs one; change nothing unless you are asked to.");
@@ -128,6 +131,20 @@ export function estimate(req: AssistantRequest, p: Provider): { usd: number; tok
   const count = Math.max(1, (n ? eps.filter(e => seasonOf(e.id) === n) : eps).length);
   const u: Usage = { input: count * 40_000, output: count * 8_000 };
   return { usd: costOf(p.id, p.model, u), tokens: u.input + u.output, why: `${/draft|write/i.test(text) ? "drafting" : "reviewing"} ${count} episode${count > 1 ? "s" : ""}${n ? ` of season ${n}` : ""} reads and writes about ${Math.round((u.input + u.output) / 1000)}k tokens on ${p.model}` };
+}
+
+/**
+ * The pictures of every tool result but the last one that has any, as a line saying one was there (the Messages API's
+ * shape: a user message of tool_result blocks whose content holds image blocks).
+ */
+export function dropOldPictures(messages: unknown[]): void {
+  type Block = { type: string; content?: unknown };
+  const withPics = (m: unknown) => Array.isArray((m as { content?: unknown }).content) && ((m as { content: Block[] }).content).some(b => b.type === "tool_result" && Array.isArray(b.content) && (b.content as Block[]).some(c => c.type === "image"));
+  const last = messages.map(withPics).lastIndexOf(true);
+  messages.forEach((m, i) => {
+    if (i === last || !withPics(m)) return;
+    for (const b of (m as { content: Block[] }).content) if (b.type === "tool_result" && Array.isArray(b.content)) b.content = (b.content as Block[]).map(c => (c.type === "image" ? { type: "text", text: "[a picture, looked at earlier]" } : c));
+  });
 }
 
 const summaryOf = (texts: string[]) => (texts[0] ?? "").split("\n")[0].slice(0, 240);
@@ -162,7 +179,7 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
     const writable = !!JSON.parse(((await client.callTool({ name: "series_overview", arguments: {} })).content as { text: string }[]).at(-1)!.text).writable;
     const system = systemPrompt({ agentEdits, writable, shareCards: o.shareCards, fresh: req.fresh, context: req.context });
     const history = req.fresh ? [req.messages.at(-1)!] : req.messages;
-    const messages: unknown[] = history.map(m => p.message(m.role, m.content));
+    const messages: unknown[] = history.map((m, i) => (i === history.length - 1 && req.pictures?.length ? p.withPictures(m.content, req.pictures) : p.message(m.role, m.content)));
     for (let turn = 0; ; turn++) {
       if (turn >= MAX_TURNS) { send({ type: "error", message: `stopped after ${MAX_TURNS} rounds of tools: ask for less at a time` }); return; }
       guard(s.caps);
@@ -214,6 +231,8 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
         results.push({ id: c.id, name: c.name, text: texts.join("\n\n"), isError, ...(images.length ? { images } : {}) });
       }
       messages.push(...p.results(results));
+      // only the newest pictures go out again: each round resends the whole conversation, and a picture costs about a thousand tokens
+      if (results.some(x => x.images?.length)) dropOldPictures(messages);
       // a question for the person ends the turn: their answer is the next message
       if (asked) break;
     }

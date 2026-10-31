@@ -142,6 +142,38 @@ test("read-only: every edit is refused, and says why", async () => {
   } finally { await close(); }
 });
 
+test("look: an open editor draws the frame (the agent's own proposal in it); none, and there is no picture", async () => {
+  const { looksOf } = await import("../server/look.ts");
+  const events = new Events();
+  const { client, close } = await connect({ write: true, agentEdits: "proposals" }, events);
+  const looks = looksOf(events);
+  const png = Buffer.from("89504e470d0a1a0a", "hex").toString("base64");
+  let asked: any = null, answer: string | null = png;
+  events.on((name, data) => { if (name === "look") { asked = data; setTimeout(() => looks.answer((data as { rid: string }).rid, answer), 5); } });
+  try {
+    assert.ok(!(await call(client, "set_texts", { id: "s1e00", path: "steps/4", texts: { en: "Hello there." } })).isError);
+    const r = await call(client, "look", { id: "s1e00", step: "steps/4" });
+    assert.ok(!r.isError, r.text);
+    assert.equal(r.images.length, 1);
+    assert.equal(r.images[0].mimeType, "image/png");
+    assert.match(r.text, /s1e00 at steps\/4 \(with your pending proposal p\d+\)/);
+    // the editor is asked to draw the episode as the agent would edit it, at that step, part way through
+    assert.equal(asked.doc.steps[4].en, "Hello there.");
+    assert.deepEqual(asked.step, ["steps", 4]);
+    assert.equal(asked.at, 0.4);
+    // an id is answered once
+    assert.equal(looks.answer(asked.rid, png), false);
+    answer = null;
+    const sg = await call(client, "suggest_staging", { id: "s1e00" });
+    assert.ok(!sg.isError, sg.text);
+    assert.ok(Array.isArray(json(sg)));
+    const none = await call(client, "look", { kind: "place", id: "bakkal" });
+    assert.ok(none.isError);
+    assert.match(none.text, /no backstage editor is open and in view/);
+    proposalsOf(events).all().forEach(p => proposalsOf(events).resolve(p.id, false));
+  } finally { await close(); }
+});
+
 test("the proposals an agent sees: waiting and answered; it takes back only its own", async () => {
   const events = new Events();
   const a = await connect({ write: true, agentEdits: "proposals" }, events);

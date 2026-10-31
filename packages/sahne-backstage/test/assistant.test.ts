@@ -168,6 +168,15 @@ test("ask_person: a card for the person ends the turn; set_review in proposals m
   assert.deepEqual(rv.find(e => e.type === "ask")!.review, { id: "s1e00", status: "reviewed" });
 });
 
+test("only the newest picture is sent again", async () => {
+  const { dropOldPictures } = await import("../server/assistant.ts");
+  const pic = (id: string) => ({ role: "user", content: [{ type: "tool_result", tool_use_id: id, content: [{ type: "text", text: id }, { type: "image", source: { type: "base64", media_type: "image/png", data: "AAAA" } }] }] });
+  const ms: any[] = [{ role: "user", content: "hi" }, pic("a"), { role: "assistant", content: [] }, pic("b")];
+  dropOldPictures(ms);
+  assert.deepEqual(ms[1].content[0].content[1], { type: "text", text: "[a picture, looked at earlier]" });
+  assert.equal(ms[3].content[0].content[1].type, "image");
+});
+
 test("an edit by the assistant is a proposal, by \"assistant\"; a quick ask takes the faster model", async () => {
   const events = new Events();
   answers(toolTurn("toolu_2", "set_texts", { id: "s1e00", path: "steps/4", texts: { en: "Good evening! Come on in." } }), textTurn("I proposed a warmer line."));
