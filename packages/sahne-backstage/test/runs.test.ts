@@ -250,14 +250,16 @@ test("a plan that would make a retired character id is refused, with why", async
 });
 
 test("undo: every direct write of a run is journaled; one person, with what was built on her, or the whole run, comes back as it was", async () => {
-  const { readdirSync, readFileSync, statSync, utimesSync } = await import("node:fs");
+  const { readdirSync, readFileSync, statSync, utimesSync, writeFileSync } = await import("node:fs");
   const snapshot = () => Object.fromEntries(["characters", "places", "stories", "seasons"].flatMap(d => readdirSync(join(root, d)).map(f => [`${d}/${f}`, readFileSync(join(root, d, f), "utf8")])));
   const before = snapshot();
   const ep = { ...episode, id: "s1e07", cast: ["dilek", "nima"], place: "kutuphane2", releaseDate: "2026-09-18" };
   const { r } = runs(scripted({
     cast_derya: [{ calls: [{ name: "create_character", args: { ...derya, id: "dilek" } }] }, finish("dilek")],
     place_library: [{ calls: [{ name: "create_place", args: { ...library, id: "kutuphane2" } }] }, finish("kutuphane2")],
-    ep_books: [{ calls: [{ name: "create_episode", args: ep }] }, { calls: [{ name: "edit_doc", args: { kind: "season", id: "s1", path: "", patch: { summary: { en: "Changed by the run." } } } }] }, finish("s1e07")],
+    // the episode is written three times: created, then changed twice (undo takes all of it back at once)
+    ep_books: [{ calls: [{ name: "create_episode", args: ep }] }, { calls: [{ name: "edit_doc", args: { kind: "season", id: "s1", path: "", patch: { summary: { en: "Changed by the run." } } } }] },
+      { calls: [{ name: "edit_doc", args: { kind: "story", id: "s1e07", path: "", patch: { summary: { tr: "Bir.", en: "One." } } } }] }, { calls: [{ name: "edit_doc", args: { kind: "story", id: "s1e07", path: "", patch: { summary: { tr: "İki.", en: "Two." } } } }] }, finish("s1e07")],
   }));
   const plan = { brief: "b", steps: [{ ...PLAN.steps[0], owns: [{ kind: "character" as const, id: "dilek" }] }, { ...PLAN.steps[1], owns: [{ kind: "place" as const, id: "kutuphane2" }] }, { ...PLAN.steps[2], owns: [{ kind: "story" as const, id: "s1e07" }] }] };
   const run = r.create({ goal: "g", plan, gates: false, agentEdits: "direct" });
@@ -271,22 +273,21 @@ test("undo: every direct write of a run is journaled; one person, with what was 
   assert.deepEqual(run.steps.map(s => s.status), ["undone", "done", "undone"]);
   const now = snapshot();
   assert.equal(now["seasons/s1.json"], before["seasons/s1.json"], "the season is as it was");
-  assert.ok(!now["characters/dilek.json"] && !now["stories/s1e07.json"] && now["places/kutuphane2.json"]);
-  // a file someone changed after the run is kept: the rest comes back
-  const placeFile = join(root, "places", "kutuphane2.json"), t = statSync(placeFile).mtime;
-  utimesSync(placeFile, t, new Date(t.getTime() + 5000));
+  assert.ok(!now["characters/dilek.json"] && !now["stories/s1e07.json"] && now["places/kutuphane2.json"], "the episode written three times is gone in one undo");
+  // a file someone changed after the run is kept; a file only touched (its mtime) is still the run's
+  const placeFile = join(root, "places", "kutuphane2.json"), was = readFileSync(placeFile, "utf8"), t = statSync(placeFile).mtime;
+  writeFileSync(placeFile, was.replace("}", ', "note": "mine" }'));
   const all = r.undo(run.id);
   assert.deepEqual([all.undone.length, all.kept.map(k => k.id)], [0, ["kutuphane2"]]);
-  utimesSync(placeFile, t, t);
-  assert.equal(r.undo(run.id).undone.length, 0, "a changed mtime is a change: put back, it is still not the run's");
+  writeFileSync(placeFile, was);
+  utimesSync(placeFile, t, new Date(t.getTime() + 5000));
+  assert.deepEqual(r.undo(run.id).undone.map(u => u.id), ["kutuphane2"], "back as the run left it, it is the run's again");
   // the whole run, on a fresh one: the root is as it was
   const { r: r2 } = runs(scripted({ cast_derya: [{ calls: [{ name: "create_character", args: { ...derya, id: "dilara2" } }] }, finish("d")] }));
   const run2 = r2.create({ goal: "g", plan: { brief: "b", steps: [{ ...PLAN.steps[0], owns: [{ kind: "character" as const, id: "dilara2" }] }] }, gates: false, agentEdits: "direct" });
   await r2.idle();
   r2.undo(run2.id);
-  const after = snapshot();
-  delete after["places/kutuphane2.json"];
-  assert.deepEqual(Object.keys(after).sort(), Object.keys(before).sort());
+  assert.deepEqual(snapshot(), before, "the root is as it was, file by file");
 });
 
 test("auto mode: no gates and no proposals, every write journaled; never asking leaves out ask_person; a budget stop goes on by itself", async () => {

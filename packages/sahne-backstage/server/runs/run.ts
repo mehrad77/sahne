@@ -272,7 +272,7 @@ export class Runs {
       }
       which = all.filter(w => named(w) || later.has(w.step));
     }
-    const r = this.journal.undo(which);
+    const r = this.journal.undo(run.id, which);
     for (const u of r.undone) this.o.events.emit("doc", { kind: u.kind, id: u.id, mtime: u.mtime ?? 0, by: run.by, ...(u.removed ? { removed: true } : {}) });
     // a step none of whose writes are left is undone; it may be done again
     const left = this.journal.of(run.id);
