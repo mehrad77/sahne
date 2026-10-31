@@ -1,11 +1,13 @@
 // Where the story data lives: the content root. It is the folder named by the env var SAHNE_CONTENT (an
 // absolute path), or, without it, this package's samples/ (one short sample story, its characters and two
 // places). The root holds stories/, characters/ and places/ (<id>.json each; the extras flat among the
-// characters, told apart by `kind: "extra"`). Everything else in it is optional, and the checks that need
-// it run only when it is there: cards/ and cards-extra/ (the word cards the stories teach), grammar/ (the
+// characters, told apart by `kind: "extra"`), and its series: series.json and seasons/ (s<n>.json each; the
+// stories are the episodes). Everything else in it is optional, and the checks that need it run only when
+// it is there: cards/ and cards-extra/ (the word cards the stories teach), grammar/ (the
 // lessons a story names), syllabus/ (a1.json, what each unit teaches), thumbs/ (the story pictures,
 // written by the gallery's thumbs.mjs), needs.json (what each place is asked for) and days.json (the
-// release calendar). The schemas stay in this package. A second, optional env var, SAHNE_STORY_DOCS (an
+// release calendar), and kit/ (the root's own kit items: pieces/<id>.json and variants/<of>.<name>.json, drawn as data,
+// sahne-kit's DRAWING.md; loaded by load.ts `loadContentKit`). The schemas stay in this package. A second, optional env var, SAHNE_STORY_DOCS (an
 // absolute folder), holds STORIES_WORLD.md (the stories' sites, §2) for the gallery's places board and
 // test/needs.test.ts; without it they leave the sites out. Every node reader (the story check, the place
 // checker, the extras' generator, the tests, the kit's set build and tests, the gallery's server and
@@ -63,8 +65,37 @@ export const SYLLABUS = new URL("syllabus/", CONTENT);
 export const THUMBS = new URL("thumbs/", CONTENT);
 /** Optional: what the stories' briefs ask of each place (src/needs.ts). */
 export const NEEDS = new URL("needs.json", CONTENT);
-/** Optional: the release calendar, { <story id>: { date, week, kind } } (check/world.ts `Day`). */
+/** Optional: the release calendar, { <story id>: { date, week, kind } } (check/world.ts `Day`); a season's `calendar` takes its place. */
 export const DAYS = new URL("days.json", CONTENT);
+
+/** The series: the root's one story world (schema/series.json). */
+export const SERIES = new URL("series.json", CONTENT);
+/** The seasons: `s<n>.json` (schema/season.json). */
+export const SEASONS = new URL("seasons/", CONTENT);
+/** One season's file. */
+export const seasonFile = (id: string): URL => new URL(`${id}.json`, SEASONS);
+/** Every season id with a file, in season order. */
+export const seasonIds = (): string[] => existsSync(SEASONS) ? readdirSync(SEASONS).filter(f => /^s[1-9][0-9]?\.json$/.test(f)).map(f => f.slice(0, -5)).sort((a, b) => Number(a.slice(1)) - Number(b.slice(1))) : [];
+/** Optional: the root's own kit items, drawn as data (sahne-kit's DRAWING.md). */
+export const KIT_DIR = new URL("kit/", CONTENT);
+/** The drawn pieces: `<id>.json`, the id `x_` then lowercase letters, digits and `_`. */
+export const KIT_PIECES = new URL("pieces/", KIT_DIR);
+/** The drawn variants: `<of>.<name>.json`, a named param set on a generator the kit has (`of`), the name `x_…`. */
+export const KIT_VARIANTS = new URL("variants/", KIT_DIR);
+/** One drawn piece's file. */
+export const kitPieceFile = (id: string): URL => new URL(`${id}.json`, KIT_PIECES);
+/** One drawn variant's file. */
+export const kitVariantFile = (of: string, name: string): URL => new URL(`${of}.${name}.json`, KIT_VARIANTS);
+/** Every drawn piece's id with a file, sorted. */
+export const kitPieceIds = (root: URL = KIT_PIECES): string[] => existsSync(root) ? readdirSync(root).filter(f => f.endsWith(".json")).map(f => f.slice(0, -5)).sort() : [];
+/** Every drawn variant with a file, sorted: `{ of, name }` from `<of>.<name>.json` (the name is what follows the last dot). */
+export const kitVariantIds = (root: URL = KIT_VARIANTS): { of: string; name: string }[] =>
+  existsSync(root) ? readdirSync(root).filter(f => f.endsWith(".json") && f.slice(0, -5).includes(".")).map(f => f.slice(0, -5)).sort().map(id => ({ of: id.slice(0, id.lastIndexOf(".")), name: id.slice(id.lastIndexOf(".") + 1) })) : [];
+
+/** Editors' notes beside the content, never read by the app or the checks: sahne-backstage's review state. */
+export const REVIEW = new URL(".backstage/review.json", CONTENT);
+/** What the editor's assistant keeps between conversations (lasting decisions, preferences): beside the review notes, shared. */
+export const MEMORY = new URL(".backstage/memory.json", CONTENT);
 
 /** The JSON schemas of stories, characters and places (stay in the package). */
 export const SCHEMA = new URL("schema/", HERE);

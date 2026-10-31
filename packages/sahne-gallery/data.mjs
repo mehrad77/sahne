@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { Marked } from "marked";
 import { execFileSync } from "node:child_process";
 import { CARDS, PLACES, STORIES_WORLD } from "../sahne-story/paths.ts";
-import { loadNeeds } from "../sahne-story/load.ts";
+import { loadContentKit, loadNeeds } from "../sahne-story/load.ts";
 import { loadCast, loadDrafts, loadExtras } from "../sahne-story/check/world.ts";
 
 const at = p => new URL(p, import.meta.url);
@@ -97,6 +97,8 @@ function measure() {
 export const DATA = {
   places: () => readdirSync(PLACES).filter(f => f.endsWith(".json") && f !== "needs.json").sort().map(f => JSON.parse(readFileSync(new URL(f, PLACES), "utf8"))),
   needs: () => loadNeeds() ?? {},
+  // the content root's own kit items (kit/ of the root, sahne-story/load.ts `loadContentKit`): the good documents; [] without kit/
+  kit: () => loadContentKit().docs,
   // the content root's cards for the place and story lints (sahne-story/load.ts): id → level, Turkish, English, retired;
   // null without cards (the card rules do not run); read only
   cards: async () => (await import(at(`../sahne-story/load.ts?${Date.now()}`).href)).loadCards(),
@@ -127,6 +129,7 @@ export const DOCS = [
   ["set", "Set pieces", "Kit", "packages/sahne-kit/SET.md"],
   ["sounds", "Sound sources", "Kit", "packages/sahne-kit/sounds/SOURCES.md"],
   ["stories", "Stories and places", "Stories", "packages/sahne-story/README.md"],
+  ["backstage", "Backstage, the editor", "Stories", "packages/sahne-backstage/README.md"],
   ["gallery", "The gallery", "Project", "packages/sahne-gallery/README.md"],
   ["packages", "Package conventions", "Project", "packages/README.md"],
   ["contributing", "Contributing", "Project", "CONTRIBUTING.md"],
@@ -175,9 +178,9 @@ export function doc(slug) {
       return `<pre><code${lang ? ` class="language-${escape(lang)}"` : ""}>${escape(text)}</code></pre>\n`;
     },
   } });
-  // inline HTML in the docs (the README's centred poster) has repo-relative src/href too
+  // inline HTML in the docs (the README's centred poster, a package's brand block) has repo-relative src/srcset/href too
   const html = md.parse(readFileSync(at(`../../${d.file}`), "utf8"))
-    .replace(/(<(?:img|a)\b[^>]*?\s(?:src|href)=")([^"#][^"]*)"/g, (m, pre, url) => /^[a-z]+:|^\/\/|^#/i.test(url) ? m : `${pre}${escape(href(url, pre.startsWith("<img")))}"`);
+    .replace(/(<(?:img|a|source)\b[^>]*?\s(?:src|srcset|href)=")([^"#][^"]*)"/g, (m, pre, url) => /^[a-z]+:|^\/\/|^#/i.test(url) ? m : `${pre}${escape(href(url, !pre.startsWith("<a")))}"`);
   return { ...d, html, toc, source: `${REPO_URL}/blob/main/${d.file}` };
 }
 

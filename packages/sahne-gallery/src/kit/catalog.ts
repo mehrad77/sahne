@@ -7,6 +7,7 @@ import { rng, withVariant, type PieceDef, type PieceMeta, type PlaceDoc, type Fl
 import { FAMILY_MODULES } from "sahne-kit/set/all";
 import type { Needs } from "sahne-story";
 import { KIT } from "../shell/kit.ts";
+import credits from "../../../sahne-kit/src/set/drawn/CREDITS.json" with { type: "json" };
 
 export type Feature = "glow" | "emits" | "moves" | "words" | "lights" | "depth" | "when";
 export const FEATURES: Record<Feature, string> = {
@@ -14,8 +15,14 @@ export const FEATURES: Record<Feature, string> = {
   lights: "lights the place", depth: "built in depth (pitched or turned flats)", when: "shows by weather, time or state",
 };
 
+/** Who drew an item promoted from a story (sahne-kit/drawing/promote.ts), from `CREDITS.json`. */
+export interface Credit { by: string; contact: string; story?: string; date: string; consent?: true | "project"; from: string }
+const CREDITS = new Map((credits as (Credit & { id: string })[]).map(c => [c.id, c]));
+
 export interface Gen {
   id: string;
+  /** The author, for an item promoted from a story. */
+  credit?: Credit;
   family: string;
   kind: "piece" | "prop" | "both";
   def: PieceDef;
@@ -57,7 +64,7 @@ export function generators(): Gen[] {
     const ids = [...new Set([...Object.keys(mod.set), ...Object.keys(mod.props)])].sort();
     for (const id of ids) {
       const def = (mod.set[id] ?? mod.props[id]) as PieceDef;
-      out.push({ id, family, kind: mod.set[id] && mod.props[id] ? "both" : mod.set[id] ? "piece" : "prop", def, meta: def.meta, variants: Object.keys(def.variants ?? {}), ...probe(def, id) });
+      out.push({ id, family, ...(CREDITS.has(id) ? { credit: CREDITS.get(id) } : {}), kind: mod.set[id] && mod.props[id] ? "both" : mod.set[id] ? "piece" : "prop", def, meta: def.meta, variants: Object.keys(def.variants ?? {}), ...probe(def, id) });
     }
   }
   return (all = out);

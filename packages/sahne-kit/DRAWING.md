@@ -1,0 +1,95 @@
+# Pieces drawn as data
+
+A set piece or a prop can be a JSON document instead of code: SVG path data, colours, words and a few motions. `sahne-kit/drawing` (`src/drawing.ts`, browser-safe, no Node, about 3 KB gzip) turns it into the same `PieceDef` the kit's generators are, so it passes the same checks (`sahne-kit/check`), draws to SVG and to the stage's atlas, and takes a place's `variant`, `n` and `held` like any other. This is the one place the format is described; the schemas are `sahne-story/schema/kit-piece.json` and `kit-variant.json`. The look it must have is [STYLE.md](STYLE.md)'s.
+
+```ts
+import { fromDrawing, withDrawings, checkDrawing } from "sahne-kit/drawing";
+fromDrawing(doc);            // one PieceDef; throws, saying what is wrong
+checkDrawing(doc);           // the problems as a list, [] when good
+withDrawings(kit, docs);     // the kit with pieces and variants added (after withSet, so variants can name its generators)
+```
+
+A content root keeps its documents in `kit/pieces/<id>.json` and `kit/variants/<of>.<name>.json`; `loadContentKit()` (`sahne-story/load.ts`) reads and checks them, and backstage, the story checks and the gallery add them to their kit (sahne-story's README, *Where the data lives*).
+
+## A drawing
+
+```jsonc
+{ "id": "x_cafe_chalkboard", "as": "prop", "about": "A chalkboard menu, on an easel or hung on the wall.",
+  "tags": ["cafe"], "terms": [],
+  "params": { "color": { "type": "color", "default": "#2F3B35" }, "label": { "type": "text", "default": "Menu" },
+              "kind": { "type": "enum", "values": ["easel", "wall"], "default": "easel" } },
+  "kinds": { "easel": { "size": [60, 110], "ppcm": 8, "grip": [0, -60],
+    "flats": [{ "shapes": [{ "d": "M-30 0L-24 -110H24L30 0Z", "fill": "$color" },
+                           { "d": "M-20 -20H20V-90H-20Z", "fill": { "tone": "$color", "step": "shade" }, "flat": true }],
+                "text": [{ "text": "$label", "x": -18, "y": -86, "w": 36, "h": 60, "font": "hand", "lang": "fr" }],
+                "glow": [], "sway": null, "shadow": "drop" }] } },
+  "repeat": { "gap": 6 }, "variants": { "wall": { "kind": "wall" } }, "solid": null }
+```
+
+- **`id`** starts with `x_` (`^x_[a-z0-9_]+$`): see *Ids* below. **`as`** is `prop` (in `kit.props`), `set` (in `kit.set`) or `both`. **`about`** says what it draws, as a generator's `meta.about` does; `tags` and `terms` are `meta.tags` and `meta.terms`.
+- **Units** are centimetres, the origin at the bottom centre, y up negative: the kit's own, so a drawing is cut like any other (STYLE.md *Paper*, *Props*). Real sizes; a set piece is drawn at `ppcm` ≤ 3 and a prop at ≤ 16 (`ppcm` defaults to 1.6 for a set piece, 5 otherwise).
+- **`params`** declare what a place may set: `type` is `enum` (with `values`), `int`, `num` (with `min`, `max`), `bool`, `text` or `color`, with a `default` and an `about`. A param named `kind` is an enum that picks one of `kinds`, and its values are exactly their names; a drawing with one kind needs no `kind` param. `n`, `held` and `variant` are the engine's and may not be declared.
+- **`kinds`** are the drawings one param picks between. A kind has `size` `[width, height]` (the width is what `n` steps by), `ppcm`, `grip` (where a hand holds it), `flats`, and optional `lights` and `emitters` (as `LightSpec` and `EmitSpec`, in cm from the origin, y up).
+- **A flat** is one paper piece: `shapes` back to front, `text`, `glow`, and `shadow` (`drop` by default, or `none`), `x`, `y`, `z`, `lit`, `front` (as `FlatSpec`). `sway` `{rot, dy, ms}` and `blink` `{ms, on, at}` are `FlatMotion`'s, and `null` is none.
+- **A shape** is `d` (SVG path data: M L H V C S Q T A Z, absolute and relative, read by `Path.fromSvg`; arcs become cubics), then `fill`, `stroke` `{color, width, cap}`, `opacity`, `flat` (no rim and no shadow: print, glints) and `evenodd` (holes). A shape needs a fill or a stroke. The paper look (the rim, the layer shadows) comes from the renderer: never draw outlines or grain.
+- **A colour** is a `#RRGGBB`, a palette id (`fab_12`), `"$param"` (a `color` param, given as either of those) or `{ "tone": colour, "step": "shade" | "deep" | "light" | "edge" | "base" }`: the tone ramp of STYLE.md *Paper*, so a drawing never hand-picks a darker colour.
+- **Text** is a box of words in the flat's cm (`x`, `y`, `w`, `h`), laid out by the page as HTML over the art (DESIGN.md §6.8): `font`, `size`, `color`, `align`, `weight`, `lit` as `TextSpec`. `lang` is required. `$param` anywhere in `text` is replaced by that param's value; a `$name` that no param declares is an error, so a typo is caught. A held prop's words go on its first flat.
+- **`repeat.gap`** (default 4 cm) is the space between the copies `n` makes: side by side, centred, each a whole copy of every flat. A set piece has no `n`.
+- **Held** (`held: true`): the origin moves to `grip`, the shadow drops, and only the first flat is drawn, as for every prop.
+- **`variants`** are named param sets of this piece, as `PieceDef.variants` (`"wall": { "kind": "wall" }`): a place says `variant: "wall"`. They may set only declared params, to legal values.
+- **`solid`** is `null` or a list of `{ a: [x, z], b: [x, z], door? }` lines on the floor, in cm (DESIGN.md §7).
+
+**Caps** (`DRAWING_LIMITS`): a document at most 64 KB, 400 shapes (`glow` shapes count) and 20 000 path commands (after arcs), at most 12 flats to a kind and 12 copies.
+
+## A variant of the kit's generator
+
+```jsonc
+{ "of": "flag", "name": "x_club_colours", "params": { "kind": "bunting", "w": 400 } }
+```
+
+`of` names a generator already in the kit (a set piece, a prop, or a drawing added before it); `name` starts with `x_`; `params` are set as any variant's are. Its params are checked with `paramProblems` (`sahne-story`), against the generator's `meta`. A name the generator already has, or a param it does not declare, is refused.
+
+## Ids
+
+Every id a content root adds starts with `x_`, and `test/drawing.test.ts` asserts no id of the kit (set pieces, props, parts, aliases, variants) ever does. So a new kit part can never take the id a story already uses, and `withDrawings` never overrides a kit id: a drawing whose id is taken is an error.
+
+## Checking
+
+`checkDrawing` reads what a schema cannot: that every path parses, every `$param` is declared (and a colour in a colour place), the kinds match the `kind` param, and the caps hold (including every coordinate and size within 1000 cm). `checkPiece` (`sahne-kit/check`) then holds the compiled generator to the kit's own rules as for any other: the meta, the variants, every param read declared, finite art that fits an atlas layer, motion, and text with a language. Both run on a document before an app loads it.
+
+## Promoting
+
+A drawing that has proved itself in a story can become official art, credited to its author. It is a document in `src/set/drawn/<family>/<id>.json`, the drawing unchanged (an id of its own, never `x_`, and a `credit`); the family's file takes it (`const drawn = drawnFamily(DRAWN)` from `./drawn/<family>.gen.ts`, spread into its `set` and `props`: `bakery.ts` does), so it joins the kit like code does, in the same chunk and within the same 40 KB. One command, `node packages/sahne-kit/drawing/promote.ts` (also the MCP tool `promote_kit_item`), does all of it:
+
+```bash
+node packages/sahne-kit/drawing/promote.ts <content-root>/kit/pieces/x_cafe_chalkboard.json \
+  --id chalkboard --family bakery --by "Ada L." --contact github:ada --consent [--story "kumru s2e04"] [--pr] [--dry]
+```
+
+- **Consent is the author's.** `--consent` says they release the drawing under CC BY 4.0 (`LICENSE-ART`) and that it is their own work, not traced or copied (CONTRIBUTING.md *Contributing art*). An agent asks its person for `--by`, `--contact` and the consent; it never gives it itself, and the MCP tool `promote_kit_item` never opens a pull request (`pr: true` is refused in every mode): it checks, draws and prints the command for the person to run. `--by`, `--contact` and `--story` are one plain line each (80 characters at most, no `<` `>`, no leading `@`; the contact is `github:name` or an address), `credit.date` a real date no later than today (the date is not a flag). Without consent promotion refuses.
+- **The project's own art** (`--project`, in place of `--by`/`--contact`/`--consent`; it needs `SAHNE_PROJECT_ART=1` in the environment, which only the owner sets, runs only inside a checkout and never with `--pr`) is what the owner's kit agents draw for the kit: the credit is the project's (`by` "Sahne kit (drawn by its agents)", `contact` github:mehrad77, `consent: "project"`), and the owner's merge is the consent. CI's art job fails a pull request carrying `"project"` that the owner did not open.
+- **The official checks** (`officialProblems` in `sahne-kit/check`) hold it to the kit's own rules and a few more: the new id is unused, snake_case, never `x_` and no past alias; the family exists, takes drawn items and stays under its budget with the item in it; every tag is on a shelf of the kit page (`model/kitgroups.ts`); `about` is a sentence; every text has a `lang`; a set piece is drawn at 3 px/cm or less; colours are the kit's (`SET` and the palettes) or a tone of one, a stray hex being a warning; no words drawn as shapes (a heuristic, a warning); the caps. `--dry` runs them, draws the sheets and writes nothing.
+- **What it writes**: the document with its credit `{ by, contact, story?, date, licence: "CC-BY-4.0", consent: true (or "project"), from: "x_cafe_chalkboard" }`, then what comes from the folder: `src/set/drawn/<family>.gen.ts` (the family's drawings as a TS const, without the credits), `aliases.gen.ts`, `CREDITS.json`, and, by `set/build.ts`, the Credits section of `SET.md` and `families.gen.ts`. These have one writer, promote.ts (`--regenerate`), and `--check` fails when any is stale; the kit's tests run it.
+- **The old id keeps working.** `from` becomes an alias, `x_cafe_chalkboard` → `chalkboard`, in `kit.aliases`: the engine's piece and prop lookup (`pieceOf` in `sahne`), `familiesOf` and `lintPlace` follow it, the kit's own entry first, so a story's own `x_` drawing is used for as long as it has one and drops it when it likes. Content ids may appear in the kit's aliases, and only there.
+- **Review.** It draws `promote-out/<id>.png` (the sheet) and `<id>-neighbours.png` (its family at one scale). With `--pr` it works in a temporary clone (its own, or a checkout's `origin`), branches `art/<id>`, commits `feat(kit): <id>, drawn by <by>` with a `Co-Authored-By` for the author, pushes to the author's fork (`gh repo fork`) when they cannot write, and opens the pull request with `gh pr create` from `.github/PULL_REQUEST_TEMPLATE/art.md`'s sections; without `gh`, it leaves `<id>.patch` and `<id>.pr.md` and says what to do. Run from an app's own folder, it always works in a clone (`SAHNE_REPO_URL` names it), so nobody needs a Sahne checkout and a checkout's working tree is never touched. The clone runs its own `promote.ts` on the checkout's `node_modules` (so on its engine), and the repository's default branch must already contain `promote.ts`. The commit's `Co-Authored-By` uses `<id>+<login>@users.noreply.github.com` (the id from `gh api users/<login>`), the form GitHub links to a profile; without the id it falls back to `<login>@users.noreply…`. CI's `art` job draws the sheets again for every pull request that touches `src/set/drawn/`.
+- **A family takes drawn items** when its file imports `DRAWN` from `./drawn/<family>.gen.ts` and spreads `drawnFamily(DRAWN)`; promote.ts refuses a family that does not, with that line. The ids are permanent from the merge on, and the credit is kept for as long as the item is. A rejected pull request changes nothing: the story keeps its `x_` drawing.
+
+## The loop, over MCP or from the shell
+
+Backstage's MCP tools (this file is its `sahne://kit-guide` resource) do the plumbing, so the effort goes to the drawing: `kit_search` for what exists, `kit_read` a neighbour, `draft_kit_item` and look at the sheet, revise until there are no problems, then `save_kit_item`. Once it is in use and its person agrees, offer it to Sahne with `promote_kit_item` (*Promoting* above). An agent with no MCP set up reaches the very same tools from the shell and reads the PNGs it prints:
+
+```bash
+node packages/sahne-backstage/server/call.ts kit_read '{"id":"flag"}' --content <root> --write --session kit   # the first call sets the session up
+node packages/sahne-backstage/server/call.ts kit_render '{"id":"money","vary":{"value":"all"},"views":["day"]}' --session kit
+node packages/sahne-backstage/server/call.ts draft_kit_item @doc.json --session kit
+```
+
+Each call prints the picture's path first (`image: <path>`, also `<out>/latest.png`), then the problems as lines and what each numbered cell shows. A later call needs only `--session kit`: it takes the session's content root and `--write`.
+
+- **Many at once.** `kit_render` and `draft_kit_item` take a list (`items`: ids or `{ id | doc, as?, variant?, params?, … }`; `docs`) and answer numbered cells, 24 to a picture, so a batch or a family is judged in one look. `vary` draws a cell per value instead of a call each: `{"vary": {"value": "all"}}` (an enum's values, a bool's two; also `variant`, `n`, `held`: `{"vary": {"held": "all"}}` shows every item of a list held).
+- **Params go under `params`.** `{"id": "money", "params": {"currency": "dollar"}}`, never beside the id: a key in the wrong place is refused with where it goes. A param that draws the same as without it is a `warning [inert]` naming the param it needs (`currency` shows only with `kind: foreign`). An enum's values are strings (`"20"`, not `20`).
+- **Scale.** Each cell prints its scale under the art (`1 cm = 16 px · grid 1 cm`): a thing under 60 cm fills its cell with a scale bar (a held one with a red cross at its grip; a thing that sits on the palm stands a little above it), a larger one stands beside a 170 cm adult. `"zoom": "scene"` draws every cell at one scale beside the adult to compare sizes; `"zoom": "fit"` fills each cell with its item, however tall or long.
+- **Closer.** `"focus": [x0, y0, x1, y1]` crops every cell to that box of cm (path-data units: up is negative), magnified, to judge an emblem or small words.
+- **Motion.** The text lists each moving item's motions and periods (`motion: flag: sway 2241 ms`). `"t": 600` (ms, or a list) draws every moving flat where it is then, a sway turned about the flat's origin; `"frames": 4` spreads four times over the longest motion.
+
+`--session kit` keeps the server alive between calls (a render in about half the time, a search in a sixth: the numbers are in that README) and restarts it when TypeScript of the kit changed, so a generator you edited draws as edited. The flags and the tool list are in sahne-backstage's README (*Calling a tool from the shell*, *Piece sheets as PNG*).

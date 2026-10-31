@@ -3,17 +3,18 @@
 // World (check/world.ts), so tests seed breaks by editing a clone. Errors stop `pnpm sahne check`;
 // warnings and info are the report.
 
-import { lowerTr } from "sahne-tr";
 import { applyLook, AVATAR_MAX_BYTES, compose, GARMENT_FIELDS, normalize, serialize, type AvatarDoc, type AvatarNote, type Kit, type KitManifest, type Solid } from "sahne";
 import { puppets as KERIM_PUPPETS } from "../../sahne-kit/src/kerim/index.ts";
 import { puppets as ANIMAL_PUPPETS } from "../../sahne-kit/src/puppets/index.ts";
-import { isAct, isChoice, isLine, isSpot, isScene, lintPlace, lintStory, NARRATOR, STANDIN, type CharacterDoc, type LineStep, type Needs, type StoryDoc, type Step } from "../src/index.ts";
+import { isAct, isChoice, isLine, isSpot, isScene, lintPlace, lintStory, NARRATOR, seasonOf, STANDIN, type CharacterDoc, type LineStep, type Needs, type StoryDoc, type Step } from "../src/index.ts";
 import type { CardIndex } from "../src/index.ts";
-import { validateDoc } from "./schema.ts";
-import { resolver, words, type Resolver } from "./words.ts";
+import { languagesOf, textOf, type Languages } from "../src/texts.ts";
+import { validateDoc, type SchemaKind } from "./schema.ts";
+import { characterLanguageGaps, languageCodeGaps, seasonLanguageGaps, seriesLanguageGaps, storyLanguageGaps } from "./languages.ts";
+import { langFor, type Resolver, type StoryLang } from "../src/lang.ts";
 import type { Draft, World } from "./world.ts";
 
-export type CheckRule = "schema" | "id" | "calendar" | "ref" | "cast" | "counts" | "flags" | "quiz" | "mistake" | "text" | "words" | "recycle" | "character" | "lint" | "place";
+export type CheckRule = "schema" | "id" | "series" | "calendar" | "ref" | "cast" | "counts" | "flags" | "quiz" | "mistake" | "text" | "words" | "recycle" | "character" | "lint" | "place";
 export interface CheckProblem { rule: CheckRule | string; level: "error" | "warning" | "info"; story: string; step?: number; message: string }
 /**
  * `kit` is a whole `Kit` (sahne-kit's full.ts) when the cast's avatars are to be composed; a bare manifest
@@ -24,47 +25,55 @@ export interface CheckOptions { kit?: KitManifest | Kit; puppets?: string[]; sol
 
 /** s1e45 has six speakers in an episode, the owner's choice (Kumru's STORIES_A1.md). */
 export const CAST_ALLOW = new Set(["s1e45"]);
-const RETIRED_CHARACTERS = new Set("ada can dede deniz ela marti mert selin simit zeynep".split(" "));
+/** Character ids of the series Kumru replaced: never used again (ids are permanent). */
+export const RETIRED_CHARACTERS = new Set("ada can dede deniz ela marti mert selin simit zeynep".split(" "));
 const BREAKS: [string, string][] = [["2026-11-02", "2026-11-07"], ["2027-01-04", "2027-01-09"]];
 const LEVELS = ["A1", "A2", "B1"];
 /** Lines per story (Kumru's STORIES_DESIGN.md §1, proposed): [min, max] by level and kind. */
 const LINES: Record<string, Record<string, [number, number]>> = { A1: { episode: [10, 14], special: [20, 28] }, A2: { episode: [14, 18], special: [26, 34] }, B1: { episode: [16, 22], special: [30, 40] } };
+
+/** A week's arc id: season 1, week 3 → `s1w03`. */
+export const arcId = (season: number, week: number) => `s${season}w${String(week).padStart(2, "0")}`;
 
 /** The unit a week teaches: weeks 1-6 their own, weeks 7-8 all of A1 (Kumru's STORIES_A1.md *Weeks*). */
 export const unitOfWeek = (week: number) => Math.min(week, 6);
 /** Where a ref sits in the course: A1_1–A1_6 are units 1–6, A2 7–12, B1 13–18; 0 for none. An A2 or B1 card is never an A1 week's. */
 export const unitOfRef = (ref?: string) => { const m = /^(A1|A2|B1)_(\d)$/.exec(ref ?? ""); return m ? LEVELS.indexOf(m[1]) * 6 + Number(m[2]) : 0; };
 
-/** Every Turkish text of a story with where it is: steps, choice options and their replies, follow-ups. */
+/**
+ * Every main-language text of a story with where it is: steps, choice options and their replies, follow-ups. The text is
+ * `tr` whatever the main language (`main`, Turkish by default).
+ */
 export interface Text { tr: string; step: number; kind: "line" | "option" | "reply" | "follow"; who?: string; narr?: boolean }
-export function texts(story: StoryDoc): Text[] {
+export function texts(story: StoryDoc, main = "tr"): Text[] {
   const out: Text[] = [];
+  const said = (o: object) => String((o as Record<string, unknown>)[main] ?? "");
   const line = (s: Step, step: number, kind: Text["kind"]) => {
-    if (isLine(s)) out.push({ tr: s.tr, step, kind, who: s.who, narr: !!s.narr });
+    if (isLine(s)) out.push({ tr: said(s), step, kind, who: s.who, narr: !!s.narr });
   };
   story.steps.forEach((s, i) => {
     line(s, i, "line");
     if (isChoice(s)) for (const o of s.choice.options) {
-      out.push({ tr: o.tr, step: i, kind: "option", who: STANDIN });
+      out.push({ tr: said(o), step: i, kind: "option", who: STANDIN });
       for (const r of o.reply ?? []) line(r as Step, i, "reply");
     }
   });
   ((story.followUp as Step[] | undefined) ?? []).forEach((s, i) => {
     line(s, story.steps.length + i, "follow");
-    if (isChoice(s)) for (const o of s.choice.options) out.push({ tr: o.tr, step: story.steps.length + i, kind: "option", who: STANDIN });
+    if (isChoice(s)) for (const o of s.choice.options) out.push({ tr: said(o), step: story.steps.length + i, kind: "option", who: STANDIN });
   });
   return out;
 }
 
-const norm = (t: string) => lowerTr(t.replace(/[“”"‘’'.,!?…:;—-]/g, " ")).replace(/\s+/g, " ").trim();
-/** The learner's hometown in the stories' text, replaced by the host (s1e01: "Tahran"). */
-const HOMETOWN = "Tahran";
-const nameWords = (d: Draft, world: World, story: StoryDoc) => {
+/** The story language of a world's series (src/lang.ts). */
+export const langOf = (world: World): StoryLang => langFor(languagesOf(world.series).main);
+const normIn = (lang: StoryLang) => (t: string) => lang.lower(t.replace(/[“”"‘’'.,!?…:;—-]/g, " ")).replace(/\s+/g, " ").trim();
+const nameWords = (d: Draft, world: World, story: StoryDoc, main = languagesOf(world.series).main) => {
   const names: string[] = [];
   // every roster character's name (a story may mention one not in its cast), and the hometown token the app personalises
-  for (const c of [...Object.values(d.characters), ...Object.values(world.cast ?? {})]) names.push(c.name);
-  names.push(HOMETOWN, `${HOMETOWN}lı`);
-  for (const p of [story.place, ...story.steps.filter(isScene).map(s => s.scene)]) { const pl = world.places[p]; if (pl?.name?.tr) names.push(pl.name.tr); }
+  for (const c of [...Object.values(d.characters), ...Object.values(world.cast ?? {})]) { const n = textOf(c.name, main); if (n) names.push(n); }
+  names.push(...(langOf(world).names ?? []));
+  for (const p of [story.place, ...story.steps.filter(isScene).map(s => s.scene)]) { const pl = world.places[p]; if (pl?.name?.[main]) names.push(pl.name[main]); }
   return names;
 };
 
@@ -73,6 +82,12 @@ const flagOptions = (s: StoryDoc) => [
   ...s.steps.flatMap((st, step) => (isChoice(st) ? st.choice.options.filter(op => op.sets).map(op => ({ ...op, step })) : [])),
   ...((s.followUp ?? []) as Step[]).flatMap(st => (isChoice(st) ? st.choice.options.filter(op => op.sets).map(op => ({ ...op, step: undefined })) : [])),
 ];
+
+/** An arc as its season writes it: everything but its id. */
+const withoutId = ({ id: _, ...rest }: { id: string }) => rest;
+
+/** A value's JSON with every object's keys sorted: equal documents compare equal whatever order their keys were written in. */
+const canonical = (v: unknown): string => JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : x));
 
 const dayOfWeek = (date: string) => new Date(`${date}T12:00:00Z`).getUTCDay();
 const addDays = (date: string, n: number) => new Date(Date.parse(`${date}T12:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
@@ -83,8 +98,9 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   const out: CheckProblem[] = [];
   const add = (rule: CheckProblem["rule"], level: CheckProblem["level"], message: string, step?: number) => out.push({ rule, level, story: id, step, message });
 
-  for (const p of validateDoc("story", s)) add("schema", "error", `${p.path}: ${p.message}`);
-  for (const [cid, c] of Object.entries(d.characters)) for (const p of validateDoc("character", c)) add("schema", "error", `character ${cid} ${p.path}: ${p.message}`);
+  const langs = languagesOf(world.series), lang = langOf(world), norm = normIn(lang), { checkWords: words, resolver } = lang;
+  for (const p of [...validateDoc("story", s), ...storyLanguageGaps(s, langs)]) add("schema", "error", `${p.path}: ${p.message}`);
+  for (const [cid, c] of Object.entries(d.characters)) for (const p of [...validateDoc("character", c), ...characterLanguageGaps(c, langs)]) add("schema", "error", `character ${cid} ${p.path}: ${p.message}`);
   if (s.id !== d.id) add("id", "error", `the folder is ${d.id} but the story's id is ${s.id}`);
 
   // the calendar rules run when the content root has one (days.json)
@@ -94,17 +110,17 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   else if (day) {
     if (s.releaseDate !== day.date) add("calendar", "error", `releaseDate ${s.releaseDate} but Days has ${day.date}`);
     if (s.kind !== day.kind) add("calendar", "error", `kind ${s.kind} but Days has ${day.kind}`);
-    if (s.arc && s.arc.id !== `s1w0${day.week}`) add("calendar", "error", `arc ${s.arc.id} but the story is in week ${day.week}`);
+    if (s.arc && s.arc.id !== arcId(seasonOf(d.id), day.week)) add("calendar", "error", `arc ${s.arc.id} but the story is in week ${day.week}`);
   }
   if (s.releaseDate && dayOfWeek(s.releaseDate) === 0) add("calendar", "error", `${s.releaseDate} is a Sunday`);
   if (s.releaseDate && BREAKS.some(([a, b]) => s.releaseDate! >= a && s.releaseDate! <= b)) add("calendar", "error", `${s.releaseDate} falls in a break week`);
   if (s.releaseDate && s.kind === "special" && dayOfWeek(s.releaseDate) !== 6) add("calendar", "error", "a special comes out on a Saturday");
   if (s.releaseDate && s.kind === "episode" && dayOfWeek(s.releaseDate) === 6) add("calendar", "error", "an episode comes out Monday to Friday");
-  if (s.level && s.season && LEVELS.indexOf(s.level) !== s.season - 1) add("id", "error", `level ${s.level} does not match season ${s.season}`);
-  if (s.id && s.season && s.id[1] !== String(s.season)) add("id", "error", `season ${s.season} does not match the id ${s.id}`);
+  if (s.id && s.season && seasonOf(s.id) !== s.season) add("id", "error", `season ${s.season} does not match the id ${s.id}`);
 
   // ref is a constraint (DESIGN §2): the week's unit
-  if (day && s.ref !== `A1_${unit}`) add("ref", "error", `ref ${s.ref} but week ${day.week} teaches A1_${unit}`);
+  const level = s.level ?? "A1";
+  if (day && s.ref !== `${level}_${unit}`) add("ref", "error", `ref ${s.ref} but week ${day.week} teaches ${level}_${unit}`);
   if (world.lessons) for (const l of s.lessons ?? []) {
     const g = world.lessons[l];
     if (!g) add("ref", "error", `lesson ${l} is not in grammar/`);
@@ -120,7 +136,7 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   }
 
   // cast
-  const all = texts(s);
+  const all = texts(s, langs.main);
   const speakers = new Set(all.filter(t => t.kind !== "option" && t.who && !(t.who === NARRATOR && t.narr)).map(t => t.who!));
   const limit = s.kind === "special" || CAST_ALLOW.has(id) ? 6 : 4;
   if (speakers.size > limit) add("cast", "error", `${speakers.size} speakers (${[...speakers].join(", ")}); the limit is ${limit}${CAST_ALLOW.has(id) ? "" : " for an episode"}`);
@@ -177,16 +193,13 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   });
 
   // text: the language-neutral stand-in, glossed names, unknown tokens
-  for (const t of all) {
-    if (t.who === STANDIN && /İran|Farsça|[؀-ۿ]/.test(t.tr)) add("text", "warning", `a stand-in line names a country or language: “${t.tr}”`, t.step);
-    if (/Kırlangıç/.test(t.tr) && !s.gl?.["kırlangıç"]) add("text", "warning", "Kırlangıç is used but not glossed in gl", t.step);
-  }
+  for (const t of all) for (const m of lang.hints?.({ text: t.tr, standin: t.who === STANDIN }, s.gl ?? {}) ?? []) add("text", "warning", m, t.step);
   const glKeys = Object.keys(s.gl ?? {});
   // unknown tokens and the known-word ratio need a dictionary: the cards (or the syllabus)
   const dictionary = !!world.cards || !!world.syllabus;
-  const resolves: Resolver = resolver([...Object.values(world.cards ?? {}).map(c => c.tr), ...glKeys, ...nameWords(d, world, s), ...Object.values(d.characters).map(c => c.name), ...(world.syllabus ? Object.values(world.syllabus.words).map(w => w.tr) : [])]);
+  const resolves: Resolver = resolver([...Object.values(world.cards ?? {}).map(c => c.tr), ...glKeys, ...nameWords(d, world, s), ...Object.values(d.characters).map(c => textOf(c.name, langs.main) ?? ""), ...(world.syllabus ? Object.values(world.syllabus.words).map(w => w.tr) : [])]);
   const unknown = new Map<string, number>();
-  for (const t of [...all, ...(quiz as { q: string; options: string[] }[]).flatMap(q => [{ tr: q.q, step: -1 }, ...q.options.map(tr => ({ tr, step: -1 }))])]) {
+  for (const t of [...all, ...(quiz as { q: unknown; options: string[] }[]).flatMap(q => [{ tr: textOf(q.q, langs.main) ?? "", step: -1 }, ...q.options.map(tr => ({ tr, step: -1 }))])]) {
     for (const w of words(t.tr)) if (!resolves(w)) unknown.set(w, (unknown.get(w) ?? 0) + 1);
   }
   if (dictionary && unknown.size) add("text", "error", `${unknown.size} words resolve to no card, gloss or name: ${[...unknown].map(([w, n]) => (n > 1 ? `${w}×${n}` : w)).join(", ")}`);
@@ -207,12 +220,12 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   const missing = [s.place, ...s.steps.filter(isScene).map(x => x.scene)].filter(p => !places[p]);
   for (const p of new Set(missing)) add("place", "error", `place ${p} has no document in places/`);
   if (!missing.length) {
-    for (const p of lintStory(s, { places, characters: d.characters, kit: o.kit, solids: o.solids?.[id] })) {
+    for (const p of lintStory(s, { places, characters: d.characters, kit: o.kit, solids: o.solids?.[id], lang })) {
       out.push({ rule: p.rule, level: p.level, story: id, step: p.step, message: p.message });
     }
     if (o.kit) {
       for (const pid of new Set([s.place, ...s.steps.filter(isScene).map(x => x.scene)])) {
-        for (const p of lintPlace(world.places[pid], { kit: o.kit, cards: o.cards, needs: o.needs })) if (p.level === "error") add("place", "error", `${pid}: ${p.message}`);
+        for (const p of lintPlace(world.places[pid], { kit: o.kit, cards: o.cards, needs: o.needs, languages: langs })) if (p.level === "error") add("place", "error", `${pid}: ${p.message}`);
       }
     }
   }
@@ -229,7 +242,7 @@ export function checkSeason(world: World, drafts: Draft[] = world.drafts, o: Che
   for (const d of drafts) {
     const s = d.story;
     if (s.releaseDate) { const prev = byDate.get(s.releaseDate); if (prev) add("calendar", "error", s.id, `${s.releaseDate} is also ${prev}'s release date`); else byDate.set(s.releaseDate, s.id); }
-    if (s.arc) { const k = JSON.stringify(s.arc), prev = arcs.get(s.arc.id); if (prev && prev.arc !== k) add("calendar", "error", s.id, `arc ${s.arc.id} differs from ${prev.id}'s`); else if (!prev) arcs.set(s.arc.id, { id: s.id, arc: k }); }
+    if (s.arc) { const k = canonical(s.arc), prev = arcs.get(s.arc.id); if (prev && prev.arc !== k) add("calendar", "error", s.id, `arc ${s.arc.id} differs from ${prev.id}'s`); else if (!prev) arcs.set(s.arc.id, { id: s.id, arc: k }); }
     for (const op of flagOptions(s)) setBy.set(op.sets!, d);
   }
   // callbacks name a flag an earlier story set; a story's date is the calendar's, or without one its own releaseDate
@@ -264,8 +277,8 @@ export function checkSeason(world: World, drafts: Draft[] = world.drafts, o: Che
   const uses = (d: Draft, card: string): boolean => {
     const c = world.cards?.[card];
     if (!c) return false;
-    const r = resolver([c.tr], { particles: false });
-    return texts(d.story).some(t => words(t.tr).some(r));
+    const lang = langOf(world), r = lang.resolver([c.tr], { particles: false });
+    return texts(d.story, lang.id).some(t => lang.checkWords(t.tr).some(r));
   };
   for (const d of drafts) {
     const date = d.story.releaseDate;
@@ -286,6 +299,68 @@ export function checkSeason(world: World, drafts: Draft[] = world.drafts, o: Che
   const kinds: Record<string, number> = {};
   for (const d of drafts) for (const st of d.story.steps) if (isChoice(st)) kinds[st.choice.kind ?? "polite"] = (kinds[st.choice.kind ?? "polite"] ?? 0) + 1;
   if (Object.keys(kinds).length) add("counts", "info", "season", `choice kinds: ${Object.entries(kinds).map(([k, n]) => `${k} ${n}`).join(", ")} (a third each wanted over the season)`);
+  return out;
+}
+
+/**
+ * The series and its seasons: each document against its schema and its file name, the narrator and the
+ * stand-in, every story's season, the calendar both ways (a row for every story of a season that has one, a
+ * story for every row) and against days.json when the root still has one, and each story's arc against its
+ * season's; the series' languages, and each document's texts in them (check/languages.ts). Without series.json, one
+ * warning (the root predates series); files still in the old language shape, one warning (convert/languages.ts).
+ */
+export function checkSeries(world: World): CheckProblem[] {
+  const out: CheckProblem[] = [];
+  const add = (level: CheckProblem["level"], story: string, message: string, rule: CheckRule = "series") => out.push({ rule, level, story, message });
+  const schema = (kind: SchemaKind, doc: unknown, at: string) => { for (const p of validateDoc(kind, doc)) add("error", at, `${p.path}: ${p.message}`, "schema"); };
+  const sr = world.series, langs = languagesOf(sr);
+  const gaps = (ps: { path: string; message: string }[], at: string) => { for (const p of ps) add("error", at, `${p.path}: ${p.message}`, "schema"); };
+  if (world.oldShape?.length) add("warning", "series", `${world.oldShape.length} files are in the old language shape (titleEn, nameFa, … ; ${world.oldShape.slice(0, 3).join(", ")}${world.oldShape.length > 3 ? ", …" : ""}): run node packages/sahne-story/convert/languages.ts`);
+  if (!sr) add("warning", "series", "the content root has no series.json: add one, with a seasons/s<n>.json per season");
+  else {
+    schema("series", sr, "series");
+    gaps([...(sr.languages ? languageCodeGaps(sr.languages) : []), ...seriesLanguageGaps(sr, langs)], "series");
+    for (const [role, id, kind, stage] of [["narrator", sr.narrator, "narrator", NARRATOR], ["stand-in", sr.standin, "standin", STANDIN]] as const) {
+      const c = world.cast[id];
+      if (!c) add("error", "series", `the ${role} ${id} has no character document`);
+      else if (c.kind !== kind) add("error", "series", `the ${role} ${id} is a ${c.kind}, not a ${kind}`);
+      if (id !== stage) add("error", "series", `the stage casts ${stage} as the ${role}; another ${role} is not supported yet`);
+    }
+  }
+  for (const [file, se] of Object.entries(world.seasons)) {
+    const at = `season:${file}`;
+    schema("season", se, at);
+    gaps(seasonLanguageGaps(se, langs), at);
+    if (se.id !== file) add("error", at, `the file is ${file} but the season's id is ${se.id}`);
+    if (se.n !== Number(file.slice(1))) add("error", at, `n is ${se.n} but the file is ${file}`);
+    for (const id of Object.keys(se.calendar ?? {})) if (seasonOf(id) !== se.n) add("error", at, `the calendar names ${id}, a story of another season`);
+    for (const id of Object.keys(se.arcs ?? {})) if (!id.startsWith(`s${se.n}w`)) add("error", at, `arc ${id} belongs to another season`);
+    const episodes = world.drafts.filter(d => seasonOf(d.id) === se.n);
+    if (!episodes.length) add("warning", at, "the season has no episodes yet");
+    if (se.calendar) {
+      for (const d of episodes) if (!se.calendar[d.id]) add("error", d.id, `${d.id} has no row in season ${file}'s calendar`, "calendar");
+      for (const id of Object.keys(se.calendar)) if (!world.drafts.some(d => d.id === id)) add("warning", at, `the calendar has ${id}, which is not written yet`, "calendar");
+    }
+    for (const d of episodes) {
+      const a = d.story.arc;
+      if (!a || !se.arcs) continue;
+      const want = se.arcs[a.id];
+      if (!want) add("error", d.id, `arc ${a.id} is not one of season ${file}'s arcs`, "calendar");
+      else if (canonical(withoutId(a)) !== canonical(want)) add("error", d.id, `arc ${a.id} differs from season ${file}'s`, "calendar");
+    }
+  }
+  if (world.series) for (const d of world.drafts) { const n = seasonOf(d.id); if (n && !world.seasons[`s${n}`]) add("error", d.id, `season s${n} has no document in seasons/`); }
+  // days.json, where an app still writes it beside the seasons' calendars, follows them: the seasons are the source, so a
+  // difference is days.json to regenerate (a warning; the app's own generator check is its gate)
+  if (world.daysFile && Object.values(world.seasons).some(se => se.calendar)) {
+    const stale = (id: string, why: string) => add("warning", id, `days.json is behind the season's calendar (${why}): regenerate it from the seasons`, "calendar");
+    for (const [id, d] of Object.entries(world.days ?? {})) {
+      const f = world.daysFile[id];
+      if (!f) stale(id, `no ${id}`);
+      else if (f.date !== d.date || f.kind !== d.kind || f.week !== d.week) stale(id, `${f.date} ${f.kind} week ${f.week}, the season ${d.date} ${d.kind} week ${d.week}`);
+    }
+    for (const id of Object.keys(world.daysFile)) if (!world.days?.[id]) stale(id, `${id} is in no season's calendar`);
+  }
   return out;
 }
 
@@ -360,8 +435,8 @@ export function normalizeChanges(doc: AvatarDoc, kit: Kit): string[] {
 }
 
 /** The checks every character document gets, roster or extra: schema, id = file and not retired, a puppet the kit has, and each look's size, parts and values. */
-function checkCharacter(file: string, c: CharacterDoc, kit: Kit | null, puppetNames: Set<string>, add: (level: CheckProblem["level"], message: string, rule?: CheckRule) => void) {
-  for (const p of validateDoc("character", c)) add("error", `${p.path}: ${p.message}`, "schema");
+function checkCharacter(file: string, c: CharacterDoc, kit: Kit | null, puppetNames: Set<string>, langs: Languages, add: (level: CheckProblem["level"], message: string, rule?: CheckRule) => void) {
+  for (const p of [...validateDoc("character", c), ...characterLanguageGaps(c, langs)]) add("error", `${p.path}: ${p.message}`, "schema");
   if (c.id !== file) add("error", `the file is characters/${file}.json but the id is ${c.id}`);
   if (RETIRED_CHARACTERS.has(file)) add("error", `${file} is a retired character id`);
   if (c.puppet !== undefined && !puppetNames.has(c.puppet)) add("error", `puppet ${c.puppet} is not a kit puppet (${[...puppetNames].join(", ") || "none loaded"})`);
@@ -392,21 +467,21 @@ export function checkCast(world: World, o: CheckOptions = {}): CheckProblem[] {
   const out: CheckProblem[] = [];
   const kit = isKit(o.kit) ? o.kit : null;
   const puppetNames = new Set([...Object.keys(kit?.puppets ?? {}), ...(o.puppets ?? [...Object.keys(KERIM_PUPPETS), ...Object.keys(ANIMAL_PUPPETS)])]);
-  const orders = new Map<number, string>();
+  const orders = new Map<number, string>(), langs = languagesOf(world.series);
   const order = (c: CharacterDoc, who: string, add: (level: CheckProblem["level"], message: string) => void) => {
     const n = c.order as number | undefined;
     if (typeof n === "number") { const prev = orders.get(n); if (prev) add("error", `order ${n} is also ${prev}'s`); else orders.set(n, who); }
   };
   for (const [file, c] of Object.entries(world.cast ?? {})) {
     const add = (level: CheckProblem["level"], message: string, rule: CheckRule = "character") => out.push({ rule, level, story: `cast:${file}`, message });
-    checkCharacter(file, c, kit, puppetNames, add);
+    checkCharacter(file, c, kit, puppetNames, langs, add);
     order(c, file, add);
   }
   for (const [file, raw] of Object.entries(world.extras ?? {})) {
     const add = (level: CheckProblem["level"], message: string, rule: CheckRule = "character") => out.push({ rule, level, story: `extra:${file}`, message });
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) { add("error", "not a character document"); continue; }
     const c = raw as CharacterDoc;
-    checkCharacter(file, c, kit, puppetNames, add);
+    checkCharacter(file, c, kit, puppetNames, langs, add);
     order(c, file, add);
     if (c.kind !== "extra") add("error", `kind is ${c.kind}; an extra's is extra`);
     if (typeof c.order === "number" && c.order < 100) add("error", `order ${c.order}; an extra's is 100 or more, after the cast`);

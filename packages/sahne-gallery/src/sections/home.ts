@@ -7,6 +7,7 @@ import { $, link } from "../shell/dom.ts";
 import type { Ctx } from "../shell/ctx.ts";
 import { live } from "../shell/live.ts";
 import { FILM, FILM_EXTRAS, FILM_PLACES, FILM_TITLES } from "../film.ts";
+import { textOf } from "sahne-story";
 
 const FEATURES: [string, string, string][] = [
   ["Cut-paper puppets", "People built from a kit of parts: faces that talk and blink, 39 gestures and 14 emotions, walks, carries and idle life, all posed by one rig.", "#/systems/actors"],
@@ -33,8 +34,9 @@ export async function render(host: HTMLElement, ctx: Ctx) {
 
   // ---- the hero ----
   const hero = $("section", "hero");
-  const word = $("h1", "wordmark", "Sahne");
-  word.append($("small", "", "Turkish for “stage”"));
+  const word = $("h1", "wordmark");
+  word.setAttribute("aria-label", "Sahne, Turkish for “stage”");
+  word.append($("span", "word"), $("small", "", "Turkish for “stage”"));
   const go = $("div", "ctas");
   const cta = (label: string, href: string, main = false) => { const a = link(label, href); a.className = `cta${main ? " main" : ""}`; return a; };
   const gh = cta("GitHub ↗", "https://github.com/mehrad77/sahne");
@@ -51,7 +53,7 @@ export async function render(host: HTMLElement, ctx: Ctx) {
   // the samples' extras it casts (an actor whose extra is missing stands in as the kit's default person)
   const extras = new Map((await ctx.data("extras").catch(() => [])).map(x => [x.file.replace(/\.json$/, ""), x]));
   const cast = Object.fromEntries(Object.entries(FILM_EXTRAS).map(([actor, id]) => [actor, extras.get(id)?.avatar ?? ctx.kit.defaultDoc]));
-  const names = Object.fromEntries(Object.entries(FILM_EXTRAS).map(([actor, id]) => [actor, String(extras.get(id)?.name ?? actor)]));
+  const names = Object.fromEntries(Object.entries(FILM_EXTRAS).map(([actor, id]) => [actor, textOf(extras.get(id)?.name) ?? actor]));
   // ?chapter=<n> starts the film at its nth chapter (for checking one)
   const chapter = Number(ctx.route.query.get("chapter") ?? 0), starts = [...FILM_TITLES.keys()];
   const film = await live(stageSlot, ctx, FILM, { loop: true, controls: false, preroll: 2600, places: FILM_PLACES, cast, names, start: starts[chapter] ?? 0, onCue: i => {

@@ -54,18 +54,24 @@
       }
     }
   },
-  "bio": "Sells village eggs and greens, and weighs everything twice.",
-  "bioFa": "تخم‌مرغِ محلی و سبزی می‌فروشد و همه‌چیز را دو بار وزن می‌کند.",
+  "bio": {
+    "en": "Sells village eggs and greens, and weighs everything twice.",
+    "fa": "تخم‌مرغِ محلی و سبزی می‌فروشد و همه‌چیز را دو بار وزن می‌کند."
+  },
   "color": "#8A8580",
   "id": "stallholder_2",
   "kind": "extra",
   "level": "A1",
-  "name": "Pazarcı",
-  "nameFa": "فروشنده‌ی بازار",
+  "name": {
+    "fa": "فروشنده‌ی بازار",
+    "tr": "Pazarcı"
+  },
   "order": 118,
   "places": [
     "pazar_ferikoy"
   ],
-  "role": "A stallholder at the Feriköy Saturday market",
-  "roleFa": "فروشنده‌ای در بازارِ شنبه‌های فری‌کؤی"
+  "role": {
+    "en": "A stallholder at the Feriköy Saturday market",
+    "fa": "فروشنده‌ای در بازارِ شنبه‌های فری‌کؤی"
+  }
 }

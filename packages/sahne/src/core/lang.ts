@@ -26,6 +26,8 @@ export interface SpeechOptions {
 export interface LangPlugin {
   /** BCP 47, e.g. "tr". */
   id: string;
+  /** The writing direction of its text: a bubble's `dir` (default "ltr"). */
+  dir?: "ltr" | "rtl";
   speech(text: string, o?: SpeechOptions): Speech;
   /** Whether `word` (as written in a line) is a form of `token` (a `link` key): ekmeği, ekmekler → ekmek. */
   match?(word: string, token: string): boolean;

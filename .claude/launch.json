@@ -10,6 +10,16 @@
       ],
       "port": 5180,
       "autoPort": true
+    },
+    {
+      "name": "sahne-backstage",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd packages/sahne-backstage && node server/cli.ts --port ${PORT:-5181}"
+      ],
+      "port": 5181,
+      "autoPort": true
     }
   ]
 }

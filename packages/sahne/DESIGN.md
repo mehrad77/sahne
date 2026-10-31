@@ -74,9 +74,10 @@ app (Kumru)                            sahne (engine)                           
 | `packages/sahne-kit` | The art: the body kit, parts, palettes, faces, poses and gestures, props, set pieces, sound patches, motifs, CC0 samples. A different app can ship a different kit in another style | `sahne` (types only) |
 | `packages/sahne-tr` | The Turkish plugin: mouth timing from spelling, token matching for word ↔ object links, normalising and matching speech for *say it aloud* (`normalise`, `matchLine`), and what the teaching lints read (*bu/şu/o*, numbers, clock times) | `sahne` (types only) |
 | `packages/sahne-story` | The story format's adapter (`adaptStory`: a story document becomes a script and its reply cards, the Kumru repo's `docs/stories/STORIES_STAGE.md` §3) and the story lints (`lintStory`, `suggest`, §4). Story-specific, so it lives beside the engine, not in it | `sahne` (types), `sahne-tr` |
+| `packages/sahne-backstage` | The editor an app runs on its content root: series, seasons and episodes played, fixed and staged in the browser, saved with the story check; a Node server beside a Preact page. Never ships | all but the gallery |
 | `packages/sahne-gallery` | The dev site: every part, view, emotion, gesture, set, light and sound; the builder; a script player; a story played through the adapter; a performance readout | all of them |
 
-All five are TypeScript with erasable syntax only, so Node 24 runs the tests directly (as the reader's tests do) and esbuild bundles them. The root pnpm workspace includes `packages/*` ([packages/README.md](../README.md)).
+All six are TypeScript with erasable syntax only, so Node 24 runs the tests directly (as the reader's tests do) and esbuild bundles them. The root pnpm workspace includes `packages/*` ([packages/README.md](../README.md)).
 
 ### 4.2 Modules of the engine
 
@@ -495,6 +496,7 @@ A flat may **react** to people (`FlatSpec.react`, `FlatReact`), and remember it.
 - **An act never blocks.** After two misses, the target is hinted with a gaze or a glow. After three, it is shown and the story goes on.
 - **Every act has an accessible alternative:** a list of buttons for keyboards and screen readers.
 - **Hit tests** cast a ray against piece quads and check a low-resolution alpha mask taken from the atlas, so taps on transparent corners pass through.
+- **Floor points.** `Stage.floorAt(x, y, height?)` casts the same ray against the level plane (`rayFloor`): the floor point under a CSS pixel, where an editor drops a mark (sahne-backstage). Marks themselves are not pickable.
 - **Each story week chooses its mechanics.** The engine never assumes one is on.
 
 **How it is built (B5).** The interaction layer is attached to a stage, not part of it, so the builder and the lists never load it: `interact(stage, { explore, list, focus, words })`, before `load`.
@@ -509,7 +511,8 @@ A flat may **react** to people (`FlatSpec.react`, `FlatReact`), and remember it.
 **Say it aloud** (built 2026-10-10):
 - `canListen()` is false without `SpeechRecognition` (or `webkitSpeechRecognition`), outside a secure context, offline (Chrome's recogniser is a server), and after the learner refused the microphone. The card hides its microphone then; `cannotListen()` says why.
 - `listenFor(expected, plugin, {signal, onInterim})` listens once in the plugin's `locale` (`tr-TR`) with interim results and five alternatives, stops early when the words so far already are a line, gives up after 6 s of silence or 12 s in all, and resolves `{matched, best, heard, score}` or an `error` (`no-speech`, `denied`, `network`, `aborted` …). It never rejects.
-- **The matching is the plugin's** (`matchLine` in `sahne-tr`): both sides become spoken words (Turkish lower case, numerals in words, no punctuation or fillers like *ıı* and *hmm*), then a word-level edit distance weighted by letters. It forgives a recogniser's joins and splits (*varmı*, *hoşgeldiniz*), a dot or cedilla (*mi* for *mı*), an extra word before the line, and the learner's name (any one or two words). The allowance scales with length: none in a word of three letters, one letter in a short phrase, about one in six beyond. A different word never passes: *İki ekmek ver* is not *İki ekmek, lütfen*. Every n-best alternative is tried; on a choice, the closest option within its allowance is the pick.
+- **The matching is the plugin's** (`matchLine`, built per language on `lineMatcher`; `sahne-tr` is the first): both sides become spoken words (Turkish lower case, numerals in words, no punctuation or fillers like *ıı* and *hmm*), then a word-level edit distance weighted by letters. It forgives a recogniser's joins and splits (*varmı*, *hoşgeldiniz*), a dot or cedilla (*mi* for *mı*), an extra word before the line, and the learner's name (any one or two words). The allowance scales with length: none in a word of three letters, one letter in a short phrase, about one in six beyond. A different word never passes: *İki ekmek ver* is not *İki ekmek, lütfen*. Every n-best alternative is tried; on a choice, the closest option within its allowance is the pick.
+- **The matcher is shared.** `lineMatcher({normalise, near, fillers, spellings, soft})` (`src/core/linematch.ts`, exported from `sahne`) is the language-blind part: the word-level edit distance, the joins and splits, names and the allowance. A plugin supplies `normalise(said): string[]` (its tokenising, lower case and numerals in words), `near` (letters that are nearly the same, each to the letter it folds to: Turkish `ı→i ş→s ç→c ğ→g ö→o ü→u`, German `ä→a ö→o ü→u ß→ss`, English none), `soft` (letters barely said, Turkish `"ğ"`), `fillers` (a RegExp tested on one word) and `spellings` (a heard word to its usual form, possibly several words). It returns `{sayWords, normalise, letters, allowance, matchLine}`.
 - Size: 1.4 KB gzip for `sahne/listen`; the matcher adds about 2 KB to the plugin.
 
 ## 10. Avatars and the builder
@@ -563,9 +566,10 @@ Mid-range means a Galaxy A15/A25-class phone; low-end means Android Go with 2–
 |---|---|
 | Engine and Turkish plugin | ≤ 150 KB gzip (raised from 60 KB by the owner, 2026-10-10; 92.6 KB with B5's interaction and listening) |
 | Kit code (parts, poses, patches, motifs) | ≤ 150 KB gzip (raised from 80 KB by the owner, 2026-10-10; batch 1 is 110 KB; 123 KB with the airport and metro sets, 106 KB once the set left it on 2026-10-13) |
-| A set family (`sahne-kit/set`), loaded when a story's places use it | ≤ 40 KB gzip each, measured without the kit code it shares; a family that outgrows it splits. The whole set is reported, not held |
+| A set family (`sahne-kit/set`), loaded when a story's places use it | ≤ 40 KB gzip each, measured without the kit code it shares; a family that outgrows it splits. The whole set is reported, not held. Drawings promoted into a family (`src/set/drawn/`) count in it, as code does; the interpreter they run through is the drawing row's |
 | Kerim's puppet (`sahne-kit/kerim`: her art, moods and gestures), loaded only by pages that cast her | ≤ 8 KB gzip |
 | The animal puppets (`sahne-kit/puppets`: Pisi and the gulls), loaded only by pages that cast them | ≤ 8 KB gzip (4.6 KB) |
+| The drawing interpreter (`sahne-kit/drawing`: pieces drawn as data), loaded by an app with content items, and by any family that takes drawn items | ≤ 8 KB gzip (3.1 KB) |
 | What an app loads for its lists: `normalize` and `portrait` | ≤ 20 KB gzip (15 KB) |
 | What an app loads for its builder: `mountBuilder` with its stage | ≤ 100 KB gzip (80.3 KB; raised from 80 on 2026-10-13) |
 | All A1 places (28) | ≤ 100 KB gzip |

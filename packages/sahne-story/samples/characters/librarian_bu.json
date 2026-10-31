@@ -62,18 +62,24 @@
       }
     }
   },
-  "bio": "Knows every shelf, and whispers.",
-  "bioFa": "همه‌ی قفسه‌ها را می‌شناسد و آهسته حرف می‌زند.",
+  "bio": {
+    "en": "Knows every shelf, and whispers.",
+    "fa": "همه‌ی قفسه‌ها را می‌شناسد و آهسته حرف می‌زند."
+  },
   "color": "#8A8580",
   "id": "librarian_bu",
   "kind": "extra",
   "level": "A1",
-  "name": "Kütüphaneci",
-  "nameFa": "کتابدار",
+  "name": {
+    "fa": "کتابدار",
+    "tr": "Kütüphaneci"
+  },
   "order": 107,
   "places": [
     "library_bu"
   ],
-  "role": "The librarian at the Beykent University library",
-  "roleFa": "کتابدارِ کتابخانه‌ی دانشگاهِ بیکنت"
+  "role": {
+    "en": "The librarian at the Beykent University library",
+    "fa": "کتابدارِ کتابخانه‌ی دانشگاهِ بیکنت"
+  }
 }

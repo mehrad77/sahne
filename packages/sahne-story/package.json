@@ -9,6 +9,9 @@
   },
   "dependencies": {
     "sahne": "workspace:*",
+    "sahne-en": "workspace:*",
+    "sahne-de": "workspace:*",
+    "sahne-fa": "workspace:*",
     "sahne-tr": "workspace:*"
   },
   "scripts": {

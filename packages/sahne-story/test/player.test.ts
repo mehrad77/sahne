@@ -79,3 +79,50 @@ test("an act's run is the player's run while it plays, and its answer is the pic
   }
   assert.fail("the bakkal scene has no act");
 });
+
+test("jump shows the opening, waits at a card, plays any other cue", () => {
+  const { stage, log } = fakeStage();
+  const p = storyPlayer(stage, adaptStory(STORY, { places, characters }));
+  const card = p.info.findIndex((i, k) => k > 0 && i.turn);
+  const plain = p.info.findIndex((i, k) => k > 0 && !i.turn);
+  assert.ok(card > 0 && plain > 0, "the bakkal scene has a card and a plain cue");
+  log.length = 0;
+  p.jump(0);
+  assert.deepEqual(log, ["show 0"]);
+  assert.equal(p.next, 1);
+  log.length = 0;
+  p.jump(card);
+  assert.deepEqual(log, [`show ${card - 1}`]);
+  assert.equal(p.next, card);
+  assert.equal(p.footer().kind, "turn");
+  log.length = 0;
+  p.jump(plain);
+  assert.deepEqual(log, [`show ${plain - 1}`, `play ${plain}`]);
+  assert.equal(p.next, plain + 1);
+});
+
+test("replace re-directs an edited story and keeps the picks", () => {
+  const { stage, log } = fakeStage();
+  const p = storyPlayer(stage, adaptStory(STORY, { places, characters }));
+  const choice = p.info.find(i => i.turn?.kind === "choice")?.turn;
+  assert.ok(choice && choice.kind === "choice", "the bakkal scene has a choice");
+  p.jump(p.info.findIndex(i => i.turn === choice || i.turn?.kind === "choice"));
+  p.choose(1);
+  const edited: StoryDoc = structuredClone(STORY);
+  const line = edited.steps.findIndex(s => "who" in s && s.who !== "nima");
+  (edited.steps[line] as { tr: string }).tr = "Yeni bir söz.";
+  log.length = 0;
+  p.replace(adaptStory(edited, { places, characters }));
+  assert.deepEqual(log, ["set 0"], "no reload");
+  assert.equal(p.picks[choice.id], 1);
+  assert.ok(p.info.some(i => i.step === line && i.tr === "Yeni bir söz."));
+});
+
+test("a reply cue names its index in the option's reply list", () => {
+  const p = storyPlayer(fakeStage().stage, adaptStory(STORY, { places, characters }));
+  const replies = p.info.filter(i => i.kind === "reply");
+  for (const r of replies) {
+    const s = STORY.steps[r.step] as { choice: { options: { reply?: unknown[] }[] } };
+    assert.ok(r.reply !== undefined && s.choice.options[r.option!].reply![r.reply] !== undefined);
+  }
+});

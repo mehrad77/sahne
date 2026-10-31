@@ -6,6 +6,7 @@
 // (open, unlock, cast, hidden) in curation.ts.
 
 import type { AvatarDoc, Kit, PartDef } from "sahne";
+import { DRAWN_ALIASES } from "./set/drawn/aliases.gen.ts";
 import { PALETTES, FAMILIES, COLOR_NAMES, PALETTE_UNLOCKS, color, nm } from "./palette.ts";
 import { body, base, LAYERS, BODY_CHOICES } from "./body.ts";
 import { faceStyle, region, draw as drawFace, EMOTIONS, VISEMES, FACE_CHOICES } from "./face.ts";
@@ -85,7 +86,7 @@ export const kit: Kit = {
   body,
   base,
   parts,
-  aliases: {},
+  aliases: { ...DRAWN_ALIASES },
   features: { ...BODY_CHOICES, ...FACE_CHOICES },
   labels,
   families: FAMILIES,

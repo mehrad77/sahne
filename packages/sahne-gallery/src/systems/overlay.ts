@@ -9,7 +9,7 @@ import { K_HEAD_VB, K_BUST, K_HEAD } from "sahne-kit/kerim/art";
 import { $, bar, button, choice, css, toggle } from "../shell/dom.ts";
 import type { Ctx } from "../shell/ctx.ts";
 import { BAKKAL, ISMAIL, NIMA, VOICES } from "../bakkal.ts";
-import { kerimPortrait, kerimOnTalk } from "../kerim.ts";
+import { kerimPortrait, kerimOnTalk } from "sahne-kit/kerim/portrait";
 import { bench } from "./bench.ts";
 
 const ART = { vb: K_HEAD_VB, bust: K_BUST, head: K_HEAD };

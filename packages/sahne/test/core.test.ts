@@ -1,7 +1,7 @@
 // Tests of the engine's pure modules: paths, tones, the rig, framing and the face model.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ellipse, smooth, rect } from "../src/art/path.ts";
+import { Path, ellipse, smooth, rect } from "../src/art/path.ts";
 import { tone, luma } from "../src/core/color.ts";
 import { rng } from "../src/core/rng.ts";
 import { humanoid, solve, jointOf, restPose } from "../src/rig/skeleton.ts";
@@ -61,4 +61,37 @@ test("faces blend, and only visible changes change the key", () => {
   const near = blendFace(NEUTRAL_FACE, happy, 0.001);
   assert.equal(faceKey(near), faceKey(NEUTRAL_FACE));
   assert.notEqual(faceKey(blendFace(NEUTRAL_FACE, happy, 0.5)), faceKey(NEUTRAL_FACE));
+});
+
+test("Path.fromSvg reads every command, absolute and relative, into the Cmd set", () => {
+  assert.equal(Path.fromSvg("M0 0L10 0 10 5H0V0Z").toD(), "M0 0L10 0L10 5L0 5L0 0Z");
+  assert.equal(Path.fromSvg("m1 1l2 0 0 2h-2v-2z").toD(), "M1 1L3 1L3 3L1 3L1 1Z");
+  assert.equal(Path.fromSvg("M0 0m5 5 5 0").toD(), "M0 0M5 5L10 5", "a move's implicit repeats are lines");
+  assert.equal(Path.fromSvg("M0-5L-5-5").toD(), "M0 -5L-5 -5", "run-together numbers");
+  assert.equal(Path.fromSvg("M0 0C1 1 2 2 3 0S5-2 6 0").toD(), "M0 0C1 1 2 2 3 0C4 -2 5 -2 6 0", "S reflects the last cubic control");
+  assert.equal(Path.fromSvg("M0 0S1 1 2 0").toD(), "M0 0C0 0 1 1 2 0", "S after no cubic starts at the point");
+  assert.equal(Path.fromSvg("M0 0Q2 2 4 0T8 0").toD(), "M0 0Q2 2 4 0Q6 -2 8 0", "T reflects the last quad control");
+  assert.equal(Path.fromSvg("M0 0 10 10").toD(), "M0 0L10 10");
+});
+
+test("Path.fromSvg turns an arc into cubics that stay on the ellipse", () => {
+  const half = Path.fromSvg("M-10 0A10 10 0 0 1 10 0");
+  assert.equal(half.cmds.filter(c => c[0] === "C").length, 2);
+  const [x0, y0, x1, y1] = half.bounds();
+  assert.ok(Math.abs(x0 + 10) < 1e-6 && Math.abs(x1 - 10) < 1e-6 && y1 === 0 && y0 > -14, "control points hug the top half");
+  const last = half.cmds[half.cmds.length - 1] as number[];
+  assert.deepEqual(last.slice(-2), [10, 0]);
+  // the sweep flag picks the side; flags may be run together
+  assert.ok(Path.fromSvg("M-10 0A10 10 0 0110 0").bounds()[1] < 0);
+  assert.ok(Path.fromSvg("M-10 0A10 10 0 0 0 10 0").bounds()[3] > 0);
+  // a radius too small is scaled up to reach; a zero radius is a line
+  assert.equal(Path.fromSvg("M0 0A1 1 0 0 1 10 0").cmds.length, 3);
+  assert.equal(Path.fromSvg("M0 0A0 5 0 0 1 10 0").toD(), "M0 0L10 0");
+  // a full circle of two arcs matches the kit's ellipse to a hair
+  const circ = Path.fromSvg("M-5 0A5 5 0 0 1 5 0A5 5 0 0 1-5 0Z").bounds();
+  assert.ok(circ.every((v, i) => Math.abs(v - [-5, -5, 5, 5][i]) < 0.1), String(circ));
+});
+
+test("Path.fromSvg refuses bad data, saying where", () => {
+  for (const d of ["", "L1 1", "M0", "M0 0 X", "M0 0Z5 5", "M0 0A1 1 0 2 0 5 5", "5 5"]) assert.throws(() => Path.fromSvg(d), /path data/, d);
 });

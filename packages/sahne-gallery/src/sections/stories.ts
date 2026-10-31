@@ -14,7 +14,7 @@ import { $, bar, button, css, frame, link, toggle } from "../shell/dom.ts";
 import type { Ctx } from "../shell/ctx.ts";
 import type { Draft } from "../shell/data.ts";
 import { glossLookup, speak, type SceneGloss } from "../gloss.ts";
-import { kerimPortrait, kerimOnTalk } from "../kerim.ts";
+import { kerimPortrait, kerimOnTalk } from "sahne-kit/kerim/portrait";
 import { replyCard, type Aloud } from "../card.ts";
 
 declare global { interface Window { storyDemo?: { stage: Stage; adapted: StoryStage; picks: Picks; next: number; heard: { cue: number; best: number; heard: string }[] } } }
@@ -66,12 +66,12 @@ export async function render(host: HTMLElement, ctx: Ctx) {
 
 function play(host: HTMLElement, ctx: Ctx, draft: Draft, PLACES: Record<string, StoryPlace>, vocab: [string, string, string][]) {
   const STORY = draft.story, CHARACTERS = draft.characters as Record<string, CharacterDoc>;
-  // the story's own glosses (`gl`: word → [fa, en]) over the A1 cards
-  const GL: Record<string, SceneGloss> = Object.fromEntries(Object.entries(STORY.gl ?? {}).map(([w, [fa, en]]) => [w, { en, fa }]));
+  // the story's own glosses (`gl`: word → { fa, en }) over the A1 cards
+  const GL: Record<string, SceneGloss> = Object.fromEntries(Object.entries(STORY.gl ?? {}).map(([w, g]) => [w, { en: g.en ?? "", fa: g.fa ?? "" }]));
   const GLOSS = { lookup: glossLookup(GL, {}, vocab), speak };
   let name = stored("story-name", "Nima"), translate = stored("story-translate", "1") === "1", aloudOn = stored("story-aloud", "1") === "1";
   /** Kumru's personalizeStr, in small: the name token becomes the learner's name. */
-  const personalise = (t: string, lang?: "tr" | "en" | "fa") => (name && name !== "Nima" ? t.replace(lang === "fa" ? /نیما/g : /Nima/g, name) : t);
+  const personalise = (t: string, lang?: string) => (name && name !== "Nima" ? t.replace(lang === "fa" ? /نیما/g : /Nima/g, name) : t);
 
   host.append(link("← every story", "#/stories"), $("h1", "", `${draft.id}${draft.fixture ? " · the bakkal test scene" : ""}`));
   const box = frame("16 / 10");

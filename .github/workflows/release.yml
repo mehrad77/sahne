@@ -4,7 +4,7 @@ name: release
 # (Settings → Secrets and variables → Actions → Variables):
 #   RELEASE_ENABLED = true   the gate runs on the tag, then a GitHub release is made with generated notes
 #   PUBLISH_ENABLED = true   after the release, the libraries go to npm (needs the NPM_TOKEN secret)
-# Before turning publishing on: drop `"private": true` from sahne, sahne-kit, sahne-tr and sahne-story, give them
+# Before turning publishing on: drop `"private": true` from sahne, sahne-kit, sahne-tr, sahne-en, sahne-de, sahne-fa and sahne-story, give them
 # the tag's version, and decide how the TypeScript source ships (today `exports` points at .ts files). pnpm skips
 # every private package, so until then the publish step publishes nothing. sahne-gallery is never published.
 
@@ -66,6 +66,6 @@ jobs:
           cache-dependency-path: pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - name: npm publish (the four libraries; private packages are skipped)
-        run: pnpm --filter sahne --filter sahne-kit --filter sahne-tr --filter sahne-story publish --access public --no-git-checks --provenance
+        run: pnpm --filter sahne --filter sahne-kit --filter sahne-tr --filter sahne-en --filter sahne-de --filter sahne-fa --filter sahne-story publish --access public --no-git-checks --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

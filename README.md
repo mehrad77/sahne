@@ -39,7 +39,11 @@ See every one of them move at [sahne.shab.boo](https://sahne.shab.boo) (or run `
 | [`sahne`](packages/sahne/) | The engine: formats, director, timeline, rig, faces, avatars and the builder, the WebGL2 paper backend and the SVG still backend, audio, interaction. No dependencies. Design: [DESIGN.md](packages/sahne/DESIGN.md) |
 | [`sahne-kit`](packages/sahne-kit/) | The first kit: bodies, faces, hair, clothes, set pieces, props, animals, sounds and music, all drawn in code. Style guide: [STYLE.md](packages/sahne-kit/STYLE.md). Every part: [CATALOGUE.md](packages/sahne-kit/CATALOGUE.md), [SET.md](packages/sahne-kit/SET.md) |
 | [`sahne-tr`](packages/sahne-tr/) | The Turkish plugin: mouth timing from spelling, word ↔ token matching, say-it-aloud matching, numbers and clock times |
+| [`sahne-en`](packages/sahne-en/) | The English plugin: the same for English (British spelling, `en-GB`), plus the English story lints in `sahne-story` |
+| [`sahne-de`](packages/sahne-de/) | The German plugin: mouth timing from spelling, word ↔ token matching, say-it-aloud matching, numbers and clock times |
+| [`sahne-fa`](packages/sahne-fa/) | The Persian plugin: the same for Persian (`fa-IR`, right to left), plus the Persian story lints in `sahne-story` |
 | [`sahne-story`](packages/sahne-story/) | The story format: the adapter (a story document becomes a script), the player, the story check and lints, the schemas, and a sample story |
+| [`sahne-backstage`](packages/sahne-backstage/) | The studio: an app runs it on its content root to plan seasons on a board, write episodes as scripts beside a live stage, direct them, review them and save them, checked as `pnpm check` checks them; with an assistant and an MCP server for agents |
 | [`sahne-gallery`](packages/sahne-gallery/) | The dev gallery: a live demo of every engine system, the whole kit, every place and every story. It also runs the checks (sizes, determinism, golden frames) |
 
 The packages follow the conventions in [packages/README.md](packages/README.md). They ship TypeScript source with erasable syntax only, so Node 24 runs it directly and esbuild bundles it. There is no build step, and nothing is published to npm. An app takes this repo as a git submodule and adds `packages/*` to its pnpm workspace.
@@ -57,7 +61,7 @@ pnpm check    # types, sizes, determinism, the story checks, every test, the gol
 
 `pnpm sahne <script>` runs any script of the gallery (`pnpm sahne golden:update`, `pnpm sahne thumbs`).
 
-**Stories and places come from a content root.** Without configuration, it is `packages/sahne-story/samples/`: one short sample story, three characters with the generated extras, and two places. To play another app's stories in the gallery, point `SAHNE_CONTENT` at its data folder (an absolute path):
+**Stories and places come from a content root.** Without configuration, it is `packages/sahne-story/samples/`: one short sample story, three characters with the generated extras, and three places. To play another app's stories in the gallery, point `SAHNE_CONTENT` at its data folder (an absolute path):
 
 ```bash
 SAHNE_CONTENT=/path/to/kumru/data pnpm dev
@@ -86,10 +90,13 @@ Pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the setup, 
 | Bundle | Budget (gzip) |
 |---|---|
 | Engine and Turkish plugin | 150 KB |
+| English plugin (`sahne-en`) | 25 KB |
+| Persian plugin (`sahne-fa`) | 25 KB |
 | Kit code | 150 KB |
 | Each set family (`sahne-kit/set`) | 40 KB |
 | Kerim's puppet (`sahne-kit/kerim`) | 8 KB |
 | The animal puppets (`sahne-kit/puppets`) | 8 KB |
+| Pieces drawn as data (`sahne-kit/drawing`) | 8 KB |
 | Portraits (`normalize`, `portrait`, `silhouette`) | 20 KB |
 | The builder with its stage | 100 KB |
 | All place documents together | 100 KB |

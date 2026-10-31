@@ -218,7 +218,7 @@ export function avatarOf(s: Spec): AvatarDoc {
 export function extraDoc(s: Spec, order: number): Record<string, unknown> {
   return {
     id: s.id, order, kind: "extra", level: "A1", color: COLOR,
-    name: s.name, nameFa: s.nameFa, role: s.role, roleFa: s.roleFa, bio: s.bio, bioFa: s.bioFa, places: s.places, avatar: avatarOf(s),
+    name: { tr: s.name, fa: s.nameFa }, role: { en: s.role, fa: s.roleFa }, bio: { en: s.bio, fa: s.bioFa }, places: s.places, avatar: avatarOf(s),
   };
 }
 

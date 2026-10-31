@@ -1,3 +1,7 @@
+<!-- sahne:brand: written by packages/sahne-gallery/brand/build.mjs, edit that and run it -->
+<p><picture><source media="(prefers-color-scheme: dark)" srcset="../../assets/brand/sahne-header-dark.svg"><img src="../../assets/brand/sahne-header.svg" alt="sahne" height="64"></picture></p>
+<!-- /sahne:brand -->
+
 # Sahne
 
 A paper-theatre stage engine for illustrated, interactive dialogue scenes on the web. The design, the decisions and the milestones are in [DESIGN.md](DESIGN.md).
@@ -40,13 +44,13 @@ type-checks the five packages, measures the bundles against their budgets (`size
 | `src/script/` | The script's cues (`types.ts`) and the world state after a cue (`world.ts`) |
 | `src/director/direct.ts` | The director: one cue and the world before it become a performance; `fold` |
 | `src/anim/timeline.ts` | A performance's tracks and `evaluate(perf, t)`, the state of the stage at any moment |
-| `src/art/` | `Path` and the shape helpers (`smooth`, `band`, `ellipse`, `rrect`…), groups and their paper drawing (rim and layer shadows) |
+| `src/art/` | `Path` and the shape helpers (`smooth`, `band`, `ellipse`, `rrect`…, `Path.fromSvg` for SVG path data), groups and their paper drawing (rim and layer shadows) |
 | `src/rig/` | The humanoid skeleton and forward kinematics (`skeleton.ts`); `composePose` (`pose.ts`): carry, walk, posture, idle, gestures, IK and the floor, one pure function; the kit puppets' rigs, a bird (`bird.ts`) and a cat (`cat.ts`) |
 | `src/face/params.ts` | The face model every backend reads |
 | `src/avatar/` | Avatar document + kit → puppet with the slot rules (`compose.ts`, `rules.ts`), checking and trimming an untrusted document (`normalize.ts`), the headless builder model (`builder.ts`), changes of clothes (`look.ts`: `applyLook`) |
 | `src/render/paper/` | The WebGL2 backend: atlases, the one shader, light presets, framing |
 | `src/render/still/` | The SVG backend: portraits, still frames, the fallback without WebGL2 |
-| `src/ui/` | The overlay: speech bubbles (tails aimed at the mouth), sound words and the narrator's window, as HTML over the canvas (`overlay.ts`, its geometry in `place.ts`); tap-to-translate (`gloss.ts`); text on props (`prop-text.ts`, attached by a page as `propText(stage)`); the builder screen (`builder.ts`, `builder-plan.ts`, `builder-css.ts`); the interaction layer's styles |
+| `src/ui/` | The overlay: speech bubbles (tails aimed at the mouth; their `lang` and `dir` the stage language plugin's), sound words and the narrator's window, as HTML over the canvas (`overlay.ts`, its geometry in `place.ts`); tap-to-translate (`gloss.ts`); text on props (`prop-text.ts`, attached by a page as `propText(stage)`); the builder screen (`builder.ts`, `builder-plan.ts`, `builder-css.ts`); the interaction layer's styles |
 | `src/interact/` | Hit tests and alpha masks (`hit.ts`), the act state machine (`act.ts`) and the layer a page attaches to a stage (`index.ts`) |
 | `src/listen/` | Say it aloud, imported as `sahne/listen` |
 | `src/audio/` | The synthesizer (`dsp.ts`: patches rendered to samples in code), the motif sequencer (`motif.ts`), the speech clock that lets a voice keep the time (`clock.ts`), the Web Audio engine with its four buses (`engine.ts`) and the browser voice (`voice.ts`) |

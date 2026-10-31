@@ -7,14 +7,18 @@ Sahne is a paper-theatre stage engine and its kits ([README.md](README.md)). Thi
 ```text
 packages/
   sahne/          the engine                                    → packages/sahne/README.md, DESIGN.md
-  sahne-kit/      the first kit: people, set pieces, props, sounds, music, Kerim → STYLE.md, CATALOGUE.md, SET.md
+  sahne-kit/      the first kit: people, set pieces, props, sounds, music, Kerim; drawn items (drawing/, src/set/drawn/) → STYLE.md, DRAWING.md, CATALOGUE.md, SET.md
   sahne-tr/       the Turkish plugin                            → packages/sahne-tr/README.md
+  sahne-en/       the English plugin                            → packages/sahne-en/README.md
+  sahne-de/       the German plugin                             → packages/sahne-de/README.md
+  sahne-fa/       the Persian plugin (right to left)            → packages/sahne-fa/README.md
   sahne-story/    the story format, its checks, paths.ts, samples/ → packages/sahne-story/README.md
+  sahne-backstage/ the studio an app runs on its content root (:5181), and its MCP server → packages/sahne-backstage/README.md
   sahne-gallery/  the dev gallery and the checks (:5180)        → packages/sahne-gallery/README.md
 .github/workflows/ci.yml       pnpm sahne check on every push and pull request, and the scan
 .github/workflows/deploy.yml   the gallery as the live demo, https://sahne.shab.boo (Cloudflare), deployed after ci passes on main; off until DEPLOY_ENABLED is set
 .github/workflows/release.yml  a GitHub release and npm publishing on a v* tag; off until RELEASE_ENABLED / PUBLISH_ENABLED are set
-assets/                        the README's poster and scene pictures (assets/README.md says how they were made)
+assets/                        the README's poster and scene pictures, and brand/: the logo of every package (assets/README.md says how they were made)
 .claude/skills/                visual-check, new-kit-part, new-place: the repo's own workflows for agents
 ```
 
@@ -24,7 +28,10 @@ assets/                        the README's poster and scene pictures (assets/RE
 |---|---|
 | The engine | [packages/sahne/README.md](packages/sahne/README.md) and [DESIGN.md](packages/sahne/DESIGN.md) |
 | Kit art (people, set, props) | [STYLE.md](packages/sahne-kit/STYLE.md), [CATALOGUE.md](packages/sahne-kit/CATALOGUE.md), [SET.md](packages/sahne-kit/SET.md), `src/curation.ts` |
+| A kit item drawn as data over MCP, or promoted into the kit with its author's credit | [DRAWING.md](packages/sahne-kit/DRAWING.md) (*Promoting*), [CONTRIBUTING.md](CONTRIBUTING.md) (*Contributing art*) |
 | Stories, places, the content root | [packages/sahne-story/README.md](packages/sahne-story/README.md) |
+| The editor (backstage), its MCP server and assistant | [packages/sahne-backstage/README.md](packages/sahne-backstage/README.md), then the story README's Series and Languages sections |
+| A series in another language, or a language's lints | [packages/sahne-story/README.md](packages/sahne-story/README.md) (Languages, the story language) |
 | The gallery, screenshots, golden frames | [packages/sahne-gallery/README.md](packages/sahne-gallery/README.md) |
 | Package conventions, Kerim | [packages/README.md](packages/README.md) |
 
@@ -34,6 +41,7 @@ assets/                        the README's poster and scene pictures (assets/RE
 - `pnpm check` (the same as `pnpm sahne check`, the gallery's `check` script) is the gate: types, sizes, bundle determinism, the story and extras checks, every package's Node tests and the golden frames. Run it after every change.
 - `pnpm sahne <script>` runs a gallery script (`pnpm sahne dev`, `pnpm sahne golden:update`).
 - Start the gallery with `preview_start sahne-gallery` (`.claude/launch.json`), or `pnpm dev`.
+- Start the editor with `preview_start sahne-backstage` (the samples, read-only), or `node packages/sahne-backstage/server/cli.ts --content <root> --write`. Agents reach it over MCP: `/mcp` on a running one (`claude mcp add --transport http sahne-backstage http://localhost:5181/mcp`), or on stdio with `node packages/sahne-backstage/server/cli.ts mcp --content <root> --write --backstage http://localhost:5181/` (without `--backstage`, proposals reach no editor). With no MCP set up, `node packages/sahne-backstage/server/call.ts <tool> '<json>' --content <root> --session kit` calls any of the same tools and saves their pictures as PNGs to Read: TS kit work (a generator you are editing) also renders through it, `kit_render` with `items` for a whole family on one sheet.
 - **The content root.** Every story, character and place is read through `packages/sahne-story/paths.ts`: from `$SAHNE_CONTENT` (an absolute folder) or, without it, from `packages/sahne-story/samples/`. Never build such a path yourself. Never point a path outside the repo: `packages/sahne-gallery/test/boundary.test.ts` fails on one.
 - The tests in `packages/sahne-story/test/kumru/` check Kumru's own content. They run only with `SAHNE_CONTENT` set to Kumru's `data/`. On the samples they are skipped, which is expected.
 
@@ -56,8 +64,8 @@ assets/                        the README's poster and scene pictures (assets/RE
 
 ## Rules for every change
 
-- **Every generator has `--check`.** Generated files have exactly one script that writes them, and a `--check` that fails when they are stale. That covers `CATALOGUE.md` (`catalogue/build.ts`), `SET.md` and `src/set/families.gen.ts` (`set/build.ts`), `src/kerim/art.gen.ts` (`kerim/build.ts`), the sounds (`sounds/build.ts`), the extras (`sahne-story/cast/extras.ts`) and the thumbnails (`sahne-gallery/thumbs.mjs`). A new generator gets one too.
-- **Ids are permanent.** Never rename a part, set piece, prop, sound, gesture or place id that a document may use. Add the new id, and map the old one through the kit's `aliases`.
+- **Every generator has `--check`.** Generated files have exactly one script that writes them, and a `--check` that fails when they are stale. That covers `CATALOGUE.md` (`catalogue/build.ts`), `SET.md` and `src/set/families.gen.ts` (`set/build.ts`), the promoted drawings' `src/set/drawn/<family>.gen.ts`, `aliases.gen.ts` and `CREDITS.json` (`drawing/promote.ts --regenerate`, `--check`), `src/kerim/art.gen.ts` (`kerim/build.ts`), the sounds (`sounds/build.ts`), the extras (`sahne-story/cast/extras.ts`), the thumbnails (`sahne-gallery/thumbs.mjs`) and the brand files (`sahne-gallery/brand/build.mjs`: `assets/brand/`, each package's favicon and the brand block atop its README). A new generator gets one too.
+- **Ids are permanent.** Never rename a part, set piece, prop, sound, gesture or place id that a document may use. Add the new id, and map the old one through the kit's `aliases` (parts, and set pieces and props too: the engine's `pieceOf`, `familiesOf` and `lintPlace` follow it). A content id (`x_…`) appears in the kit only as an alias key, where a promoted item replaced it.
 - **Docs follow the code.** One fact lives in one place and is linked from elsewhere. Update the area's doc in the same commit as the change. Never renumber a section that code or other docs cite (`DESIGN.md §12`).
 - **The size budgets bind** (README, `size.mjs`). A bundle over budget fails the gate.
 - **No story data that is not ours.** The samples are original. Never add text we don't hold the rights to, card or lesson data, or another project's characters to this repo.

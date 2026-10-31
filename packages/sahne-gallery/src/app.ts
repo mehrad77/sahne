@@ -4,19 +4,22 @@
 
 import { $, choice, toggle, button } from "./shell/dom.ts";
 import { Ctx, parseRoute, type Settings } from "./shell/ctx.ts";
+import { addContentKit } from "./shell/kit.ts";
 import { CSS } from "./shell/style.ts";
 import { SECTIONS, type NavItem } from "./registry.ts";
 
 declare global { interface Window { gallery: Ctx } }
 
+await addContentKit();
 const ctx = new Ctx();
 window.gallery = ctx;
 document.head.append(Object.assign(document.createElement("style"), { textContent: CSS }));
 ctx.applyPage();
 
 const app = $("div", "app"), side = $("aside", "side"), main = $("div", "main"), top = $("div", "topbar"), view = $("main", "view");
-const brand = Object.assign($("a", "brand", "Sahne"), { href: "#/" });
-brand.append($("small", "", "a paper-theatre stage engine: demos and docs"));
+const brand = Object.assign($("a", "brand"), { href: "#/" });
+brand.setAttribute("aria-label", "sahne gallery");
+brand.append($("span", "lockup"), $("small", "", "a paper-theatre stage engine: demos and docs"));
 const nav = $("nav");
 nav.setAttribute("aria-label", "Gallery");
 side.append(brand, nav);

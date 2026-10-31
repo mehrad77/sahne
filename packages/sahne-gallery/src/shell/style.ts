@@ -10,8 +10,12 @@ html, body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.4
 a { color: var(--accent); }
 .app { display: grid; grid-template-columns: 236px 1fr; min-height: 100vh; }
 .side { background: var(--side); border-right: 1px solid var(--line); padding: 12px 10px 24px; position: sticky; top: 0; height: 100vh; overflow: auto; }
-.side .brand { font-weight: 700; font-size: 16px; padding: 2px 8px 10px; display: block; color: var(--ink); text-decoration: none; }
-.side .brand small { color: var(--mute); font-weight: 400; display: block; font-size: 12px; }
+.side .brand { padding: 4px 8px 10px; display: block; text-decoration: none; }
+/* the sahne GALLERY lockup (assets/brand/, written by brand/build.mjs), light or dark with the theme */
+.side .brand .lockup { display: block; width: 100%; max-width: 200px; aspect-ratio: 671 / 112; background: url(assets/brand/sahne-gallery-header.svg) left center / contain no-repeat; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .side .brand .lockup { background-image: url(assets/brand/sahne-gallery-header-dark.svg); } }
+:root[data-theme="dark"] .side .brand .lockup { background-image: url(assets/brand/sahne-gallery-header-dark.svg); }
+.side .brand small { color: var(--mute); font-weight: 400; display: block; font-size: 12px; margin-top: 6px; }
 .side nav a { display: block; color: var(--ink); text-decoration: none; padding: 3px 8px; border-radius: 8px; font-size: 13.5px; }
 .side nav a.top { font-weight: 650; margin-top: 6px; }
 .side nav a.sub { padding-left: 18px; color: var(--mute); }
@@ -100,7 +104,11 @@ table.t th { color: var(--mute); font-weight: 600; }
 /* the home page */
 .cards.stats { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .hero { padding: 18px 0 6px; }
-.hero .wordmark { font: 700 clamp(44px, 9vw, 76px)/1 Georgia, "Times New Roman", serif; letter-spacing: -.01em; margin: 0; }
+.hero .wordmark { margin: 0; }
+/* sah·n·e, the mark as its n (assets/brand/sahne-wordmark*.svg), light or dark with the theme */
+.hero .wordmark .word { display: block; height: clamp(48px, 9vw, 84px); aspect-ratio: 294 / 81.5; background: url(assets/brand/sahne-wordmark.svg) left center / contain no-repeat; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .hero .wordmark .word { background-image: url(assets/brand/sahne-wordmark-dark.svg); } }
+:root[data-theme="dark"] .hero .wordmark .word { background-image: url(assets/brand/sahne-wordmark-dark.svg); }
 .hero .wordmark small { display: block; font: italic 400 15px/1.6 Georgia, serif; color: var(--mute); letter-spacing: 0; margin-top: 4px; }
 .hero .tagline { font-size: clamp(16px, 2.4vw, 20px); line-height: 1.4; max-width: 46ch; margin: 12px 0 14px; }
 .ctas { display: flex; flex-wrap: wrap; gap: 8px; }

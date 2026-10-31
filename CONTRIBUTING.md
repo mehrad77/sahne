@@ -29,6 +29,22 @@ You need Node 24.
 
 The [README](README.md#adding-to-the-kit) says where a new kit part, set piece or sound goes.
 
+## Contributing art
+
+A drawing from your own story, a person's or an agent's, can become official Sahne art. You draw it as data in your content root (`kit/pieces/x_<id>.json`, [DRAWING.md](packages/sahne-kit/DRAWING.md), with backstage's MCP tools or `server/call.ts`), and when you want to offer it, one command checks it and opens the pull request:
+
+```bash
+node packages/sahne-kit/drawing/promote.ts <content-root>/kit/pieces/x_cafe_chalkboard.json \
+  --id chalkboard --family bakery --by "Ada L." --contact github:ada --consent --pr
+```
+
+- **You need no checkout.** Run it from your app's folder and it works in a temporary clone, pushes to your fork and opens the pull request with `gh`. Without `gh` it leaves a `.patch` and the pull request text in `promote-out/` and says what to do. `--dry` only checks and draws the review sheet.
+- **Consent is yours.** `--consent` says that **you release the drawing under CC BY 4.0** ([LICENSE-ART](LICENSE-ART)) and that **it is your own work: not traced, not copied** from a logo, a landmark, a brand or another artist. An agent asks its person for this, and for their name and a contact; it never gives the consent itself, and it never opens the pull request itself: the backstage tool `promote_kit_item` only checks and draws, and prints the command for you to run. Without consent, promotion refuses. Your name, contact and story are one plain line each (80 characters at most, no `<` `>` `[` `]` `` ` `` `|`, no leading `@` or `-`), and the contact is `github:name` or an address. With `--pr`, a `github:name` contact must be the `gh` login that runs it: the commit's `Co-Authored-By` names that account, and nothing else proves who the author is.
+- **You are credited**, for as long as the art is in the kit: your name and contact are in the drawing's `credit`, in `CREDITS.json`, in the Credits section of [SET.md](packages/sahne-kit/SET.md) and on the item's page in the gallery, and your commit carries a `Co-Authored-By` for you.
+- **What a reviewer sees** is in the pull request ([the template](.github/PULL_REQUEST_TEMPLATE/art.md)): the review sheet and its family at one scale, what it is, where it was used, your credit and consent, and the checklist from [STYLE.md](packages/sahne-kit/STYLE.md): paper, light from the upper left, puppet scale, words as text, nothing traced. CI draws the sheets for every pull request that touches `src/set/drawn/` and links them (the `sahne-art-sheets` artifact of the run: a comment cannot hold pictures).
+- **The project's own art.** Art drawn by the owner's kit agents for the kit is credited to the project (`consent: "project"`, written only by `promote.ts --project`, which refuses to run unless the owner sets `SAHNE_PROJECT_ART=1`, and only inside a checkout, never with `--pr`): the owner's merge is the consent. CI fails a pull request that adds or changes a drawing with `"project"` unless the owner opened it.
+- **When an owner approves**, the art is official: its id is permanent, your credit stays, and your story's old `x_` id keeps working as an alias. A rejected pull request changes nothing, and your story keeps its own drawing.
+
 ## Licences
 
 By contributing, you agree to license your code under the MIT License ([LICENSE](LICENSE)) and your kit art, sounds and music under CC BY 4.0 ([LICENSE-ART](LICENSE-ART)). Sound recordings must be CC0, with their source in `packages/sahne-kit/sounds/SOURCES.md`.

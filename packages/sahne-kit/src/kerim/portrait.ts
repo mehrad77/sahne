@@ -1,7 +1,7 @@
-// Kerim's portrait for the narrator's round window (Kumru's STORIES_STAGE.md §8). Kerim stays one
-// drawing with the app's mascot: the head crop (K_HEAD_VB, K_BUST, K_HEAD) is imported from
-// packages/sahne-kit/src/kerim/art.ts and passed in (Kumru and its icon tool read the same
-// file). Nothing of the drawing is copied here.
+// Kerim's portrait for the narrator's round window (Kumru's STORIES_STAGE.md §8), exported as
+// `sahne-kit/kerim/portrait` for the gallery and sahne-backstage. Kerim stays one drawing with the app's
+// mascot: the head crop (K_HEAD_VB, K_BUST, K_HEAD) is imported from art.ts (`sahne-kit/kerim/art`) and
+// passed in (Kumru and its icon tool read the same file). Nothing of the drawing is copied here. DOM only.
 
 const STYLE_ID = "sahne-kerim-css";
 // The animations follow the app's (sahne-kit/src/kerim/kerim.css): a blink, and

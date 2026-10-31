@@ -53,19 +53,25 @@
       }
     }
   },
-  "bio": "Hands out the warm loaves when the bread comes out at four.",
-  "bioFa": "ساعتِ چهار که نان از تنور درمی‌آید، نان‌های گرم را می‌دهد.",
+  "bio": {
+    "en": "Hands out the warm loaves when the bread comes out at four.",
+    "fa": "ساعتِ چهار که نان از تنور درمی‌آید، نان‌های گرم را می‌دهد."
+  },
   "color": "#8A8580",
   "id": "baker_firin",
   "kind": "extra",
   "level": "A1",
-  "name": "Fırıncı",
-  "nameFa": "نانوا",
+  "name": {
+    "fa": "نانوا",
+    "tr": "Fırıncı"
+  },
   "order": 104,
   "places": [
     "firin",
     "ferikoy"
   ],
-  "role": "The baker at the corner bakery in Feriköy",
-  "roleFa": "نانوای نانواییِ سرِ کوچه در فری‌کؤی"
+  "role": {
+    "en": "The baker at the corner bakery in Feriköy",
+    "fa": "نانوای نانواییِ سرِ کوچه در فری‌کؤی"
+  }
 }

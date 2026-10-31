@@ -5,13 +5,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
-import kit from "../../sahne-kit/src/full.ts";
+import full from "../../sahne-kit/src/full.ts";
+import { withDrawings } from "../../sahne-kit/src/drawing.ts";
 import { placeSolids } from "sahne";
-import { loadCards } from "../load.ts";
+import { loadCards, loadContentKit } from "../load.ts";
 import { loadNeeds } from "../load.ts";
 import { PLACES } from "../paths.ts";
 import { lintPlace, lintStory, type CardIndex, type Needs, type PlaceRule, type StoryDoc, type StoryPlace } from "../src/index.ts";
 
+const kit = full; // the kit as it is; the content root's own drawings are added only where a root's places are read
 const cards: CardIndex = JSON.parse(readFileSync(new URL("./fixtures/cards.json", import.meta.url), "utf8"));
 const needs: Needs = {
   dukkan: { stories: ["s1e99"], places: { dukkan: { why: "a test shop", stories: ["s1e99"], times: ["day", "night"],
@@ -55,6 +57,18 @@ const good = (): StoryPlace => ({
 const lint = (doc: StoryPlace) => lintPlace(doc, { kit, cards, needs });
 const rules = (doc: StoryPlace) => [...new Set(lint(doc).filter(p => p.level === "error").map(p => p.rule))].sort();
 const broken = (rule: PlaceRule, f: (d: StoryPlace) => void) => { const d = good(); f(d); assert.deepEqual(rules(d), [rule], `${rule}: ${JSON.stringify(lint(d))}`); };
+
+test("a kit id a promoted item replaced (kit.aliases) still stands in a place, as a piece and as a prop", () => {
+  const aliased = { ...kit, aliases: { ...kit.aliases, x_old_plant: "plant", x_old_simit: "simit_tray" } };
+  const d = good();
+  d.pieces = d.pieces.map(p => (p.kit === "plant" ? { ...p, kit: "x_old_plant" } : p));
+  d.props!.simit = { ...d.props!.simit, kit: "x_old_simit" };
+  assert.deepEqual(lintPlace(d, { kit: aliased, cards, needs }), []);
+  assert.ok(lintPlace(d, { kit, cards, needs }).some(p => /x_old_plant is not in the kit/.test(p.message)), "without the alias the id is unknown");
+  // the kit's own entry wins over an alias of the same id (a content drawing is used while it is there)
+  const own = { ...aliased, props: { ...aliased.props, x_old_simit: aliased.props.bread } };
+  assert.deepEqual(lintPlace(d, { kit: own, cards, needs }).filter(p => p.level === "error" && /x_old_simit/.test(p.message)), []);
+});
 
 test("a place built to the standard passes every rule", () => {
   assert.deepEqual(lint(good()), []);
@@ -107,10 +121,10 @@ test("the story's place rule: unknown places, marks, perches and times are error
 });
 
 test("every place document has no errors", () => {
-  const real = loadNeeds(), index = loadCards();
+  const real = loadNeeds(), index = loadCards(), rootKit = withDrawings(full, loadContentKit({ kit: full }).docs); // a place may use the root's own kit items
   for (const f of readdirSync(PLACES).filter(f => f.endsWith(".json") && f !== "needs.json")) {
     const doc: StoryPlace = JSON.parse(readFileSync(new URL(f, PLACES), "utf8"));
-    assert.deepEqual(lintPlace(doc, { kit, cards: index, needs: real }).filter(p => p.level === "error"), [], f);
+    assert.deepEqual(lintPlace(doc, { kit: rootKit, cards: index, needs: real }).filter(p => p.level === "error"), [], f);
   }
 });
 

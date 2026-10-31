@@ -21,6 +21,7 @@ node_modules/
 
 # Sahne gallery build output
 packages/sahne-gallery/dist/
+packages/sahne-backstage/dist/
 
 # Sahne kit: source recordings (local only; SOURCES.md says where each comes from)
 packages/sahne-kit/sounds/library/
@@ -28,3 +29,6 @@ packages/sahne-kit/sounds/library/
 # Playwright output
 test-results/
 playwright-report/
+
+# Promotion output (sahne-kit/drawing/promote.ts: sheets, patch, pull request text)
+promote-out/

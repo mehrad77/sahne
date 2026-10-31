@@ -10,8 +10,12 @@
     "./full": "./src/full.ts",
     "./set": "./src/set/index.ts",
     "./set/all": "./src/set/all.ts",
+    "./drawing": "./src/drawing.ts",
+    "./set-svg": "./src/set-svg.ts",
+    "./check": "./src/check.ts",
     "./kerim": "./src/kerim/index.ts",
     "./kerim/art": "./src/kerim/art.ts",
+    "./kerim/portrait": "./src/kerim/portrait.ts",
     "./puppets": "./src/puppets/index.ts",
     "./kerim.css": "./src/kerim/kerim.css"
   },

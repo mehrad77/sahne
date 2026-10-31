@@ -43,3 +43,73 @@ jobs:
           name: sahne-golden-failed
           path: packages/sahne-gallery/golden/failed/
           if-no-files-found: ignore
+
+  art:
+    # a pull request that touches the drawings promoted into the kit (packages/sahne-kit/src/set/drawn/): check what is generated
+    # from them, run the kit's tests, draw each changed item's review sheet and its family at one scale, and link them in one comment.
+    # (A job cannot filter on paths, so it finds what changed itself, and the rest is skipped when nothing did.)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: the drawings this pull request changes
+        id: changed
+        run: |
+          files=$(git diff --name-only --diff-filter=AMR "origin/${{ github.base_ref }}...HEAD" -- 'packages/sahne-kit/src/set/drawn/*/*.json')
+          # only well-formed ids go on: a file name is the pull request's to choose
+          ids=$(for f in $files; do basename "$f" .json; done | grep -E '^[a-z][a-z0-9_]*$' | paste -sd, - || true)
+          echo "ids=$ids" >> "$GITHUB_OUTPUT"
+          echo "changed drawings: ${ids:-none}"
+      - name: project consent is the owner's
+        # consent "project" is the owner's own kit agents' art: a pull request from anyone else may not add or change it
+        if: steps.changed.outputs.ids != '' && github.event.pull_request.user.login != github.repository_owner
+        run: |
+          bad=$(git diff --name-only --diff-filter=AMR "origin/${{ github.base_ref }}...HEAD" -- 'packages/sahne-kit/src/set/drawn/*/*.json' | while read -r f; do grep -l '"consent": *"project"' "$f" || true; done)
+          if [ -n "$bad" ]; then echo "consent \"project\" is the owner's, not this pull request author's:"; echo "$bad"; exit 1; fi
+      - uses: pnpm/action-setup@v4
+        if: steps.changed.outputs.ids != ''
+      - uses: actions/setup-node@v4
+        if: steps.changed.outputs.ids != ''
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - if: steps.changed.outputs.ids != ''
+        run: pnpm install --frozen-lockfile
+      - name: what is generated from the drawings is current
+        if: steps.changed.outputs.ids != ''
+        run: node packages/sahne-kit/drawing/promote.ts --check
+      - name: the kit's tests
+        # the whole gate (golden frames) runs in the main job on this pull request; this one only runs what the art can break first
+        if: steps.changed.outputs.ids != ''
+        run: pnpm --dir packages/sahne-kit test
+      - name: the review sheets
+        if: steps.changed.outputs.ids != ''
+        env:
+          IDS: ${{ steps.changed.outputs.ids }}
+        run: node packages/sahne-kit/drawing/promote.ts --sheet "$IDS" --out promote-out
+      - uses: actions/upload-artifact@v4
+        if: steps.changed.outputs.ids != ''
+        with:
+          name: sahne-art-sheets
+          path: promote-out/
+      - name: link the sheets in one comment
+        # a fork's pull request has a read-only token: the sheets stay in the run's artifacts
+        if: steps.changed.outputs.ids != '' && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        env:
+          IDS: ${{ steps.changed.outputs.ids }}
+        with:
+          script: |
+            const marker = "<!-- sahne-art-sheets -->";
+            const run = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `${marker}\nReview sheets for ${process.env.IDS.split(",").map(i => `\`${i}\``).join(", ")}: each item as the kit sheet draws it, and its family at one scale. A comment cannot hold the pictures, so they are the \`sahne-art-sheets\` artifact of [this run](${run}).`;
+            const { owner, repo } = context.repo, issue_number = context.issue.number;
+            const old = (await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number })).find(c => c.body?.startsWith(marker));
+            if (old) await github.rest.issues.updateComment({ owner, repo, comment_id: old.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number, body });
