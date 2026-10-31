@@ -50,7 +50,22 @@ export const net: Fetch = (...a) => fetcher(...a);
 /** A JSON Schema as a provider takes it: no `$schema`. */
 export function schemaFor(s: Record<string, unknown>): Record<string, unknown> {
   const { $schema: _drop, ...rest } = s;
-  return { type: "object", properties: {}, ...rest };
+  return { type: "object", properties: {}, ...(draft2020(rest) as Record<string, unknown>) };
+}
+
+/**
+ * A schema in JSON Schema 2020-12, as Anthropic's API requires: a tuple written the draft-07 way (`items` as a list, with
+ * `additionalItems`), which zod's converter writes for a z.tuple, becomes `prefixItems` (and `items: false` for none more).
+ */
+function draft2020(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(draft2020);
+  if (!v || typeof v !== "object") return v;
+  const o = Object.fromEntries(Object.entries(v).map(([k, x]) => [k, draft2020(x)])) as Record<string, unknown>;
+  if (Array.isArray(o.items)) {
+    const { items, additionalItems, ...more } = o;
+    return { ...more, prefixItems: items, ...(additionalItems === undefined ? {} : { items: additionalItems }) };
+  }
+  return o;
 }
 
 /** Read a Server-Sent Events body: each event's name (or "message") and its data. */
