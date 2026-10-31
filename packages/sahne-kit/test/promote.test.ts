@@ -152,6 +152,11 @@ test("promote.ts moves the drawing in, adds the alias and the credit, and --chec
   assert.match(readFileSync(join(root, "packages/sahne-kit/src/set/families.gen.ts"), "utf8"), /butter_cookie: "bakery"/);
   assert.ok(existsSync(join(root, "out/butter_cookie-neighbours.png")) && existsSync(join(root, "out/butter_cookie.pr.md")));
   assert.equal(runIn(root, root, ["--check"]).status, 0, "fresh");
+  // CI draws the sheets of the items a pull request changed, by id
+  const sheets = runIn(root, root, ["--sheet", "butter_cookie", "--out", join(root, "ci")]);
+  assert.equal(sheets.status, 0, sheets.stdout + sheets.stderr);
+  assert.ok(existsSync(join(root, "ci/butter_cookie.png")) && existsSync(join(root, "ci/butter_cookie-neighbours.png")));
+  assert.equal(runIn(root, root, ["--sheet", "nonesuch"]).status, 1);
 
   // a story that still names its x_ id stages through the alias: the family loads, the place lints, the piece draws
   const probe = spawnSync(process.execPath, ["--input-type=module", "-e", `

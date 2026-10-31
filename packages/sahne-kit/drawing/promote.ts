@@ -6,6 +6,8 @@
 //   node packages/sahne-kit/drawing/promote.ts <content-root>/kit/pieces/x_cafe_chalkboard.json \
 //     --id chalkboard --family bakery --by "Ada L." --contact github:ada --consent [--pr] [--dry] [--out promote-out]
 //   node packages/sahne-kit/drawing/promote.ts --check      the generated files below are current
+//   node packages/sahne-kit/drawing/promote.ts --regenerate  write them
+//   node packages/sahne-kit/drawing/promote.ts --sheet butter_cookie,chalkboard [--out dir]   the review sheets of items already in the kit
 //
 // What it does, in order:
 //   1 checks   `officialProblems` (sahne-kit/check) on the drawing under its new id with its credit, the schema, and the
@@ -191,10 +193,40 @@ export function familySize(family: string, docs: readonly DrawingDoc[]): { gzip:
   } catch { return null; } finally { rmSync(dir, { recursive: true, force: true }); }
 }
 
+/** The review sheets of a drawing under its kit id: the item as the kit sheet shows it, and its family at one scale. Returns their paths. */
+export async function drawSheets(doc: DrawingDoc, family: string, out: string): Promise<string[]> {
+  const [{ drawnFamily }, { default: full }, { FAMILY_MODULES }, { kitSheetSvg, cellSheetSvg, SMALL_CM }, { rng, groupBounds }, { renderPng }] = await Promise.all([
+    import("../src/drawing.ts"), import("../src/full.ts"), import("../src/set/all.ts"), import("../src/set-svg.ts"), import("sahne"), import("../../sahne-backstage/server/render.ts"),
+  ]);
+  const images: string[] = [];
+  const mine = drawnFamily([doc]), kit = { ...full, set: { ...full.set, ...mine.set }, props: { ...full.props, ...mine.props } };
+  const kind = doc.as === "set" ? "set" as const : "props" as const, def = (kind === "set" ? mine.set : mine.props)[doc.id];
+  mkdirSync(out, { recursive: true });
+  const sheet = join(out, `${doc.id}.png`), near = join(out, `${doc.id}-neighbours.png`);
+  writeFileSync(sheet, renderPng(kitSheetSvg(kit, [{ id: doc.id, def, kind }]), { background: "#E8E1D4" }));
+  images.push(sheet);
+  // its neighbours: the family's items sharing the most tags, one default look each, all at one scale: the scene's (beside the
+  // adult) when any is large, else one box of cm round all of them, so a cup and a salami are told apart by size
+  const mod = FAMILY_MODULES[family];
+  if (mod) {
+    const tags = new Set(doc.tags ?? []), seen = new Set<string>();
+    const pool = (["props", "set"] as const).flatMap(k => Object.entries(mod[k]).map(([id, d]) => ({ id, def: d, kind: k, hit: (d.meta?.tags ?? []).filter(t => tags.has(t)).length })));
+    const friends = pool.filter(p => p.id !== doc.id && !seen.has(`${p.kind}:${p.id}`) && seen.add(`${p.kind}:${p.id}`)).sort((a, b) => b.hit - a.hit || a.id.localeCompare(b.id)).slice(0, 11);
+    const group = [{ id: doc.id, def, kind }, ...friends];
+    const box = group.map(g => g.def.draw({}, rng(`${g.id}/a`), kit).flats.map(f => groupBounds(f.group))).flat();
+    const w = Math.max(...box.map(b => Math.max(-b[0], b[2]))), h = Math.max(...box.map(b => -b[1]));
+    const small = Math.max(w * 2, h) <= SMALL_CM, pad = (v: number) => Math.ceil(v * 1.1);
+    const cells = group.map((g, i) => ({ item: { id: g.id, def: g.def, kind: g.kind }, label: "default", params: {}, num: i + 1, ...(small ? { focus: [-pad(w), -pad(h), pad(w), 1] as [number, number, number, number] } : {}) }));
+    writeFileSync(near, renderPng(cellSheetSvg(kit, cells, { zoom: small ? "auto" : "scene", columns: 6 }), { background: "#E8E1D4" }));
+    images.push(near);
+  }
+  return images;
+}
+
 /** Checks the drawing and draws its sheets; writes nothing to the kit. */
 async function inspect(o: Options, doc: DrawingDoc): Promise<{ problems: Problem[]; images: string[]; notes: string[] }> {
-  const [{ officialProblems }, { drawnFamily, compileDrawing }, { default: full }, { FAMILIES }, { FAMILY_MODULES }, groups, set] = await Promise.all([
-    import("../src/check.ts"), import("../src/drawing.ts"), import("../src/full.ts"), import("../src/set/index.ts"), import("../src/set/all.ts"),
+  const [{ officialProblems }, { compileDrawing }, { default: full }, { FAMILIES }, groups, set] = await Promise.all([
+    import("../src/check.ts"), import("../src/drawing.ts"), import("../src/full.ts"), import("../src/set/index.ts"),
     import("../../sahne-backstage/src/model/kitgroups.ts"), import("../../sahne-story/check/schema.ts"),
   ]);
   const notes: string[] = [], problems: Problem[] = [];
@@ -207,33 +239,7 @@ async function inspect(o: Options, doc: DrawingDoc): Promise<{ problems: Problem
     kit: full, family: o.family, families: Object.keys(FAMILIES), wired: wiredFamilies().includes(o.family),
     shelfTags: { props: tagsOf(groups.PROP_SHELVES), set: tagsOf(groups.SET_SHELVES) }, ...(size ? { size } : {}),
   }));
-  // the sheets: the item as the kit sheet shows it, then its family at one scale
-  const images: string[] = [];
-  if (!compileDrawing(doc, true).problems.length) {
-    const { kitSheetSvg, cellSheetSvg, SMALL_CM } = await import("../src/set-svg.ts"), { rng, groupBounds } = await import("sahne"), { renderPng } = await import("../../sahne-backstage/server/render.ts");
-    const mine = drawnFamily([doc]), kit = { ...full, set: { ...full.set, ...mine.set }, props: { ...full.props, ...mine.props } };
-    const kind = doc.as === "set" ? "set" as const : "props" as const, def = (kind === "set" ? mine.set : mine.props)[doc.id];
-    const out = o.out ?? join(process.cwd(), "promote-out");
-    mkdirSync(out, { recursive: true });
-    const sheet = join(out, `${doc.id}.png`), near = join(out, `${doc.id}-neighbours.png`);
-    writeFileSync(sheet, renderPng(kitSheetSvg(kit, [{ id: doc.id, def, kind }]), { background: "#E8E1D4" }));
-    images.push(sheet);
-    // its neighbours: the family's items sharing the most tags, one default look each, all at one scale: the scene's (beside the
-    // adult) when any is large, else one box of cm round all of them, so a cup and a salami are told apart by size
-    const mod = FAMILY_MODULES[o.family];
-    if (mod) {
-      const tags = new Set(doc.tags ?? []), seen = new Set<string>();
-      const pool = (["props", "set"] as const).flatMap(k => Object.entries(mod[k]).map(([id, d]) => ({ id, def: d, kind: k, hit: (d.meta?.tags ?? []).filter(t => tags.has(t)).length })));
-      const friends = pool.filter(p => p.id !== doc.id && !seen.has(`${p.kind}:${p.id}`) && seen.add(`${p.kind}:${p.id}`)).sort((a, b) => b.hit - a.hit || a.id.localeCompare(b.id)).slice(0, 11);
-      const group = [{ id: doc.id, def, kind }, ...friends];
-      const box = group.map(g => g.def.draw({}, rng(`${g.id}/a`), kit).flats.map(f => groupBounds(f.group))).flat();
-      const w = Math.max(...box.map(b => Math.max(-b[0], b[2]))), h = Math.max(...box.map(b => -b[1]));
-      const small = Math.max(w * 2, h) <= SMALL_CM, pad = (v: number) => Math.ceil(v * 1.1);
-      const cells = group.map((g, i) => ({ item: { id: g.id, def: g.def, kind: g.kind }, label: "default", params: {}, num: i + 1, ...(small ? { focus: [-pad(w), -pad(h), pad(w), 1] as [number, number, number, number] } : {}) }));
-      writeFileSync(near, renderPng(cellSheetSvg(kit, cells, { zoom: small ? "auto" : "scene", columns: 6 }), { background: "#E8E1D4" }));
-      images.push(near);
-    }
-  }
+  const images = compileDrawing(doc, true).problems.length ? [] : await drawSheets(doc, o.family, o.out ?? join(process.cwd(), "promote-out"));
   return { problems, images, notes };
 }
 
@@ -379,7 +385,7 @@ export async function promote(o: Options): Promise<Outcome> {
 export async function main(argv: string[]): Promise<number> {
   const { values: v, positionals } = parseArgs({ args: argv, allowPositionals: true, options: {
     id: { type: "string" }, family: { type: "string" }, by: { type: "string" }, contact: { type: "string" }, story: { type: "string" }, date: { type: "string" }, out: { type: "string" },
-    consent: { type: "boolean" }, pr: { type: "boolean" }, dry: { type: "boolean" }, check: { type: "boolean" }, regenerate: { type: "boolean" }, help: { type: "boolean", short: "h" },
+    sheet: { type: "string" }, consent: { type: "boolean" }, pr: { type: "boolean" }, dry: { type: "boolean" }, check: { type: "boolean" }, regenerate: { type: "boolean" }, help: { type: "boolean", short: "h" },
   } });
   if (v.check) {
     const bad = check();
@@ -388,8 +394,18 @@ export async function main(argv: string[]): Promise<number> {
     return 0;
   }
   if (v.regenerate) { regenerate(); return 0; }
+  if (v.sheet !== undefined) {
+    // the review sheets of items already in src/set/drawn/ (CI draws them for a pull request's changed items)
+    const items = readDrawn(), want = v.sheet.split(",").map(x => x.trim()).filter(Boolean), out = resolve(v.out ?? "promote-out");
+    for (const id of want) {
+      const it = items.find(i => i.doc.id === id);
+      if (!it) { console.error(`no promoted drawing ${id}`); return 1; }
+      for (const i of await drawSheets(it.doc, it.family, out)) console.log(`image: ${i}`);
+    }
+    return 0;
+  }
   if (v.help || positionals.length !== 1 || !v.id || !v.family) {
-    console.error("usage: node packages/sahne-kit/drawing/promote.ts <kit/pieces/x_….json> --id <new id> --family <family> --by <name> --contact <github:name> --consent [--story <s>] [--pr] [--dry] [--out <dir>]\n       node packages/sahne-kit/drawing/promote.ts --check");
+    console.error("usage: node packages/sahne-kit/drawing/promote.ts <kit/pieces/x_….json> --id <new id> --family <family> --by <name> --contact <github:name> --consent [--story <s>] [--pr] [--dry] [--out <dir>]\n       node packages/sahne-kit/drawing/promote.ts --check | --regenerate | --sheet <id,id>");
     return v.help ? 0 : 2;
   }
   const r = await promote({ source: resolve(positionals[0]), id: v.id, family: v.family, by: v.by ?? "", contact: v.contact ?? "", consent: !!v.consent, story: v.story, date: v.date, pr: v.pr, dry: v.dry, out: v.out ? resolve(v.out) : undefined });
