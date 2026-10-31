@@ -1,6 +1,6 @@
-// The assistant (server/assistant.ts) with the network stubbed, on a temp copy of the samples and a temp config folder:
-// an Anthropic streamed tool_use loop that calls a real backstage tool through MCP, keeps the thinking block for the next
-// request, and ends with text; an edit that becomes a proposal; an OpenAI-compatible tool_calls loop; a refusal, API
+// The assistant (server/assistant.ts, on LangGraph and LangChain's models) with the network stubbed, on a temp copy of the
+// samples and a temp config folder: an Anthropic streamed tool_use loop that calls a real backstage tool through MCP, keeps
+// the thinking block for the next request, and ends with text; the web through Tavily, on Claude; an edit that becomes a proposal; an OpenAI-compatible tool_calls loop; a refusal, API
 // errors and a missing key; a big ask that asks first; the second reader's fresh conversation; the budget logging each
 // call's cost and refusing at the caps; the settings' round trip. Over HTTP: /api/assistant streams from a local
 // OpenAI-compatible server, and /api/world, /api/usage and /api/settings answer.
@@ -37,12 +37,12 @@ const chunked = (text: string, n = 23) => new ReadableStream<Uint8Array>({
 const anthropicSse = (events: object[]) => new Response(chunked(events.map(e => `event: ${(e as { type: string }).type}\ndata: ${JSON.stringify(e)}\n\n`).join("")), { status: 200, headers: { "content-type": "text/event-stream" } });
 const openaiSse = (chunks: object[]) => new Response(chunked([...chunks.map(c => `data: ${JSON.stringify(c)}\n\n`), "data: [DONE]\n\n"].join("")), { status: 200, headers: { "content-type": "text/event-stream" } });
 
-let sent: { url: string; body: any; headers: Record<string, string> }[] = [];
+let sent: { url: string; body: any; headers: Headers }[] = [];
 function answers(...rs: (() => Response)[]) {
   sent = [];
   let i = 0;
   setFetch(async (url, init) => {
-    sent.push({ url: String(url), body: JSON.parse(String(init!.body)), headers: init!.headers as Record<string, string> });
+    sent.push({ url: String(url), body: JSON.parse(String(init!.body)), headers: new Headers(init!.headers) });
     const f = rs[i++];
     if (!f) throw new Error("no more stubbed answers");
     return f();
@@ -105,13 +105,14 @@ test("anthropic: a streamed tool_use loop reads a real step through MCP, keeps i
   assert.match(evs[2].detail, /"who": "ismail"/);
   assert.equal(typeof evs[2].ms, "number");
   assert.equal(text(evs), "İsmail welcomes Nima in.");
-  const usd = (1000 * 4 + 200 * 20 + 1500 * 4 + 30 * 20) / 1e6;
-  assert.deepEqual(evs.at(-1)!.usage, { input: 2500, output: 230, usd });
+  // LangChain counts the message_start's output token too (one a turn)
+  const usd = (1000 * 4 + 201 * 20 + 1500 * 4 + 31 * 20) / 1e6;
+  assert.deepEqual(evs.at(-1)!.usage, { input: 2500, output: 232, usd });
   // the request: the API, the key, streaming, adaptive thinking, the tools without $schema, a system prompt from the series
   const [r1, r2] = sent;
   assert.equal(r1.url, "https://api.anthropic.com/v1/messages");
-  assert.equal(r1.headers["x-api-key"], "test-key");
-  assert.equal(r1.headers["anthropic-version"], "2023-06-01");
+  assert.equal(r1.headers.get("x-api-key"), "test-key");
+  assert.equal(r1.headers.get("anthropic-version"), "2023-06-01");
   assert.equal(r1.body.model, "claude-opus-5-5");
   assert.equal(r1.body.stream, true);
   assert.deepEqual(r1.body.thinking, { type: "adaptive", display: "summarized" });
@@ -136,7 +137,7 @@ test("anthropic: a streamed tool_use loop reads a real step through MCP, keeps i
   const log = readFileSync(usageFile(), "utf8").trim().split("\n").map(l => JSON.parse(l));
   assert.equal(log.length, 2);
   assert.equal(log[0].provider, "anthropic");
-  assert.equal(log[0].usd, (1000 * 4 + 200 * 20) / 1e6);
+  assert.equal(log[0].usd, (1000 * 4 + 201 * 20) / 1e6);
   assert.ok(Math.abs(totals().today.usd - usd) < 1e-12);
 });
 
@@ -177,37 +178,37 @@ test("the conversation goes back as it was: an earlier tool's picture is not rew
   assert.equal(images, 2, "both pictures are still there");
 });
 
-test("the web on Claude: Anthropic's search runs on its side; a paused turn goes on; the pages found are shown, and each search is priced", async () => {
+/** Tavily's answers, when the stub is asked for its search or a page. */
+const tavily = (url: string) => url.startsWith("https://api.tavily.com/search") ? new Response(JSON.stringify({ results: [{ title: "Simit", url: "https://example.com/simit", content: "About 20 lira." }] }), { status: 200, headers: { "content-type": "application/json" } }) : null;
+function answersWithWeb(...rs: (() => Response)[]) {
+  sent = [];
+  let i = 0;
+  setFetch(async (url, init) => {
+    const t = tavily(String(url));
+    if (t) return t;
+    sent.push({ url: String(url), body: JSON.parse(String(init!.body)), headers: new Headers(init!.headers) });
+    const f = rs[i++];
+    if (!f) throw new Error("no more stubbed answers");
+    return f();
+  });
+}
+
+test("the web on Claude goes through Tavily: its pages are shown; off, the lists say how to turn it on", async () => {
   process.env.ANTHROPIC_API_KEY = "test-key";
-  delete process.env.TAVILY_API_KEY;
-  const searchTurn = (stop: string) => () => anthropicSse([
-    { type: "message_start", message: { model: "claude-opus-5-5", usage: { input_tokens: 100, output_tokens: 1 } } },
-    { type: "content_block_start", index: 0, content_block: { type: "server_tool_use", id: "srvtoolu_1", name: "web_search", input: {} } },
-    { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{\"query\":\"simit fiyatı\"}" } },
-    { type: "content_block_stop", index: 0 },
-    { type: "content_block_start", index: 1, content_block: { type: "web_search_tool_result", tool_use_id: "srvtoolu_1", content: [{ type: "web_search_result", url: "https://example.com/simit", title: "Simit" }] } },
-    { type: "content_block_stop", index: 1 },
-    { type: "message_delta", delta: { stop_reason: stop }, usage: { output_tokens: 10, server_tool_use: { web_search_requests: 1 } } },
-    { type: "message_stop" },
-  ]);
-  answers(searchTurn("pause_turn"), textTurn("A simit costs about 20 lira."));
+  process.env.TAVILY_API_KEY = "tvly-test";
+  answersWithWeb(toolTurn("toolu_w1", "web_search", { query: "simit fiyatı" }), textTurn("A simit costs about 20 lira."));
   const evs = await ask("How much is a simit?");
-  // the request carries the server tools; a paused turn is sent back as it is, with no extra message
-  assert.ok(sent[0].body.tools.some((t: { type?: string }) => t.type === "web_search_20260209"));
-  assert.equal(sent.length, 2);
-  assert.equal(sent[1].body.messages.at(-1).role, "assistant");
-  assert.deepEqual(sent[1].body.messages.at(-1).content[0].input, { query: "simit fiyatı" });
-  const tool = evs.find(e => e.type === "tool")!;
-  assert.deepEqual({ name: tool.name, input: tool.input }, { name: "web_search", input: { query: "simit fiyatı" } });
-  assert.match(evs.find(e => e.type === "tool_result")!.summary, /1 page/);
+  // Anthropic's own search is never asked for: the web is the assistant's own tool
+  assert.ok(!sent[0].body.tools.some((t: { type?: string }) => typeof t.type === "string" && t.type.startsWith("web_search_")));
+  assert.ok(sent[0].body.tools.some((t: { name: string }) => t.name === "web_search"));
+  assert.match(evs.find(e => e.type === "tool_result")!.summary, /1 page \(Tavily/);
   assert.deepEqual(evs.find(e => e.type === "sources")!.list, [{ url: "https://example.com/simit", title: "Simit" }]);
   assert.equal(text(evs), "A simit costs about 20 lira.");
-  assert.ok(evs.at(-1)!.usage.usd >= 0.01, "a search costs a cent");
-  // off: no web tools, and the lists say how to turn it on
   answers(textTurn("No web."));
   await ask("Search it", { settings: { web: "off" } });
-  assert.ok(!sent[0].body.tools.some((t: { type?: string }) => t.type === "web_search_20260209"));
+  assert.ok(!sent[0].body.tools.some((t: { name: string }) => t.name === "web_search"));
   assert.match(sent[0].body.system, /Browse the web: Settings turns it on/);
+  delete process.env.TAVILY_API_KEY;
 });
 
 test("memory: a kept note is in every later prompt; forgotten, it goes; never a key; after the web, the person decides", async () => {
@@ -228,7 +229,8 @@ test("memory: a kept note is in every later prompt; forgotten, it goes; never a 
   // after a web search in the ask, a note waits for the person, and a direct-mode edit becomes a proposal
   const webTurn = () => anthropicSse([
     { type: "message_start", message: { model: "claude-opus-5-5", usage: { input_tokens: 10, output_tokens: 1 } } },
-    { type: "content_block_start", index: 0, content_block: { type: "server_tool_use", id: "srvtoolu_w", name: "web_search", input: {} } },
+    { type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_w", name: "web_search", input: {} } },
+    { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{\"query\":\"simit\"}" } },
     { type: "content_block_stop", index: 0 },
     { type: "content_block_start", index: 1, content_block: { type: "tool_use", id: "toolu_r2", name: "remember", input: {} } },
     { type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: "{\"text\":\"Simit is 20 lira.\"}" } },
@@ -236,12 +238,14 @@ test("memory: a kept note is in every later prompt; forgotten, it goes; never a 
     { type: "message_delta", delta: { stop_reason: "tool_use" }, usage: { output_tokens: 5 } },
     { type: "message_stop" },
   ]);
-  answers(webTurn, toolTurn("toolu_e", "set_texts", { id: "s1e00", path: "steps/4", texts: { en: "Good evening, friend." } }), textTurn("Done."));
+  process.env.TAVILY_API_KEY = "tvly-test";
+  answersWithWeb(webTurn, toolTurn("toolu_e", "set_texts", { id: "s1e00", path: "steps/4", texts: { en: "Good evening, friend." } }), textTurn("Done."));
   const wv = await ask("Look it up and remember the price, then fix the line.", { agentEdits: "direct" });
   assert.equal(wv.find(e => e.type === "ask")!.remember, "Simit is 20 lira.");
   assert.deepEqual(readMemory(), []);
   assert.ok(wv.some(e => e.type === "proposal"), "the edit after the web is a proposal, not saved");
   assert.doesNotMatch(readFileSync(join(root, "stories", "s1e00.json"), "utf8"), /Good evening, friend/);
+  delete process.env.TAVILY_API_KEY;
 });
 
 test("an edit by the assistant is a proposal, by \"assistant\"; a quick ask takes the faster model", async () => {
@@ -300,7 +304,7 @@ test("a big ask asks first; the second reader starts fresh", async () => {
 });
 
 test("openai-compatible: reasoning goes to the thinking, never into the answer, a <think> tag cut across chunks too", async () => {
-  const { thinkSplitter } = await import("../server/ai/providers/openai.ts");
+  const { thinkSplitter } = await import("../server/ai/models.ts");
   let said = "", thought = "";
   const sp = thinkSplitter(x => { said += x; }, x => { thought += x; });
   for (const c of ["Hi <thi", "nk>weigh it", " up</th", "ink> there <", "b>"]) sp.push(c);
@@ -308,7 +312,8 @@ test("openai-compatible: reasoning goes to the thinking, never into the answer, 
   assert.equal(said, "Hi  there <b>");
   assert.equal(thought, "weigh it up");
   answers(() => openaiSse([
-    { choices: [{ delta: { reasoning_content: "Short answer." } }] },
+    // a server's first chunk names the role (LangChain reads the rest of the answer as the assistant's by it)
+    { choices: [{ delta: { role: "assistant", reasoning_content: "Short answer." } }] },
     { choices: [{ delta: { content: "<think>also this</think>Merhaba!" } }] },
     { choices: [{ delta: {}, finish_reason: "stop" }] },
   ]));
@@ -326,7 +331,7 @@ test("openai-compatible: a streamed tool_calls loop, usage estimated when the se
       { choices: [{ index: 0, delta: {}, finish_reason: "stop" }] },
     ]),
     () => openaiSse([
-      { choices: [{ index: 0, delta: { content: "İsmail " } }] },
+      { choices: [{ index: 0, delta: { role: "assistant", content: "İsmail " } }] },
       { choices: [{ index: 0, delta: { content: "speaks." }, finish_reason: "stop" }] },
       { choices: [], usage: { prompt_tokens: 900, completion_tokens: 4 } },
     ]),
@@ -336,7 +341,7 @@ test("openai-compatible: a streamed tool_calls loop, usage estimated when the se
   assert.deepEqual(evs.filter(e => e.type !== "text").map(e => e.type), ["tool", "tool_result", "done"]);
   assert.equal(text(evs), "İsmail speaks.");
   assert.equal(sent[0].url, "http://localhost:1234/v1/chat/completions");
-  assert.equal(sent[0].body.model, undefined, "no model named: the server's loaded one");
+  assert.equal(sent[0].body.model, "local", "no model named: the server's loaded one");
   assert.equal(sent[0].body.messages[0].role, "system");
   assert.equal(sent[0].body.tools[0].type, "function");
   assert.deepEqual(sent[1].body.messages.at(-2).tool_calls, [{ id: "call_1", type: "function", function: { name: "read_step", arguments: "{\"id\":\"s1e00\",\"path\":4}" } }]);
@@ -410,7 +415,7 @@ before(async () => {
     req.resume();
     req.on("end", () => {
       res.writeHead(200, { "content-type": "text/event-stream" });
-      for (const c of [{ choices: [{ index: 0, delta: { content: "Merhaba!" } }] }, { choices: [{ index: 0, delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 400, completion_tokens: 3 } }]) res.write(`data: ${JSON.stringify(c)}\n\n`);
+      for (const c of [{ choices: [{ index: 0, delta: { role: "assistant", content: "Merhaba!" } }] }, { choices: [{ index: 0, delta: {}, finish_reason: "stop" }] }, { choices: [], usage: { prompt_tokens: 400, completion_tokens: 3 } }]) res.write(`data: ${JSON.stringify(c)}\n\n`);
       res.end("data: [DONE]\n\n");
     });
   });

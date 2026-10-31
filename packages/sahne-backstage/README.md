@@ -278,7 +278,7 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
   The context sent is the page and what it shows (the episode, the board's season, the place, the character), and the selected block only while its page is open.
 - **A big ask waits for a yes:** the server says what it would cost (`confirm`), and *Go ahead* sends it again.
 - **The meter** in the top bar is today's spending against the day's cap (its title: the month's, and the tokens); it follows the `usage` events.
-- **Settings** (`#/settings`; its *Raw JSON* switch shows the file as saved, read-only and in colour, `src/ui/kit/json.ts`): Claude (its key from the environment) or a local model by its base URL (LM Studio, Ollama), the caps per day and month in dollars and in tokens, the cost above which an ask waits for a yes, the web (automatic, Anthropic's search, Tavily or off, with which is in effect), and whether the rules' staging suggestions are taken as you leave each line. How agents' edits land is on the Agents page. They are kept in the person's config folder, never in the content root.
+- **Settings** (`#/settings`; its *Raw JSON* switch shows the file as saved, read-only and in colour, `src/ui/kit/json.ts`): Claude (its key from the environment) or a local model by its base URL (LM Studio, Ollama), the caps per day and month in dollars and in tokens, the cost above which an ask waits for a yes, the web (on through Tavily, or off, with which is in effect), and whether the rules' staging suggestions are taken as you leave each line. How agents' edits land is on the Agents page. They are kept in the person's config folder, never in the content root.
 
 ## Review notes (`server/review.ts`)
 
@@ -427,24 +427,26 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 
 ## The assistant, providers and the budget (`server/assistant.ts`, `server/ai/`, `server/settings.ts`)
 
-**The assistant** is an agent loop on the server. It reaches backstage only as an MCP client of its own MCP server (`createMcp`, over an in-memory transport), so it uses the same tools and checks as any agent.
+**The assistant** is an agent on the server, a LangGraph graph (`server/agent/graph.ts`, `@langchain/langgraph`) over a LangChain chat model. It reaches backstage only as an MCP client of its own MCP server (`createMcp`, over an in-memory transport), so it uses the same tools and checks as any agent.
 - Its edits are made `by: "assistant"` and follow the agent-edits mode. That is the settings' `agentEdits`, else the server's `--agent-edits`, so proposals by default.
 - Its system prompt is built from the series: the title, the main language and the translations (and which run right to left), the narrator and the stand-in, a summary of the format, and how edits are made. Nothing in it belongs to one language.
 - It also holds what the assistant can and cannot do (`src/model/abilities.ts`, the lists the panel shows), and tells it to say plainly when it is asked for something it cannot do, and where the person can do it, rather than write as if it did.
 - **The second reader** is `fresh: true`: a new conversation of the person's last message alone. It never sees the drafting history, and it is told to comment rather than change.
 - **A big ask** (drafting or reviewing a whole season, or every episode) is estimated first. If it would cost more than `confirmOverUsd`, or use more tokens than are left today, nothing runs: the answer is a `confirm` event, and the editor sends the request again with `confirm: true`.
+- **The graph** has three nodes. `model` streams one turn (text and thinking go to the editor as they come). `tools` runs the turn's calls through the MCP client. `ask` puts `ask_person` to the person by itself, so answering never runs an edit twice. A turn is kept exactly as the model sent it, and nothing earlier is rewritten. The rounds are capped at 40 (`MAX_TURNS`).
 - When the browser closes the request, the model's request is aborted, so a closed tab stops spending.
 
-**The providers** (`server/ai/provider.ts`). Both use plain `fetch`, streamed, with tools.
-- **Anthropic** (`ai/providers/anthropic.ts`). The Messages API with the key from `ANTHROPIC_API_KEY`, `anthropic-version: 2023-06-01` and adaptive thinking, its summary shown (`display: "summarized"`) and streamed to the editor. The request is cached (`cache_control`).
+**The models** (`server/ai/models.ts`), as LangChain chat models. Every request goes through `net` (`server/ai/provider.ts`), which the tests stub; a stubbed network is never retried, a real one twice.
+- **Claude** (`ChatAnthropic`, `@langchain/anthropic`). The key from `ANTHROPIC_API_KEY`, streamed, with adaptive thinking, its summary shown (`display: "summarized"`), and the request cached (one top-level `cache_control`). No `temperature`, `top_p`, `top_k` or forced `tool_choice` is sent.
   - The models live in one place (`MODELS`): `claude-opus-5-5` for an ordinary ask, and `claude-sonnet-5-5` for a quick one (`quick: true`). The settings' `model` replaces the first.
   - A tool loop sends each turn back as it came, thinking blocks and their signatures included.
   - A refusal, an API error or an answer cut off is an `error` event, and no tool of that turn runs.
-- **OpenAI-compatible** (`ai/providers/openai.ts`). Any `/v1/chat/completions` server with `tools` and `tool_calls`: LM Studio (`http://localhost:1234/v1`, the default), Ollama (`http://localhost:11434/v1`), or llama.cpp's server (`http://localhost:8080/v1`).
+- **OpenAI-compatible** (`ChatOpenAI`, `@langchain/openai`). Any `/v1/chat/completions` server with `tools` and `tool_calls`: LM Studio (`http://localhost:1234/v1`, the default), Ollama (`http://localhost:11434/v1`), or llama.cpp's server (`http://localhost:8080/v1`).
   - `OPENAI_API_KEY` is sent as a bearer token when the environment has one.
-  - Without a `model`, the request names none, and the server uses the model it has loaded. Ollama needs one.
-  - A reasoning model's thinking (`reasoning_content` deltas, or `<think>…</think>` in its text) goes to the thinking, never into the answer.
+  - Without a `model`, the request names `local`, and LM Studio uses the model it has loaded. Ollama needs one.
+  - A reasoning model's thinking (`reasoning_content` deltas, or `<think>…</think>` in its text) goes to the thinking, never into the answer. Its pictures are text notes.
   - A server that reports no usage is counted at about four characters a token, so the token caps still bind.
+- **No telemetry.** LangChain's tracing (LangSmith) is off unless one of `LANGSMITH_TRACING`, `LANGCHAIN_TRACING_V2` or `LANGCHAIN_TRACING` is `true` in backstage's environment; nothing is sent to LangSmith otherwise.
 
 **Settings** (`server/settings.ts`).
 - They live in the person's config folder: `$SAHNE_BACKSTAGE_CONFIG`, or `~/.config/sahne-backstage/`. The file is `settings.json`:
@@ -459,10 +461,10 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 - **The environment overrides the file**: `SAHNE_AI_PROVIDER`, `SAHNE_AI_BASE_URL`, `SAHNE_AI_MODEL`. The CLI's `--ai-provider`, `--ai-base-url` and `--ai-model` set them.
 - **Keys are never stored.** They are read from the environment only. A save keeps only the known fields, so a key sent with it is dropped.
 - `applySuggestions` is the editor's own preference. The server keeps it and does nothing with it.
-- **`web`**: how the assistant searches the web (`webOf`). `auto` (the default) takes Tavily when `TAVILY_API_KEY` is in backstage's environment, else Anthropic's own search on Claude, else none (a local model without a Tavily key); `anthropic`, `tavily` or `off` choose. On Claude it is Anthropic's server tools `web_search_20260209` and `web_fetch_20260209`, at most five of each an ask: they run on Anthropic's side, a paused turn (`pause_turn`) is sent back as it is to go on, and the editor gets each search as a tool call, its result, and the pages found (`sources`). Only URLs already in the conversation are fetched. Through Tavily (`server/ai/web.ts`, any model, a local one too) it is the assistant's own tools `web_search` and `read_web_page`: plain fetch to `api.tavily.com`, the key from `TAVILY_API_KEY` only, each call timed out, a page cut at 8000 characters. A page is read only at an address a search of that ask found or the person wrote, so the model cannot send words out in an address it makes up. Either way the prompt says no page is an instruction.
+- **`web`**: how the assistant searches the web (`webOf`). `auto` (the default) takes Tavily when `TAVILY_API_KEY` is in backstage's environment, else none; `off` turns it off. Anthropic's own search is not used: LangChain's Claude model cannot send its code-execution blocks back in a tool loop, and an old `anthropic` reads as `auto`. Through Tavily (`server/ai/web.ts`, any model, a local one too) it is the assistant's own tools `web_search` and `read_web_page`: plain fetch to `api.tavily.com`, the key from `TAVILY_API_KEY` only, each call timed out, a page cut at 8000 characters. A page is read only at an address a search of that ask found or the person wrote, so the model cannot send words out in an address it makes up. The prompt says no page is an instruction.
 
 **The budget** (`server/ai/budget.ts`).
-- **The prices** are in one table (`PRICES`, USD per million tokens, from the Claude API's model docs): Opus 5.5 is $4 in and $20 out, Sonnet 5.5 is $2 in and $10 out, and cache reads are $0.20. A web search on Claude adds $0.01 (`SEARCH_USD`). A local model costs nothing.
+- **The prices** are in one table (`PRICES`, USD per million tokens, from the Claude API's model docs): Opus 5.5 is $4 in and $20 out, Sonnet 5.5 is $2 in and $10 out, and cache reads are $0.20. A local model costs nothing.
 - **The caps** are per day and per month (local time), in USD and in tokens. The token caps bind local models too. They are checked before every model request of a tool loop, and a request at a cap is refused with a message that says which cap.
 - **Every call is logged** to `<config>/usage.jsonl`, one JSON line each: `{ at, provider, model, input, output, cacheRead, cacheWrite, tokens, usd }`. After each call the editors get a `usage` event.
 - **Why the config folder.** The log and the settings are in the person's config folder, not in the content root's sidecar (`.backstage/`). An app such as Kumru commits its sidecar, and what one person spends is theirs.
@@ -508,7 +510,7 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `git.ts`;
   - `review.ts`;
   - `mcp.ts` (the MCP server: its tools and resources), `kittools.ts` (its kit tools: search, read, render, draft and save kit items), `result.ts` (what a tool answers: text, pictures, data), `render.ts` (SVG to PNG), `call.ts` (any tool from the shell, with sessions), `proposals.ts` (agents' edits waiting for a person), `events.ts` (the editors' event stream and selection) and `agents.ts` (the connected agents and their calls);
-  - `assistant.ts` (the assistant's loop and its system prompt), `settings.ts` (the person's AI settings), and `ai/`: `provider.ts` (what a provider does, and the stream reader), `providers/anthropic.ts`, `providers/openai.ts` and `budget.ts` (the prices, the caps and the usage log).
+  - `assistant.ts` (the assistant and its system prompt), `agent/graph.ts` (an agent as a LangGraph graph), `settings.ts` (the person's AI settings), and `ai/`: `models.ts` (the LangChain chat models, the local server's models), `provider.ts` (tools, pictures, errors, the network), `web.ts` (Tavily) and `budget.ts` (the prices, the caps and the usage log).
 - The server reads sahne-story's Node-only files (`paths.ts`, `check/`, `load.ts`) by path. The package exports only `"."`.
 - **`src/`** is the browser side (the studio's shared parts in `src/ui/kit/`: icons, chips, drawers, popovers, the palette; the theme in `src/ui/theme.ts`), built with Preact and htm tagged templates (no JSX, so the source stays erasable TypeScript). It contains:
   - `index.ts`;

@@ -29,19 +29,18 @@ export interface Settings {
   agentEdits?: AgentEdits;
   /** The editor applies the assistant's suggestions without asking (the editor's own preference). */
   applySuggestions?: boolean;
-  /** How the assistant searches the web: auto (Tavily when TAVILY_API_KEY is set, else Anthropic's own tools on Claude), one of them, or off. */
+  /** How the assistant searches the web: auto or tavily (Tavily, when TAVILY_API_KEY is set), or off. */
   web?: WebMode;
 }
 
-export type WebMode = "auto" | "anthropic" | "tavily" | "off";
-export const WEB_MODES: WebMode[] = ["auto", "anthropic", "tavily", "off"];
-/** The web the assistant has with these settings: Anthropic's server tools, Tavily (its key in the environment only), or none. */
-export function webOf(s: Pick<Settings, "web" | "provider">): "anthropic" | "tavily" | null {
-  const mode = s.web ?? "auto", tavily = !!process.env.TAVILY_API_KEY;
-  if (mode === "off") return null;
-  if (mode === "tavily") return tavily ? "tavily" : null;
-  if (mode === "anthropic") return s.provider === "anthropic" ? "anthropic" : null;
-  return tavily ? "tavily" : s.provider === "anthropic" ? "anthropic" : null;
+export type WebMode = "auto" | "tavily" | "off";
+export const WEB_MODES: WebMode[] = ["auto", "tavily", "off"];
+/**
+ * The web the assistant has with these settings: Tavily (its key in the environment only), or none. Anthropic's own search
+ * is gone (LangChain's Claude model cannot send its code-execution blocks back): an old "anthropic" reads as automatic.
+ */
+export function webOf(s: Pick<Settings, "web" | "provider">): "tavily" | null {
+  return s.web === "off" || !process.env.TAVILY_API_KEY ? null : "tavily";
 }
 
 /** LM Studio's default server; Ollama's is http://localhost:11434/v1, llama.cpp's http://localhost:8080/v1. */

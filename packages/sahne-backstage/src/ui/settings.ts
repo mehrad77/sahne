@@ -13,9 +13,9 @@ import { JsonCode } from "./kit/json.ts";
 export interface Settings {
   provider: "anthropic" | "openai"; model?: string; baseUrl?: string;
   caps: { dayUsd?: number; monthUsd?: number; dayTokens?: number; monthTokens?: number };
-  confirmOverUsd?: number; agentEdits?: "proposals" | "direct"; applySuggestions?: boolean; web?: "auto" | "anthropic" | "tavily" | "off";
+  confirmOverUsd?: number; agentEdits?: "proposals" | "direct"; applySuggestions?: boolean; web?: "auto" | "tavily" | "off";
 }
-interface Answer { settings: Settings; file: string; overrides: Record<string, string>; keys: { anthropic: boolean; openai: boolean; tavily?: boolean }; web?: "anthropic" | "tavily" | null; /** The file as it is on disk, null before the first save. */ raw?: string | null }
+interface Answer { settings: Settings; file: string; overrides: Record<string, string>; keys: { anthropic: boolean; openai: boolean; tavily?: boolean }; web?: "tavily" | null; /** The file as it is on disk, null before the first save. */ raw?: string | null }
 
 /** The settings as last read (the studio reads `applySuggestions`). */
 let current: Settings | null = null;
@@ -78,8 +78,8 @@ export function SettingsPage() {
     </div>
     <div class="step-card fields"><h3>The web</h3>
       <div class="segmented" role="group" aria-label="How the assistant searches the web">
-        ${([["auto", "Automatic"], ["anthropic", "Anthropic's search"], ["tavily", "Tavily"], ["off", "Off"]] as const).map(([k, label]) => html`<button aria-pressed=${(s.web ?? "auto") === k} onClick=${() => put("web", k)}>${label}</button>`)}</div>
-      <p class="note">${a.web ? html`In effect: <b>${a.web === "tavily" ? "Tavily" : "Anthropic's search"}</b>. ` : "In effect: no web. "}Automatic takes Tavily when <code>TAVILY_API_KEY</code> is set${a.keys.tavily ? " (it is)" : ""}, else Anthropic's own search on Claude (a cent a search), and none with a local model and no Tavily key. Keys come from backstage's environment, never a file.</p>
+        ${([["auto", "On"], ["off", "Off"]] as const).map(([k, label]) => html`<button aria-pressed=${(s.web === "off" ? "off" : "auto") === k} onClick=${() => put("web", k)}>${label}</button>`)}</div>
+      <p class="note">${a.web ? html`In effect: <b>Tavily</b>. ` : "In effect: no web. "}The assistant searches through Tavily when <code>TAVILY_API_KEY</code> is set${a.keys.tavily ? " (it is)" : " (it is not)"}, on Claude and on a local model alike. Keys come from backstage's environment, never a file.</p>
     </div>
     <${Memory} />
     <div class="step-card fields"><h3>Staging suggestions</h3>

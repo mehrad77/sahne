@@ -19,8 +19,7 @@ import { allProblems, check, exists, forget, isKind, kitDocs, lessons, listing, 
 import { headOf } from "./git.ts";
 import { blocksFor, readReview, writeReview } from "./review.ts";
 import { requestOf, runAssistant, usageSummary } from "./assistant.ts";
-import { MODELS } from "./ai/providers/anthropic.ts";
-import { localModels } from "./ai/providers/openai.ts";
+import { localModels, MODELS } from "./ai/models.ts";
 import { overrides, readiness, readSettings, settingsFile, writeSettings, webOf } from "./settings.ts";
 import { Events, selectionOf } from "./events.ts";
 import { Agents, callOf } from "./agents.ts";
