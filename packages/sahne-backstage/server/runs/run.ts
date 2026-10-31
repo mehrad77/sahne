@@ -267,7 +267,7 @@ export class Runs {
   }
 
   /** The person answers a step's question, stops it, or has it try again. */
-  async step(id: string, stepId: string, a: { action: "answer"; answer: string } | { action: "stop" } | { action: "retry" } | { action: "redo"; note?: string }): Promise<Run> {
+  async step(id: string, stepId: string, a: { action: "answer"; answer: string } | { action: "stop" } | { action: "retry" } | { action: "redo"; note?: string; owns?: Owned[] }): Promise<Run> {
     const run = this.need(id), s = run.steps.find(x => x.id === stepId);
     if (!s) throw new Error(`run ${id} has no step ${stepId}`);
     if (a.action === "stop") { this.live.get(`${run.id}:${s.id}`)?.abort(); s.status = "stopped"; delete s.question; }
@@ -277,6 +277,14 @@ export class Runs {
       await this.saver.deleteThread(`${run.by}:${s.id}`);
       s.status = "waiting"; s.attempts = 0; delete s.error; delete s.summary; delete s.question;
       if (a.note?.trim()) s.brief = `${s.brief}\n\nDone again, because: ${a.note.trim()}`;
+      // what it makes, changed by the person (an id that cannot be made): no other step may make the same
+      if (a.owns) {
+        const taken = a.owns.find(o => run.steps.some(x => x !== s && x.owns.some(y => y.kind === o.kind && y.id === o.id)));
+        if (taken) throw new Error(`${taken.kind} ${taken.id} is another step's to make`);
+        s.owns = a.owns;
+      }
+      // the steps after it read its report again: those that have not started wait for it
+      for (const x of this.after(run, s.id)) if (x.status === "done") x.status = "stale";
       if (run.status === "paused" || run.status === "done") { run.status = "running"; delete run.why; }
     }
     else if (a.action === "retry") { if (s.status === "failed" || s.status === "stopped") { s.status = "waiting"; s.attempts = 0; delete s.error; if (run.status === "paused") { run.status = "running"; delete run.why; } } }
