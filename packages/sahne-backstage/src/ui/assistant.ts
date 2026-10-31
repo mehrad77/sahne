@@ -342,7 +342,7 @@ interface LocalModel { id: string; loaded?: boolean; context?: number; kind?: st
 const ctxText = (n?: number) => (n ? `up to ${n >= 1000 ? `${Math.round(n / 1000)}k` : n} context` : "");
 
 /** The model, in the composer: a pick saves it in the settings. A local server's models are listed (LM Studio's, loaded or not: it loads one when asked). */
-function ModelPicker(p: { ai: { provider: string; model?: string } }) {
+function ModelPicker(p: { ai: { provider: string; model?: string; pinned?: boolean } }) {
   const [at, toggle, close] = usePop();
   const [local, setLocal] = useState<LocalModel[] | null>(null);
   useEffect(() => { if (at && p.ai.provider !== "anthropic") void api.get<{ models: LocalModel[] }>("models").then(r => setLocal(r.status === 200 ? r.models : [])); }, [!!at]);
@@ -350,6 +350,7 @@ function ModelPicker(p: { ai: { provider: string; model?: string } }) {
   const pick = async (id: string) => {
     close();
     if (id === now) return;
+    if (p.ai.pinned) return say("backstage was started with --ai-model: restart it without that to pick the model here", true);
     const r = await api.post("settings", { model: id });
     if (r.status !== 200) return say((r as { message?: string }).message ?? "the model was not changed", true);
     await loadWorld();
@@ -357,7 +358,8 @@ function ModelPicker(p: { ai: { provider: string; model?: string } }) {
   return html`<button type="button" class="model-pick" aria-haspopup="menu" aria-expanded=${!!at} title="The assistant's model" onClick=${(e: MouseEvent) => toggle(e, 300)}>
       <${Icon} name="spark" size=${14} /><span>${modelName(p.ai)}</span><${Icon} name="down" size=${14} /></button>
     ${at && html`<${Popover} above x=${at.x} y=${at.y} label="The assistant's model" onClose=${close}><div class="model-menu" role="menu">
-      ${p.ai.provider === "anthropic" ? CLAUDE.map(m => html`<button type="button" role="menuitemradio" aria-checked=${m.id === now} onClick=${() => void pick(m.id)}>
+      ${p.ai.pinned && html`<p class="note model-wait">Backstage was started with <code>--ai-model</code>, which sets the model over this menu. Start it without that to pick one here.</p>`}
+      ${p.ai.provider === "anthropic" ? CLAUDE.map(m => html`<button type="button" role="menuitemradio" aria-checked=${m.id === now} disabled=${!!p.ai.pinned && m.id !== now} onClick=${() => void pick(m.id)}>
         <span><b>${m.name}</b><small>${m.note}</small></span>${m.id === now && html`<${Icon} name="check" size=${16} />`}</button>`)
         : html`${local === null ? html`<p class="note model-wait">Asking the local server for its models…</p>`
             : local.length ? html`<div class="model-list">${[...local].sort((a, b) => Number(!!b.loaded) - Number(!!a.loaded) || a.id.localeCompare(b.id)).map(m => html`<button type="button" role="menuitemradio" aria-checked=${m.id === now} onClick=${() => void pick(m.id)}>

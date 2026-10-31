@@ -82,7 +82,7 @@ export async function serve(o: Options): Promise<Running> {
   /** The assistant, as `GET /api/world` gives it: false when it cannot run, so a plain truthiness check still works. */
   const aiOf = () => {
     const r = readiness();
-    return r.ready ? { ready: true, provider: r.provider, model: r.model ?? (r.provider === "anthropic" ? MODELS.full : "local"), web: webOf(readSettings()) } : false;
+    return r.ready ? { ready: true, provider: r.provider, model: r.model ?? (r.provider === "anthropic" ? MODELS.full : "local"), web: webOf(readSettings()), ...(overrides().model ? { pinned: true } : {}) } : false;
   };
   /** The settings for the editor: what is in effect, where the file is, what the environment overrides, and whether keys are set (never the keys). */
   const settingsView = () => ({ settings: readSettings(), file: settingsFile(), overrides: overrides(), keys: { anthropic: !!process.env.ANTHROPIC_API_KEY, openai: !!process.env.OPENAI_API_KEY, tavily: !!process.env.TAVILY_API_KEY }, ai: readiness(), web: webOf(readSettings()), raw: existsSync(settingsFile()) ? readFileSync(settingsFile(), "utf8") : null });
