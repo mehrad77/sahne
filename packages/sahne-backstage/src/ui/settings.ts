@@ -1,6 +1,6 @@
 // Settings (#/settings): the assistant's provider (Claude, or any OpenAI-compatible server such as LM Studio or Ollama, by
 // its base URL; the model itself is picked in the chat), the budget (caps per day and month, in dollars and in tokens, which hold for local models too, and the
-// cost above which an ask waits for a yes), and whether the rules' staging suggestions are taken as you leave a line. They are kept in this person's config folder
+// cost above which an ask waits for a yes), how a long task goes (checking with you, or just doing it), and whether the rules' staging suggestions are taken as you leave a line. They are kept in this person's config folder
 // (`~/.config/sahne-backstage/settings.json`), never in the content root; API keys stay in the environment.
 
 import { html } from "htm/preact";
@@ -13,7 +13,7 @@ import { JsonCode } from "./kit/json.ts";
 export interface Settings {
   provider: "anthropic" | "openai"; model?: string; baseUrl?: string;
   caps: { dayUsd?: number; monthUsd?: number; dayTokens?: number; monthTokens?: number };
-  confirmOverUsd?: number; agentEdits?: "proposals" | "direct"; applySuggestions?: boolean; web?: "auto" | "tavily" | "off";
+  confirmOverUsd?: number; agentEdits?: "proposals" | "direct"; applySuggestions?: boolean; web?: "auto" | "tavily" | "off"; runMode?: "check" | "auto";
 }
 interface Answer { settings: Settings; file: string; overrides: Record<string, string>; keys: { anthropic: boolean; openai: boolean; tavily?: boolean }; web?: "tavily" | null; /** The file as it is on disk, null before the first save. */ raw?: string | null }
 
@@ -82,6 +82,12 @@ export function SettingsPage() {
       <p class="note">${a.web ? html`In effect: <b>Tavily</b>. ` : "In effect: no web. "}The assistant searches through Tavily when <code>TAVILY_API_KEY</code> is set${a.keys.tavily ? " (it is)" : " (it is not)"}, on Claude and on a local model alike. Keys come from backstage's environment, never a file.</p>
     </div>
     <${Memory} />
+    <div class="step-card fields"><h3>Long tasks</h3>
+      <p class="note">How a task the assistant offers goes, unless you choose otherwise on its card. Either way it saves as it goes, and you can undo what it made.</p>
+      <div class="segmented" role="group" aria-label="How a task goes">
+        <button aria-pressed=${(s.runMode ?? "check") === "check"} onClick=${() => put("runMode", "check")}>Check with me: the plan first, then only real choices</button>
+        <button aria-pressed=${s.runMode === "auto"} onClick=${() => put("runMode", "auto")}>Just do it: no stops</button></div>
+    </div>
     <div class="step-card fields"><h3>Staging suggestions</h3>
       <label class="row"><input type="checkbox" style="width:auto" checked=${!!s.applySuggestions} onChange=${(e: Event) => put("applySuggestions", (e.target as HTMLInputElement).checked)} /> Take the rules' staging suggestions as I leave each line</label>
     </div>

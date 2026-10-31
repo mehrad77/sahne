@@ -93,7 +93,7 @@ export interface RunsOptions {
 /** The most rounds of tools one step takes. */
 const STEP_TURNS = 60;
 
-const STEP_ASK: ToolDef = { name: "ask_person", description: "Ask the person a question and wait for the answer: this step waits, the task's other steps go on. Use it for a real choice (a name, what they study, which of two places), not for what you can decide. With options, they answer with a button.", schema: { type: "object", properties: { question: { type: "string" }, options: { type: "array", items: { type: "string" }, maxItems: 6 } }, required: ["question"] } };
+const STEP_ASK: ToolDef = { name: "ask_person", description: "Ask the person a question and wait for the answer: this step waits, the task's other steps go on. Use it only for a real choice the goal leaves open (which of two ideas, a name, a fact only the person knows) or for their reply, never to confirm making or changing something: they can undo it. With options, they answer with a button.", schema: { type: "object", properties: { question: { type: "string" }, options: { type: "array", items: { type: "string" }, maxItems: 6 } }, required: ["question"] } };
 const PLAN_STEPS = { type: "array", items: { type: "object", properties: {
   id: { type: "string", description: "a-z, 0-9, _: cast_derya, place_library, ep_s2e01, review" },
   kind: { type: "string", enum: ["season", "character", "place", "episode", "review", "task"] },
@@ -104,7 +104,7 @@ const PLAN_STEPS = { type: "array", items: { type: "object", properties: {
 }, required: ["id", "kind", "title", "brief", "about"] } };
 const PROPOSE_PLAN: ToolDef = { name: "propose_plan", description: "Set this task's plan, once you have read what it needs: a brief every step reads (the story, the people and their names, the places, what each episode teaches and how they connect) and the steps. One step for each new season, character and place, one for each episode (owning its story id, and needing the cast, places and season it uses), and a review step at the end that needs every episode. Ids must be new. The person sees the plan before any step runs, unless they turned that off.", schema: { type: "object", properties: { brief: { type: "string" }, steps: PLAN_STEPS }, required: ["brief", "steps"] } };
 /** The planner's own brief. */
-const PLANNING = "Plan this task. Read the series first (series_overview), the season it goes in, and the cast and places there are (kit_search characters, places), so the plan reuses what exists and makes only what is missing. Pick the new ids (free ones: a character's from its name, episodes the season's next numbers). Then call propose_plan. If something is a real choice for the person (names, which season, what the episodes teach), ask_person before you propose.";
+const PLANNING = "Plan this task. Read the series first (series_overview), the season it goes in, and the cast and places there are (kit_search characters, places), so the plan reuses what exists and makes only what is missing. Pick the new ids (free ones: a character's from its name, episodes the season's next numbers). Then call propose_plan. If something is a real choice for the person that the goal leaves open (names, which season, what the episodes teach), ask_person before you propose; never ask to confirm the plan, as the person sees it.";
 
 /** What a task of these steps may cost, by kind, on Claude (a local model costs nothing): a rough guide, shown at the plan gate. */
 export function estimate(steps: Pick<Step, "kind" | "model">[], provider: string): number {
@@ -147,8 +147,8 @@ function stepPrompt(run: Run, s: Step): string {
     `Your step: ${s.title} (${s.kind}, step ${s.id}).\n${s.brief}`,
     s.owns.length ? `You make: ${s.owns.map(o => `${o.kind} ${o.id}`).join(", ")}. The task's other steps make the rest: read their documents, never change them. A season and the series are shared.` : "You make no document of your own: read, check and report.",
     before.length ? `What the steps before yours did:\n${before.map(x => `- ${x.title}: ${x.summary ?? "(no report)"}`).join("\n")}` : "",
-    run.mode === "auto" ? "What you make is saved as you make it, after the check; the person can undo any of it." : "Nothing a step proposes is saved until the person accepts it, but every step of this task sees the task's pending proposals as there.",
-    `When your work is made and checked, call finish_step with a short report for the steps after yours.${run.asks === "never" ? " Do not wait for the person: decide what is a choice yourself, and say in the report what you chose." : " If the person must decide something, ask_person: you wait for the answer, and the other steps go on."}`,
+    run.agentEdits === "direct" ? "What you make is saved as you make it, after the check; the person can undo any of it, so never ask whether to make or change something." : "Nothing a step proposes is saved until the person accepts it, but every step of this task sees the task's pending proposals as there.",
+    `When your work is made and checked, call finish_step with a short report for the steps after yours.${run.asks === "never" ? " Do not wait for the person: decide what is a choice yourself, and say in the report what you chose." : " If the person must decide something the goal leaves open, ask_person: you wait for the answer, and the other steps go on. Never ask to confirm what you make."}`,
   ].filter(Boolean).join("\n\n");
 }
 
@@ -212,11 +212,14 @@ export class Runs {
     const bad = planProblems(plan);
     if (bad.length) throw new Error(`the plan: ${bad.join("; ")}`);
     const s = this.settings(), id = `r${++this.n}`, mode = v.mode ?? s.runMode ?? "check";
-    const gates: Gates = v.gates === false || mode === "auto" ? { plan: false, castAndPlaces: false } : { plan: v.gates?.plan ?? true, castAndPlaces: v.gates?.castAndPlaces ?? true };
+    // checking with the person shows the plan first; after that it stops only for a real choice (a new person or place is
+    // not one: it can be undone), unless the gates say otherwise
+    const gates: Gates = v.gates === false || mode === "auto" ? { plan: false, castAndPlaces: false } : { plan: v.gates?.plan ?? true, castAndPlaces: v.gates?.castAndPlaces ?? false };
     const run: Run = {
-      id, goal: v.goal, mode, asks: v.asks ?? "choices", by: `run:${id}`, status: "running", gates, passed: [], usd: 0,
+      id, goal: v.goal, mode, asks: v.asks ?? (mode === "auto" ? "never" : "choices"), by: `run:${id}`, status: "running", gates, passed: [], usd: 0,
       maxUsd: v.maxUsd ?? 10, ...(v.maxUsd !== undefined ? { maxSet: true } : {}), concurrency: v.concurrency ?? (s.provider === "openai" ? 1 : 3),
-      agentEdits: mode === "auto" ? "direct" : v.agentEdits ?? s.agentEdits ?? "proposals", brief: plan.brief, at: Date.now(),
+      // a task writes straight in, journaled to undo; proposals only when asked for (the server's setting is for its other agents)
+      agentEdits: mode === "auto" ? "direct" : v.agentEdits ?? "direct", brief: plan.brief, at: Date.now(),
       steps: plan.steps.map(stepOf),
     };
     if (v.plan) this.estimated(run);
@@ -427,7 +430,7 @@ export class Runs {
       const st = this.settings(), model = this.modelOf(run, s);
       bs = await backstage({ write: this.o.write, agentEdits: run.agentEdits, shareCards: this.o.shareCards, events: this.o.events, by: run.by, onCall: this.o.onCall, step: { id: s.id, owns: s.owns }, journal: (before, saved) => this.journal.record(run.id, s.id, before, saved) }, run.by);
       const mcp = bs.client;
-      const system = `${systemPrompt({ agentEdits: run.agentEdits, writable: this.o.write, shareCards: this.o.shareCards, web: null, notes: readMemory() })}\n\nYou are one step of a task: a long piece of work split into steps, each done by its own agent with a fresh context. Do your step well and only your step; the person reviews the task's work by step.${run.asks === "never" ? " The person asked not to be asked: where something is a choice (a name, a wording), decide it yourself and say in your report what you chose, so they can change it later." : ""}${run.mode === "auto" ? " Your edits are saved as you make them, each after the check, and the person can undo any of them." : ""}`;
+      const system = `${systemPrompt({ agentEdits: run.agentEdits, writable: this.o.write, shareCards: this.o.shareCards, web: null, notes: readMemory() })}\n\nYou are one step of a task: a long piece of work split into steps, each done by its own agent with a fresh context. Do your step well and only your step; the person reviews the task's work by step.${run.asks === "never" ? " The person asked not to be asked: where something is a choice (a name, a wording), decide it yourself and say in your report what you chose, so they can change it later." : ""}${run.agentEdits === "direct" ? " Your edits are saved as you make them, each after the check, and the person can undo any of them." : ""}`;
       const graph = agentGraph({
         model, system, tools: [...bs.tools, ...(run.asks === "never" ? [] : [STEP_ASK]), s.kind === "plan" ? PROPOSE_PLAN : FINISH], maxTurns: STEP_TURNS, ask: "wait",
         before: () => {

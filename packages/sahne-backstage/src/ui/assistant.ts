@@ -23,6 +23,7 @@ import { acceptAndSave, proposals, selection, usage } from "../events.ts";
 import { abilities } from "../model/abilities.ts";
 import { Icon, Popover } from "./kit/index.ts";
 import { Markdown } from "./md.ts";
+import { loadSettings, settingsNow } from "./settings.ts";
 import { hrefOf } from "./proposed.ts";
 import { hostOf } from "../model/tools.ts";
 import { liveLine, scrollerOf, ThinkingBlock, tick, ToolGroup, useStickToBottom, type Thinking, type ToolPart } from "./chat/parts.ts";
@@ -208,31 +209,34 @@ export function fold(t: { content: string; parts?: Part[] }, e: { type: string; 
 }
 
 /**
- * A task the assistant offers for a long task: its goal, and the person's choice that starts it. Check with me: the plan
- * and the new cast and places wait for a look, and its work comes as proposals. Just do it: it writes as it goes, within
- * a budget, and anything it made can be undone; it asks about real choices unless told not to.
+ * A task the assistant offers for a long task: its goal, and the person's choice that starts it. Either way it writes as
+ * it goes, within a budget, and anything it made can be undone. Check with me: the plan waits for a look, and a step
+ * asks when the goal leaves a real choice open. Just do it: no stop at all; it decides and says what it chose. The last
+ * choice is remembered (the settings' runMode) and offered first.
  */
 function StartRunCard(p: { part: Extract<Part, { type: "start_run" }> }) {
-  const [budget, setBudget] = useState(10), [quiet, setQuiet] = useState(false), [busy2, setBusy2] = useState(false);
+  const [budget, setBudget] = useState(10), [busy2, setBusy2] = useState(false), [last, setLast] = useState<"check" | "auto">(settingsNow()?.runMode ?? "check");
+  useEffect(() => { if (!settingsNow()) void loadSettings().then(() => setLast(settingsNow()?.runMode ?? "check")); }, []);
   const x = p.part;
   const start = async (mode: "check" | "auto") => {
     setBusy2(true);
-    const r = await api.post<{ run: { id: string } }>("runs", { goal: x.goal, mode, maxUsd: budget, ...(mode === "auto" && quiet ? { asks: "never" } : {}) });
+    const r = await api.post<{ run: { id: string } }>("runs", { goal: x.goal, mode, maxUsd: budget });
     setBusy2(false);
     if (r.status !== 200) { say((r as { message?: string }).message ?? "the task did not start", true); return; }
+    if (mode !== settingsNow()?.runMode) void api.post("settings", { runMode: mode }).then(() => loadSettings());
     x.started = r.run.id; turns.value = [...turns.value];
     go("agents", "tasks", r.run.id);
   };
+  const choice = (mode: "check" | "auto", title: string, about: string) => html`<button class=${last === mode ? "primary" : ""} disabled=${busy2} onClick=${() => void start(mode)}><b>${title}</b><small>${about}</small></button>`;
   return html`<div class="ask-card start-run" role="group" aria-label="A task the assistant offers">
     <b>A task for this</b><blockquote>${x.goal}</blockquote>
     ${x.started ? html`<a class="button" href=${`#/agents/tasks/${x.started}`}>Follow task ${x.started}</a>` : html`
-      <p class="note">It plans itself, then each part (a person, a place, an episode, a check) is made by its own agent, while this editor may be closed.</p>
+      <p class="note">It plans itself, then each part (a person, a place, an episode, a check) is made by its own agent, while this editor may be closed. It saves as it goes, and you can undo anything it made, or all of it.</p>
       <div class="start-run-choices">
-        <button disabled=${busy2} onClick=${() => void start("check")}><b>Check with me as it goes</b><small>You see the plan and the new people and places first, and accept what it makes.</small></button>
-        <button class="primary" disabled=${busy2} onClick=${() => void start("auto")}><b>Just do it</b><small>It saves as it goes. You can undo anything it made, or all of it.</small></button>
+        ${choice("check", "Check with me", "You see the plan first. After that it asks only when there is a real choice to make.")}
+        ${choice("auto", "Just do it", "No stops: it decides the choices itself and tells you what it chose.")}
       </div>
-      <div class="row wrap"><label class="row">Up to $ <input type="number" min="1" step="1" style="max-width:80px" value=${budget} onInput=${(e: Event) => setBudget(Math.max(1, Number((e.target as HTMLInputElement).value) || 1))} /></label>
-        <label class="row"><input type="checkbox" style="width:auto" checked=${quiet} onChange=${(e: Event) => setQuiet((e.target as HTMLInputElement).checked)} /> Just doing it, don't ask me: decide and tell me</label></div>`}
+      <label class="row">Up to $ <input type="number" min="1" step="1" style="max-width:80px" value=${budget} onInput=${(e: Event) => setBudget(Math.max(1, Number((e.target as HTMLInputElement).value) || 1))} /></label>`}
   </div>`;
 }
 

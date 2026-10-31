@@ -81,7 +81,7 @@ test("steps run as sub-agents: two at once, the third after both with their repo
     place_library: [{ calls: [{ name: "create_place", args: library }] }, finish("kutuphane: a library, copied from bakkal")],
     ep_books: [{ calls: [{ name: "create_episode", args: episode }] }, finish("s1e05 drafted")],
   }, { wait: 20, log, seen }));
-  const run = r.create({ goal: "A week at the library", plan: PLAN, gates: false });
+  const run = r.create({ goal: "A week at the library", plan: PLAN, gates: false , agentEdits: "proposals" });
   await r.idle();
   assert.equal(run.status, "done", JSON.stringify(run.steps.map(s => [s.id, s.status, s.error])));
   // the cast and the place at once; the episode after both
@@ -114,7 +114,7 @@ test("a step that asks waits alone, and goes on with the answer in a new process
   };
   const plan = { brief: "b", steps: PLAN.steps.slice(0, 2) };
   const one = runs(scripted(scripts), events, store).r;
-  const run = one.create({ goal: "g", plan, gates: false });
+  const run = one.create({ goal: "g", plan, gates: false , agentEdits: "proposals" });
   await one.idle();
   assert.deepEqual(run.steps.map(s => s.status), ["asking", "done"], "the other step went on");
   assert.deepEqual(run.steps[0].question, { question: "What does she study?", options: ["Maths", "Music"] });
@@ -136,7 +136,7 @@ test("gates: the plan, then the cast and places, each waits for the person", asy
     ep_books: [finish("read it")],
   }));
   const plan = { brief: "b", steps: [{ ...PLAN.steps[0], owns: [{ kind: "character" as const, id: "deniz" }] }, { ...PLAN.steps[1], owns: [] }, { ...PLAN.steps[2], owns: [] }] };
-  const run = r.create({ goal: "g", plan });
+  const run = r.create({ goal: "g", plan, gates: { castAndPlaces: true }, agentEdits: "proposals" });
   assert.deepEqual([run.status, run.gate], ["gate", "plan"]);
   assert.ok(run.steps.every(s => s.status === "waiting"), "nothing runs before the plan is looked at");
   r.act(run.id, { action: "continue" });
@@ -157,13 +157,13 @@ test("a step makes only what the plan gave it; a stopped step tries again; a spe
       return finish(`refused: ${String(refused?.content).slice(0, 200)}`);
     },
   }, { wait: 30 }));
-  const run = r.create({ goal: "g", plan: { brief: "b", steps: [PLAN.steps[0]] }, gates: false });
+  const run = r.create({ goal: "g", plan: { brief: "b", steps: [PLAN.steps[0]] }, gates: false , agentEdits: "proposals" });
   await r.idle();
   assert.equal(r.log(run.id, "cast_derya").filter(e => e.event.type === "tool" && e.event.name === "finish_step").length, 1, "finish_step ends the step");
   assert.match(run.steps[0].summary!, /not proposed: place not_mine is not this step's to create\. This step makes character derya/);
   // a step stopped while it runs: the run waits for the person, and the step tries again
   const { r: r2 } = runs(scripted({ cast_derya: [finish("made")] }, { wait: 200 }));
-  const run2 = r2.create({ goal: "g", plan: { brief: "b", steps: [PLAN.steps[0]] }, gates: false });
+  const run2 = r2.create({ goal: "g", plan: { brief: "b", steps: [PLAN.steps[0]] }, gates: false , agentEdits: "proposals" });
   await new Promise(res => setTimeout(res, 50));
   await r2.step(run2.id, "cast_derya", { action: "stop" });
   await r2.idle();
@@ -173,7 +173,7 @@ test("a step makes only what the plan gave it; a stopped step tries again; a spe
   assert.equal(run2.status, "done");
   // a budget: the first step spends it, and the second does not start
   const { r: r3 } = runs(scripted({ cast_derya: [finish("a")], place_library: [finish("b")] }, { usage: { input: 1_000_000, output: 0 } }));
-  const run3 = r3.create({ goal: "g", plan: { brief: "b", steps: [PLAN.steps[0], { ...PLAN.steps[1], needs: ["cast_derya"] }] }, gates: false, maxUsd: 1 });
+  const run3 = r3.create({ goal: "g", plan: { brief: "b", steps: [PLAN.steps[0], { ...PLAN.steps[1], needs: ["cast_derya"] }] }, gates: false, maxUsd: 1 , agentEdits: "proposals" });
   await r3.idle();
   assert.equal(run3.status, "paused");
   assert.match(run3.why!, /budget/);
@@ -183,7 +183,7 @@ test("a step makes only what the plan gave it; a stopped step tries again; a spe
 test("after a restart, a step that was running goes on", async () => {
   const file = join(config, "restart.sqlite"), events = new Events();
   const one = runs(scripted({ cast_derya: [finish("made")] }), events, new Store(file)).r;
-  const run = one.create({ goal: "g", plan: { brief: "b", steps: [PLAN.steps[0]] }, gates: { plan: true } });
+  const run = one.create({ goal: "g", plan: { brief: "b", steps: [PLAN.steps[0]] }, gates: { plan: true } , agentEdits: "proposals" });
   // the process ended while the step ran: so the store says
   const s = new Store(file);
   s.set("runs", { n: 1, runs: [{ ...run, status: "running", passed: ["plan"], steps: run.steps.map(x => ({ ...x, status: "running" })) }] });
@@ -198,7 +198,7 @@ test("a run from its goal alone plans itself: the planner proposes, the plan wai
   const { r } = runs(scripted({
     plan: [{ calls: [{ name: "propose_plan", args: { brief: "x", steps: [{ id: "a", kind: "task", title: "A", brief: "a", needs: ["b"] }] } }] }, { calls: [{ name: "propose_plan", args: proposed }] }],
   }));
-  const run = r.create({ goal: "A week at the library" });
+  const run = r.create({ goal: "A week at the library" , agentEdits: "proposals" });
   assert.deepEqual(run.steps.map(s => s.kind), ["plan"]);
   await r.idle();
   // the first plan is refused with why; the second is set, each step after the planner
@@ -224,7 +224,7 @@ test("turning a step's proposal down: it and the finished steps built on it need
     ep_books: [finish("read")],
   }));
   const plan = { brief: "b", steps: [{ ...PLAN.steps[0], owns: [{ kind: "character" as const, id: "defne" }] }, { ...PLAN.steps[1], owns: [] }, { ...PLAN.steps[2], owns: [] }] };
-  const run = r.create({ goal: "g", plan, gates: false });
+  const run = r.create({ goal: "g", plan, gates: false , agentEdits: "proposals" });
   await r.idle();
   assert.equal(run.status, "done");
   const q = proposalsOf(events), p = q.all().find(x => x.doc === "defne")!;
@@ -244,7 +244,7 @@ test("turning a step's proposal down: it and the finished steps built on it need
 
 test("a plan that would make a retired character id is refused, with why", async () => {
   const { r } = runs(scripted({ plan: [{ calls: [{ name: "propose_plan", args: { brief: "b", steps: [{ id: "cast_z", kind: "character", title: "Zeynep", brief: "z", owns: [{ kind: "character", id: "zeynep" }] }] } }] }, { text: "stuck" }] }));
-  const run = r.create({ goal: "g" });
+  const run = r.create({ goal: "g" , agentEdits: "proposals" });
   await r.idle();
   assert.match(JSON.stringify(r.log(run.id, "plan")), /the character id zeynep is retired/);
   assert.deepEqual(run.steps.map(s => s.id), ["plan"]);
@@ -307,10 +307,35 @@ test("auto mode: no gates and no proposals, every write journaled; never asking 
   r.undo(run.id);
   // a step the run's budget stopped waits, and goes on once the budget is raised
   const { r: r2 } = runs(scripted({ cast_derya: [finish("a")], place_library: [finish("b")] }, { usage: { input: 1_000_000, output: 0 } }));
-  const run2 = r2.create({ goal: "g", plan: { brief: "b", steps: [{ ...PLAN.steps[0], owns: [] }, { ...PLAN.steps[1], owns: [] }] }, gates: false, maxUsd: 1, concurrency: 1 });
+  const run2 = r2.create({ goal: "g", plan: { brief: "b", steps: [{ ...PLAN.steps[0], owns: [] }, { ...PLAN.steps[1], owns: [] }] }, gates: false, maxUsd: 1, concurrency: 1 , agentEdits: "proposals" });
   await r2.idle();
   assert.equal(run2.status, "paused");
   r2.act(run2.id, { action: "budget", maxUsd: 20 });
   await r2.idle();
   assert.equal(run2.status, "done", JSON.stringify(run2.steps.map(s => [s.id, s.status, s.error])));
+});
+
+test("checking with the person: the plan waits, then it writes straight in, journaled, and asks only real choices", async () => {
+  const tools: Record<string, string[]> = {}, seen: Record<string, BaseMessage[][]> = {};
+  const { r, events } = runs(scripted({
+    plan: [{ calls: [{ name: "propose_plan", args: { brief: "b", steps: [{ id: "cast_x", kind: "character", title: "Defne", brief: "make her", owns: [{ kind: "character", id: "defne4" }] }] } }] }],
+    cast_x: [{ calls: [{ name: "create_character", args: { ...derya, id: "defne4" } }] }, finish("defne4 made")],
+  }, { tools, seen }));
+  const run = r.create({ goal: "a person", mode: "check" });
+  assert.deepEqual([run.mode, run.agentEdits, run.asks, run.gates], ["check", "direct", "choices", { plan: true, castAndPlaces: false }]);
+  await r.idle();
+  assert.deepEqual([run.status, run.gate], ["gate", "plan"], "the plan waits for a look");
+  r.act(run.id, { action: "continue" });
+  await r.idle();
+  assert.equal(run.status, "done", JSON.stringify(run.steps.map(s => [s.id, s.status, s.error])));
+  assert.equal(proposalsOf(events).all().length, 0, "no proposal waits: a new person is no question");
+  assert.deepEqual(r.journal.made(run.id).map(m => m.id), ["defne4"]);
+  assert.ok(tools.cast_x.includes("ask_person"), "it may still ask a real choice");
+  const first = seen.cast_x[0].map(m => String(m.content)).join("\n");
+  assert.match(first, /never ask whether to make or change something/);
+  r.undo(run.id);
+  // just doing it asks nothing, unless told otherwise
+  const quiet = r.create({ goal: "g", plan: { brief: "b", steps: [{ ...PLAN.steps[0], owns: [] }] }, mode: "auto" });
+  assert.equal(quiet.asks, "never");
+  await r.idle();
 });

@@ -1,8 +1,8 @@
 // Tasks (#/agents/tasks, #/agents/tasks/<id>; runs in the code): a long task the assistant does in steps (server/runs/run.ts). The list of
 // runs; and one run, shown by what it makes rather than how: a line of progress and cost; one place for what needs you
 // (the plan to start, a question, a pause, the new people and places to look at); what it made as cards with pictures,
-// grouped into people, places and episodes, each to open and, in Auto mode, to undo (with what was built on it), or, when
-// it checks with you, to accept and save or turn down; and its steps, logs and reports folded under "Show the work".
+// grouped into people, places and episodes, each to open and to undo (with what was built on it), or, for an older task
+// that proposed its work, to accept and save or turn down; and its steps, logs and reports folded under "Show the work".
 
 import { html } from "htm/preact";
 import { useEffect, useState } from "preact/hooks";
@@ -27,6 +27,8 @@ const STEP_TONE: Record<RunStep["status"], "" | "ok" | "warn" | "bad"> = { waiti
 const KIND_WORD: Record<string, string> = { plan: "plan", season: "season", character: "character", place: "place", episode: "episode", review: "review", task: "task" };
 const waitsForYou = (r: Run) => r.status === "gate" || r.steps.some(s => s.status === "asking");
 const auto = (r: Run) => r.mode === "auto";
+/** It wrote straight in (journaled, to undo) rather than as proposals: every task now, but an older one may have proposed. */
+const direct = (r: Run) => r.agentEdits === "direct";
 
 /** The steps that need `id`, through the steps they need (the browser's copy of the run's own). */
 function stepsAfter(run: Run, id: string): RunStep[] {
@@ -54,7 +56,7 @@ function RunView(p: { id: string }) {
   const run = runs.value.find(r => r.id === p.id);
   if (!run) return html`<p class="note">There is no task ${p.id}. <a href="#/agents/tasks">All tasks</a></p>`;
   const work = run.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done").length;
-  const stop = async () => { if (!confirm(`Stop this task? Its steps stop where they are${auto(run) ? "; what it made stays, and you can still undo it" : "; what they proposed stays for you to answer"}.`)) return; const e = await act(run.id, { action: "stop" }); if (e) say(e, true); };
+  const stop = async () => { if (!confirm(`Stop this task? Its steps stop where they are${direct(run) ? "; what it made stays, and you can still undo it" : "; what they proposed stays for you to answer"}.`)) return; const e = await act(run.id, { action: "stop" }); if (e) say(e, true); };
   const [work2, setWork] = useState(false);
   return html`<div class="run">
     <p class="note"><a href="#/agents/tasks">All tasks</a></p>
@@ -65,7 +67,7 @@ function RunView(p: { id: string }) {
       ${run.status !== "done" && run.status !== "stopped" && html`<button class="small" onClick=${() => void stop()}><${Icon} name="stop" size=${14} /> Stop</button>`}
     </div>
     <${NeedsYou} run=${run} />
-    ${auto(run) && run.status !== "running" && run.status !== "gate" && ((run.made ?? []).length > 0 || run.status === "done") && html`<${Finished} run=${run} />`}
+    ${direct(run) && run.status !== "running" && run.status !== "gate" && ((run.made ?? []).length > 0 || run.status === "done") && html`<${Finished} run=${run} />`}
     <${Results} run=${run} />
     <details class="run-work" open=${work2} onToggle=${(e: Event) => setWork((e.target as HTMLDetailsElement).open)}><summary>Show the work: ${run.steps.length} steps, their reports and logs</summary>
       ${run.brief && html`<details class="run-brief"><summary>The plan's brief</summary><${Markdown} text=${run.brief} /></details>`}
@@ -174,7 +176,7 @@ function ResultCard(p: { run: Run; kind: Kind2; id: string; step: RunStep }) {
     : kind === "story" ? ((pl => (pl ? () => placeThumb(pl) : null))(w.places[(doc as { place?: string } | undefined)?.place ?? ""]))
     : null;
   const state = step.status === "running" ? "being made" : step.status === "asking" ? "asks you" : step.status === "undone" ? "undone"
-    : heads.length ? "waits for you" : doc && (made || !auto(run)) ? "made" : step.status === "failed" || step.status === "stopped" ? "stopped" : "to come";
+    : heads.length ? "waits for you" : doc && (made || !direct(run)) ? "made" : step.status === "failed" || step.status === "stopped" ? "stopped" : "to come";
   const after = stepsAfter(run, step.id).flatMap(s => s.owns.map(o => o.id)).filter(x => x !== id);
   const undoIt = async () => {
     if (!confirm(`Undo ${name}?${after.length ? ` This also undoes what was built on it: ${after.join(", ")}.` : ""}`)) return;
@@ -194,7 +196,7 @@ function ResultCard(p: { run: Run; kind: Kind2; id: string; step: RunStep }) {
         ${heads.length > 0 && html`<button class="small" disabled=${busy} onClick=${() => openProposal(heads[0])}>Look</button>
           <button class="small primary" disabled=${busy || blocked.length > 0} onClick=${() => void answer(x => acceptAndSave(x))}>Accept and save</button>
           <button class="small" disabled=${busy} onClick=${() => void answer(x => reject(x))}>Reject</button>`}
-        ${auto(run) && made && step.status !== "running" && html`<button class="small" disabled=${busy} onClick=${() => void undoIt()}>Undo</button>`}
+        ${direct(run) && made && step.status !== "running" && html`<button class="small" disabled=${busy} onClick=${() => void undoIt()}>Undo</button>`}
         ${step.status === "undone" && html`<button class="small" onClick=${() => void redo()}>Make it again</button>`}
       </div></div></div>`;
 }
