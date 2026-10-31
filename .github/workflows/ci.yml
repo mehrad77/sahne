@@ -60,7 +60,7 @@ jobs:
       - name: the drawings this pull request changes
         id: changed
         run: |
-          files=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- 'packages/sahne-kit/src/set/drawn/*/*.json')
+          files=$(git diff --name-only --diff-filter=AMR "origin/${{ github.base_ref }}...HEAD" -- 'packages/sahne-kit/src/set/drawn/*/*.json')
           # only well-formed ids go on: a file name is the pull request's to choose
           ids=$(for f in $files; do basename "$f" .json; done | grep -E '^[a-z][a-z0-9_]*$' | paste -sd, - || true)
           echo "ids=$ids" >> "$GITHUB_OUTPUT"
