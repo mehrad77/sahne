@@ -2,7 +2,7 @@
 // the studio is one (the cast, the places, props, gestures, emotions, sounds; ui/galleries.ts makes their items), and so
 // are the Cast and Places pages. A picture is an SVG string, an image URL, or one drawn later (a promise: the card shows a
 // placeholder until it lands, and is asked for only once the card nears the screen). One card or several can be picked; a
-// card can instead be a link. `Tile` is one card, for pages that lay cards out themselves (the kit page).
+// card can instead be a link. A card that holds several kinds is drawn as a short deck. `Tile` is one card, for pages that lay cards out themselves (the kit page).
 
 import { html } from "htm/preact";
 import { useEffect, useRef, useState } from "preact/hooks";
@@ -28,6 +28,8 @@ export interface Item {
   shelf?: string;
   /** A small label on the card (the kit page: an item the content root drew). */
   badge?: string;
+  /** How many kinds it holds (the kit page): the card is drawn as a deck and says so. */
+  kinds?: number;
 }
 
 /** Ask for lazy pictures only near the screen: one observer for every card. */
@@ -59,13 +61,13 @@ export function Picture(p: { art?: Art; label: string }) {
 /** One card: a link, or a button that picks. `onHover` hears the pointer come (with the card's picture) and go. */
 export function Tile(p: { item: Item; on?: boolean; playing?: boolean; onPick?(id: string): void; onHover?(id: string, art: HTMLElement | null): void }) {
   const i = p.item;
-  const body = html`<${Picture} art=${i.art} label=${i.label} /><b lang=${i.lang} dir=${i.dir}>${i.label}</b>${i.badge && html`<span class="tilebadge">${i.badge}</span>`}${i.sub && html`<small>${i.sub}</small>`}`;
+  const body = html`<${Picture} art=${i.art} label=${i.label} /><b lang=${i.lang} dir=${i.dir}>${i.label}</b>${i.badge && html`<span class="tilebadge">${i.badge}</span>`}${i.kinds && html`<span class="tilekinds" title=${`${i.kinds} kinds: open it to see them`}>${i.kinds} kinds</span>`}${i.sub && html`<small>${i.sub}</small>`}`;
   if (i.href) return html`<a class=${`tile${i.faded ? " faded" : ""}`} href=${i.href} role="listitem">${body}</a>`;
   const hover = p.onHover && {
     onPointerEnter: (e: PointerEvent) => p.onHover!(i.id, (e.currentTarget as HTMLElement).querySelector(".art")),
     onPointerLeave: () => p.onHover!(i.id, null),
   };
-  return html`<button class=${`tile${p.on ? " on" : ""}${p.playing ? " playing" : ""}${i.faded ? " faded" : ""}`} role="option" aria-selected=${!!p.on} onClick=${() => p.onPick?.(i.id)} title=${i.sub ? `${i.label}: ${i.sub}` : i.label} ...${hover ?? {}}>${body}${p.on && html`<span class="tick" aria-hidden="true">✓</span>`}</button>`;
+  return html`<button class=${`tile${i.kinds ? " deck" : ""}${p.on ? " on" : ""}${p.playing ? " playing" : ""}${i.faded ? " faded" : ""}`} role="option" aria-selected=${!!p.on} onClick=${() => p.onPick?.(i.id)} title=${i.sub ? `${i.label}: ${i.sub}` : i.label} ...${hover ?? {}}>${body}${p.on && html`<span class="tick" aria-hidden="true">✓</span>`}</button>`;
 }
 
 export function Gallery(p: {

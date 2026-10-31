@@ -9,6 +9,7 @@ import { html } from "htm/preact";
 import { AudioEngine, hashString, portrait, type AvatarDoc } from "sahne";
 import { pieceSvg } from "sahne-kit/set-svg";
 import { languagesOf, textOf, type CharacterDoc, type StoryPlace } from "sahne-story";
+import { looksOf, type Look } from "../model/kinds.ts";
 import { EMOTION_SHELVES, PROP_SHELVES, SERIES_SHELF, SET_SHELVES, gestureShelf, shelfOf } from "../model/kitgroups.ts";
 import { own } from "../kitdocs.ts";
 import { KIT, SOUNDS } from "../stage.ts";
@@ -46,14 +47,26 @@ export function placeItems(o: { href?: boolean } = {}): Item[] {
   }));
 }
 
-/** The kit's props (or set pieces) as sketches. */
+/** The kit's props (or set pieces) as sketches; one with several kinds says how many (model/kinds.ts). */
 export function pieceItems(which: "props" | "set"): Item[] {
   return Object.entries(KIT[which]).sort(([a], [b]) => a.localeCompare(b)).map(([id, def]) => ({
     id, label: id.replace(/_/g, " "), sub: def.meta?.about, tags: def.meta?.tags, keywords: `${id} ${(def.meta?.terms ?? []).join(" ")} ${(def.meta?.tags ?? []).join(" ")}`,
     shelf: own.has(id) ? SERIES_SHELF.id : shelfOf(which === "props" ? PROP_SHELVES : SET_SHELVES, def.meta?.tags).id,
     ...(own.has(id) ? { badge: "this series" } : {}),
+    kinds: looksOf(def).length || undefined,
     art: async () => svgOf(() => pieceSvg(KIT, def, {}, id, 96)) || null,
   }));
+}
+
+/** A kind's sketch, drawn as a document that names it would draw it. */
+export const lookArt = (which: "props" | "set", id: string, look: Look, px = 96) => async () => svgOf(() => pieceSvg(KIT, KIT[which][id], look.params, id, px)) || null;
+
+/** Every kind of every prop (or set piece), as cards of their own for the search: "pastry · croissant", id `pastry~croissant`. */
+export function lookItems(which: "props" | "set", items: Item[]): Item[] {
+  return items.flatMap(i => looksOf(KIT[which][i.id]).map(look => ({
+    id: `${i.id}~${look.name}`, label: `${i.label} · ${look.name.replace(/_/g, " ")}`, keywords: look.name.replace(/_/g, " "),
+    sub: i.sub, tags: i.tags, shelf: i.shelf, badge: i.badge, art: lookArt(which, i.id, look),
+  })));
 }
 
 export const emotionItems = (): Item[] => Object.keys(KIT.face.emotions).map(e => { const m = model(); return { id: e, label: e, shelf: shelfOf(EMOTION_SHELVES, [e]).id, art: m ? () => emotionThumb(e, m) : null }; });

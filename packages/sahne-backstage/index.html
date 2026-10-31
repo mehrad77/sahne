@@ -207,6 +207,12 @@ button.state.ro:hover { background: var(--curtain-soft); }
 .gallery.s .tile .art { aspect-ratio: 1; }
 .tile .art svg, .tile .art img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .tile .art.blank { font-size: 26px; font-weight: 700; }
+/* a card that holds several kinds: a short deck of sheets behind it, and how many on its picture */
+.tile.deck { box-shadow: 3px -3px 0 -1px var(--panel), 3px -3px 0 0 var(--line), 6px -6px 0 -1px var(--panel), 6px -6px 0 0 var(--line); }
+.tile.deck:hover { box-shadow: 3px -3px 0 -1px var(--panel), 3px -3px 0 0 var(--accent), 6px -6px 0 -1px var(--panel), 6px -6px 0 0 var(--accent), var(--shadow); }
+.tilekinds { position: absolute; top: 12px; right: 12px; font-size: 10.5px; font-weight: 600; line-height: 1.6; padding: 0 7px; border-radius: 99px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); pointer-events: none; }
+.gallery.s .tilekinds { top: 8px; right: 8px; padding: 0 5px; }
+.tile.on .tilekinds { right: 32px; } .gallery.s .tile.on .tilekinds { right: 30px; }
 .tile .tick { position: absolute; top: 6px; right: 6px; width: 20px; height: 20px; border-radius: 99px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-size: 12px; }
 .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: 6px 0 12px; }
 .tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 12px; color: var(--mute); }
@@ -285,6 +291,7 @@ a.button.primary { background: var(--accent); color: var(--accent-ink); border-c
 .kitlib-shelf h3 .all { margin-left: auto; font-size: 13px; font-weight: 500; color: var(--accent); }
 .kitlib-more { padding: 16px; text-align: center; }
 .kitlib-detail { position: sticky; top: 0; width: 300px; max-height: calc(100vh - 120px); overflow: auto; display: grid; gap: 10px; align-content: start; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
+.kitlib-scrim { display: none; }
 .kitlib-detail header { display: flex; align-items: center; justify-content: space-between; font-size: 16px; }
 .kitlib-detail .tile.big { cursor: default; padding: 6px; }
 .kitlib-detail .tile.big:hover { box-shadow: none; border-color: var(--line); }
@@ -304,7 +311,9 @@ a.button.primary { background: var(--accent); color: var(--accent-ink); border-c
 .kitlib-play { display: flex; align-items: center; gap: 10px; }
 .kitlib-play .elapsed { font: 12.5px ui-monospace, monospace; color: var(--mute); font-variant-numeric: tabular-nums; }
 .kitlib-id { display: flex; align-items: center; gap: 4px; }
-.kitlib-id code { background: var(--chip); padding: 2px 8px; border-radius: 6px; font-size: 13px; }
+.kitlib-kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; padding: 2px; }
+.kitlib-kinds .tile { padding: 4px; } .kitlib-kinds .tile .art { aspect-ratio: 1; margin-bottom: 2px; } .kitlib-kinds .tile b { font-size: 11.5px; font-weight: 500; }
+.kitlib-id code { overflow-wrap: anywhere;  background: var(--chip); padding: 2px 8px; border-radius: 6px; font-size: 13px; }
 .tile.playing { border-color: var(--accent); background: var(--accent-soft); }
 .tile.playing .art { color: var(--accent); animation: kit-pulse 1s ease-in-out infinite alternate; }
 @keyframes kit-pulse { from { opacity: .65; } to { opacity: 1; } }
@@ -341,7 +350,9 @@ a.button.primary { background: var(--accent); color: var(--accent-ink); border-c
   .gallery .grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
   .gallery.l .grid { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
   .gallery.s .grid { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
-  .kitlib-detail { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: auto; max-height: 72vh; z-index: 40; border-radius: 14px 14px 0 0; border-bottom: 0; box-shadow: var(--shadow); padding: 14px 16px calc(14px + env(safe-area-inset-bottom)); }
+  /* the details are a modal over a dimmed page */
+  .kitlib-scrim { display: block; position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / .45); }
+  .kitlib-detail { position: fixed; inset: 0; margin: auto; width: min(520px, calc(100vw - 32px)); height: fit-content; max-height: calc(100dvh - 32px); z-index: 41; border-radius: 14px; box-shadow: var(--shadow); padding: 14px 16px; }
   .kitlib-detail .tile.big .art { aspect-ratio: 2 / 1; }
 }
 @media (prefers-reduced-motion: reduce) { .tile.playing .art { animation: none; } }

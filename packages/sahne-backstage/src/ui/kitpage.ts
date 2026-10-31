@@ -4,9 +4,13 @@
 // its first row and a way to the rest; otherwise the cards come in pages as the list scrolls. A click opens a card's
 // details (its id, what it is, its parameters); a sound also plays (a loop until clicked again). Gestures and emotions
 // play on the stand-in while the pointer rests on them (live.ts). The same items are the pickers of the script and stage.
+// On a small screen the details are a modal. A prop or set piece with several kinds (model/kinds.ts) is a deck that
+// says how many; its details lay them out to pick and copy, the search finds a kind by its name ("pastry · croissant"),
+// and the counts say how many kinds a shelf holds.
 
 import { html } from "htm/preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { lookRef, looksOf } from "../model/kinds.ts";
 import { search } from "../model/search.ts";
 import { EMOTION_SHELVES, GESTURE_SHELVES, PROP_SHELVES, SERIES_SHELF, SET_SHELVES, SOUND_SHELVES, shelvesWith, type Shelf } from "../model/kitgroups.ts";
 import { shownKit } from "../events.ts";
@@ -16,7 +20,7 @@ import { KIT } from "../stage.ts";
 import { route, say } from "../store.ts";
 import { Icon } from "./kit/index.ts";
 import { Picture, Tile, type Item } from "./kit/gallery.ts";
-import { emotionItems, gestureItems, liveScene, pieceItems, playSound, soundAt, soundClock, soundItems, soundLength, soundPlaying, stopSounds, warmSound } from "./galleries.ts";
+import { emotionItems, gestureItems, liveScene, lookArt, lookItems, pieceItems, playSound, soundAt, soundClock, soundItems, soundLength, soundPlaying, stopSounds, warmSound } from "./galleries.ts";
 import { useLangs } from "./lang.ts";
 
 type Section = "props" | "set" | "gestures" | "emotions" | "sounds";
@@ -35,6 +39,10 @@ export function KitPage() {
   const { main } = useLangs();
   const all = useMemo(() => Object.fromEntries(SECTIONS.map(([s]) => [s, s === "props" || s === "set" ? pieceItems(s) : s === "gestures" ? gestureItems() : s === "emotions" ? emotionItems() : soundItems(main)])) as Record<Section, Item[]>, [main, kitVersion.value]);
   const items = all[section];
+  const kindsAll = useMemo(() => section === "props" || section === "set" ? lookItems(section, items) : [], [items]);
+  /** Kinds in a list: an item with none is one. */
+  const kindsIn = (l: Item[]) => l.reduce((n, i) => n + (i.kinds ?? 1), 0);
+  const kindTotal = (s: Section) => s === "props" || s === "set" ? kindsIn(all[s]) : 0;
   const [q, setQ] = useState(""), [tag, setTag] = useState<string | null>(null), [open, setOpen] = useState<string | null>(null);
   const [size, setSize] = useState<"s" | "m" | "l">(() => { try { return (localStorage.getItem(SIZE_KEY) as "s" | "m" | "l") || "m"; } catch { return "m"; } });
   const [limit, setLimit] = useState(PAGE);
@@ -52,7 +60,9 @@ export function KitPage() {
 
   const onShelf = shelfId ? items.filter(i => i.shelf === shelfId) : items;
   const tagged = tag ? onShelf.filter(i => i.tags?.includes(tag)) : onShelf;
-  const shown = search(tagged, q, Infinity);
+  // a kind is found by its own name only, so "pastry" finds the pastry card, not its eleven kinds too
+  const kindHits = q ? search(kindsAll.filter(k => (!shelfId || k.shelf === shelfId) && (!tag || k.tags?.includes(tag))).map(k => ({ k, label: k.keywords ?? "", keywords: "" })), q, Infinity).map(x => x.k) : [];
+  const shown = [...search(tagged, q, Infinity), ...kindHits];
   const counts = shelvesWith(shelves, items, i => i.shelf ?? "other");
   // the tags of what is on the shelf, the commonest first, as filters
   const tagCounts = new Map<string, number>();
@@ -77,25 +87,29 @@ export function KitPage() {
     return () => io.disconnect();
   }, [shown.length > limit, section, shelfId]);
 
-  const detail = open ? items.find(i => i.id === open) : undefined;
+  const [openId, openLook] = (open ?? "").split("~");
+  const detail = open ? items.find(i => i.id === openId) : undefined;
+  /** "33" with what a kind count adds: "33 · 240 kinds" (or, short, "33 · 240"). */
+  const withKinds = (n: number, k: number, short = false) => k > n ? `${n} · ${k}${short ? "" : " kinds"}` : String(n);
+  const shelfKinds = (id: string) => kindsIn(items.filter(i => (i.shelf ?? "other") === id));
   return html`<section class="kitlib">
-    <div class="pagehead"><h2 class="grow">The kit</h2><span class="note">What a scene is staged with: ${SECTIONS.map(([s, l]) => `${all[s].length} ${l.toLowerCase()}`).join(", ")}.</span></div>
+    <div class="pagehead"><h2 class="grow">The kit</h2><span class="note">What a scene is staged with: ${SECTIONS.map(([s, l]) => `${all[s].length} ${l.toLowerCase()}${kindTotal(s) > all[s].length ? ` (${kindTotal(s)} kinds)` : ""}`).join(", ")}.</span></div>
     <div class=${`kitlib-body${narrow ? " narrow" : ""}`}>
       <nav class="kitlib-side" aria-label="Kit sections">
         <button class="iconbtn fold" aria-expanded=${!narrow} aria-controls="kit-side-list" onClick=${toggleSide} title=${narrow ? "Show the sections" : "Fold the sections to icons"} aria-label=${narrow ? "Show the sections" : "Fold the sections to icons"}><${Icon} name="panel" size=${17} /></button>
         <div id="kit-side-list" class="kitlib-secs">${SECTIONS.map(([s, l, , , icon]) => html`<div class=${`kitlib-sec${section === s ? " here" : ""}`}>
-          <a href=${`#/kit/${s}`} aria-current=${section === s && !shelfId ? "page" : undefined} title=${narrow ? `${l} (${all[s].length})` : undefined} aria-label=${narrow ? `${l}, ${all[s].length}` : undefined}><${Icon} name=${icon} size=${17} /><span>${l}</span><small>${all[s].length}</small></a>
-          ${section === s && !narrow && counts.length > 1 && html`<ul>${counts.map(({ shelf, n }) => html`<li><a href=${`#/kit/${s}/${shelf.id}`} aria-current=${shelfId === shelf.id ? "page" : undefined}><span>${shelf.label}</span><small>${n}</small></a></li>`)}</ul>`}
+          <a href=${`#/kit/${s}`} aria-current=${section === s && !shelfId ? "page" : undefined} title=${narrow ? `${l} (${withKinds(all[s].length, kindTotal(s))})` : undefined} aria-label=${narrow ? `${l}, ${withKinds(all[s].length, kindTotal(s))}` : undefined}><${Icon} name=${icon} size=${17} /><span>${l}</span><small title=${withKinds(all[s].length, kindTotal(s))}>${withKinds(all[s].length, kindTotal(s), true)}</small></a>
+          ${section === s && !narrow && counts.length > 1 && html`<ul>${counts.map(({ shelf, n }) => html`<li><a href=${`#/kit/${s}/${shelf.id}`} aria-current=${shelfId === shelf.id ? "page" : undefined}><span>${shelf.label}</span><small title=${withKinds(n, shelfKinds(shelf.id))}>${withKinds(n, shelfKinds(shelf.id), true)}</small></a></li>`)}</ul>`}
         </div>`)}</div>
         ${counts.length > 1 && html`<ul class="kitlib-row" aria-label=${`${label}: shelves`}>
           <li><a href=${`#/kit/${section}`} aria-current=${!shelfId ? "page" : undefined}>All</a></li>
-          ${counts.map(({ shelf, n }) => html`<li><a href=${`#/kit/${section}/${shelf.id}`} aria-current=${shelfId === shelf.id ? "page" : undefined}>${shelf.label} <small>${n}</small></a></li>`)}
+          ${counts.map(({ shelf, n }) => html`<li><a href=${`#/kit/${section}/${shelf.id}`} aria-current=${shelfId === shelf.id ? "page" : undefined}>${shelf.label} <small title=${withKinds(n, shelfKinds(shelf.id))}>${withKinds(n, shelfKinds(shelf.id), true)}</small></a></li>`)}
         </ul>`}
       </nav>
       <div class="kitlib-main">
         <div class="kitlib-bar">
           <div class="kitlib-crumbs"><a href=${`#/kit/${section}`}>${label}</a>${shelfId && html` › <b>${[...shelves].find(s => s.id === shelfId)?.label ?? "Other"}</b>`}${tag && html` › <button class="chip on" onClick=${() => setTag(null)} title="Clear the filter">${tag} ✕</button>`}
-            <span class="note">${shown.length} ${shown.length === 1 ? one : `${one}s`}</span></div>
+            <span class="note">${shown.length - kindHits.length} ${shown.length - kindHits.length === 1 ? one : `${one}s`}${kindHits.length ? `, ${kindHits.length} ${kindHits.length === 1 ? "kind" : "kinds"}` : !q && kindsIn(tagged) > tagged.length ? ` · ${kindsIn(tagged)} kinds` : ""}</span></div>
           <div class="kitlib-tools">
             <input type="search" value=${q} placeholder=${`Search ${shelfId ? "this shelf" : `${items.length} ${label.toLowerCase()}`}…`} aria-label=${`Search ${label}`} onInput=${(e: Event) => { setQ((e.target as HTMLInputElement).value); setLimit(PAGE); }} />
             <div class="seg" role="group" aria-label="Card size">${(["s", "m", "l"] as const).map(s => html`<button aria-pressed=${size === s} onClick=${() => pickSize(s)} title=${{ s: "Small cards", m: "Medium cards", l: "Large cards" }[s]}>${s.toUpperCase()}</button>`)}</div>
@@ -105,7 +119,7 @@ export function KitPage() {
         <div class=${`gallery ${size}`} onPointerLeave=${() => liveOff()}>
           ${overview
             ? counts.map(({ shelf, n }) => html`<div class="kitlib-shelf">
-                <h3><a href=${`#/kit/${section}/${shelf.id}`}>${shelf.label}</a><small>${n}</small>${n > ROW && html`<a class="all" href=${`#/kit/${section}/${shelf.id}`}>See all ${n} ›</a>`}</h3>
+                <h3><a href=${`#/kit/${section}/${shelf.id}`}>${shelf.label}</a><small>${withKinds(n, shelfKinds(shelf.id))}</small>${n > ROW && html`<a class="all" href=${`#/kit/${section}/${shelf.id}`}>See all ${n} ›</a>`}</h3>
                 <div class="grid" role="listbox" aria-label=${shelf.label}>${items.filter(i => (i.shelf ?? "other") === shelf.id).slice(0, ROW).map(tile)}</div>
               </div>`)
             : html`<div class="grid" role="listbox" aria-label=${label}>${shown.slice(0, limit).map(tile)}</div>
@@ -113,7 +127,8 @@ export function KitPage() {
               ${!shown.length && html`<p class="note">${q ? `Nothing matches “${q}”.` : "Nothing here yet."}</p>`}`}
         </div>
       </div>
-      ${detail && html`<${Detail} key=${detail.id} section=${section} item=${detail} playing=${playing === detail.id} onTag=${(t: string) => { setTag(t); setQ(""); }} onClose=${() => setOpen(null)} />`}
+      ${detail && html`<div class="kitlib-scrim" onClick=${() => setOpen(null)} aria-hidden="true"></div>`}
+      ${detail && html`<${Detail} key=${detail.id} section=${section} item=${detail} look=${openLook} onLook=${(name?: string) => setOpen(name ? `${detail.id}~${name}` : detail.id)} playing=${playing === detail.id} onTag=${(t: string) => { setTag(t); setQ(""); }} onClose=${() => setOpen(null)} />`}
     </div>
   </section>`;
 }
@@ -121,24 +136,31 @@ export function KitPage() {
 interface Param { type: string; default?: unknown; about?: string; values?: string[]; min?: number; max?: number }
 
 /** A card's details: a bigger picture, its id to copy, what it is, its tags and its parameters. */
-function Detail(p: { section: Section; item: Item; playing: boolean; onTag(t: string): void; onClose(): void }) {
+function Detail(p: { section: Section; item: Item; look?: string; onLook(name?: string): void; playing: boolean; onTag(t: string): void; onClose(): void }) {
   const { item: i, section } = p;
   const def = section === "props" || section === "set" ? KIT[section][i.id] : undefined;
+  // its kinds, each drawn once (a new picture function would draw it again)
+  const looks = useMemo(() => def && (section === "props" || section === "set") ? looksOf(def).map(l => ({ look: l, art: lookArt(section, i.id, l), big: lookArt(section, i.id, l, 240) })) : [], [def]);
+  const at = looks.find(l => l.look.name === p.look);
   const params = Object.entries((def?.meta?.params ?? {}) as Record<string, Param>);
   const gesture = section === "gestures" ? KIT.gestures[i.id] : undefined;
   const sound = section === "sounds" ? KIT.sounds?.[i.id] : undefined;
-  const copy = () => { void navigator.clipboard?.writeText(i.id).then(() => say(`Copied “${i.id}”`)); };
+  const ref = at ? lookRef(i.id, at.look) : i.id;
+  const copy = () => { void navigator.clipboard?.writeText(ref).then(() => say(`Copied ${ref}`)); };
   const rows: [string, unknown][] = gesture ? [["Lasts", `${(gesture.dur / 1000).toFixed(1)} s`], ["Needs", gesture.needs?.join(", ") || "nothing"]]
     : sound ? [["Bus", sound.bus], ["Kind", sound.loop ? "a loop" : "a one-shot"], ["Takes", sound.takes ?? 1], ["Recording", sound.recording ? "yes (the patch is its fallback)" : "no, synthesized"], ...Object.entries(sound.word ?? {}).map(([l, w]) => [`Word (${l})`, w] as [string, string])]
     : [];
-  return html`<aside class="kitlib-detail" aria-label=${`${i.label}: details`}>
-    <header><b>${i.label}</b><button class="iconbtn" onClick=${p.onClose} aria-label="Close"><${Icon} name="close" /></button></header>
-    <div class="tile big"><${Picture} art=${i.art} label=${i.label} />${section === "sounds" && html`<${Playhead} id=${i.id} />`}</div>
+  // Escape closes it (on a small screen it is a modal)
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === "Escape") p.onClose(); }; addEventListener("keydown", k); return () => removeEventListener("keydown", k); }, []);
+  return html`<aside class="kitlib-detail" role="dialog" aria-label=${`${i.label}: details`}>
+    <header><b>${i.label}${at ? html` <span class="note">· ${at.look.name.replace(/_/g, " ")}</span>` : ""}</b><button class="iconbtn" onClick=${p.onClose} aria-label="Close"><${Icon} name="close" /></button></header>
+    <div class="tile big"><${Picture} key=${at?.look.name ?? ""} art=${at?.big ?? i.art} label=${i.label} />${section === "sounds" && html`<${Playhead} id=${i.id} />`}</div>
     ${section === "sounds" && html`<div class="kitlib-play"><button class="primary" onClick=${() => playSound(i.id)}><${Icon} name=${p.playing ? "pause" : "play"} size=${16} /> ${p.playing ? "Stop" : "Play"}</button><${Elapsed} id=${i.id} /></div>`}
-    <div class="kitlib-id"><code>${i.id}</code><button class="iconbtn" onClick=${copy} title="Copy the id" aria-label="Copy the id"><${Icon} name="copy" size=${16} /></button></div>
+    <div class="kitlib-id"><code>${ref}</code><button class="iconbtn" onClick=${copy} title=${at ? "Copy how a place names this kind" : "Copy the id"} aria-label=${at ? "Copy how a place names this kind" : "Copy the id"}><${Icon} name="copy" size=${16} /></button></div>
     ${def?.meta?.about && html`<p>${def.meta.about}</p>`}
+    ${looks.length > 0 && html`<h4>${looks.length} kinds</h4><div class="kitlib-kinds" role="listbox" aria-label=${`${i.label}: kinds`}>${looks.map(({ look, art }) => html`<button key=${look.name} class=${`tile${at?.look.name === look.name ? " on" : ""}`} role="option" aria-selected=${at?.look.name === look.name} onClick=${() => p.onLook(at?.look.name === look.name ? undefined : look.name)} title=${look.name}><${Picture} art=${art} label=${look.name} /><b>${look.name.replace(/_/g, " ")}</b></button>`)}</div>`}
     ${i.tags?.length && section !== "sounds" ? html`<div class="tags">${i.tags.map(t => html`<button class="chip" onClick=${() => p.onTag(t)}>${t}</button>`)}</div>` : ""}
-    ${def?.meta?.terms?.length && html`<p class="note">Also called: ${def.meta.terms.join(", ")}</p>`}
+    ${def?.meta?.terms?.length ? html`<p class="note">Also called: ${def.meta.terms.join(", ")}</p>` : ""}
     ${rows.length > 0 && html`<dl>${rows.map(([k, v]) => html`<dt>${k}</dt><dd>${String(v)}</dd>`)}</dl>`}
     ${params.length > 0 && html`<h4>Parameters</h4><table class="grid params"><tbody>${params.map(([k, d]) => html`<tr>
       <td><code>${k}</code></td><td><span class="note">${d.type}${d.values ? `: ${d.values.join(" | ")}` : ""}${d.default !== undefined ? ` = ${JSON.stringify(d.default)}` : ""}</span>${d.about && html`<div>${d.about}</div>`}</td>
