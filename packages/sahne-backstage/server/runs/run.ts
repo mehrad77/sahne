@@ -93,20 +93,20 @@ export interface RunsOptions {
 /** The most rounds of tools one step takes. */
 const STEP_TURNS = 60;
 
-const STEP_ASK: ToolDef = { name: "ask_person", description: "Ask the person a question and wait for the answer: this step waits, the run's other steps go on. Use it for a real choice (a name, what they study, which of two places), not for what you can decide. With options, they answer with a button.", schema: { type: "object", properties: { question: { type: "string" }, options: { type: "array", items: { type: "string" }, maxItems: 6 } }, required: ["question"] } };
+const STEP_ASK: ToolDef = { name: "ask_person", description: "Ask the person a question and wait for the answer: this step waits, the task's other steps go on. Use it for a real choice (a name, what they study, which of two places), not for what you can decide. With options, they answer with a button.", schema: { type: "object", properties: { question: { type: "string" }, options: { type: "array", items: { type: "string" }, maxItems: 6 } }, required: ["question"] } };
 const PLAN_STEPS = { type: "array", items: { type: "object", properties: {
   id: { type: "string", description: "a-z, 0-9, _: cast_derya, place_library, ep_s2e01, review" },
   kind: { type: "string", enum: ["season", "character", "place", "episode", "review", "task"] },
-  title: { type: "string" }, brief: { type: "string", description: "What this step makes, in enough detail for an agent who has read only this and the run's brief" },
+  title: { type: "string" }, brief: { type: "string", description: "What this step makes, in enough detail for an agent who has read only this and the task's brief" },
   about: { type: "string", description: "The same for the person, in one plain sentence they read at the plan gate: what it makes and why, no ids, tools or staging terms (\"Writes the episode where Nima buys bread from Selma, with a polite or blunt way to ask\")" },
   needs: { type: "array", items: { type: "string" }, description: "The steps it must wait for (an episode: the cast and places it uses, and the season)" },
   owns: { type: "array", items: { type: "object", properties: { kind: { type: "string", enum: ["season", "character", "place", "story", "kit_piece", "kit_variant"] }, id: { type: "string" } }, required: ["kind", "id"] }, description: "The documents it creates or changes, by their new ids" },
 }, required: ["id", "kind", "title", "brief", "about"] } };
-const PROPOSE_PLAN: ToolDef = { name: "propose_plan", description: "Set this run's plan, once you have read what it needs: a brief every step reads (the story, the people and their names, the places, what each episode teaches and how they connect) and the steps. One step for each new season, character and place, one for each episode (owning its story id, and needing the cast, places and season it uses), and a review step at the end that needs every episode. Ids must be new. The person sees the plan before any step runs, unless they turned that off.", schema: { type: "object", properties: { brief: { type: "string" }, steps: PLAN_STEPS }, required: ["brief", "steps"] } };
+const PROPOSE_PLAN: ToolDef = { name: "propose_plan", description: "Set this task's plan, once you have read what it needs: a brief every step reads (the story, the people and their names, the places, what each episode teaches and how they connect) and the steps. One step for each new season, character and place, one for each episode (owning its story id, and needing the cast, places and season it uses), and a review step at the end that needs every episode. Ids must be new. The person sees the plan before any step runs, unless they turned that off.", schema: { type: "object", properties: { brief: { type: "string" }, steps: PLAN_STEPS }, required: ["brief", "steps"] } };
 /** The planner's own brief. */
-const PLANNING = "Plan this run. Read the series first (series_overview), the season it goes in, and the cast and places there are (kit_search characters, places), so the plan reuses what exists and makes only what is missing. Pick the new ids (free ones: a character's from its name, episodes the season's next numbers). Then call propose_plan. If something is a real choice for the person (names, which season, what the episodes teach), ask_person before you propose.";
+const PLANNING = "Plan this task. Read the series first (series_overview), the season it goes in, and the cast and places there are (kit_search characters, places), so the plan reuses what exists and makes only what is missing. Pick the new ids (free ones: a character's from its name, episodes the season's next numbers). Then call propose_plan. If something is a real choice for the person (names, which season, what the episodes teach), ask_person before you propose.";
 
-/** What a run of these steps may cost, by kind, on Claude (a local model costs nothing): a rough guide, shown at the plan gate. */
+/** What a task of these steps may cost, by kind, on Claude (a local model costs nothing): a rough guide, shown at the plan gate. */
 export function estimate(steps: Pick<Step, "kind" | "model">[], provider: string): number {
   if (provider === "openai") return 0;
   const USD: Record<StepKind, number> = { plan: 0.6, season: 0.1, character: 0.25, place: 0.3, episode: 0.8, review: 0.8, task: 0.2 };
@@ -137,17 +137,17 @@ export function planProblems(p: Plan): string[] {
   return out;
 }
 
-/** The first words of a step: the run's goal and brief, its own brief, what it makes, and what the steps before it said. */
+/** The first words of a step: the task's goal and brief, its own brief, what it makes, and what the steps before it said. */
 function stepPrompt(run: Run, s: Step): string {
   const before = run.steps.filter(x => s.needs.includes(x.id));
-  if (s.kind === "plan") return [`The run's goal: ${run.goal}`, run.asks === "never" ? s.brief.replace(/ If something is a real choice[^.]*\./, " Where something is a choice (names, what the episodes teach), decide it yourself and say so in the brief.") : s.brief, "Nothing is made in this step: it ends with propose_plan."].join("\n\n");
+  if (s.kind === "plan") return [`The task's goal: ${run.goal}`, run.asks === "never" ? s.brief.replace(/ If something is a real choice[^.]*\./, " Where something is a choice (names, what the episodes teach), decide it yourself and say so in the brief.") : s.brief, "Nothing is made in this step: it ends with propose_plan."].join("\n\n");
   return [
-    `The run's goal: ${run.goal}`,
+    `The task's goal: ${run.goal}`,
     `The plan's brief, shared by every step:\n${run.brief}`,
     `Your step: ${s.title} (${s.kind}, step ${s.id}).\n${s.brief}`,
-    s.owns.length ? `You make: ${s.owns.map(o => `${o.kind} ${o.id}`).join(", ")}. The run's other steps make the rest: read their documents, never change them. A season and the series are shared.` : "You make no document of your own: read, check and report.",
+    s.owns.length ? `You make: ${s.owns.map(o => `${o.kind} ${o.id}`).join(", ")}. The task's other steps make the rest: read their documents, never change them. A season and the series are shared.` : "You make no document of your own: read, check and report.",
     before.length ? `What the steps before yours did:\n${before.map(x => `- ${x.title}: ${x.summary ?? "(no report)"}`).join("\n")}` : "",
-    run.mode === "auto" ? "What you make is saved as you make it, after the check; the person can undo any of it." : "Nothing a step proposes is saved until the person accepts it, but every step of this run sees the run's pending proposals as there.",
+    run.mode === "auto" ? "What you make is saved as you make it, after the check; the person can undo any of it." : "Nothing a step proposes is saved until the person accepts it, but every step of this task sees the task's pending proposals as there.",
     `When your work is made and checked, call finish_step with a short report for the steps after yours.${run.asks === "never" ? " Do not wait for the person: decide what is a choice yourself, and say in the report what you chose." : " If the person must decide something, ask_person: you wait for the answer, and the other steps go on."}`,
   ].filter(Boolean).join("\n\n");
 }
@@ -427,12 +427,12 @@ export class Runs {
       const st = this.settings(), model = this.modelOf(run, s);
       bs = await backstage({ write: this.o.write, agentEdits: run.agentEdits, shareCards: this.o.shareCards, events: this.o.events, by: run.by, onCall: this.o.onCall, step: { id: s.id, owns: s.owns }, journal: (before, saved) => this.journal.record(run.id, s.id, before, saved) }, run.by);
       const mcp = bs.client;
-      const system = `${systemPrompt({ agentEdits: run.agentEdits, writable: this.o.write, shareCards: this.o.shareCards, web: null, notes: readMemory() })}\n\nYou are one step of a run: a long task split into steps, each done by its own agent with a fresh context. Do your step well and only your step; the person reviews the run's work by step.${run.asks === "never" ? " The person asked not to be asked: where something is a choice (a name, a wording), decide it yourself and say in your report what you chose, so they can change it later." : ""}${run.mode === "auto" ? " Your edits are saved as you make them, each after the check, and the person can undo any of them." : ""}`;
+      const system = `${systemPrompt({ agentEdits: run.agentEdits, writable: this.o.write, shareCards: this.o.shareCards, web: null, notes: readMemory() })}\n\nYou are one step of a task: a long piece of work split into steps, each done by its own agent with a fresh context. Do your step well and only your step; the person reviews the task's work by step.${run.asks === "never" ? " The person asked not to be asked: where something is a choice (a name, a wording), decide it yourself and say in your report what you chose, so they can change it later." : ""}${run.mode === "auto" ? " Your edits are saved as you make them, each after the check, and the person can undo any of them." : ""}`;
       const graph = agentGraph({
         model, system, tools: [...bs.tools, ...(run.asks === "never" ? [] : [STEP_ASK]), s.kind === "plan" ? PROPOSE_PLAN : FINISH], maxTurns: STEP_TURNS, ask: "wait",
         before: () => {
           guard(st.caps);
-          if (run.usd >= run.maxUsd) throw new BudgetError(`the run's budget, $${run.maxUsd.toFixed(2)}, is spent`);
+          if (run.usd >= run.maxUsd) throw new BudgetError(`the task's budget, $${run.maxUsd.toFixed(2)}, is spent`);
         },
         after: (u: Usage) => {
           const e = record(model.id, model.model, u);

@@ -72,7 +72,7 @@ const OWN: ToolDef[] = [
 ];
 
 /** A long task as a run of steps (runs/run.ts): the assistant offers it on a card, and the person starts it. */
-const START_RUN: ToolDef = { name: "start_run", description: "Offer to do a long task as a run: a plan of steps (each new character, place, season and episode, then a review), each done by its own agent with a fresh context, that goes on when the editor is closed. Use it when the task is more than a few edits (a week of episodes, a new season with its cast and places); do small tasks yourself. The person sees a card and starts the run; it plans itself first. Say in one sentence what the run will do, then end your turn.", schema: { type: "object", properties: { goal: { type: "string", description: "The task, in full: what the person asked for, with every detail they gave" } }, required: ["goal"] } };
+const START_RUN: ToolDef = { name: "start_run", description: "Offer to do a long task in steps, as a task: a plan of steps (each new character, place, season and episode, then a review), each done by its own agent with a fresh context, that goes on when the editor is closed. Use it when the task is more than a few edits (a week of episodes, a new season with its cast and places); do small tasks yourself. The person sees a card and starts the task; it plans itself first. Say in one sentence what the task will do, then end your turn.", schema: { type: "object", properties: { goal: { type: "string", description: "The task, in full: what the person asked for, with every detail they gave" } }, required: ["goal"] } };
 
 /** What it remembers (memory.ts): keep a note of a lasting decision, or forget one. */
 const MEMORY_TOOLS: ToolDef[] = [
@@ -208,7 +208,7 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
     async function run(c: Call, signal?: AbortSignal): Promise<Outcome> {
       if (c.name === "start_run") {
         const goal = String((c.input as { goal?: unknown }).goal ?? "").slice(0, 4000);
-        return { text: "Offered: the person starts the run from the card. End your turn now.", isError: false, detail: "", after: [{ type: "start_run", goal }], end: true };
+        return { text: "Offered: the person starts the task from the card. End your turn now.", isError: false, detail: "", after: [{ type: "start_run", goal }], end: true };
       }
       if (c.name === "remember" || c.name === "forget") {
         const i = c.input as { text?: unknown; id?: unknown };

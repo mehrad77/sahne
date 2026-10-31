@@ -110,7 +110,7 @@ export const ASKS: { id: string; label: string; prompt: string; on: "block" | "e
   { id: "draft", label: "Draft this episode from its brief", prompt: "This episode is a draft. Write its steps and quiz from its title, premise, cast, place, target words and lessons, in the series' languages, using the place's marks. Propose the result.", on: "episode", pages: ["episode"] },
   { id: "second", label: "Second reader", prompt: "Review this episode as a careful second reader who did not write it: the main language, the translations against it, the quiz, the staging. List what must be fixed, most important first. Propose fixes for clear mistakes.", on: "episode", pages: ["episode"], fresh: true },
   { id: "season-needs", label: "What needs work this season", prompt: "Look at this season: its weeks and their themes, its episodes, their check results and review notes. Tell me briefly what needs work first, most important first. Change nothing.", on: "page", pages: ["board", "season"] },
-  { id: "season-week", label: "Plan a week of episodes", prompt: "Plan the next week of this season that has no episodes yet: its episodes, one for each free weekday, fitting the week's theme and the episodes around it, with any new people and places they need. It is a long task: offer it to me as a run with start_run, with the whole goal written out.", on: "page", pages: ["board", "season"] },
+  { id: "season-week", label: "Plan a week of episodes", prompt: "Plan the next week of this season that has no episodes yet: its episodes, one for each free weekday, fitting the week's theme and the episodes around it, with any new people and places they need. It is a long task: offer it to me as a task with start_run, with the whole goal written out.", on: "page", pages: ["board", "season"] },
   { id: "season-next", label: "Propose an episode for the next free day", prompt: "Propose one new episode for the first free weekday of this season, in a week that has an arc, fitting that week's theme and the episodes around it, with a place and cast that exist. Draft its steps and quiz, check it, and tell me what you proposed.", on: "page", pages: ["board", "season"] },
   { id: "place-uses", label: "Which episodes are set here", prompt: "Which episodes are set in this place, and which of its marks and props do they use? Say which marks and props no episode uses yet. Change nothing.", on: "page", pages: ["place"] },
   { id: "place-ideas", label: "Scene ideas for this place", prompt: "Suggest three short scene ideas for this place at the series' level, each naming the marks people stand on and the props they use. Change nothing.", on: "page", pages: ["place"] },
@@ -208,7 +208,7 @@ export function fold(t: { content: string; parts?: Part[] }, e: { type: string; 
 }
 
 /**
- * A run the assistant offers for a long task: its goal, and the person's choice that starts it. Check with me: the plan
+ * A task the assistant offers for a long task: its goal, and the person's choice that starts it. Check with me: the plan
  * and the new cast and places wait for a look, and its work comes as proposals. Just do it: it writes as it goes, within
  * a budget, and anything it made can be undone; it asks about real choices unless told not to.
  */
@@ -219,13 +219,13 @@ function StartRunCard(p: { part: Extract<Part, { type: "start_run" }> }) {
     setBusy2(true);
     const r = await api.post<{ run: { id: string } }>("runs", { goal: x.goal, mode, maxUsd: budget, ...(mode === "auto" && quiet ? { asks: "never" } : {}) });
     setBusy2(false);
-    if (r.status !== 200) { say((r as { message?: string }).message ?? "the run did not start", true); return; }
+    if (r.status !== 200) { say((r as { message?: string }).message ?? "the task did not start", true); return; }
     x.started = r.run.id; turns.value = [...turns.value];
-    go("agents", "runs", r.run.id);
+    go("agents", "tasks", r.run.id);
   };
-  return html`<div class="ask-card start-run" role="group" aria-label="A run the assistant offers">
-    <b>A run for this</b><blockquote>${x.goal}</blockquote>
-    ${x.started ? html`<a class="button" href=${`#/agents/runs/${x.started}`}>Follow run ${x.started}</a>` : html`
+  return html`<div class="ask-card start-run" role="group" aria-label="A task the assistant offers">
+    <b>A task for this</b><blockquote>${x.goal}</blockquote>
+    ${x.started ? html`<a class="button" href=${`#/agents/tasks/${x.started}`}>Follow task ${x.started}</a>` : html`
       <p class="note">It plans itself, then each part (a person, a place, an episode, a check) is made by its own agent, while this editor may be closed.</p>
       <div class="start-run-choices">
         <button disabled=${busy2} onClick=${() => void start("check")}><b>Check with me as it goes</b><small>You see the plan and the new people and places first, and accept what it makes.</small></button>

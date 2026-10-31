@@ -1,4 +1,4 @@
-// Runs (#/agents/runs, #/agents/runs/<id>): a long task the assistant does in steps (server/runs/run.ts). The list of
+// Tasks (#/agents/tasks, #/agents/tasks/<id>; runs in the code): a long task the assistant does in steps (server/runs/run.ts). The list of
 // runs; and one run, shown by what it makes rather than how: a line of progress and cost; one place for what needs you
 // (the plan to start, a question, a pause, the new people and places to look at); what it made as cards with pictures,
 // grouped into people, places and episodes, each to open and, in Auto mode, to undo (with what was built on it), or, when
@@ -41,10 +41,10 @@ export function RunsTab() {
   const id = route.value[2];
   if (id) return html`<${RunView} id=${id} />`;
   const list = [...runs.value].sort((a, b) => b.at - a.at);
-  if (!list.length) return html`<p class="note">No run yet. Ask the assistant for a long task (a week of episodes, a new season with its people and places), and it offers one: a card you start.</p>`;
+  if (!list.length) return html`<p class="note">No task yet. Ask the assistant for a long task (a week of episodes, a new season with its people and places), and it offers one: a card you start.</p>`;
   return html`<ol class="runs-list">${list.map(r => {
     const work = r.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done").length;
-    return html`<li><a class="card run-card" href=${`#/agents/runs/${r.id}`}>
+    return html`<li><a class="card run-card" href=${`#/agents/tasks/${r.id}`}>
       <span class="row"><b class="grow">${r.goal.length > 140 ? `${r.goal.slice(0, 140)}…` : r.goal}</b><${Chip} tone=${waitsForYou(r) ? "warn" : r.status === "done" ? "ok" : r.status === "paused" ? "bad" : ""}>${waitsForYou(r) ? "waits for you" : RUN_WORD[r.status]}</${Chip}></span>
       <span class="note">${auto(r) ? "Just doing it" : "Checking with you"} · ${done} of ${work.length} done · ${usd(r.usd)} · ${ago(r.at)}</span></a></li>`;
   })}</ol>`;
@@ -52,12 +52,12 @@ export function RunsTab() {
 
 function RunView(p: { id: string }) {
   const run = runs.value.find(r => r.id === p.id);
-  if (!run) return html`<p class="note">There is no run ${p.id}. <a href="#/agents/runs">All runs</a></p>`;
+  if (!run) return html`<p class="note">There is no task ${p.id}. <a href="#/agents/tasks">All tasks</a></p>`;
   const work = run.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done").length;
-  const stop = async () => { if (!confirm(`Stop this run? Its steps stop where they are${auto(run) ? "; what it made stays, and you can still undo it" : "; what they proposed stays for you to answer"}.`)) return; const e = await act(run.id, { action: "stop" }); if (e) say(e, true); };
+  const stop = async () => { if (!confirm(`Stop this task? Its steps stop where they are${auto(run) ? "; what it made stays, and you can still undo it" : "; what they proposed stays for you to answer"}.`)) return; const e = await act(run.id, { action: "stop" }); if (e) say(e, true); };
   const [work2, setWork] = useState(false);
   return html`<div class="run">
-    <p class="note"><a href="#/agents/runs">All runs</a></p>
+    <p class="note"><a href="#/agents/tasks">All tasks</a></p>
     <div class="run-head">
       <div class="grow"><h3 class="run-goal" title=${run.goal}>${run.goal}</h3>
         <div class="run-progress"><span class="bar"><span style=${`width:${work.length ? Math.round((done / work.length) * 100) : 0}%`}></span></span>
@@ -125,7 +125,7 @@ function PausedCard(p: { run: Run; stuck: RunStep[] }) {
   const raise = async () => { const e = await act(run.id, { action: "budget", maxUsd: more }); if (e) say(e, true); };
   const retryAll = async () => { for (const s of p.stuck) { const e = await actStep(run.id, s.id, { action: "retry" }); if (e) { say(e, true); return; } } };
   const budget = /budget|cap/.test(run.why ?? "") || run.steps.some(s => s.budget);
-  return html`<div class="ask-card gate-card bad" role="group" aria-label="The run is paused">
+  return html`<div class="ask-card gate-card bad" role="group" aria-label="The task is paused">
     ${budget ? html`<b>Paused at its budget.</b><div class="row"><label class="row">Raise it to $ <input type="number" min=${Math.ceil(run.usd)} step="1" style="max-width:90px" value=${more} onInput=${(e: Event) => setMore(Number((e.target as HTMLInputElement).value))} /></label><button class="primary" onClick=${() => void raise()}>Go on</button></div>
       <p class="note">If the day's cap in Settings stopped it, raise that there; the stopped parts go on by themselves once there is room.</p>`
       : p.stuck.length ? html`<b>${p.stuck.length === 1 ? `${p.stuck[0].title} stopped` : `${p.stuck.length} parts stopped`}.</b><div class="row"><button class="primary" onClick=${() => void retryAll()}>Try ${p.stuck.length === 1 ? "it" : "them"} again</button></div>`
@@ -136,9 +136,9 @@ function PausedCard(p: { run: Run; stuck: RunStep[] }) {
 function Finished(p: { run: Run }) {
   const run = p.run, made = run.made ?? [];
   const all = async () => {
-    if (!confirm(`Undo everything this run made (${made.length} document${made.length === 1 ? "" : "s"})? Anything changed since it wrote it is kept.`)) return;
+    if (!confirm(`Undo everything this task made (${made.length} document${made.length === 1 ? "" : "s"})? Anything changed since it wrote it is kept.`)) return;
     const r = await undo(run.id);
-    if (typeof r === "string") say(r, true); else say(`undone: ${r.undone.length}${r.kept.length ? `; kept, as it changed after the run: ${r.kept.map(k => k.id).join(", ")}` : ""}`);
+    if (typeof r === "string") say(r, true); else say(`undone: ${r.undone.length}${r.kept.length ? `; kept, as it changed after the task: ${r.kept.map(k => k.id).join(", ")}` : ""}`);
   };
   const said = run.status === "done" ? "Done. Here is what it made." : run.status === "stopped" ? "Stopped. Here is what it made so far." : "Paused. Here is what it made so far.";
   return html`<div class="run-finished"><b class="grow">${said}</b>${made.length > 0 && html`<button class="small" onClick=${() => void all()}>Undo all of it</button>`}</div>`;
@@ -179,7 +179,7 @@ function ResultCard(p: { run: Run; kind: Kind2; id: string; step: RunStep }) {
   const undoIt = async () => {
     if (!confirm(`Undo ${name}?${after.length ? ` This also undoes what was built on it: ${after.join(", ")}.` : ""}`)) return;
     setBusy(true); const r = await undo(run.id, [{ kind, id }]); setBusy(false);
-    if (typeof r === "string") say(r, true); else say(`undone: ${r.undone.map(u => u.id).join(", ") || "nothing"}${r.kept.length ? `; kept, as it changed after the run: ${r.kept.map(k => k.id).join(", ")}` : ""}`);
+    if (typeof r === "string") say(r, true); else say(`undone: ${r.undone.map(u => u.id).join(", ") || "nothing"}${r.kept.length ? `; kept, as it changed after the task: ${r.kept.map(k => k.id).join(", ")}` : ""}`);
   };
   const redo = async () => { const e = await actStep(run.id, step.id, { action: "redo" }); if (e) say(e, true); };
   const answer = async (fn: (x: Proposal) => Promise<unknown>) => { setBusy(true); try { for (const x of heads) if (proposals.value.some(q => q.id === x.id)) await fn(x); } finally { setBusy(false); } };

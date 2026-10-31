@@ -4,8 +4,8 @@
 /** The editor's own assistant, in a chat or in a run. */
 export const isAssistant = (by: string): boolean => by === "assistant" || by.startsWith("run:");
 
-/** "The assistant", "The assistant's run r3", or the agent's name; `lower` for the middle of a sentence. */
+/** "The assistant", "The assistant's task r3", or the agent's name; `lower` for the middle of a sentence. */
 export function who(by: string, lower = false): string {
-  const s = by === "assistant" ? "The assistant" : by.startsWith("run:") ? `The assistant's run ${by.slice(4)}` : by;
+  const s = by === "assistant" ? "The assistant" : by.startsWith("run:") ? `The assistant's task ${by.slice(4)}` : by;
   return lower && isAssistant(by) ? s[0].toLowerCase() + s.slice(1) : s;
 }

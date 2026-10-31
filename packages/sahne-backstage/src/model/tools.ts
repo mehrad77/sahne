@@ -83,7 +83,7 @@ const TOOLS: Record<string, { kind: ToolKind; label: (i: In) => string }> = {
   remember: { kind: "memory", label: () => "Remembered a note" },
   forget: { kind: "memory", label: i => `Forgot note ${str(i.id)}` },
   ask_person: { kind: "ask", label: () => "Asked you" },
-  start_run: { kind: "ask", label: () => "Offered a run" },
+  start_run: { kind: "ask", label: () => "Offered a task" },
   propose_plan: { kind: "create", label: i => `Proposed the plan${Array.isArray(i.steps) ? `: ${i.steps.length} steps` : ""}` },
   finish_step: { kind: "check", label: () => "Finished its step" },
 };

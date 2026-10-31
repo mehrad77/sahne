@@ -1,5 +1,5 @@
 // Agents (#/agents): four tabs. The assistant, its conversation in full view (#/agents, the side panel's ⤢ opens it); its
-// runs, long tasks in steps (#/agents/runs: ui/runs.ts);
+// tasks, long tasks in steps (#/agents/tasks: ui/runs.ts, called runs in the code);
 // Activity (#/agents/activity; the side panel's Agents tab holds its essentials) and Connect (#/agents/mcp). Together: how to connect one over MCP (the commands to copy, for Claude
 // Code over HTTP or stdio and for any other client), how their edits land (proposals or written, switched here for the
 // agents that connect next), who is connected, every proposal waiting across the episodes, what agents did lately
@@ -136,13 +136,15 @@ function Tools(p: { v: AgentsView }) {
 
 /** The Agents page: the assistant in full view, or the agents over MCP. */
 export function AgentsPage() {
-  const sub = route.value[1], tab = sub === "mcp" ? "connect" : sub === "activity" ? "activity" : sub === "runs" ? "runs" : "assistant", n = proposals.value.length, r = runsWaiting.value.length;
+  const sub = route.value[1], tab = sub === "mcp" ? "connect" : sub === "activity" ? "activity" : (sub === "tasks" || sub === "runs") ? "runs" : "assistant", n = proposals.value.length, r = runsWaiting.value.length;
   // the page shows what the side panel would, so the panel closes on the way in
   useEffect(() => { assistantOpen.value = false; }, []);
+  // a run is called a task now: an old link to #/agents/runs… lands on #/agents/tasks…
+  useEffect(() => { if (sub === "runs") location.replace(location.hash.replace("#/agents/runs", "#/agents/tasks")); }, [sub]);
   const link = (href: string, id: string, label: unknown) => html`<a href=${href} aria-current=${tab === id ? "page" : undefined}>${label}</a>`;
   return html`<section class=${`agents${tab === "assistant" ? " agents-assistant" : ""}`}>
     <div class="pagehead"><h2 class="grow">Agents</h2>${tab === "assistant" && html`<${AboutButton} />`}</div>
-    <nav class="season-tabs" aria-label="Agents">${link("#/agents", "assistant", "Assistant")}${link("#/agents/runs", "runs", html`Runs${r ? html` <span class="badge" title=${`${r} run${r > 1 ? "s" : ""} waiting for you`}>${r}</span>` : ""}`)}${link("#/agents/activity", "activity", html`Activity${n ? html` <span class="badge">${n}</span>` : ""}`)}${link("#/agents/mcp", "connect", "Connect")}</nav>
+    <nav class="season-tabs" aria-label="Agents">${link("#/agents", "assistant", "Assistant")}${link("#/agents/tasks", "runs", html`Tasks${r ? html` <span class="badge" title=${`${r} task${r > 1 ? "s" : ""} waiting for you`}>${r}</span>` : ""}`)}${link("#/agents/activity", "activity", html`Activity${n ? html` <span class="badge">${n}</span>` : ""}`)}${link("#/agents/mcp", "connect", "Connect")}</nav>
     ${tab === "assistant" ? html`<div class="assistant-page"><${AssistantChat} /></div>` : tab === "runs" ? html`<${RunsTab} />` : tab === "activity" ? html`<${ActivityTab} />` : html`<${ConnectTab} />`}
   </section>`;
 }
