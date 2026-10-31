@@ -5,7 +5,7 @@
 export interface Shelf { id: string; label: string; tags?: readonly string[] }
 
 export const PROP_SHELVES: readonly Shelf[] = [
-  { id: "food", label: "Food & drink", tags: ["food", "drink", "sweet", "snack", "fruit", "vegetable", "pantry", "bottle", "dish", "cookware", "cutlery", "kitchen", "stove"] },
+  { id: "food", label: "Food & drink", tags: ["food", "drink", "sweet", "snack", "fruit", "vegetable", "pantry", "bottle", "dish", "cookware", "cutlery", "kitchen", "stove", "bakery", "pastry", "bread", "cafe", "deli", "cheese"] },
   { id: "home", label: "Home", tags: ["home", "furniture", "bed", "rug", "linen", "cleaning", "laundry", "toiletry", "bathroom", "sewing", "light", "door", "window", "floor", "box", "appliance", "fire", "seating"] },
   { id: "nature", label: "Animals & nature", tags: ["animal", "bird", "pet", "farm", "insect", "zoo", "nature", "plant", "garden"] },
   { id: "transport", label: "Transport & travel", tags: ["vehicle", "bike", "metro", "airport", "transport", "travel", "ticket", "pass"] },
