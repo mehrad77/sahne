@@ -16,7 +16,7 @@ export const FEATURES: Record<Feature, string> = {
 };
 
 /** Who drew an item promoted from a story (sahne-kit/drawing/promote.ts), from `CREDITS.json`. */
-export interface Credit { by: string; contact: string; story?: string; date: string; from: string }
+export interface Credit { by: string; contact: string; story?: string; date: string; consent?: true | "project"; from: string }
 const CREDITS = new Map((credits as (Credit & { id: string })[]).map(c => [c.id, c]));
 
 export interface Gen {

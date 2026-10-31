@@ -84,11 +84,11 @@ export function renderMd(): string {
     }
     lines.push("");
   }
-  const credits = JSON.parse(readFileSync(CREDITS, "utf8")) as { id: string; family: string; by: string; contact: string; story?: string; date: string; licence: string; from: string }[];
-  lines.push("## Credits", "", "Items drawn by the stories that first needed them and promoted into the kit (`drawing/promote.ts`, CONTRIBUTING.md *Contributing art*). Each author released their drawing under CC BY 4.0 ([LICENSE-ART](../../LICENSE-ART)) and said it is their own work; the credit is kept for as long as the item is. The drawings are `src/set/drawn/<family>/<id>.json`.", "");
+  const credits = JSON.parse(readFileSync(CREDITS, "utf8")) as { id: string; family: string; by: string; contact: string; story?: string; date: string; licence: string; consent?: true | "project"; from: string }[];
+  lines.push("## Credits", "", "Items drawn by the stories that first needed them and promoted into the kit (`drawing/promote.ts`, CONTRIBUTING.md *Contributing art*). Items marked *project* are the project's own art, drawn by its kit agents and released by the owner under CC BY 4.0 ([LICENSE-ART](../../LICENSE-ART)); for the others the author released the drawing under CC BY 4.0 and said it is their own work. The credit is kept for as long as the item is. The drawings are `src/set/drawn/<family>/<id>.json`.", "");
   if (credits.length) {
-    lines.push("| id | family | drawn by | contact | story | date | was |", "|---|---|---|---|---|---|---|");
-    for (const c of credits) lines.push(`| \`${c.id}\` | ${c.family} | ${cell(c.by)} | ${cell(c.contact)} | ${cell(c.story ?? "–")} | ${c.date} | \`${c.from}\` |`);
+    lines.push("| id | family | drawn by | contact | consent | story | date | was |", "|---|---|---|---|---|---|---|---|");
+    for (const c of credits) lines.push(`| \`${c.id}\` | ${c.family} | ${cell(c.by)} | ${cell(c.contact)} | ${c.consent === "project" ? "project" : "author"} | ${cell(c.story ?? "–")} | ${c.date} | \`${c.from}\` |`);
   } else lines.push("None yet.");
   lines.push("");
   const planned = Object.entries(plan());

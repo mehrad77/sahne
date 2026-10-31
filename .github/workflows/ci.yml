@@ -65,6 +65,12 @@ jobs:
           ids=$(for f in $files; do basename "$f" .json; done | grep -E '^[a-z][a-z0-9_]*$' | paste -sd, - || true)
           echo "ids=$ids" >> "$GITHUB_OUTPUT"
           echo "changed drawings: ${ids:-none}"
+      - name: project consent is the owner's
+        # consent "project" is the owner's own kit agents' art: a pull request from anyone else may not add or change it
+        if: steps.changed.outputs.ids != '' && github.event.pull_request.user.login != github.repository_owner
+        run: |
+          bad=$(git diff --name-only --diff-filter=AMR "origin/${{ github.base_ref }}...HEAD" -- 'packages/sahne-kit/src/set/drawn/*/*.json' | while read -r f; do grep -l '"consent": *"project"' "$f" || true; done)
+          if [ -n "$bad" ]; then echo "consent \"project\" is the owner's, not this pull request author's:"; echo "$bad"; exit 1; fi
       - uses: pnpm/action-setup@v4
         if: steps.changed.outputs.ids != ''
       - uses: actions/setup-node@v4

@@ -258,9 +258,9 @@ function wordLike(doc: DrawingDoc): string[] {
 
 const SENTENCE = /^\p{Lu}.{14,}[.!?]$/u;
 
-/** One line of plain text that can stand in a commit, a table cell and a pull request: no control characters, no `<`/`>`, no leading `@`. */
-const plainLine = (v: unknown, max = 80): v is string => typeof v === "string" && v.trim().length > 0 && v.length <= max && !/[\u0000-\u001f\u007f<>]/.test(v) && !v.trim().startsWith("@");
-const CONTACT = /^(github:@?[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})|[^\s@<>|`]+@[^\s@<>|`]+\.[^\s@<>|`]+)$/;
+/** One line of plain text that can stand in a commit, a table cell and a pull request: no control characters, no `<`/`>`, no markdown (`[ ] ` |`), no leading `@` or `-`. */
+const plainLine = (v: unknown, max = 80): v is string => typeof v === "string" && v.trim().length > 0 && v.length <= max && !/[\u0000-\u001f\u007f<>\[\]`|]/.test(v) && !/^[@-]/.test(v.trim());
+const CONTACT = /^(github:@?[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})|[^\s@<>|`\[\]-][^\s@<>|`\[\]]*@[^\s@<>|`]+\.[^\s@<>|`]+)$/;
 /** Whether `YYYY-MM-DD` is a real calendar date, no later than today (UTC). */
 const realDate = (v: unknown): boolean => {
   if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
@@ -275,9 +275,9 @@ const realDate = (v: unknown): boolean => {
  */
 export function creditProblems(cr: Credit): string[] {
   const out: string[] = [];
-  if (!plainLine(cr.by)) out.push("credit.by: the author's name as they want it shown: one plain line of at most 80 characters, no < > and no leading @");
+  if (!plainLine(cr.by)) out.push("credit.by: the author's name as they want it shown: one plain line of at most 80 characters, no < > [ ] ` | and no leading @ or -");
   if (!(typeof cr.contact === "string" && cr.contact.length <= 80 && CONTACT.test(cr.contact))) out.push("credit.contact: how to reach the author: github:name or an email address");
-  if (cr.story !== undefined && !plainLine(cr.story)) out.push("credit.story: one plain line of at most 80 characters, no < > and no leading @");
+  if (cr.story !== undefined && !plainLine(cr.story)) out.push("credit.story: one plain line of at most 80 characters, no < > [ ] ` | and no leading @ or -");
   if (cr.consent !== true && cr.consent !== "project") out.push("credit.consent: the author must agree to release the art under CC BY 4.0 (LICENSE-ART) and say it is their own work, not traced or copied");
   if (cr.licence !== "CC-BY-4.0") out.push("credit.licence: CC-BY-4.0");
   if (!realDate(cr.date)) out.push("credit.date: a real date, YYYY-MM-DD, no later than today");

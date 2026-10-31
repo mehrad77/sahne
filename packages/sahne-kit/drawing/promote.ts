@@ -110,11 +110,11 @@ export function stale(): string[] {
     if (froms.has(f)) out.push(`${f} is the old id of both ${froms.get(f)} and ${i.doc.id}: only one item can be its successor`);
     else froms.set(f, i.doc.id);
   }
-  for (const f of readdirSync(DRAWN_DIR, { withFileTypes: true }).filter(d => d.isDirectory())) for (const j of readdirSync(join(DRAWN_DIR, f.name)))
+  if (existsSync(DRAWN_DIR)) for (const f of readdirSync(DRAWN_DIR, { withFileTypes: true }).filter(d => d.isDirectory())) for (const j of readdirSync(join(DRAWN_DIR, f.name)))
     if (!items.some(i => i.family === f.name && `${i.doc.id}.json` === j)) out.push(`src/set/drawn/${f.name}/${j} is not named for its drawing's id`);
   const want = generated(items, wired);
   for (const [path, text] of want) if (!existsSync(path) || readFileSync(path, "utf8") !== text) out.push(`${relative(ROOT, path)} is stale`);
-  for (const f of readdirSync(DRAWN_DIR).filter(f => f.endsWith(".gen.ts"))) if (!want.has(join(DRAWN_DIR, f))) out.push(`src/set/drawn/${f} belongs to no family that takes drawn items`);
+  if (existsSync(DRAWN_DIR)) for (const f of readdirSync(DRAWN_DIR).filter(f => f.endsWith(".gen.ts"))) if (!want.has(join(DRAWN_DIR, f))) out.push(`src/set/drawn/${f} belongs to no family that takes drawn items`);
   return out;
 }
 
@@ -124,7 +124,7 @@ const node = (args: string[], cwd = ROOT) => spawnSync(process.execPath, args, {
 export function regenerate(): void {
   const want = generated(readDrawn(), wiredFamilies());
   mkdirSync(DRAWN_DIR, { recursive: true });
-  for (const f of readdirSync(DRAWN_DIR).filter(f => f.endsWith(".gen.ts"))) if (!want.has(join(DRAWN_DIR, f))) rmSync(join(DRAWN_DIR, f));
+  if (existsSync(DRAWN_DIR)) for (const f of readdirSync(DRAWN_DIR).filter(f => f.endsWith(".gen.ts"))) if (!want.has(join(DRAWN_DIR, f))) rmSync(join(DRAWN_DIR, f));
   for (const [path, text] of want) writeFileSync(path, text);
   const b = node([join(KIT, "set/build.ts")]);
   if (b.status !== 0) throw new Error(`set/build.ts failed:\n${b.stderr || b.stdout}`);
@@ -248,8 +248,8 @@ async function inspect(o: Options, doc: DrawingDoc): Promise<{ problems: Problem
   // the schema of the content drawing: the promoted copy is checked as the x_ copy it was
   for (const s of set.validateDoc("kit_piece", { ...strip(doc), id: doc.credit!.from })) problems.push({ level: "error", rule: "official", id: doc.id, msg: `schema ${s.path} ${s.message}` });
   const tagsOf = (shelves: readonly { tags?: readonly string[] }[]) => new Set(shelves.flatMap(s => s.tags ?? []));
-  const items = readDrawn().filter(i => i.doc.id !== doc.id), size = Object.hasOwn(FAMILIES, o.family) ? familySize(o.family, [...items.filter(i => i.family === o.family).map(i => i.doc), doc]) : null;
-  if (!size) notes.push("note: the family's size was not measured (esbuild is not installed here); pnpm check measures it");
+  const items = readDrawn().filter(i => i.doc.id !== doc.id), known = Object.hasOwn(FAMILIES, o.family), size = known ? familySize(o.family, [...items.filter(i => i.family === o.family).map(i => i.doc), doc]) : null;
+  if (!size) notes.push(known ? "note: the family's size was not measured (esbuild is not installed here); pnpm check measures it" : `note: the family's size was not measured (${JSON.stringify(o.family)} is not a kit family)`);
   problems.push(...officialProblems(doc, {
     kit: full, family: o.family, families: Object.keys(FAMILIES), wired: wiredFamilies().includes(o.family),
     shelfTags: { props: tagsOf(groups.PROP_SHELVES), set: tagsOf(groups.SET_SHELVES) }, ...(size ? { size } : {}),
@@ -264,13 +264,13 @@ const line = (p: Problem) => `${p.level === "warn" ? "warning" : "error"}: ${p.m
 /** The pull request's text: the template's sections, filled (.github/PULL_REQUEST_TEMPLATE/art.md). */
 export function prText(doc: DrawingDoc, family: string): string {
   const c = doc.credit!, at = (v: string) => v.replace(/@/g, "@\u200b"); // GitHub pings an @name
-  const by = at(c.by), contact = at(c.contact), story = c.story ? at(c.story) : undefined;
+  const by = at(c.by), contact = at(c.contact), story = c.story ? at(c.story) : undefined, about = at(doc.about), fam = at(family), tags = (doc.tags ?? []).map(at);
   return [
-    `## ${doc.id}: ${doc.about}`, "",
+    `## ${doc.id}: ${about}`, "",
     "### The sheet", "",
     `CI renders the review sheet and the family comparison for this item and links them in a comment below. Locally: promote-out/${doc.id}.png and promote-out/${doc.id}-neighbours.png.`, "",
     "### What it is", "",
-    `${doc.about} A ${doc.as === "both" ? "set piece and prop" : doc.as === "set" ? "set piece" : "prop"} of the \`${family}\` family, tags: ${(doc.tags ?? []).join(", ") || "none"}.`, "",
+    `${about} A ${doc.as === "both" ? "set piece and prop" : doc.as === "set" ? "set piece" : "prop"} of the \`${fam}\` family, tags: ${tags.join(", ") || "none"}.`, "",
     "### Where it was used", "",
     `${story ? `Story: ${story}. ` : ""}Its content id there was \`${c.from}\`; the kit's \`aliases\` now answer to it, so a story that still names it keeps working.`, "",
     "### Credit and consent", "",
@@ -327,6 +327,8 @@ export function coAuthorEmail(contact: string, githubId?: string): string {
 export async function promote(o: Options): Promise<Outcome> {
   const out: Outcome = { ok: false, problems: [], lines: [], images: [], written: [] };
   if (o.project) {
+    if (process.env.SAHNE_PROJECT_ART !== "1") { out.lines.push("--project is the owner's: it writes the project's consent, which no agent and no contributor gives. The owner sets SAHNE_PROJECT_ART=1 for their own kit agents; anyone else uses --by, --contact and --consent."); return out; }
+    if (!inCheckout()) { out.lines.push("--project writes into a Sahne checkout in place: run it inside one (never in a temporary clone or from an app folder)."); return out; }
     if (o.pr) { out.lines.push("--project is the owner's own kit agents' art and is never offered by pull request: a pull request needs the author's consent (--consent)."); return out; }
     o = { ...o, by: o.by?.trim() ? o.by : PROJECT_CREDIT.by, contact: o.contact?.trim() ? o.contact : PROJECT_CREDIT.contact };
   } else if (!o.consent) { out.lines.push(CONSENT_TEXT); return out; }
@@ -359,7 +361,7 @@ export async function promote(o: Options): Promise<Outcome> {
   const root = cloneRepo();
   const cli = join(root, "packages/sahne-kit/drawing/promote.ts"), src = join(dirname(root), "source.json");
   writeFileSync(src, JSON.stringify(typeof o.source === "string" ? JSON.parse(readFileSync(o.source, "utf8")) : o.source));
-  const args = [cli, src, "--id", o.id, "--family", o.family, "--by", o.by, "--contact", o.contact, o.project ? "--project" : "--consent", "--date", doc.credit!.date, "--out", outDir, ...(o.story ? ["--story", o.story] : [])];
+  const args = [cli, src, `--id=${o.id}`, `--family=${o.family}`, `--by=${o.by}`, `--contact=${o.contact}`, "--consent", `--date=${doc.credit!.date}`, `--out=${outDir}`, ...(o.story ? [`--story=${o.story}`] : [])]; // --k=v: a value may start with "-"
   const r = sh(process.execPath, args, root);
   if (r.status !== 0) { out.lines.push(`the clone's promotion failed (the repository's default branch must already contain drawing/promote.ts; the clone runs its own copy, on this checkout's modules):\n${(r.stdout + r.stderr).trim()}`); return out; }
   out.written = touched(doc, o.family);
@@ -376,6 +378,8 @@ export async function promote(o: Options): Promise<Outcome> {
   const who = sh("gh", ["api", "user", "--jq", ".login"], root);
   if (who.status !== 0) return fallback("gh is not signed in (gh auth login)");
   const login = who.stdout.trim();
+  const gl = /^github:@?([A-Za-z0-9-]+)$/.exec(doc.credit!.contact);
+  if (gl && gl[1].toLowerCase() !== login.toLowerCase()) { out.lines.push(`the contact github:${gl[1]} is not the signed-in gh login (${login}): the credit and its Co-Authored-By name the person who runs this, so run it as them, or give an email address as the contact.`); return out; }
   const branch = `art/${doc.id}`, gid = /^github:@?([A-Za-z0-9-]+)$/.exec(doc.credit!.contact), uid = gid ? sh("gh", ["api", `users/${gid[1]}`, "--jq", ".id"], root).stdout.trim() : "";
   const email = coAuthorEmail(doc.credit!.contact, /^\d+$/.test(uid) ? uid : undefined); // GitHub links a co-author only by <id>+<login>@users.noreply.github.com
   for (const step of [["checkout", "-q", "-b", branch], ["commit", "-q", "-m", `feat(kit): ${doc.id}, drawn by ${doc.credit!.by}\n\nPromoted from ${doc.credit!.from}${o.story ? ` (${o.story})` : ""} into the ${o.family} family.\n\nCo-Authored-By: ${doc.credit!.by} <${email}>`]]) {
@@ -384,16 +388,18 @@ export async function promote(o: Options): Promise<Outcome> {
   }
   // push where the user may: the repository itself, else their fork
   const write = sh("gh", ["api", `repos/${GH_REPO}`, "--jq", ".permissions.push"], root).stdout.trim() === "true";
-  let head = branch, remote = "origin";
-  if (!write) {
+  let head = branch, remote = "target";
+  if (write) sh("git", ["remote", "add", remote, process.env.SAHNE_PUSH_URL ?? `https://github.com/${GH_REPO}.git`], root); // the repository itself, whatever this clone's origin is
+  else {
     const f = sh("gh", ["repo", "fork", GH_REPO, "--clone=false"], root);
     if (f.status !== 0) return fallback(`could not fork ${GH_REPO} (${(f.stderr || f.stdout).trim()})`);
+    const fu = sh("gh", ["repo", "view", `${login}/${GH_REPO.split("/")[1]}`, "--json", "url", "--jq", ".url"], root).stdout.trim(); // the fork's own url, not a guess
     remote = "fork"; head = `${login}:${branch}`;
-    sh("git", ["remote", "add", remote, process.env.SAHNE_FORK_URL ?? `https://github.com/${login}/sahne.git`], root);
+    sh("git", ["remote", "add", remote, process.env.SAHNE_FORK_URL ?? (fu ? `${fu}.git` : `https://github.com/${login}/${GH_REPO.split("/")[1]}.git`)], root);
   }
   const push = sh("git", ["push", "-q", "-u", remote, branch], root);
   if (push.status !== 0) return fallback(`could not push to ${remote} (${push.stderr.trim()})`);
-  const pr = sh("gh", ["pr", "create", "--repo", GH_REPO, "--base", "main", "--head", head, "--title", `feat(kit): ${doc.id}, drawn by ${doc.credit!.by}`, "--body-file", join(outDir, `${doc.id}.pr.md`)], root);
+  const pr = sh("gh", ["pr", "create", "--repo", GH_REPO, "--base", "main", "--head", head, "--title", `feat(kit): ${doc.id}, drawn by ${doc.credit!.by.replace(/@/g, "@\u200b")}`, "--body-file", join(outDir, `${doc.id}.pr.md`)], root);
   if (pr.status !== 0) return fallback(`gh pr create failed (${(pr.stderr || pr.stdout).trim()})`);
   out.pr = pr.stdout.trim().split("\n").pop()!;
   out.ok = true;
@@ -404,10 +410,12 @@ export async function promote(o: Options): Promise<Outcome> {
 // ---- the command ---------------------------------------------------------------------------------------------------------
 
 export async function main(argv: string[]): Promise<number> {
-  const { values: v, positionals } = parseArgs({ args: argv, allowPositionals: true, options: {
+  let parsed;
+  try { parsed = parseArgs({ args: argv, allowPositionals: true, options: {
     id: { type: "string" }, family: { type: "string" }, by: { type: "string" }, contact: { type: "string" }, story: { type: "string" }, date: { type: "string" }, out: { type: "string" },
     sheet: { type: "string" }, consent: { type: "boolean" }, project: { type: "boolean" }, pr: { type: "boolean" }, dry: { type: "boolean" }, check: { type: "boolean" }, regenerate: { type: "boolean" }, help: { type: "boolean", short: "h" },
-  } });
+  } }); } catch (e) { console.error(`${(e as Error).message}\n(a value that starts with "-" is written --by=-Ada)`); return 2; }
+  const { values: v, positionals } = parsed;
   if (v.check) {
     const bad = check();
     for (const b of bad) console.error(b);

@@ -79,6 +79,8 @@ test("the credit's text is one plain line: no newline to forge a trailer or brea
   says(c({ by: "Ada <e@x.org>" }), /credit\.by/);
   says(c({ by: "@acme/team" }), /credit\.by/);
   says(c({ by: "x".repeat(81) }), /credit\.by/);
+  says(c({ by: "![x](https://evil.example)" }), /credit\.by/);
+  says(c({ by: "-Ada" }), /credit\.by/);
   says(c({ story: "s\n| x |" }), /credit\.story/);
   says(c({ contact: "https://example.org" }), /credit\.contact/);
   says(c({ contact: "github:ada\nx" }), /credit\.contact/);
@@ -86,6 +88,7 @@ test("the credit's text is one plain line: no newline to forge a trailer or brea
   assert.deepEqual(errs(c({ consent: "project", by: "Sahne kit (drawn by its agents)", contact: "github:mehrad77" })), []);
   says(c({ consent: "yes" }), /consent/);
   assert.doesNotMatch(prText(c({ by: "Ada", contact: "github:@ada" }), "bakery"), /@ada/, "an @name in the text is defused");
+  assert.doesNotMatch(prText({ ...c({}), about: "A loaf. Thanks @someone for the idea.", tags: ["@team"] }, "bakery"), /@(someone|team)/, "an @name in about or a tag is defused too");
 });
 
 test("a set piece is drawn at 3 px/cm or less, text has a language, a stray colour and drawn words are warnings", () => {
@@ -166,7 +169,7 @@ test("promote.ts moves the drawing in, adds the alias and the credit, and --chec
   const credits = JSON.parse(readFileSync(join(root, "packages/sahne-kit/src/set/drawn/CREDITS.json"), "utf8"));
   assert.deepEqual(credits.filter((c: { id: string }) => c.id === "butter_cookie").map((c: { id: string; family: string; kind: string; by: string }) => [c.id, c.family, c.kind, c.by]), [["butter_cookie", "bakery", "prop", "Ada L."]]);
   assert.equal(credits.length, readdirSync(join(root, "packages/sahne-kit/src/set/drawn/bakery")).length, "a credit for every drawing in the folder");
-  assert.match(readFileSync(join(root, "packages/sahne-kit/SET.md"), "utf8"), /## Credits[\s\S]*\| `butter_cookie` \| bakery \| Ada L\. \| github:ada \| – \| 2026-10-30 \| `x_butter_cookie` \|/);
+  assert.match(readFileSync(join(root, "packages/sahne-kit/SET.md"), "utf8"), /## Credits[\s\S]*\| `butter_cookie` \| bakery \| Ada L\. \| github:ada \| author \| – \| 2026-10-30 \| `x_butter_cookie` \|/);
   assert.match(readFileSync(join(root, "packages/sahne-kit/SET.md"), "utf8"), /\| `butter_cookie` \| prop \| A butter cookie/);
   assert.match(readFileSync(join(root, "packages/sahne-kit/src/set/families.gen.ts"), "utf8"), /butter_cookie: "bakery"/);
   assert.ok(existsSync(join(root, "out/butter_cookie-neighbours.png")) && existsSync(join(root, "out/butter_cookie.pr.md")));
@@ -226,7 +229,14 @@ test("promote.ts refuses, and writes nothing: no consent, a taken id, an x_ id, 
   no(run(base(["--consent", "--story", "s\n| x |"])), /credit\.story/);
   no(run(base(["--consent"]).map(a => (a === "github:ada" ? "not a contact" : a))), /credit\.contact/);
   no(run(base(["--consent", "--date", "2026-13-99"])), /credit\.date/);
-  no(run(base(["--project", "--pr"])), /never offered by pull request/);
+  // --project is the owner's: refused without SAHNE_PROJECT_ART, outside a checkout, and with --pr
+  no(run(base(["--project", "--dry"])), /--project is the owner's/);
+  const ownerRun = (args: string[], cwd = root) => runIn(root, cwd, [src, ...args], { SAHNE_PROJECT_ART: "1" });
+  no(ownerRun(base(["--project", "--pr"])), /never offered by pull request/);
+  no(ownerRun(base(["--project", "--dry"]), tmpdir()), /inside one/);
+  assert.equal(ownerRun(base(["--project", "--dry"])).status, 0);
+  // a dash-leading name is one --by=value argument, and a markdown link in a name is refused
+  no(run(base(["--consent", "--dry"]).map(a => (a === "Ada L." ? "[x](https://evil.example)" : a))), /credit\.by/);
   // over budget: the copy's budget is made a kilobyte
   const size = join(root, "packages/sahne-gallery/size.mjs");
   writeFileSync(size, readFileSync(size, "utf8").replace("shared: true, budget: 40 }", "shared: true, budget: 1 }"));
@@ -251,7 +261,7 @@ echo "$@" >> "${log}"
 [ -n "$GH_MISSING" ] && exit 1
 case "$1 $2" in
   "--version "*) echo "gh version 0.0.0 (stub)";;
-  "api user") echo tester;;
+  "api user") echo ada;;
   "api repos/mehrad77/sahne") echo "\${GH_PUSH:-true}";;
   "repo fork") ;;
   "pr create") echo "https://github.com/mehrad77/sahne/pull/42";;
@@ -275,7 +285,7 @@ function fakeOrigin(): { root: string; origin: string } {
 const prRun = (root: string, origin: string, env: Record<string, string>, extra: string[] = []) => {
   const outside = mkdtempSync(join(realpathSync(tmpdir()), "sahne-app-")), src = write(join(outside, "kit/pieces/x_butter_cookie.json"), cookie());
   const gh = stubGh(outside);
-  const r = runIn(root, outside, promoteArgs(src, ["--consent", "--pr", ...extra]), { PATH: `${gh.bin}:${process.env.PATH}`, SAHNE_REPO_URL: `file://${origin}`, GIT_AUTHOR_NAME: "T", GIT_AUTHOR_EMAIL: "t@example.org", GIT_COMMITTER_NAME: "T", GIT_COMMITTER_EMAIL: "t@example.org", ...env });
+  const r = runIn(root, outside, promoteArgs(src, ["--consent", "--pr", ...extra]), { PATH: `${gh.bin}:${process.env.PATH}`, SAHNE_REPO_URL: `file://${origin}`, SAHNE_PUSH_URL: `file://${origin}`, GIT_AUTHOR_NAME: "T", GIT_AUTHOR_EMAIL: "t@example.org", GIT_COMMITTER_NAME: "T", GIT_COMMITTER_EMAIL: "t@example.org", ...env });
   return { r, outside, log: existsSync(gh.log) ? readFileSync(gh.log, "utf8") : "" };
 };
 
@@ -302,7 +312,7 @@ test("--pr without write access forks and pushes there; without gh it leaves a p
   const a = prRun(root, origin, { GH_PUSH: "false", SAHNE_FORK_URL: `file://${fork}` });
   assert.equal(a.r.status, 0, a.r.stdout + a.r.stderr);
   assert.match(a.log, /repo fork mehrad77\/sahne --clone=false/);
-  assert.match(a.log, /--head tester:art\/butter_cookie/);
+  assert.match(a.log, /--head ada:art\/butter_cookie/);
   assert.match(git(fork, "log", "-1", "--format=%s", "art/butter_cookie").stdout, /^feat\(kit\): butter_cookie, drawn by Ada L\./);
   assert.equal(git(origin, "branch", "--list", "art/*").stdout.trim(), "", "nothing was pushed to the repository itself");
 
