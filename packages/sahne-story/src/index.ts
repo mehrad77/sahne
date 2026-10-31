@@ -19,3 +19,4 @@ export { langFor, plainLang, motivated, motiveText, LANGS, type StoryLang, type 
 export { trLang } from "./langs/tr.ts";
 export { enLang } from "./langs/en.ts";
 export { deLang } from "./langs/de.ts";
+export { faLang } from "./langs/fa.ts";

@@ -178,6 +178,11 @@ test("parenthetical: gestures, feelings, who it is said to, where it points, wal
   assert.deepEqual(parseParenthetical("points at the apple", v).staging, { do: "point", at: "obj:apple" });
   assert.deepEqual(parseParenthetical("walks to counter, whispers, close", v, "nima").staging, { move: { who: "nima", to: "counter" }, voice: "whisper", cam: "close" });
   assert.deepEqual(parseParenthetical("angry, juggles", v), { staging: { emo: "annoyed" }, rest: ["juggles"] });
+  // a Persian writer's ، and ؛ split, and ZWNJ is no matter (the language's own words)
+  const { faLang } = await import("sahne-story");
+  const fv = { ...v, words: faLang.parenthetical };
+  assert.deepEqual(parseParenthetical("(دست تکان می‌دهد، شاد)", fv), { staging: { do: "wave", emo: "happy" }, rest: [] });
+  assert.deepEqual(parseParenthetical("(دست تکان میدهد؛ غمگین)", fv).staging, { do: "wave", emo: "sad" });
   assert.deepEqual(chipsOf({ do: "wave", to: "ismail", at: "obj:apple" }, id => (id === "ismail" ? "İsmail" : id)).map(c => c.label), ["wave", "→ İsmail", "at apple"]);
 });
 

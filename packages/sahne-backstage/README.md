@@ -225,7 +225,7 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 - An edit that changes only words (`src/model/steps.ts` `wordsOnly`) re-directs the cues: `storyPlayer.replace`, with no reload.
 - Any other edit adapts the story again and loads the stage.
 - Either way, the stage returns to the cue that was showing.
-- The stage's language plugin (mouth timing, word matching) follows the series' main language: `sahne-tr` for Turkish, `sahne-en` for English, `sahne-de` for German, none for another (`PLUGINS` and `langPlugin` in `src/stage.ts`; Turkish when the series names none). The preview, the live card previews, the thumbnails and the place stage all use it (`seriesLang()`).
+- The stage's language plugin (mouth timing, word matching) follows the series' main language: `sahne-tr` for Turkish, `sahne-en` for English, `sahne-de` for German, `sahne-fa` for Persian, none for another (`PLUGINS` and `langPlugin` in `src/stage.ts`; Turkish when the series names none). The preview, the live card previews, the thumbnails and the place stage all use it (`seriesLang()`).
 - A sign's or a phone's text is drawn into the art, so editing it needs a load. A load happens anyway, because that text is not one of the word keys.
 
 ## How saving works (`server/content.ts`, with `sahne-story/json.ts`)

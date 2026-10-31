@@ -1,12 +1,13 @@
 // A story language: what the lints and the check know of the series' main language (src/texts.ts). The engine's
 // `LangPlugin` (sahne's core/lang.ts) times a mouth and hears a line; this reads a story's text: its words and pauses,
 // whether a word is a form of another, the words that motivate a gesture, a number said aloud, and the language's own
-// lints (Turkish: bu/şu/o, var/yok, counts, clock times) and the check's dictionary forms. `langs/tr.ts` is Turkish, `langs/en.ts` English, `langs/de.ts` German;
+// lints (Turkish: bu/şu/o, var/yok, counts, clock times) and the check's dictionary forms. `langs/tr.ts` is Turkish, `langs/en.ts` English, `langs/de.ts` German, `langs/fa.ts` Persian;
 // any other language gets `plainLang`: the lints and checks that need no grammar, and exact words.
 
 import type { Staging, Target } from "sahne";
 import { deLang } from "./langs/de.ts";
 import { enLang } from "./langs/en.ts";
+import { faLang } from "./langs/fa.ts";
 import { trLang } from "./langs/tr.ts";
 
 /** A word of a line (lower case, `i` its offset), or a pause: "," or "." (`q` for a question mark). */
@@ -90,8 +91,8 @@ export function plainLang(id: string): StoryLang {
   };
 }
 
-/** The story languages Sahne has: Turkish, English and German. */
-export const LANGS: Record<string, StoryLang> = { tr: trLang, en: enLang, de: deLang };
+/** The story languages Sahne has: Turkish, English, German and Persian. */
+export const LANGS: Record<string, StoryLang> = { tr: trLang, en: enLang, de: deLang, fa: faLang };
 
 /** The story language of a code: its plugin, else `plainLang`. */
 export const langFor = (id: string): StoryLang => LANGS[id] ?? plainLang(id);

@@ -26,6 +26,7 @@
     "sahne": "workspace:*",
     "sahne-kit": "workspace:*",
     "sahne-en": "workspace:*",
+    "sahne-fa": "workspace:*",
     "sahne-story": "workspace:*",
     "sahne-de": "workspace:*",
     "sahne-tr": "workspace:*",

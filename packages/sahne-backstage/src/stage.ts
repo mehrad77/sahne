@@ -1,5 +1,5 @@
 // The stage an episode plays on in backstage: the whole kit (every set family), Kerim's puppet and the animals', the
-// language plugins (Turkish, English, German; a preview takes its series' main language's), the kit's sounds, the interaction layer (acts, explore, picking) and prop text; Kerim's round window for
+// language plugins (Turkish, English, German, Persian; a preview takes its series' main language's), the kit's sounds, the interaction layer (acts, explore, picking) and prop text; Kerim's round window for
 // the narrator. `Preview` keeps one stage and a story player over it, and follows the document as it is edited: a change
 // to words re-directs the cues (`player.replace`, no reload), anything else adapts and loads again; either way the stage
 // goes back to the cue that was showing.
@@ -12,13 +12,14 @@ import { K_BUST, K_HEAD, K_HEAD_VB } from "sahne-kit/kerim/art";
 import { kerimOnTalk, kerimPortrait } from "sahne-kit/kerim/portrait";
 import de from "sahne-de";
 import en from "sahne-en";
+import fa from "sahne-fa";
 import tr from "sahne-tr";
 import { world } from "./store.ts";
 import { adaptStory, languagesOf, storyPlayer, type CharacterDoc, type Languages, type StoryDoc, type StoryPlace, type StoryPlayer, type StoryStage } from "sahne-story";
 
 export const KIT: Kit = { ...full, puppets: { ...full.puppets, ...kerimPuppets, ...animals } };
 /** The language plugins, by the code of a series' main language. */
-export const PLUGINS: Record<string, LangPlugin> = { tr, en, de };
+export const PLUGINS: Record<string, LangPlugin> = { tr, en, de, fa };
 /** The plugin of a series' main language: Turkish when none is named (the samples' default); none for a language without a plugin. */
 export const langPlugin = (main?: string): LangPlugin | undefined => PLUGINS[main ?? "tr"];
 /** The plugin of the open series' main language, for the shared stages (live previews, thumbnails, the place stage). */
