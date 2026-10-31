@@ -68,12 +68,12 @@
     "gap": 4
   },
   "credit": {
-    "by": "Sahne kit agents",
-    "contact": "https://github.com/mehrad77/sahne",
+    "by": "Sahne kit (drawn by its agents)",
+    "contact": "github:mehrad77",
     "story": "the bakery family",
     "date": "2026-10-31",
     "licence": "CC-BY-4.0",
-    "consent": true,
+    "consent": "project",
     "from": "x_eclair"
   }
 }

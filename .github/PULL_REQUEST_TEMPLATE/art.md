@@ -19,6 +19,7 @@
 
 ## Reviewer's checklist
 
+- [ ] `credit.consent` is `true`; `"project"` only in the owner's own kit agents' commits (it is never opened by pull request).
 - [ ] Cut paper: no outlines, no drawn grain; details printed on the paper are `flat` (STYLE.md *Paper*).
 - [ ] Light from the upper left; colours are the kit's or a tone of one.
 - [ ] Puppet scale: real centimetres, right beside the 170 cm adult or on the scale bar.

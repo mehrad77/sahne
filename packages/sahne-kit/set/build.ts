@@ -66,7 +66,7 @@ function usedBy(): Record<string, string[]> {
   return out;
 }
 
-const cell = (v: string) => v.replace(/\|/g, "\\|");
+const cell = (v: string) => v.replace(/[\r\n]+/g, " ").replace(/\|/g, "\\|");
 
 export function renderMd(): string {
   const used = usedBy(), lines = [

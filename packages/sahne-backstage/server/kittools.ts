@@ -596,7 +596,7 @@ export function registerKitTools(server: McpServer, k: KitToolsCtx): void {
 
   server.registerTool("promote_kit_item", {
     title: "Offer a drawing to Sahne",
-    description: "Step 7 of the loop: offer a drawing saved in this content root (kit/pieces/x_….json) to become official Sahne art, credited to its author. It checks the drawing as the kit's own items are checked (the official rules on top of draft_kit_item's: an unused snake_case id, the family and its size, shelved tags, a real `about`, words as text with a language, set pieces at 3 px/cm or less) and returns the problems with the review sheet and the family comparison as pictures. Without `pr` it writes nothing anywhere. With `pr: true`, a write mode and `gh` signed in, it opens a pull request on GitHub from a temporary clone (a branch art/<id>, your person's fork when they cannot write), else leaves a .patch and the pull request text and says what to do. YOU MUST ASK YOUR PERSON for `by` (their name as they want it shown), `contact` (github:name or an address) and `consent`: consent is theirs to give, never yours. It means they release the drawing under CC BY 4.0 (the kit's art licence, LICENSE-ART) and say it is their own work, not traced or copied. Never pass consent: true unless they said so in this conversation. Promotion refuses without it. The old x_ id stays working: the kit's aliases answer to it.",
+    description: "Step 7 of the loop: offer a drawing saved in this content root (kit/pieces/x_….json) to become official Sahne art, credited to its author. It checks the drawing as the kit's own items are checked (the official rules on top of draft_kit_item's: an unused snake_case id, the family and its size, shelved tags, a real `about`, words as text with a language, set pieces at 3 px/cm or less) and returns the problems with the review sheet and the family comparison as pictures. It writes nothing anywhere and publishes nothing: opening the pull request is your person's own act, never a tool's (`pr: true` is refused in every mode; the result gives the command your person runs, which opens it from a temporary clone, on their fork when they cannot write, or leaves a .patch). YOU MUST ASK YOUR PERSON for `by` (their name as they want it shown), `contact` (github:name or an address) and `consent`: consent is theirs to give, never yours. It means they release the drawing under CC BY 4.0 (the kit's art licence, LICENSE-ART) and say it is their own work, not traced or copied. Never pass consent: true unless they said so in this conversation. Promotion refuses without it. The old x_ id stays working: the kit's aliases answer to it.",
     inputSchema: {
       kitId: z.string().describe("The drawing's id in this content root, x_…"),
       id: z.string().describe("The id it takes in the kit, for good: lowercase snake_case, never x_ (ids are permanent)"),
@@ -605,16 +605,19 @@ export function registerKitTools(server: McpServer, k: KitToolsCtx): void {
       contact: z.string().describe("How to reach the author: github:name or an address: ask your person"),
       consent: z.boolean().describe("true only when your person agreed in this conversation to release it under CC BY 4.0 as their own work: ask them, never assume"),
       story: z.string().optional().describe("Where it was used, like \"kumru s2e04\""),
-      pr: z.boolean().optional().describe("Open the pull request (needs a write mode and gh); default false: check and draw only"),
+      pr: z.boolean().optional().describe("Refused: a person opens the pull request themselves with the command this tool prints"),
     },
     annotations: { destructiveHint: false, openWorldHint: true },
   }, run("promote_kit_item", async ({ kitId, id, family, by, contact, consent, story, pr }) => {
+    // publishing (a branch, a public pull request, and the licence grant in it) is a person's act: no mode lets a tool do it
+    if (pr) return fail("promote_kit_item never opens a pull request: that publishes the drawing under CC BY 4.0 and needs your person's own go-ahead. Leave out `pr` to check and draw, then give your person the command to run themselves (it is printed after a successful check).");
     if (!exists("kit_piece", kitId)) throw new Refusal(`there is no drawing ${kitId} in this content root (kit_search lists this series' items)`);
-    if (pr) { const why = k.readOnly(); if (why) return fail(why); }
     const { promote } = await import("../../sahne-kit/drawing/promote.ts");
     const out = mkdtempSync(join(tmpdir(), "sahne-promote-")), doc = readDoc("kit_piece", kitId).doc as DrawingDoc;
-    const r = await promote({ source: doc, id, family, by, contact, consent, story, pr, dry: !pr, out });
-    const text = [`${kitId} → ${id} (${family}): ${r.ok ? (pr ? "offered" : "ready to offer") : "not ready"}`, ...r.lines].join("\n");
+    const r = await promote({ source: doc, id, family, by, contact, consent, story, dry: true, out });
+    const q = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
+    const cmd = `node packages/sahne-kit/drawing/promote.ts <content-root>/kit/pieces/${kitId}.json --id ${id} --family ${family} --by ${q(by)} --contact ${q(contact)} --consent${story ? ` --story ${q(story)}` : ""} --pr`;
+    const text = [`${kitId} → ${id} (${family}): ${r.ok ? "ready to offer" : "not ready"}`, ...r.lines, ...(r.ok ? [`To offer it, your person runs: ${cmd}`] : [])].join("\n");
     const res = ok(text, { ok: r.ok, problems: r.problems, ...(r.pr ? { pr: r.pr } : {}), ...(r.patch ? { patch: r.patch } : {}) }, r.images.map(f => readFileSync(f)));
     return r.ok ? res : { ...res, isError: true };
   }));

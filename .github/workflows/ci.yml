@@ -46,7 +46,7 @@ jobs:
 
   art:
     # a pull request that touches the drawings promoted into the kit (packages/sahne-kit/src/set/drawn/): check what is generated
-    # from them, run the gate, draw each changed item's review sheet and its family at one scale, and link them in one comment.
+    # from them, run the kit's tests, draw each changed item's review sheet and its family at one scale, and link them in one comment.
     # (A job cannot filter on paths, so it finds what changed itself, and the rest is skipped when nothing did.)
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -78,12 +78,10 @@ jobs:
       - name: what is generated from the drawings is current
         if: steps.changed.outputs.ids != ''
         run: node packages/sahne-kit/drawing/promote.ts --check
-      - name: the gate
+      - name: the kit's tests
+        # the whole gate (golden frames) runs in the main job on this pull request; this one only runs what the art can break first
         if: steps.changed.outputs.ids != ''
-        run: |
-          pnpm --dir packages/sahne-gallery exec playwright install --with-deps chromium
-          sudo apt-get install -y fonts-comic-neue
-          pnpm sahne check
+        run: pnpm --dir packages/sahne-kit test
       - name: the review sheets
         if: steps.changed.outputs.ids != ''
         env:

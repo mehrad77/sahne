@@ -765,6 +765,7 @@ test("promote_kit_item: the agent asks its person for consent; it checks the dra
     const yes = await call(d.client, "promote_kit_item", args);
     assert.ok(!yes.isError, yes.text);
     assert.match(yes.text, /ready to offer/);
+    assert.match(yes.text, /your person runs: node packages\/sahne-kit\/drawing\/promote\.ts .* --consent --pr/);
     assert.equal(yes.images.length, 2);
     assert.ok(yes.images.every(isPng));
     assert.equal(json(yes).ok, true);
@@ -776,9 +777,15 @@ test("promote_kit_item: the agent asks its person for consent; it checks the dra
     assert.match((await call(d.client, "promote_kit_item", { ...args, family: "food" })).text, /does not take drawn items yet/);
     assert.match((await call(d.client, "promote_kit_item", { ...args, kitId: "x_nothing" })).text, /no drawing x_nothing/);
   } finally { await d.close(); rmSync(kitFile(), { recursive: true, force: true }); forget(); }
-  // a pull request is a write: a read-only server refuses it
-  const ro = await connect({ write: false, agentEdits: "direct" });
-  try { assert.match((await call(ro.client, "promote_kit_item", { kitId: "x_cafe_chalkboard", id: "chalkboard", family: "bakery", by: "A", contact: "b", consent: true, pr: true })).text, /read-only|no drawing/); } finally { await ro.close(); }
+  // a pull request publishes under a licence: no mode lets the tool open one, however the agent sets consent
+  for (const o of [{ write: false, agentEdits: "direct" }, { write: true, agentEdits: "proposals" }, { write: true, agentEdits: "direct" }] as const) {
+    const ro = await connect(o);
+    try {
+      const r = await call(ro.client, "promote_kit_item", { kitId: "x_cafe_chalkboard", id: "chalkboard", family: "bakery", by: "A", contact: "github:a", consent: true, pr: true });
+      assert.ok(r.isError);
+      assert.match(r.text, /never opens a pull request/, JSON.stringify(o));
+    } finally { await ro.close(); }
+  }
 });
 
 test("read-only: saving a kit item is refused, and says why", async () => {

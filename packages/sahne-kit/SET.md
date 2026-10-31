@@ -388,11 +388,11 @@ Items drawn by the stories that first needed them and promoted into the kit (`dr
 
 | id | family | drawn by | contact | story | date | was |
 |---|---|---|---|---|---|---|
-| `apple_strudel` | bakery | Sahne kit agents | https://github.com/mehrad77/sahne | the bakery family | 2026-10-31 | `x_apple_strudel` |
-| `doughnut` | bakery | Sahne kit agents | https://github.com/mehrad77/sahne | the bakery family | 2026-10-31 | `x_doughnut` |
-| `eclair` | bakery | Sahne kit agents | https://github.com/mehrad77/sahne | the bakery family | 2026-10-31 | `x_eclair` |
-| `iced_latte` | bakery | Sahne kit agents | https://github.com/mehrad77/sahne | the bakery family | 2026-10-31 | `x_iced_latte` |
-| `salami` | bakery | Sahne kit agents | https://github.com/mehrad77/sahne | the bakery family | 2026-10-31 | `x_salami` |
+| `apple_strudel` | bakery | Sahne kit (drawn by its agents) | github:mehrad77 | the bakery family | 2026-10-31 | `x_apple_strudel` |
+| `doughnut` | bakery | Sahne kit (drawn by its agents) | github:mehrad77 | the bakery family | 2026-10-31 | `x_doughnut` |
+| `eclair` | bakery | Sahne kit (drawn by its agents) | github:mehrad77 | the bakery family | 2026-10-31 | `x_eclair` |
+| `iced_latte` | bakery | Sahne kit (drawn by its agents) | github:mehrad77 | the bakery family | 2026-10-31 | `x_iced_latte` |
+| `salami` | bakery | Sahne kit (drawn by its agents) | github:mehrad77 | the bakery family | 2026-10-31 | `x_salami` |
 
 ## Planned
 

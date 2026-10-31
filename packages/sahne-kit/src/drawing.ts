@@ -25,8 +25,10 @@ export interface Credit {
   by: string; contact: string; story?: string; date: string;
   /** The kit's art licence (LICENSE-ART). */
   licence: "CC-BY-4.0";
-  /** The author releases it under that licence and says it is their own work, not traced or copied. */
-  consent: true;
+  /** The author releases it under that licence and says it is their own work, not traced or copied (`true`), or it is the
+   *  project's own art, drawn by the owner's kit agents (`"project"`: only promote.ts --project writes it, never with a pull
+   *  request; the owner's merge is the consent). */
+  consent: true | "project";
   /** The content id it had in the story, which the kit's `aliases` still answer to. */
   from: string;
 }

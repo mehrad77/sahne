@@ -14,7 +14,7 @@
 // `officialProblems` holds a drawing to be promoted into the kit (`drawing/promote.ts`) to the stricter rules of an official item.
 
 import { Path, cellSize, fitsAtlas, groupBounds, moveAt, rng, tone, type Kit, type PieceDef, type PieceOut, type ParamSpec, type ParamType, type Tone } from "sahne";
-import { compileDrawing, KIT_ID, DRAWING_LIMITS, type DrawingDoc, type DrawingFill } from "./drawing.ts";
+import { compileDrawing, KIT_ID, DRAWING_LIMITS, type Credit, type DrawingDoc, type DrawingFill } from "./drawing.ts";
 import { FABRIC, HAIR, METAL, SET, SKIN } from "./palette.ts";
 
 /** Which rule a problem breaks (the header above). */
@@ -258,6 +258,33 @@ function wordLike(doc: DrawingDoc): string[] {
 
 const SENTENCE = /^\p{Lu}.{14,}[.!?]$/u;
 
+/** One line of plain text that can stand in a commit, a table cell and a pull request: no control characters, no `<`/`>`, no leading `@`. */
+const plainLine = (v: unknown, max = 80): v is string => typeof v === "string" && v.trim().length > 0 && v.length <= max && !/[\u0000-\u001f\u007f<>]/.test(v) && !v.trim().startsWith("@");
+const CONTACT = /^(github:@?[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})|[^\s@<>|`]+@[^\s@<>|`]+\.[^\s@<>|`]+)$/;
+/** Whether `YYYY-MM-DD` is a real calendar date, no later than today (UTC). */
+const realDate = (v: unknown): boolean => {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v && v <= new Date().toISOString().slice(0, 10);
+};
+
+/**
+ * What is wrong with a credit's own fields (the lines; [] when whole). The text fields end up in a commit, a pull request, a
+ * table and a JSON file, so they are one plain line each. `consent` is `true` (the author's, for a person's art) or "project"
+ * (the owner's own kit agents' art, which only promote.ts without --pr writes; the owner's merge is the consent).
+ */
+export function creditProblems(cr: Credit): string[] {
+  const out: string[] = [];
+  if (!plainLine(cr.by)) out.push("credit.by: the author's name as they want it shown: one plain line of at most 80 characters, no < > and no leading @");
+  if (!(typeof cr.contact === "string" && cr.contact.length <= 80 && CONTACT.test(cr.contact))) out.push("credit.contact: how to reach the author: github:name or an email address");
+  if (cr.story !== undefined && !plainLine(cr.story)) out.push("credit.story: one plain line of at most 80 characters, no < > and no leading @");
+  if (cr.consent !== true && cr.consent !== "project") out.push("credit.consent: the author must agree to release the art under CC BY 4.0 (LICENSE-ART) and say it is their own work, not traced or copied");
+  if (cr.licence !== "CC-BY-4.0") out.push("credit.licence: CC-BY-4.0");
+  if (!realDate(cr.date)) out.push("credit.date: a real date, YYYY-MM-DD, no later than today");
+  if (!/^x_[a-z0-9_]+$/.test(cr.from ?? "")) out.push("credit.from: the content id it had (x_…)");
+  return out;
+}
+
 /**
  * Everything wrong with a drawing about to join the kit under its new id, with its `credit` (the document `promote.ts` would
  * write): the content rules (`compileDrawing`, `checkPiece`) and the official ones. The id is unused, not `x_`, snake_case and
@@ -302,13 +329,8 @@ export function officialProblems(doc: DrawingDoc, c: OfficialContext): Problem[]
   const cr = doc.credit;
   if (!cr) err("credit: who drew it, how to reach them, and their consent");
   else {
-    if (!(typeof cr.by === "string" && cr.by.trim())) err("credit.by: the author's name, as they want it shown");
-    if (!(typeof cr.contact === "string" && cr.contact.trim())) err("credit.contact: how to reach the author (github:name, an address)");
-    if (cr.consent !== true) err("credit.consent: the author must agree to release the art under CC BY 4.0 (LICENSE-ART) and say it is their own work, not traced or copied");
-    if (cr.licence !== "CC-BY-4.0") err("credit.licence: CC-BY-4.0");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(cr.date ?? "")) err("credit.date: YYYY-MM-DD");
-    if (!/^x_[a-z0-9_]+$/.test(cr.from ?? "")) err("credit.from: the content id it had (x_…)");
-    else if (c.kit.aliases && Object.hasOwn(c.kit.aliases, cr.from)) err(`credit.from ${cr.from} is already an alias (of ${c.kit.aliases[cr.from]}): two stories may use one x_ id, but only one item can be its successor`);
+    for (const m of creditProblems(cr)) err(m);
+    if (/^x_[a-z0-9_]+$/.test(cr.from ?? "") && c.kit.aliases && Object.hasOwn(c.kit.aliases, cr.from)) err(`credit.from ${cr.from} is already an alias (of ${c.kit.aliases[cr.from]}): two stories may use one x_ id, but only one item can be its successor`);
   }
   // the compiled generator, as a place would draw it
   if (!problems.length) {

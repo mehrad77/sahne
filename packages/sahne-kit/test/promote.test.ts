@@ -29,7 +29,7 @@ const cookie = (): DrawingDoc => ({
   ] }] } },
   repeat: { gap: 2 },
 });
-const promoted = (o: Partial<DrawingDoc> = {}): DrawingDoc => ({ ...cookie(), id: "butter_cookie", credit: creditOf({ by: "Ada L.", contact: "github:ada", date: "2026-11-02" }, "x_butter_cookie"), ...o });
+const promoted = (o: Partial<DrawingDoc> = {}): DrawingDoc => ({ ...cookie(), id: "butter_cookie", credit: creditOf({ by: "Ada L.", contact: "github:ada", date: "2026-10-30" }, "x_butter_cookie"), ...o });
 
 const ctx = (o: Partial<OfficialContext> = {}): OfficialContext => ({
   kit: full, family: "bakery", families: Object.keys(FAMILIES), wired: true,
@@ -67,8 +67,25 @@ test("the credit must be whole, with consent; an old id already answered is refu
   says(c({ contact: "" }), /credit\.contact/);
   says(c({ licence: "MIT" }), /credit\.licence/);
   says(c({ date: "yesterday" }), /credit\.date/);
+  says(c({ date: "2026-13-99" }), /credit\.date/);
+  says(c({ date: "2999-01-01" }), /credit\.date/);
   says(c({ from: "butter_cookie" }), /credit\.from/);
   says(c({}), /already an alias/, ctx({ kit: { ...full, aliases: { ...full.aliases, x_butter_cookie: "pastry" } } }));
+});
+
+test("the credit's text is one plain line: no newline to forge a trailer or break a table, no ping, a real contact", () => {
+  const c = (o: object) => promoted({ credit: { ...promoted().credit!, ...o } as never });
+  says(c({ by: "Ada\nCo-Authored-By: Evil <e@x.org>" }), /credit\.by/);
+  says(c({ by: "Ada <e@x.org>" }), /credit\.by/);
+  says(c({ by: "@acme/team" }), /credit\.by/);
+  says(c({ by: "x".repeat(81) }), /credit\.by/);
+  says(c({ story: "s\n| x |" }), /credit\.story/);
+  says(c({ contact: "https://example.org" }), /credit\.contact/);
+  says(c({ contact: "github:ada\nx" }), /credit\.contact/);
+  assert.deepEqual(errs(c({ contact: "ada@example.org", story: "kumru s2e04" })), []);
+  assert.deepEqual(errs(c({ consent: "project", by: "Sahne kit (drawn by its agents)", contact: "github:mehrad77" })), []);
+  says(c({ consent: "yes" }), /consent/);
+  assert.doesNotMatch(prText(c({ by: "Ada", contact: "github:@ada" }), "bakery"), /@ada/, "an @name in the text is defused");
 });
 
 test("a set piece is drawn at 3 px/cm or less, text has a language, a stray colour and drawn words are warnings", () => {
@@ -110,6 +127,7 @@ test("the pull request text carries the sheet note, the credit with consent and 
   const t = prText(promoted(), "bakery");
   for (const re of [/### The sheet/, /### What it is/, /### Where it was used/, /### Credit and consent/, /\[x\] The author releases/, /### Reviewer's checklist/, /x_butter_cookie/, /Ada L\./, /words are `text`/i]) assert.match(t, re);
   assert.equal(coAuthorEmail("github:ada"), "ada@users.noreply.github.com");
+  assert.equal(coAuthorEmail("github:ada", "123"), "123+ada@users.noreply.github.com");
   assert.equal(coAuthorEmail("ada@example.org"), "ada@example.org");
   assert.equal(coAuthorEmail("a phone number"), "noreply@sahne.invalid");
 });
@@ -127,7 +145,7 @@ function copyRepo(): string {
 }
 const git = (cwd: string, ...args: string[]) => spawnSync("git", args, { cwd, encoding: "utf8", env: { ...process.env, GIT_AUTHOR_NAME: "T", GIT_AUTHOR_EMAIL: "t@example.org", GIT_COMMITTER_NAME: "T", GIT_COMMITTER_EMAIL: "t@example.org" } });
 const write = (path: string, doc: unknown) => { mkdirSync(join(path, ".."), { recursive: true }); writeFileSync(path, JSON.stringify(doc, null, 2)); return path; };
-const promoteArgs = (src: string, o: string[] = []) => [src, "--id", "butter_cookie", "--family", "bakery", "--by", "Ada L.", "--contact", "github:ada", "--date", "2026-11-02", ...o];
+const promoteArgs = (src: string, o: string[] = []) => [src, "--id", "butter_cookie", "--family", "bakery", "--by", "Ada L.", "--contact", "github:ada", "--date", "2026-10-30", ...o];
 const runIn = (root: string, cwd: string, args: string[], env: Record<string, string> = {}) =>
   spawnSync(process.execPath, [join(root, "packages/sahne-kit/drawing/promote.ts"), ...args], { cwd, encoding: "utf8", env: { ...process.env, ...env } });
 
@@ -139,7 +157,7 @@ test("promote.ts moves the drawing in, adds the alias and the credit, and --chec
   assert.match(r.stdout, /^image: .*butter_cookie\.png/m);
   const doc = JSON.parse(readFileSync(join(root, "packages/sahne-kit/src/set/drawn/bakery/butter_cookie.json"), "utf8"));
   assert.equal(doc.id, "butter_cookie");
-  assert.deepEqual(doc.credit, { by: "Ada L.", contact: "github:ada", date: "2026-11-02", licence: "CC-BY-4.0", consent: true, from: "x_butter_cookie" });
+  assert.deepEqual(doc.credit, { by: "Ada L.", contact: "github:ada", date: "2026-10-30", licence: "CC-BY-4.0", consent: true, from: "x_butter_cookie" });
   assert.deepEqual({ ...doc, id: "x_butter_cookie", credit: undefined }, { ...cookie(), credit: undefined }, "the drawing itself is unchanged");
   const gen = readFileSync(join(root, "packages/sahne-kit/src/set/drawn/bakery.gen.ts"), "utf8");
   assert.match(gen, /"id":"butter_cookie"/);
@@ -148,7 +166,7 @@ test("promote.ts moves the drawing in, adds the alias and the credit, and --chec
   const credits = JSON.parse(readFileSync(join(root, "packages/sahne-kit/src/set/drawn/CREDITS.json"), "utf8"));
   assert.deepEqual(credits.filter((c: { id: string }) => c.id === "butter_cookie").map((c: { id: string; family: string; kind: string; by: string }) => [c.id, c.family, c.kind, c.by]), [["butter_cookie", "bakery", "prop", "Ada L."]]);
   assert.equal(credits.length, readdirSync(join(root, "packages/sahne-kit/src/set/drawn/bakery")).length, "a credit for every drawing in the folder");
-  assert.match(readFileSync(join(root, "packages/sahne-kit/SET.md"), "utf8"), /## Credits[\s\S]*\| `butter_cookie` \| bakery \| Ada L\. \| github:ada \| – \| 2026-11-02 \| `x_butter_cookie` \|/);
+  assert.match(readFileSync(join(root, "packages/sahne-kit/SET.md"), "utf8"), /## Credits[\s\S]*\| `butter_cookie` \| bakery \| Ada L\. \| github:ada \| – \| 2026-10-30 \| `x_butter_cookie` \|/);
   assert.match(readFileSync(join(root, "packages/sahne-kit/SET.md"), "utf8"), /\| `butter_cookie` \| prop \| A butter cookie/);
   assert.match(readFileSync(join(root, "packages/sahne-kit/src/set/families.gen.ts"), "utf8"), /butter_cookie: "bakery"/);
   assert.ok(existsSync(join(root, "out/butter_cookie-neighbours.png")) && existsSync(join(root, "out/butter_cookie.pr.md")));
@@ -186,7 +204,7 @@ test("promote.ts moves the drawing in, adds the alias and the credit, and --chec
   const bad = JSON.parse(readFileSync(join(root, "packages/sahne-kit/src/set/drawn/bakery/butter_cookie.json"), "utf8"));
   bad.credit.consent = false;
   writeFileSync(join(root, "packages/sahne-kit/src/set/drawn/bakery/butter_cookie.json"), JSON.stringify(bad));
-  assert.match(runIn(root, root, ["--check"]).stderr, /no credit with consent/);
+  assert.match(runIn(root, root, ["--check"]).stderr, /credit\.consent/);
 });
 
 test("promote.ts refuses, and writes nothing: no consent, a taken id, an x_ id, an unshelved tag, a family that cannot take it, over budget", () => {
@@ -203,6 +221,12 @@ test("promote.ts refuses, and writes nothing: no consent, a taken id, an x_ id, 
   no(run(base(["--consent"]).map(a => (a === "bakery" ? "nonesuch" : a))), /does not exist/);
   no(run(base(["--consent"]), { ...cookie(), id: "x_other", about: "cookie" }), /about: say what it draws in a sentence/);
   no(run(["--id", "butter_cookie", "--family", "bakery", "--consent", "--out", join(root, "out")]), /--by/);
+  // free text that would forge a trailer, break a table or ping a team is refused before anything is written
+  no(run(base(["--consent"]).map(a => (a === "Ada L." ? "Ada\nCo-Authored-By: Evil <e@x.org>" : a))), /credit\.by/);
+  no(run(base(["--consent", "--story", "s\n| x |"])), /credit\.story/);
+  no(run(base(["--consent"]).map(a => (a === "github:ada" ? "not a contact" : a))), /credit\.contact/);
+  no(run(base(["--consent", "--date", "2026-13-99"])), /credit\.date/);
+  no(run(base(["--project", "--pr"])), /never offered by pull request/);
   // over budget: the copy's budget is made a kilobyte
   const size = join(root, "packages/sahne-gallery/size.mjs");
   writeFileSync(size, readFileSync(size, "utf8").replace("shared: true, budget: 40 }", "shared: true, budget: 1 }"));
