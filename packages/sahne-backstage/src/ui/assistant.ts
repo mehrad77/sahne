@@ -17,10 +17,11 @@ import { html } from "htm/preact";
 import { signal } from "@preact/signals";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Path } from "../model/path.ts";
-import { route, say, setReview, world } from "../store.ts";
+import { api } from "../api.ts";
+import { loadWorld, route, say, setReview, world } from "../store.ts";
 import { acceptAndSave, proposals, selection, usage } from "../events.ts";
 import { abilities } from "../model/abilities.ts";
-import { Icon } from "./kit/index.ts";
+import { Icon, Popover } from "./kit/index.ts";
 import { Markdown } from "./md.ts";
 import { hrefOf } from "./proposed.ts";
 import { hostOf } from "../model/tools.ts";
@@ -241,12 +242,12 @@ export function Meter() {
 }
 
 /** What the assistant can and cannot do here: the same list its instructions hold (model/abilities.ts). */
-function Abilities(p: { open?: boolean }) {
+function Abilities() {
   const w = world.value!;
   const a = abilities({ writable: w.writable, agentEdits: w.agentEdits ?? "proposals", shareCards: w.shareCards, cards: w.cards, page: pageNow(), web: typeof w.ai === "object" ? w.ai.web : null });
-  return html`<details class="abilities" open=${p.open}><summary>What it can and cannot do here</summary>
+  return html`<div class="abilities">
     <div><b>It can</b><ul>${a.can.map(x => html`<li>${x}</li>`)}</ul></div>
-    <div><b>It cannot</b><ul>${a.cannot.map(x => html`<li>${x}${/word cards/.test(x) ? html` <a href="#/agents">Share them</a>` : ""}</li>`)}</ul></div></details>`;
+    <div><b>It cannot</b><ul>${a.cannot.map(x => html`<li>${x}${/word cards/.test(x) ? html` <a href="#/agents">Share them</a>` : ""}</li>`)}</ul></div></div>`;
 }
 
 const KIND_WORD: Record<string, string> = { story: "episode", season: "season", series: "series", place: "place", character: "character" };
@@ -307,13 +308,57 @@ function Answer(p: { turn: Turn; live: boolean }) {
   return html`${out}`;
 }
 
+/** A popover a button opens above (or below) itself and closes again (a click on the button while open closes it). */
+function usePop(below = false): [{ x: number; y: number } | null, (e: MouseEvent, width: number) => void, () => void] {
+  const [at, setAt] = useState<{ x: number; y: number } | null>(null), shut = useRef(0);
+  const toggle = (e: MouseEvent, width: number) => {
+    if (at || Date.now() - shut.current < 300) return setAt(null);
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setAt({ x: Math.min(r.left, innerWidth - width - 8), y: below ? r.bottom + 6 : r.top - 6 });
+  };
+  return [at, toggle, () => { shut.current = Date.now(); setAt(null); }];
+}
+
+/** The ? atop the side panel: what the assistant can and cannot do here. */
+export function AboutButton() {
+  const [at, toggle, close] = usePop(true);
+  return html`<button type="button" class="iconbtn about" title="What it can and cannot do here" aria-label="What it can and cannot do here" aria-expanded=${!!at} onClick=${(e: MouseEvent) => toggle(e, 420)}>?</button>
+    ${at && html`<${Popover} x=${at.x} y=${at.y} label="What it can and cannot do here" onClose=${close}><${Abilities} /></${Popover}>`}`;
+}
+
+/** The Claude models the picker offers (ai/budget.ts prices them; a quick ask takes Sonnet whatever is picked). */
+const CLAUDE = [
+  { id: "claude-opus-5-5", name: "Claude Opus 5.5", note: "The strongest: drafts and reviews" },
+  { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", note: "Faster, and half the price" },
+];
+const modelName = (ai: { provider: string; model?: string }) => ai.provider === "anthropic" ? CLAUDE.find(m => m.id === (ai.model ?? CLAUDE[0]!.id))?.name ?? ai.model! : ai.model ?? "A local model";
+
+/** The model, in the composer: a pick saves it in the settings. */
+function ModelPicker(p: { ai: { provider: string; model?: string } }) {
+  const [at, toggle, close] = usePop();
+  const now = p.ai.model ?? (p.ai.provider === "anthropic" ? CLAUDE[0]!.id : "");
+  const pick = async (id: string) => {
+    close();
+    if (id === now) return;
+    const r = await api.post("settings", { model: id });
+    if (r.status !== 200) return say((r as { message?: string }).message ?? "the model was not changed", true);
+    await loadWorld();
+  };
+  return html`<button type="button" class="model-pick" aria-haspopup="menu" aria-expanded=${!!at} title="The assistant's model" onClick=${(e: MouseEvent) => toggle(e, 300)}>
+      <${Icon} name="spark" size=${14} /><span>${modelName(p.ai)}</span><${Icon} name="down" size=${14} /></button>
+    ${at && html`<${Popover} above x=${at.x} y=${at.y} label="The assistant's model" onClose=${close}><div class="model-menu" role="menu">
+      ${p.ai.provider === "anthropic" ? CLAUDE.map(m => html`<button type="button" role="menuitemradio" aria-checked=${m.id === now} onClick=${() => void pick(m.id)}>
+        <span><b>${m.name}</b><small>${m.note}</small></span>${m.id === now && html`<${Icon} name="check" size=${16} />`}</button>`)
+        : html`<button type="button" role="menuitemradio" aria-checked="true" onClick=${close}><span><b>${modelName(p.ai)}</b><small>A local model, on its own server</small></span><${Icon} name="check" size=${16} /></button>`}
+      <a class="model-more" href="#/settings" onClick=${close}><${Icon} name="settings" size=${14} /> Another provider or model, and the budget</a></div></${Popover}>`}`;
+}
+
 /** The conversation, in the side panel's Assistant tab. */
 export function AssistantChat() {
   const w = world.value!;
   loadChats();
   const [text, setText] = useState("");
   const [past, setPast] = useState(false);
-  const [about, setAbout] = useState(false);
   const [files, setFiles] = useState<Attached[]>([]);
   const [drop, setDrop] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null), pick = useRef<HTMLInputElement>(null);
@@ -335,12 +380,10 @@ export function AssistantChat() {
   const ai = typeof w.ai === "object" ? w.ai : null;
   const ctx = contextNow();
   const empty = !turns.value.length;
-  return html`${ai ? html`<p class="note model">${ai.provider === "anthropic" ? "Claude" : "A local model"} · ${ai.model ?? ""} · <a href="#/settings">change</a>
-      ${!empty && html` · <button type="button" class="linkish" aria-expanded=${about} onClick=${() => setAbout(!about)}>What it can do</button>`}</p>` : ""}
-    ${w.ai && about && !empty && html`<${Abilities} open />`}
+  return html`
     ${!w.ai ? html`<p>The assistant is off. Set up Claude (an API key) or a local model (LM Studio, Ollama) in <a href="#/settings">Settings</a>.</p>` : html`
     <div class="chat">
-      ${empty && html`<div class="note">Ask anything about the series, or pick an ask. It sees ${ctx.id ? html`${ctx.kind === "season" ? "season " : ctx.kind === "place" ? "the place " : ctx.kind === "character" ? "the character " : ""}<b>${ctx.id}</b>${(ctx as { path?: Path }).path ? html` at <b>${(ctx as { path: Path }).path.slice(1).join(".")}</b>` : ""}` : `the ${ctx.page} page`}.<${Abilities} /><${AskMenu} chips /></div>`}
+      ${empty && html`<div class="note">Ask anything about the series, or pick an ask. It sees ${ctx.id ? html`${ctx.kind === "season" ? "season " : ctx.kind === "place" ? "the place " : ctx.kind === "character" ? "the character " : ""}<b>${ctx.id}</b>${(ctx as { path?: Path }).path ? html` at <b>${(ctx as { path: Path }).path.slice(1).join(".")}</b>` : ""}` : `the ${ctx.page} page`}.<${AskMenu} chips /></div>`}
       ${turns.value.map((t, i) => html`<div class=${`turn ${t.role}${t.fresh ? " fresh" : ""}`}>
         ${t.role === "user" ? html`${t.files?.length ? html`<div class="files">${t.files.map(f => html`<span class="chip">📎 ${f}</span>`)}</div>` : ""}${t.files?.length ? t.content.replace(/\n\nFile [\s\S]*$/, "") : t.content}` : html`<${Answer} turn=${t} live=${busy.value && i === turns.value.length - 1} />`}
       </div>`)}
@@ -357,9 +400,9 @@ export function AssistantChat() {
         <div class="tools">
           <button type="button" class="iconbtn" title="Attach a picture or a text file (or paste or drop one here)" aria-label="Attach a file" onClick=${() => pick.current?.click()}><${Icon} name="clip" size=${17} /></button>
           <input ref=${pick} type="file" multiple hidden accept="image/png,image/jpeg,image/webp,image/gif,text/*,.json,.md,.txt,.csv" onChange=${(e: Event) => { const el = e.target as HTMLInputElement; if (el.files?.length) void attach(el.files); el.value = ""; }} />
-          <span class="hint">Enter sends · Shift+Enter for a new line</span>
+          ${ai && html`<${ModelPicker} ai=${ai} />`}<span class="grow"></span>
           ${busy.value ? html`<button type="button" class="send stop" onClick=${stop} title="Stop the answer: nothing more runs" aria-label="Stop"><${Icon} name="stop" size=${15} /></button>`
-            : html`<button class="send primary" title="Send" aria-label="Send" disabled=${!text.trim() && !files.length}><${Icon} name="send" size=${17} /></button>`}
+            : html`<button class="send primary" title="Send (Enter) · Shift+Enter for a new line" aria-label="Send" disabled=${!text.trim() && !files.length}><${Icon} name="send" size=${17} /></button>`}
         </div>
       </div>
       <div class="meta"><button type="button" class="linkish" disabled=${busy.value || !turns.value.length} onClick=${() => { newChat(); setPast(false); }}><${Icon} name="plus" size=${14} /> New conversation</button>

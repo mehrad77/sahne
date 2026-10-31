@@ -43,6 +43,7 @@ const PATHS: Record<string, string> = {
   send: "M12 19V5M6 11l6-6 6 6",
   stop: "M7 7h10v10H7z",
   history: "M3.5 12a8.5 8.5 0 1 0 2.5-6M3 4v4h4M12 8v4l3 2",
+  down: "M6 9l6 6 6-6",
 };
 
 /** An icon by name, `size` px square. */

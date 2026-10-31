@@ -594,7 +594,7 @@ select.tone { width: auto; font-size: 12px; padding: 0 4px; }
 .composer textarea { border: 0; background: none; padding: 4px 0; resize: none; min-height: 0; max-height: 40vh; overflow-y: auto; line-height: 1.45; }
 .composer textarea:focus { outline: 0; }
 .composer .tools { display: flex; align-items: center; gap: 6px; margin-left: -6px; } .composer .tools .iconbtn { width: 30px; height: 30px; }
-.composer .hint { flex: 1; font-size: 11.5px; color: var(--faint); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.composer .tools .grow { flex: 1; }
 .composer .send { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 50%; flex: none; }
 .composer .send.stop { background: none; } .composer .send:disabled { opacity: .35; }
 .chat-input .meta { display: flex; gap: 14px; padding: 0 4px; font-size: 12.5px; } .chat-input .meta .linkish { border: 0; background: none; padding: 2px 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; color: var(--mute); }
@@ -610,9 +610,16 @@ select.tone { width: auto; font-size: 12px; padding: 0 4px; }
 .iconbtn.help { font-weight: 700; font-size: 15px; }
 .note.model { margin: 0 0 8px; }
 .note.model .linkish { border: 0; background: none; padding: 0; color: var(--accent, inherit); text-decoration: underline; font: inherit; cursor: pointer; }
-.abilities { display: grid; gap: 8px; margin: 8px 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px; color: var(--ink, inherit); }
+.abilities { display: grid; gap: 10px; width: min(404px, calc(92vw - 16px)); padding: 4px 6px; font-size: 12.5px; color: var(--ink, inherit); }
+.drawer > header .about { font-weight: 700; font-size: 15px; } .drawer > header .about[aria-expanded="true"], .model-pick[aria-expanded="true"] { color: var(--accent); }
+.model-pick { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 8px; border: 0; border-radius: 8px; background: none; color: var(--mute); font-size: 13px; white-space: nowrap; min-width: 0; }
+.model-pick span { overflow: hidden; text-overflow: ellipsis; } .model-pick:hover { background: var(--chip); color: var(--ink); }
+.model-menu { display: grid; gap: 2px; width: min(300px, 88vw); }
+.model-menu button { display: flex; align-items: center; gap: 10px; text-align: left; border: 0; background: none; padding: 7px 10px; border-radius: 8px; color: var(--ink); }
+.model-menu button span { flex: 1; display: grid; gap: 1px; } .model-menu button b { font-weight: 500; font-size: 13.5px; } .model-menu button small { color: var(--mute); font-size: 12px; }
+.model-menu button:hover, .model-menu button[aria-checked="true"] { background: var(--chip); }
+.model-more { display: flex; align-items: center; gap: 6px; margin-top: 4px; padding: 8px 10px 4px; border-top: 1px solid var(--line); color: var(--mute); font-size: 12.5px; text-decoration: none; } .model-more:hover { color: var(--ink); }
 .abilities ul { margin: 2px 0 0; padding-left: 18px; display: grid; gap: 2px; } .abilities b { font-weight: 600; }
-.abilities summary { cursor: pointer; color: var(--mute); } .abilities[open] summary { margin-bottom: 2px; }
 .abilities > div:last-child li::marker { content: "✕  "; color: var(--mute); }
 /* agents */
 .agents-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 12px; align-items: start; }

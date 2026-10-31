@@ -17,8 +17,8 @@ export const Empty = (p: { icon?: string; title: string; children?: ComponentChi
 
 /** A panel on the page's right: the assistant (in the shell's drawer column), or, `float` from inside a page, a step's
  *  details over the page's right edge (a page's own drawer would fall under its content). */
-export const Drawer = (p: { title: ComponentChildren; onClose(): void; children?: ComponentChildren; label?: string; float?: boolean }) => html`<aside class=${`drawer${p.float ? " float" : ""}`} aria-label=${p.label ?? "Side panel"}>
-  <header><b>${p.title}</b><button class="iconbtn" onClick=${p.onClose} aria-label="Close"><${Icon} name="close" /></button></header>
+export const Drawer = (p: { title: ComponentChildren; onClose(): void; children?: ComponentChildren; label?: string; float?: boolean; actions?: ComponentChildren }) => html`<aside class=${`drawer${p.float ? " float" : ""}`} aria-label=${p.label ?? "Side panel"}>
+  <header><b>${p.title}</b>${p.actions}<button class="iconbtn" onClick=${p.onClose} aria-label="Close"><${Icon} name="close" /></button></header>
   <div class="body">${p.children}</div></aside>`;
 
 /**
@@ -39,8 +39,8 @@ export function Modal(p: { title: ComponentChildren; onClose(): void; children?:
     <div class="body">${p.children}</div></dialog>`;
 }
 
-/** A popover at a screen point (kept on screen), closed by Escape or a click outside it. */
-export function Popover(p: { x: number; y: number; onClose(): void; children?: ComponentChildren; label?: string }) {
+/** A popover at a screen point (kept on screen), closed by Escape or a click outside it. `above`: its bottom is at the point. */
+export function Popover(p: { x: number; y: number; onClose(): void; children?: ComponentChildren; label?: string; above?: boolean }) {
   const el = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const key = (e: KeyboardEvent) => { if (e.key === "Escape") p.onClose(); };
@@ -54,7 +54,7 @@ export function Popover(p: { x: number; y: number; onClose(): void; children?: C
     if (!d) return;
     const r = d.getBoundingClientRect();
     d.style.left = `${Math.max(8, Math.min(p.x, innerWidth - r.width - 8))}px`;
-    d.style.top = `${Math.max(8, Math.min(p.y, innerHeight - r.height - 8))}px`;
+    d.style.top = `${Math.max(8, Math.min(p.above ? p.y - r.height : p.y, innerHeight - r.height - 8))}px`;
   });
   return html`<div class="popover" ref=${el} role="dialog" aria-label=${p.label ?? "Options"} style=${`left:${p.x}px;top:${p.y}px`}>${p.children}</div>`;
 }
