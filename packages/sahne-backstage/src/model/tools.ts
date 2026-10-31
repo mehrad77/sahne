@@ -74,6 +74,7 @@ const TOOLS: Record<string, { kind: ToolKind; label: (i: In) => string }> = {
   show: { kind: "show", label: i => `Showed ${str(i.id)}${at(i, "step")} in the editor` },
   look: { kind: "look", label: i => `Looked at ${str(i.id)}${at(i, "step")}` },
   web_search: { kind: "web", label: i => `Searched the web: “${str(i.query)}”` },
+  code_execution: { kind: "web", label: () => "Sorted the search results" },
   web_fetch: { kind: "web", label: i => `Read a web page${i.url ? `: ${hostOf(str(i.url))}` : ""}` },
   read_web_page: { kind: "web", label: i => `Read a web page: ${hostOf(str(i.url))}` },
   remember: { kind: "memory", label: () => "Remembered a note" },

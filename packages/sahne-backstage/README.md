@@ -272,7 +272,7 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
   The context sent is the page and what it shows (the episode, the board's season, the place, the character), and the selected block only while its page is open.
 - **A big ask waits for a yes:** the server says what it would cost (`confirm`), and *Go ahead* sends it again.
 - **The meter** in the top bar is today's spending against the day's cap (its title: the month's, and the tokens); it follows the `usage` events.
-- **Settings** (`#/settings`): Claude (its key from the environment) or a local model by its base URL (LM Studio, Ollama), the model, the caps per day and month in dollars and in tokens, the cost above which an ask waits for a yes, and whether the rules' staging suggestions are taken as you leave each line. How agents' edits land is on the Agents page. They are kept in the person's config folder, never in the content root.
+- **Settings** (`#/settings`): Claude (its key from the environment) or a local model by its base URL (LM Studio, Ollama), the model, the caps per day and month in dollars and in tokens, the cost above which an ask waits for a yes, the web (automatic, Anthropic's search, Tavily or off, with which is in effect), and whether the rules' staging suggestions are taken as you leave each line. How agents' edits land is on the Agents page. They are kept in the person's config folder, never in the content root.
 
 ## Review notes (`server/review.ts`)
 
@@ -440,21 +440,22 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 ```json
 { "provider": "anthropic", "model": "claude-opus-5-5", "baseUrl": "http://localhost:1234/v1",
   "caps": { "dayUsd": 5, "monthUsd": 50, "dayTokens": 2000000, "monthTokens": 20000000 },
-  "confirmOverUsd": 0.5, "agentEdits": "proposals", "applySuggestions": false }
+  "confirmOverUsd": 0.5, "agentEdits": "proposals", "applySuggestions": false, "web": "auto" }
 ```
 
 - The values above for `provider`, `caps` and `confirmOverUsd` are the defaults. Choosing `openai` without a `baseUrl` saves LM Studio's.
 - **The environment overrides the file**: `SAHNE_AI_PROVIDER`, `SAHNE_AI_BASE_URL`, `SAHNE_AI_MODEL`. The CLI's `--ai-provider`, `--ai-base-url` and `--ai-model` set them.
 - **Keys are never stored.** They are read from the environment only. A save keeps only the known fields, so a key sent with it is dropped.
 - `applySuggestions` is the editor's own preference. The server keeps it and does nothing with it.
+- **`web`**: how the assistant searches the web (`webOf`). `auto` (the default) takes Tavily when `TAVILY_API_KEY` is in backstage's environment, else Anthropic's own search on Claude, else none (a local model without a Tavily key); `anthropic`, `tavily` or `off` choose. On Claude it is Anthropic's server tools `web_search_20260209` and `web_fetch_20260209`, at most five of each an ask: they run on Anthropic's side, a paused turn (`pause_turn`) is sent back as it is to go on, and the editor gets each search as a tool call, its result, and the pages found (`sources`). Only URLs already in the conversation are fetched.
 
 **The budget** (`server/ai/budget.ts`).
-- **The prices** are in one table (`PRICES`, USD per million tokens, from the Claude API's model docs): Opus 5.5 is $4 in and $20 out, Sonnet 5.5 is $2 in and $10 out, and cache reads are $0.20. A local model costs nothing.
+- **The prices** are in one table (`PRICES`, USD per million tokens, from the Claude API's model docs): Opus 5.5 is $4 in and $20 out, Sonnet 5.5 is $2 in and $10 out, and cache reads are $0.20. A web search on Claude adds $0.01 (`SEARCH_USD`). A local model costs nothing.
 - **The caps** are per day and per month (local time), in USD and in tokens. The token caps bind local models too. They are checked before every model request of a tool loop, and a request at a cap is refused with a message that says which cap.
 - **Every call is logged** to `<config>/usage.jsonl`, one JSON line each: `{ at, provider, model, input, output, cacheRead, cacheWrite, tokens, usd }`. After each call the editors get a `usage` event.
 - **Why the config folder.** The log and the settings are in the person's config folder, not in the content root's sidecar (`.backstage/`). An app such as Kumru commits its sidecar, and what one person spends is theirs.
 
-**What leaves the machine** is what the tools return: the story documents (texts and staging, with card ids), the cast's names and roles, the places' marks and the kit's names. With `--share-cards`, it also includes a card's main-language word. A card's translations and notes never leave.
+**What leaves the machine** is what the tools return, and the assistant's web searches: the story documents (texts and staging, with card ids), the cast's names and roles, the places' marks and the kit's names. With `--share-cards`, it also includes a card's main-language word. A card's translations and notes never leave.
 
 **The routes:**
 

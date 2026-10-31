@@ -20,7 +20,7 @@ import { headOf } from "./git.ts";
 import { readReview, writeReview } from "./review.ts";
 import { requestOf, runAssistant, usageSummary } from "./assistant.ts";
 import { MODELS } from "./ai/providers/anthropic.ts";
-import { overrides, readiness, readSettings, settingsFile, writeSettings } from "./settings.ts";
+import { overrides, readiness, readSettings, settingsFile, writeSettings, webOf } from "./settings.ts";
 import { Events, selectionOf } from "./events.ts";
 import { Agents, callOf } from "./agents.ts";
 import { createMcp, type AgentEdits } from "./mcp.ts";
@@ -83,10 +83,10 @@ export async function serve(o: Options): Promise<Running> {
   /** The assistant, as `GET /api/world` gives it: false when it cannot run, so a plain truthiness check still works. */
   const aiOf = () => {
     const r = readiness();
-    return r.ready ? { ready: true, provider: r.provider, model: r.model ?? (r.provider === "anthropic" ? MODELS.full : "local") } : false;
+    return r.ready ? { ready: true, provider: r.provider, model: r.model ?? (r.provider === "anthropic" ? MODELS.full : "local"), web: webOf(readSettings()) } : false;
   };
   /** The settings for the editor: what is in effect, where the file is, what the environment overrides, and whether keys are set (never the keys). */
-  const settingsView = () => ({ settings: readSettings(), file: settingsFile(), overrides: overrides(), keys: { anthropic: !!process.env.ANTHROPIC_API_KEY, openai: !!process.env.OPENAI_API_KEY }, ai: readiness() });
+  const settingsView = () => ({ settings: readSettings(), file: settingsFile(), overrides: overrides(), keys: { anthropic: !!process.env.ANTHROPIC_API_KEY, openai: !!process.env.OPENAI_API_KEY, tavily: !!process.env.TAVILY_API_KEY }, ai: readiness(), web: webOf(readSettings()) });
 
   // ---- MCP over Streamable HTTP: a session per client, made by its initialize request ----
   const sessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();

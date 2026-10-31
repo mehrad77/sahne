@@ -17,7 +17,9 @@ export const PRICES: Record<string, { input: number; output: number; cacheRead: 
   "claude-sonnet-5-5": { input: 2, output: 10, cacheRead: 0.2, cacheWrite: 2.5 },
 };
 
-export interface Usage { input: number; output: number; cacheRead?: number; cacheWrite?: number }
+export interface Usage { input: number; output: number; cacheRead?: number; cacheWrite?: number; /** Anthropic web searches (server tools), each priced on its own. */ searches?: number }
+/** What one Anthropic web search costs (USD): $10 per 1000. */
+export const SEARCH_USD = 0.01;
 
 export const tokensOf = (u: Usage) => u.input + u.output + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0);
 
@@ -25,7 +27,7 @@ export const tokensOf = (u: Usage) => u.input + u.output + (u.cacheRead ?? 0) + 
 export function costOf(provider: ProviderId, model: string, u: Usage): number {
   if (provider !== "anthropic") return 0;
   const p = PRICES[model] ?? Object.values(PRICES).reduce((a, b) => (b.output > a.output ? b : a));
-  return (u.input * p.input + u.output * p.output + (u.cacheRead ?? 0) * p.cacheRead + (u.cacheWrite ?? 0) * p.cacheWrite) / 1e6;
+  return (u.input * p.input + u.output * p.output + (u.cacheRead ?? 0) * p.cacheRead + (u.cacheWrite ?? 0) * p.cacheWrite) / 1e6 + (u.searches ?? 0) * SEARCH_USD;
 }
 
 export const usageFile = (): string => join(configDir(), "usage.jsonl");

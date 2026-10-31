@@ -22,7 +22,7 @@ export interface Turn {
   model: string;
 }
 
-export interface TurnOptions { system: string; messages: unknown[]; tools: ToolDef[]; onText: (t: string) => void; /** The model's thinking as it streams, where the provider gives it. */ onThinking?: (t: string) => void; signal?: AbortSignal; maxTokens?: number }
+export interface TurnOptions { system: string; messages: unknown[]; tools: ToolDef[]; onText: (t: string) => void; /** The model's thinking as it streams, where the provider gives it. */ onThinking?: (t: string) => void; /** Tools the provider runs itself (Anthropic's web search and fetch), as its API takes them. */ serverTools?: unknown[]; signal?: AbortSignal; maxTokens?: number }
 
 export interface Provider {
   id: "anthropic" | "openai";

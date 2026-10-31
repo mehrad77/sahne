@@ -35,7 +35,7 @@ export function anthropic(model: string = MODELS.full): Provider {
           body: JSON.stringify({
             model, max_tokens: o.maxTokens ?? 32000, stream: true, thinking: { type: "adaptive", display: "summarized" }, cache_control: { type: "ephemeral" },
             system: o.system, messages: o.messages,
-            tools: o.tools.map(t => ({ name: t.name, description: t.description, input_schema: schemaFor(t.schema) })),
+            tools: [...o.tools.map(t => ({ name: t.name, description: t.description, input_schema: schemaFor(t.schema) })), ...(o.serverTools ?? [])],
           }),
         });
       } catch (e) {
@@ -58,6 +58,8 @@ export function anthropic(model: string = MODELS.full): Provider {
         if (typeof u.output_tokens === "number") usage.output = u.output_tokens; // cumulative: the last one counts
         if (typeof u.cache_read_input_tokens === "number") usage.cacheRead = u.cache_read_input_tokens;
         if (typeof u.cache_creation_input_tokens === "number") usage.cacheWrite = u.cache_creation_input_tokens;
+        const st = u.server_tool_use as { web_search_requests?: number } | undefined;
+        if (typeof st?.web_search_requests === "number") usage.searches = st.web_search_requests;
       };
       await readSse(r.body, (_event, data) => {
         let e: Record<string, any>;
@@ -66,7 +68,7 @@ export function anthropic(model: string = MODELS.full): Provider {
           case "message_start": take(e.message?.usage); if (e.message?.model) served = e.message.model; break;
           case "content_block_start": {
             const b: Block = { ...e.content_block };
-            if (b.type === "tool_use") { json[e.index] = ""; b.input = {}; }
+            if (b.type === "tool_use" || b.type === "server_tool_use") { json[e.index] = ""; b.input = {}; }
             blocks[e.index] = b;
             break;
           }
@@ -77,11 +79,12 @@ export function anthropic(model: string = MODELS.full): Provider {
             else if (d.type === "thinking_delta") { b.thinking = (b.thinking ?? "") + d.thinking; o.onThinking?.(d.thinking); }
             else if (d.type === "signature_delta") b.signature = (b.signature ?? "") + d.signature;
             else if (d.type === "input_json_delta") json[e.index] = (json[e.index] ?? "") + (d.partial_json ?? "");
+            else if (d.type === "citations_delta" && d.citation) ((b.citations ??= []) as unknown[]).push(d.citation);
             break;
           }
           case "content_block_stop": {
             const b = blocks[e.index];
-            if (b?.type === "tool_use") {
+            if (b?.type === "tool_use" || b?.type === "server_tool_use") {
               const raw = json[e.index] ?? "";
               try { b.input = raw.trim() ? JSON.parse(raw) : {}; } catch { b.input = {}; (b as { _bad?: string })._bad = raw; }
             }
@@ -96,7 +99,8 @@ export function anthropic(model: string = MODELS.full): Provider {
       const calls = content.filter(b => b.type === "tool_use").map(b => ({ id: String(b.id), name: String(b.name), input: (b.input ?? {}) as Record<string, unknown>, ...((b as { _bad?: string })._bad !== undefined ? { bad: (b as { _bad?: string })._bad } : {}) }));
       for (const b of content) delete (b as { _bad?: string })._bad;
       const text = content.filter(b => b.type === "text").map(b => b.text ?? "").join("");
-      const word = stop === "end_turn" || stop === "stop_sequence" ? "end" : stop === "tool_use" ? "tools" : stop || "end";
+      // pause_turn: the server's own tool loop (a web search) paused; send the turn back as it is to go on
+      const word = stop === "end_turn" || stop === "stop_sequence" ? "end" : stop === "tool_use" ? "tools" : stop === "pause_turn" ? "pause" : stop || "end";
       return { text, calls, usage, stop: word, message: { role: "assistant", content }, model: served };
     },
   };

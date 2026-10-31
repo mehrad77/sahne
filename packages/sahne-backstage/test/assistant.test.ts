@@ -177,6 +177,39 @@ test("only the newest picture is sent again", async () => {
   assert.equal(ms[3].content[0].content[1].type, "image");
 });
 
+test("the web on Claude: Anthropic's search runs on its side; a paused turn goes on; the pages found are shown, and each search is priced", async () => {
+  process.env.ANTHROPIC_API_KEY = "test-key";
+  delete process.env.TAVILY_API_KEY;
+  const searchTurn = (stop: string) => () => anthropicSse([
+    { type: "message_start", message: { model: "claude-opus-5-5", usage: { input_tokens: 100, output_tokens: 1 } } },
+    { type: "content_block_start", index: 0, content_block: { type: "server_tool_use", id: "srvtoolu_1", name: "web_search", input: {} } },
+    { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: "{\"query\":\"simit fiyatı\"}" } },
+    { type: "content_block_stop", index: 0 },
+    { type: "content_block_start", index: 1, content_block: { type: "web_search_tool_result", tool_use_id: "srvtoolu_1", content: [{ type: "web_search_result", url: "https://example.com/simit", title: "Simit" }] } },
+    { type: "content_block_stop", index: 1 },
+    { type: "message_delta", delta: { stop_reason: stop }, usage: { output_tokens: 10, server_tool_use: { web_search_requests: 1 } } },
+    { type: "message_stop" },
+  ]);
+  answers(searchTurn("pause_turn"), textTurn("A simit costs about 20 lira."));
+  const evs = await ask("How much is a simit?");
+  // the request carries the server tools; a paused turn is sent back as it is, with no extra message
+  assert.ok(sent[0].body.tools.some((t: { type?: string }) => t.type === "web_search_20260209"));
+  assert.equal(sent.length, 2);
+  assert.equal(sent[1].body.messages.at(-1).role, "assistant");
+  assert.deepEqual(sent[1].body.messages.at(-1).content[0].input, { query: "simit fiyatı" });
+  const tool = evs.find(e => e.type === "tool")!;
+  assert.deepEqual({ name: tool.name, input: tool.input }, { name: "web_search", input: { query: "simit fiyatı" } });
+  assert.match(evs.find(e => e.type === "tool_result")!.summary, /1 page/);
+  assert.deepEqual(evs.find(e => e.type === "sources")!.list, [{ url: "https://example.com/simit", title: "Simit" }]);
+  assert.equal(text(evs), "A simit costs about 20 lira.");
+  assert.ok(evs.at(-1)!.usage.usd >= 0.01, "a search costs a cent");
+  // off: no web tools, and the lists say how to turn it on
+  answers(textTurn("No web."));
+  await ask("Search it", { settings: { web: "off" } });
+  assert.ok(!sent[0].body.tools.some((t: { type?: string }) => t.type === "web_search_20260209"));
+  assert.match(sent[0].body.system, /Browse the web: Settings turns it on/);
+});
+
 test("an edit by the assistant is a proposal, by \"assistant\"; a quick ask takes the faster model", async () => {
   const events = new Events();
   answers(toolTurn("toolu_2", "set_texts", { id: "s1e00", path: "steps/4", texts: { en: "Good evening! Come on in." } }), textTurn("I proposed a warmer line."));
@@ -360,7 +393,7 @@ test("over HTTP: the assistant streams, and the world, the usage and the setting
     return { status: r.status, type: r.headers.get("content-type"), text: await r.text() };
   };
   assert.equal(JSON.parse((await api(off!.url, "GET", "world")).text).ai, false, "no key: falsy");
-  assert.deepEqual(JSON.parse((await api(web!.url, "GET", "world")).text).ai, { ready: true, provider: "openai", model: "local" });
+  assert.deepEqual(JSON.parse((await api(web!.url, "GET", "world")).text).ai, { ready: true, provider: "openai", model: "local", web: null });
   const r = await api(web!.url, "POST", "assistant", { messages: [{ role: "user", content: "Say hello." }], context: { page: "home" } });
   assert.equal(r.status, 200);
   assert.equal(r.type, "text/event-stream; charset=utf-8");
@@ -375,6 +408,6 @@ test("over HTTP: the assistant streams, and the world, the usage and the setting
   const s = JSON.parse((await api(web!.url, "POST", "settings", { caps: { dayUsd: 3 }, anthropicKey: "sk-ant-x" })).text);
   assert.equal(s.settings.caps.dayUsd, 3);
   assert.equal(s.overrides.provider, "SAHNE_AI_PROVIDER");
-  assert.deepEqual(s.keys, { anthropic: false, openai: false });
+  assert.deepEqual(s.keys, { anthropic: false, openai: false, tavily: false });
   assert.doesNotMatch(readFileSync(join(config2, "settings.json"), "utf8"), /sk-ant/);
 });

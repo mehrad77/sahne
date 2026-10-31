@@ -19,7 +19,7 @@ export interface World {
   /** How many content files are still in the old language shape (then nothing is saved: convert the root first). */
   oldShape?: number;
   /** Whether AI help is on (the server has ANTHROPIC_API_KEY). */
-  ai?: boolean | { ready: boolean; provider: string; model?: string };
+  ai?: boolean | { ready: boolean; provider: string; model?: string; web?: "anthropic" | "tavily" | null };
   /** How agents' edits land: as proposals to accept, or written directly. */
   agentEdits?: "proposals" | "direct";
   /** Whether agents may see a card's main-language word. */

@@ -23,9 +23,10 @@ import { abilities } from "../model/abilities.ts";
 import { Icon } from "./kit/index.ts";
 import { Markdown } from "./md.ts";
 import { hrefOf } from "./proposed.ts";
+import { hostOf } from "../model/tools.ts";
 import { liveLine, ThinkingBlock, tick, ToolGroup, type Thinking, type ToolPart } from "./chat/parts.ts";
 
-type Part = { type: "text"; text: string } | Thinking | ToolPart | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number } | { type: "stopped" } | AskPart;
+type Part = { type: "text"; text: string } | Thinking | ToolPart | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number } | { type: "stopped" } | AskPart | { type: "sources"; list: { url: string; title?: string }[] };
 /** A question the assistant put to the person (ask_person, set_review): buttons that answer, proposals to accept and save, a status to set. */
 type AskPart = { type: "ask"; question: string; options?: string[]; save?: string[]; review?: { id: string; status: string }; answered?: string };
 interface Turn { role: "user" | "assistant"; content: string; parts?: Part[]; fresh?: boolean; at?: number; /** The files the person attached (their names; the pictures are not kept). */ files?: string[] }
@@ -238,7 +239,7 @@ export function Meter() {
 /** What the assistant can and cannot do here: the same list its instructions hold (model/abilities.ts). */
 function Abilities() {
   const w = world.value!;
-  const a = abilities({ writable: w.writable, agentEdits: w.agentEdits ?? "proposals", shareCards: w.shareCards, cards: w.cards, page: pageNow() });
+  const a = abilities({ writable: w.writable, agentEdits: w.agentEdits ?? "proposals", shareCards: w.shareCards, cards: w.cards, page: pageNow(), web: typeof w.ai === "object" ? w.ai.web : null });
   return html`<div class="abilities">
     <div><b>It can</b><ul>${a.can.map(x => html`<li>${x}</li>`)}</ul></div>
     <div><b>It cannot</b><ul>${a.cannot.map(x => html`<li>${x}${/word cards/.test(x) ? html` <a href="#/agents">Share them</a>` : ""}</li>`)}</ul></div></div>`;
@@ -292,6 +293,7 @@ function Answer(p: { turn: Turn; live: boolean }) {
     else if (x.type === "proposal") out.push(html`<${Proposed} id=${x.id} />`);
     else if (x.type === "confirm") out.push(html`<div class="confirm">${x.why} It would cost about ${fmtUsd(x.estimateUsd)}. <button class="small primary" onClick=${() => { const q = [...turns.value].reverse().find(y => y.role === "user"); if (q) void send(q.content, { confirm: true, fresh: q.fresh }); }}>Go ahead</button></div>`);
     else if (x.type === "error") out.push(html`<div class="chat-error"><span class="grow">${x.message}</span>${!p.live && p.turn === turns.value.at(-1) && html`<button type="button" class="small" onClick=${retry}>Try again</button>`}</div>`);
+    else if (x.type === "sources") out.push(html`<div class="sources" aria-label="Sources">${x.list.map(s => html`<a class="chip" href=${s.url} target="_blank" rel="noreferrer" title=${s.title ?? s.url}>${hostOf(s.url)}</a>`)}</div>`);
     else if (x.type === "ask") out.push(html`<${AskCard} part=${x} latest=${p.turn === turns.value.at(-1)} />`);
     else if (x.type === "stopped") out.push(html`<div class="note">Stopped. Nothing more ran after that.</div>`);
     else if (x.type === "done" && x.usd !== undefined) out.push(html`<div class="note cost">${fmtUsd(x.usd)}</div>`);

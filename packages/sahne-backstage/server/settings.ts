@@ -29,6 +29,19 @@ export interface Settings {
   agentEdits?: AgentEdits;
   /** The editor applies the assistant's suggestions without asking (the editor's own preference). */
   applySuggestions?: boolean;
+  /** How the assistant searches the web: auto (Tavily when TAVILY_API_KEY is set, else Anthropic's own tools on Claude), one of them, or off. */
+  web?: WebMode;
+}
+
+export type WebMode = "auto" | "anthropic" | "tavily" | "off";
+export const WEB_MODES: WebMode[] = ["auto", "anthropic", "tavily", "off"];
+/** The web the assistant has with these settings: Anthropic's server tools, Tavily (its key in the environment only), or none. */
+export function webOf(s: Pick<Settings, "web" | "provider">): "anthropic" | "tavily" | null {
+  const mode = s.web ?? "auto", tavily = !!process.env.TAVILY_API_KEY;
+  if (mode === "off") return null;
+  if (mode === "tavily") return tavily ? "tavily" : null;
+  if (mode === "anthropic") return s.provider === "anthropic" ? "anthropic" : null;
+  return tavily ? "tavily" : s.provider === "anthropic" ? "anthropic" : null;
 }
 
 /** LM Studio's default server; Ollama's is http://localhost:11434/v1, llama.cpp's http://localhost:8080/v1. */
@@ -63,6 +76,7 @@ export function clean(v: unknown): Partial<Settings> {
   if (over !== undefined) out.confirmOverUsd = over;
   if (b.agentEdits === "proposals" || b.agentEdits === "direct") out.agentEdits = b.agentEdits;
   if (typeof b.applySuggestions === "boolean") out.applySuggestions = b.applySuggestions;
+  if (WEB_MODES.includes(b.web as WebMode)) out.web = b.web as WebMode;
   return out;
 }
 

@@ -12,9 +12,9 @@ import { usage } from "../events.ts";
 export interface Settings {
   provider: "anthropic" | "openai"; model?: string; baseUrl?: string;
   caps: { dayUsd?: number; monthUsd?: number; dayTokens?: number; monthTokens?: number };
-  confirmOverUsd?: number; agentEdits?: "proposals" | "direct"; applySuggestions?: boolean;
+  confirmOverUsd?: number; agentEdits?: "proposals" | "direct"; applySuggestions?: boolean; web?: "auto" | "anthropic" | "tavily" | "off";
 }
-interface Answer { settings: Settings; file: string; overrides: Record<string, string>; keys: { anthropic: boolean; openai: boolean } }
+interface Answer { settings: Settings; file: string; overrides: Record<string, string>; keys: { anthropic: boolean; openai: boolean; tavily?: boolean }; web?: "anthropic" | "tavily" | null }
 
 /** The settings as last read (the studio reads `applySuggestions`). */
 let current: Settings | null = null;
@@ -59,6 +59,11 @@ export function SettingsPage() {
       </div>
       <div class="field"><label>Ask first when an ask would cost more than (dollars)</label><input type="number" min="0" step="0.1" style="max-width:160px" value=${s.confirmOverUsd ?? ""} onInput=${(e: Event) => put("confirmOverUsd", (e.target as HTMLInputElement).value === "" ? undefined : Number((e.target as HTMLInputElement).value))} /></div>
       <p class="note">At a cap the assistant stops and says so. A local model costs nothing, but its tokens count against the token caps.</p>
+    </div>
+    <div class="step-card fields"><h3>The web</h3>
+      <div class="segmented" role="group" aria-label="How the assistant searches the web">
+        ${([["auto", "Automatic"], ["anthropic", "Anthropic's search"], ["tavily", "Tavily"], ["off", "Off"]] as const).map(([k, label]) => html`<button aria-pressed=${(s.web ?? "auto") === k} onClick=${() => put("web", k)}>${label}</button>`)}</div>
+      <p class="note">${a.web ? html`In effect: <b>${a.web === "tavily" ? "Tavily" : "Anthropic's search"}</b>. ` : "In effect: no web. "}Automatic takes Tavily when <code>TAVILY_API_KEY</code> is set${a.keys.tavily ? " (it is)" : ""}, else Anthropic's own search on Claude (a cent a search), and none with a local model and no Tavily key. Keys come from backstage's environment, never a file.</p>
     </div>
     <div class="step-card fields"><h3>Suggestions and agents</h3>
       <p class="note">How the assistant's and other agents' edits land, and how to connect an agent over MCP, are on the <a href="#/agents">Agents</a> page.</p>

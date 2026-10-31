@@ -3,7 +3,7 @@
 // assistant's tools (server/mcp.ts) and the edit mode, and starts with what matters on the page open (an episode, the
 // board, a place, a character): when a tool is added or removed there, change this too.
 
-export interface AbilitiesOf { writable: boolean; agentEdits: "proposals" | "direct"; shareCards?: boolean; cards?: boolean; page?: string }
+export interface AbilitiesOf { writable: boolean; agentEdits: "proposals" | "direct"; shareCards?: boolean; cards?: boolean; page?: string; /** The web it has: Anthropic's search, Tavily, or none. */ web?: "anthropic" | "tavily" | null }
 export interface Abilities { can: string[]; cannot: string[] }
 
 /** The page's own lines, said first. */
@@ -47,6 +47,7 @@ export function abilities(o: AbilitiesOf): Abilities {
       "See which of its proposals you took or turned down, and take back one of its own.",
     ] : []),
     "Open an episode at a step in the editor, to show you what it means.",
+    ...(o.web ? [`Search the web and read pages (${o.web === "tavily" ? "Tavily" : "Anthropic's search"}), with its sources shown: for words, customs, prices and places.`] : []),
   ];
   const cannot = [
     ...(!o.writable ? ["Change anything: backstage is read-only, so it can read, check and advise only."] : proposing ? ["Save without your click: each proposal waits for you (Accept and save does both at once)."] : []),
@@ -54,7 +55,8 @@ export function abilities(o: AbilitiesOf): Abilities {
     "Change the kit: it cannot draw new art or add props, gestures or sounds.",
     "Hear sounds: it reads what each sound is (its kind, length and word) instead.",
     ...(o.cards && !o.shareCards ? ["See the words on the word cards, only their ids (the Agents tab can share them)."] : []),
-    "Browse the web, or read files outside this content root.",
+    ...(o.web ? [] : ["Browse the web: Settings turns it on (Anthropic's search on Claude, or Tavily with TAVILY_API_KEY in backstage's environment)."]),
+    "Read files outside this content root, unless you attach them.",
     "Remember other conversations: each starts from what is on screen and in the files.",
   ];
   return { can, cannot };
