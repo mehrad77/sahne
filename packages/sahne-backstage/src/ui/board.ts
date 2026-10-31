@@ -6,6 +6,7 @@
 // own date and kind, saved together); an empty day starts a new episode on it. Episodes with no date wait under the
 // board. A new episode not on disk shows too, on its day: one an agent proposes (dashed, "proposed": it opens the preview
 // to accept or reject) and one taken but not saved yet ("unsaved"). The series' and the season's settings open in a modal.
+// A switch beside them (remembered) shows the season as a list instead: its episodes by week and date, one row each.
 
 import { html } from "htm/preact";
 import { useEffect, useState } from "preact/hooks";
@@ -33,6 +34,8 @@ const dayLabel = (date: string, first: boolean) => (first || date.endsWith("-01"
 /** A week's span, Monday to Saturday: `14–19 Sept`, or `28 Sept – 3 Oct` across a month. */
 const span = (monday: string, saturday: string) => (monday.slice(5, 7) === saturday.slice(5, 7) ? `${Number(monday.slice(8))}–${short(saturday)}` : `${short(monday)} – ${short(saturday)}`);
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+const VIEW_KEY = "backstage-board-view";
+type View = "calendar" | "list";
 
 export function Board(p: { id?: string }) {
   const w = world.value!;
@@ -62,6 +65,8 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
   const [ready, setReady] = useState(false);
   const [drag, setDrag] = useState<string | null>(null), [over, setOver] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ week: number; x: number; y: number } | null>(null);
+  const [view, setView] = useState<View>(() => { try { return localStorage.getItem(VIEW_KEY) === "list" ? "list" : "calendar"; } catch { return "calendar"; } });
+  const pickView = (v: View) => { setView(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* a private window */ } };
   // the season and its stories open, so a move or a theme edits them together
   useEffect(() => { void Promise.all([openDoc("season", p.id), ...onDisk.map(e => openDoc("story", e.id))]).then(() => setReady(true)); }, [p.id]);
   useEffect(() => { if (!allProblems.value) void loadAllProblems(); }, []);
@@ -116,11 +121,13 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
     <div class="pagehead">
       <div class="grow"><h2 ...${inLang(langs.main)}>${textOf(se.title, langs.main, ...langs.translations) ?? `Season ${se.n}`}</h2>
         <span class="note">${[gloss && textOf(se.title, gloss) && html`<span ...${inLang(gloss)}>${textOf(se.title, gloss)}</span>`, plural(eps.length - proposed.size, "episode"), proposed.size > 0 && `${proposed.size} proposed`, se.launch && `from ${short(se.launch)}`].filter(Boolean).map((x, k) => html`${k ? " · " : ""}${x}`)}</span></div>
+      <div class="seg viewseg" role="group" aria-label="View">${([["calendar", "calendar", "The calendar: weeks and days"], ["list", "list", "A list: one row per episode"]] as const).map(([v, icon, t]) => html`<button aria-pressed=${view === v} onClick=${() => pickView(v)} title=${t} aria-label=${t}><${Icon} name=${icon} size=${16} /></button>`)}</div>
       <button onClick=${() => p.setSettings("season")} title="The season's titles, summary and launch day"><${Icon} name="settings" size=${16} /> Season settings</button>
       <button onClick=${() => p.setSettings("series")} title="The series' titles, languages, narrator and stand-in"><${Icon} name="settings" size=${16} /> Series settings</button>
       <a href=${`#/new/${p.id}`}><button class="primary"><${Icon} name="plus" size=${16} /> New episode</button></a>
     </div>
     <${ProposalsStrip} kind="season" id=${p.id} /><${ProposalsStrip} kind="series" />
+    ${view === "list" ? html`<${EpisodeList} weeks=${weeks} eps=${eps} unscheduled=${unscheduled} dates=${dates} arcOf=${arcOf} story=${story} markOf=${markOf} seasonId=${p.id} />` : html`
     ${!se.calendar && w.writable && html`<p class="note">The days come from each episode's own date. Drag an episode to another day to start the season's calendar.</p>`}
     <div class="board" role="grid" aria-label=${`Season ${se.n}: weeks and days`}>
       <div class="board-head" role="row"><span role="columnheader">Week · theme</span>${DAYS.map((d, k) => html`<span role="columnheader" class=${k === 5 ? "special" : ""}>${d}${k === 5 ? html` <small>special</small>` : ""}</span>`)}</div>
@@ -152,7 +159,7 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
       })}
     </div>
     ${unscheduled.length > 0 && html`<h3>Not on the calendar (${unscheduled.length})</h3><p class="note">Drag one onto a day.</p>
-      <div class="tray">${unscheduled.map(e => html`<${EpisodeCard} e=${e} story=${story(e.id)} mark=${markOf(e.id)} onDrag=${(on: boolean) => setDrag(on ? e.id : null)} />`)}</div>`}
+      <div class="tray">${unscheduled.map(e => html`<${EpisodeCard} e=${e} story=${story(e.id)} mark=${markOf(e.id)} onDrag=${(on: boolean) => setDrag(on ? e.id : null)} />`)}</div>`}`}
     ${changed.length > 0 && html`<div class="savebar"><span class="grow">${changed.map(k => k.replace(":", " ")).join(", ")}
         ${changed.flatMap(k => (checked.value[k] ?? []).filter(x => x.new && x.level === "error")).map(x => html`<span class="bad-line">${x.story}: ${x.message}</span>`)}</span>
       <button onClick=${() => { for (const k of changed) { const [kind, id] = k.split(":") as ["season" | "story", string]; void openDoc(kind, id, true); } }}>Discard</button>
@@ -173,8 +180,6 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
 function EpisodeCard(p: { e: Episode; story?: StoryDoc; mark?: "proposed" | "unsaved"; onDrag(on: boolean): void }) {
   const w = world.value!, { main } = useLangs();
   const status = review.value[p.e.id]?.status ?? "draft";
-  const probs = (allProblems.value ?? []).filter(x => x.story === p.e.id);
-  const errors = probs.filter(x => x.level === "error").length, warnings = probs.filter(x => x.level === "warning").length;
   const place = w.places[p.story?.place ?? p.e.place];
   const title = p.story?.title ?? p.e.title;
   const proposed = p.mark === "proposed";
@@ -184,12 +189,51 @@ function EpisodeCard(p: { e: Episode; story?: StoryDoc; mark?: "proposed" | "uns
     <${Picture} art=${place ? () => placeThumb(place) : null} label=${p.e.id} />
     <b ...${inLang(main)}>${textOf(title, main) ?? p.e.id}</b>
     <small>${p.e.id}${(p.story?.kind ?? p.e.kind) === "special" ? " · special" : ""}</small>
-    <span class="badges">
-      ${p.mark ? html`<span class=${`chip ${proposed ? "suggest" : "warn"}`}>${p.mark}</span>`
-        : html`<span class=${`chip ${status === "approved" ? "ok" : status === "reviewed" ? "" : "warn"}`}>${status === "draft" ? "to review" : status}</span>`}
-      ${(p.story?.draft ?? p.e.draft) && html`<span class="chip">draft</span>`}
-      ${errors > 0 && html`<span class="chip bad" title="errors">${errors} ✕</span>`}${warnings > 0 && html`<span class="chip warn" title="warnings">${warnings} !</span>`}
-    </span></a>`;
+    <${Badges} e=${p.e} story=${p.story} mark=${p.mark} /></a>`;
+}
+
+/** An episode's state: proposed or unsaved, else its review status; a draft; its errors and warnings. */
+function Badges(p: { e: Episode; story?: StoryDoc; mark?: "proposed" | "unsaved" }) {
+  const status = review.value[p.e.id]?.status ?? "draft";
+  const probs = (allProblems.value ?? []).filter(x => x.story === p.e.id);
+  const errors = probs.filter(x => x.level === "error").length, warnings = probs.filter(x => x.level === "warning").length;
+  return html`<span class="badges">
+    ${p.mark ? html`<span class=${`chip ${p.mark === "proposed" ? "suggest" : "warn"}`}>${p.mark}</span>`
+      : html`<span class=${`chip ${status === "approved" ? "ok" : status === "reviewed" ? "" : "warn"}`}>${status === "draft" ? "to review" : status}</span>`}
+    ${(p.story?.draft ?? p.e.draft) && html`<span class="chip">draft</span>`}
+    ${errors > 0 && html`<span class="chip bad" title="errors">${errors} ✕</span>`}${warnings > 0 && html`<span class="chip warn" title="warnings">${warnings} !</span>`}
+  </span>`;
+}
+
+/** The season as a list: each week (its dates and theme) with its episodes in release order, then those with no date. */
+function EpisodeList(p: { weeks: Week[]; eps: Episode[]; unscheduled: Episode[]; dates: Record<string, string>; arcOf(week: number): Record<string, unknown> | undefined; story(id: string): StoryDoc | undefined; markOf(id: string): "proposed" | "unsaved" | undefined; seasonId: string }) {
+  const langs = useLangs();
+  const groups = p.weeks.filter(wk => wk.days.some(d => d.episode)).map(wk => ({ wk, eps: wk.days.flatMap(d => (d.episode ? p.eps.filter(e => e.id === d.episode) : [])) }));
+  if (!p.eps.length) return html`<${Empty} icon="board" title="No episode yet"><p>Start the season's first.</p><a href=${`#/new/${p.seasonId}`}><button class="primary">New episode</button></a></${Empty}>`;
+  const row = (e: Episode) => html`<${EpisodeRow} e=${e} story=${p.story(e.id)} mark=${p.markOf(e.id)} date=${p.dates[e.id]} />`;
+  return html`<div class="ep-list" role="list" aria-label="Episodes">
+    ${groups.map(({ wk, eps }) => {
+      const arc = wk.week ? p.arcOf(wk.week) : undefined, theme = arc && textOf(arc as never, langs.main);
+      return html`<div class="ep-week"><h3><b>${wk.week === null ? "Break" : `Week ${wk.week}`}</b><small>${span(wk.monday, wk.days[5].date)}</small>${theme && html`<span class="theme" ...${inLang(langs.main)}>${theme}</span>`}<small class="count">${plural(eps.length, "episode")}</small></h3>${eps.map(row)}</div>`;
+    })}
+    ${p.unscheduled.length > 0 && html`<div class="ep-week"><h3><b>Not on the calendar</b><small class="count">${plural(p.unscheduled.length, "episode")}</small></h3>${p.unscheduled.map(row)}</div>`}
+  </div>`;
+}
+
+/** One episode in the list: its place's picture, title (and its first translation), day, place, cast and state. */
+function EpisodeRow(p: { e: Episode; story?: StoryDoc; mark?: "proposed" | "unsaved"; date?: string }) {
+  const w = world.value!, langs = useLangs(), gloss = langs.translations[0];
+  const s = p.story, place = w.places[s?.place ?? p.e.place], title = s?.title ?? p.e.title;
+  const cast = (s?.cast ?? p.e.cast).map(c => textOf(w.characters[c]?.name, langs.main) ?? c);
+  const special = (s?.kind ?? p.e.kind) === "special";
+  const day = p.date ? new Date(`${p.date}T12:00:00Z`) : undefined;
+  return html`<a class=${`ep-row ${p.mark === "proposed" ? "proposed" : review.value[p.e.id]?.status ?? "draft"}`} href=${`#/episode/${p.e.id}`} role="listitem">
+    <span class="when">${day ? html`<b>${day.toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" })}</b><small>${short(p.date!)}</small>` : html`<small>no date</small>`}</span>
+    <${Picture} art=${place ? () => placeThumb(place) : null} label=${p.e.id} />
+    <span class="what"><b ...${inLang(langs.main)}>${textOf(title, langs.main) ?? p.e.id}</b>${gloss && textOf(title, gloss) && html`<small ...${inLang(gloss)}>${textOf(title, gloss)}</small>`}</span>
+    <span class="meta"><small>${p.e.id}${special ? " · special" : ""}</small><small>${place ? textOf(place.name, langs.main, ...langs.translations) ?? place.id : ""}${cast.length ? ` · ${cast.join(", ")}` : ""}</small></span>
+    <${Badges} e=${p.e} story=${p.story} mark=${p.mark} />
+  </a>`;
 }
 
 /** The board of the route's season (or the first). */

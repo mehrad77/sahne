@@ -5,6 +5,8 @@ import { html } from "htm/preact";
 const PATHS: Record<string, string> = {
   stage: "M3 5h18M5 5v14M19 5v14M5 5c2 4 4 5 7 5s5-1 7-5M3 19h18",
   board: "M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z",
+  calendar: "M4 6h16v14H4zM4 10h16M8 3v5M16 3v5M8 14h2M14 14h2M8 17h2",
+  list: "M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01",
   cast: "M9 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM2.5 20c.8-3.5 3.3-5.5 6.5-5.5s5.7 2 6.5 5.5M16 4.6a3.2 3.2 0 0 1 0 6.3M18 14.8c2 .7 3.2 2.5 3.5 5.2",
   places: "M3 20h18M5 20V9l7-5 7 5v11M10 20v-6h4v6",
   review: "M9 11l2 2 4-4M5 4h14v16H5z",
