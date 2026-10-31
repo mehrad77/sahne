@@ -15,6 +15,7 @@ import { flagsIn, wordsOnly } from "../../model/steps.ts";
 import { dirty } from "../../model/history.ts";
 import { KIT, Preview, solidsOf } from "../../stage.ts";
 import { pathOfKey, ReviewGutter, ReviewPanel } from "../review.ts";
+import { ReviewMode } from "./reviewmode.ts";
 import { blocksOf, standingOf, STAGE_NAME } from "../../model/review.ts";
 import { NotesPanel } from "./notes.ts";
 import { ChangesPanel } from "../changes.ts";
@@ -66,6 +67,7 @@ function Studio(p: { id: string }) {
   const [path, setPath] = useState<Path | null>(null), [focusTick, setFocusTick] = useState(0);
   const [flags, setFlags] = useState<string[]>([]);
   const [tab, setTab] = useState<"problems" | "review" | "changes">("problems");
+  const [inReview, setReviewMode] = useState(false);
   const [asks, setAsks] = useState<{ x: number; y: number } | null>(null);
   const [here, setHere] = useState(false);
   const [details, setDetails] = useState(false);
@@ -160,7 +162,7 @@ function Studio(p: { id: string }) {
   // an agent pointed here
   useEffect(() => { const s = agentShown.value; if (s && s.id === p.id && s.step) select(s.step, true); }, [agentShown.value?.n]);
   // from the review page: a block (#/episode/<id>/at/<key>), or the episode's review (#/episode/<id>/review)
-  useEffect(() => { const [, , sub, k] = route.value; if (sub === "at" && k) select(pathOfKey(k), true); if (sub === "review") setTab("review"); }, [route.value.join("/")]);
+  useEffect(() => { const [, , sub, k] = route.value; if (sub === "at" && k) select(pathOfKey(k), true); if (sub === "review") { setTab("review"); setReviewMode(true); } }, [route.value.join("/")]);
   const mine = proposals.value.filter(x => (x.kind === "story" && x.doc === p.id) || x.also?.some(a => a.kind === "story" && a.doc === p.id));
   const conflict = conflicts.value.has(key);
   const problems = [...(checked.value[key] ?? []), ...lints];
@@ -169,7 +171,7 @@ function Studio(p: { id: string }) {
   const comments = review.value[p.id]?.comments?.length ?? 0;
   const allFlags = flagsIn(story);
   const errors = problems.filter(x => x.level === "error").length;
-  const standing = standingOf(review.value[p.id], blocksOf(story, langs), { errors, translations: langs.translations });
+  const blocks = blocksOf(story, langs), standing = standingOf(review.value[p.id], blocks, { errors, translations: langs.translations });
   const save = () => void saveDocs([key, keyOf("season", `s${seasonOf(p.id)}`)]);
 
   return html`<section class="studio-episode" onKeyDown=${(e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); } }}>
@@ -204,13 +206,14 @@ function Studio(p: { id: string }) {
           const next = flags.includes(f) ? flags.filter(x => x !== f) : [...flags, f];
           setFlags(next); pv!.setFlags(next, Math.max(0, player!.next - 1)); redraw();
         }}>${f}</button>`)}</div>`}
+        ${inReview ? html`<${ReviewMode} id=${p.id} story=${story} blocks=${blocks} standing=${standing} path=${path} main=${langs.main} select=${select} onExit=${() => setReviewMode(false)} />` : html`
         <div class="tabs" role="tablist">
           ${(["problems", "review", "changes"] as const).map(t => html`<button role="tab" aria-selected=${tab === t} onClick=${() => setTab(t)}>${t === "problems" ? `Notes${errors ? ` (${errors})` : ""}` : t === "review" ? "Review" : "Changes"}</button>`)}
         </div>
         ${tab === "problems" && html`<label class="row note"><input type="checkbox" style="width:auto" checked=${here} onChange=${(e: Event) => setHere((e.target as HTMLInputElement).checked)} /> only the selected block</label>
           <${NotesPanel} problems=${problems} path=${path} select=${select} edit=${edit} onlyHere=${here} />`}
-        ${tab === "review" && html`<${ReviewPanel} id=${p.id} story=${story} path=${path} standing=${standing} />`}
-        ${tab === "changes" && html`<${ChangesPanel} id=${p.id} story=${story} savedAt=${d.mtime} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} select=${(x: Path) => select(x, true)} />`}
+        ${tab === "review" && html`<${ReviewPanel} id=${p.id} story=${story} path=${path} standing=${standing} onReview=${() => setReviewMode(true)} />`}
+        ${tab === "changes" && html`<${ChangesPanel} id=${p.id} story=${story} savedAt=${d.mtime} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} select=${(x: Path) => select(x, true)} />`}`}
       </div>
     </div>
     ${asks && html`<${Popover} x=${asks.x} y=${asks.y} onClose=${() => setAsks(null)} label="Ask the assistant"><${AskMenu} onDone=${() => setAsks(null)} /></${Popover}>`}
