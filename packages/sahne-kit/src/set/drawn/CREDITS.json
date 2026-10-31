@@ -23,6 +23,17 @@
     "from": "x_bread_basket"
   },
   {
+    "id": "butter_cookie",
+    "family": "bakery",
+    "kind": "prop",
+    "by": "Ada L.",
+    "contact": "github:ada",
+    "date": "2026-10-30",
+    "licence": "CC-BY-4.0",
+    "consent": true,
+    "from": "x_butter_cookie"
+  },
+  {
     "id": "doughnut",
     "family": "bakery",
     "kind": "prop",

@@ -1,0 +1,64 @@
+{
+  "id": "butter_cookie",
+  "as": "prop",
+  "about": "A butter cookie with a sugar rim, on its own.",
+  "tags": [
+    "food",
+    "bakery",
+    "pastry"
+  ],
+  "terms": [],
+  "params": {
+    "color": {
+      "type": "color",
+      "default": "#D9A860",
+      "about": "the biscuit"
+    }
+  },
+  "kinds": {
+    "main": {
+      "size": [
+        8,
+        2
+      ],
+      "ppcm": 14,
+      "grip": [
+        0,
+        -1
+      ],
+      "flats": [
+        {
+          "shapes": [
+            {
+              "d": "M-4 -1C-4 -2 -2 -2.4 0 -2.4C2 -2.4 4 -2 4 -1C4 -0.4 3 0 2 0H-2C-3 0 -4 -0.4 -4 -1Z",
+              "fill": "$color"
+            },
+            {
+              "d": "M-3 -1.6C-1.4 -2 1.4 -2 3 -1.6",
+              "stroke": {
+                "color": {
+                  "tone": "$color",
+                  "step": "light"
+                },
+                "width": 0.3
+              },
+              "flat": true,
+              "opacity": 0.8
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "repeat": {
+    "gap": 2
+  },
+  "credit": {
+    "by": "Ada L.",
+    "contact": "github:ada",
+    "date": "2026-10-30",
+    "licence": "CC-BY-4.0",
+    "consent": true,
+    "from": "x_butter_cookie"
+  }
+}

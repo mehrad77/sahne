@@ -3,6 +3,7 @@
 export const DRAWN_ALIASES: Record<string, string> = {
   x_apple_strudel: "apple_strudel",
   x_bread_basket: "bread_basket",
+  x_butter_cookie: "butter_cookie",
   x_doughnut: "doughnut",
   x_eclair: "eclair",
   x_iced_latte: "iced_latte",
