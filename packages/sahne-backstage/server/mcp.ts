@@ -21,7 +21,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { IS_SAMPLES } from "../../sahne-story/paths.ts";
 import { arcId } from "../../sahne-story/check/rules.ts";
 import { allLanguages, languagesOf, seasonOf, textOf, type Languages, type SeasonDoc, type SeriesDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
-import { check, exists, forget, idsOf, kit as kitOf, listing, oldShape, readDoc, save, searchCards, type Edit, type Kind, type Problem } from "./content.ts";
+import { allProblems, check, refuse, usesOf, exists, forget, idsOf, kit as kitOf, listing, oldShape, readDoc, save, searchCards, type Edit, type Kind, type Problem } from "./content.ts";
 import { readReview, STATUSES, writeReview, type EpisodeReview } from "./review.ts";
 import { fail, ok, Refusal, type Result } from "./result.ts";
 import { pieceRows, registerKitTools } from "./kittools.ts";
@@ -30,6 +30,7 @@ import type { Events, Selection } from "./events.ts";
 import { latestOf, proposalsOf, type ProposalEdit, type Queue } from "./proposals.ts";
 import { get, insert, move, set, type Key } from "../src/model/path.ts";
 import { toolLabel } from "../src/model/tools.ts";
+import { boardOf, datesOf, themed, weekOfArc } from "../src/model/board.ts";
 import { skeleton } from "../src/model/skeleton.ts";
 
 export type AgentEdits = "proposals" | "direct";
@@ -250,6 +251,8 @@ export function createMcp(o: McpOptions): McpServer {
       const fresh = (r.problems ?? []).filter(p => p.new);
       return ok(`saved: ${m.summary}`, { saved: r.saved, newProblems: fresh.map(fmt) });
     }
+    // what a save would refuse whatever the check says (an id changed, an extra edited, a taken new id), a proposal is refused too
+    for (const e of list) { const no = refuse(e); if (no) return fail(`not proposed: ${no}`); }
     const problems = check(list);
     const errs = problems.filter(p => p.new && p.level === "error");
     if (errs.length) return fail(`not proposed: the edit brings ${errs.length} error${errs.length > 1 ? "s" : ""}. Fix ${errs.length > 1 ? "them" : "it"} and try again:\n${errs.map(fmt).join("\n")}`);
@@ -261,27 +264,29 @@ export function createMcp(o: McpOptions): McpServer {
     return ok(`proposal ${p.id} is waiting in ${queue.where}: ${m.summary}. A person accepts or rejects it; nothing is saved until they accept.${m.after ? ` It holds your earlier proposal ${m.after} on this document too.` : ""}`, { proposal: p.id, newProblems: problems.filter(x => x.new).map(fmt) });
   }
 
-  /** Edit one story: `fn` turns the document into the new one. */
-  async function editStory(id: string, mtime: number | undefined, summary: string, paths: Key[][], fn: (doc: Record<string, unknown>) => Record<string, unknown>): Promise<Result> {
+  /** Edit one document (a story, a season, the series, a place, a character): `fn` turns it into the new one. */
+  async function editDoc(kind: Kind, id: string, mtime: number | undefined, summary: string, paths: Key[][], fn: (doc: Record<string, unknown>) => Record<string, unknown>): Promise<Result> {
     const why = readOnly();
     if (why) return fail(why);
-    const c = await current("story", id, mtime);
+    const c = await current(kind, id, mtime);
     const next = fn(c.doc);
-    const main: ProposalEdit = c.create ? { kind: "story", doc: id, next, create: true } : { kind: "story", doc: id, next, base: c.mtime };
+    const main: ProposalEdit = c.create ? { kind, doc: id, next, create: true } : { kind, doc: id, next, base: c.mtime };
     return submit([main, ...(c.also ?? [])], { summary, paths, after: c.after });
   }
+  const editStory = (id: string, mtime: number | undefined, summary: string, paths: Key[][], fn: (doc: Record<string, unknown>) => Record<string, unknown>) => editDoc("story", id, mtime, summary, paths, fn);
 
-  /** An episode as this agent reads it: as it would edit it (`current`), with a line saying what is not saved yet. */
-  async function seen(id: string): Promise<{ doc: Record<string, unknown>; mtime?: number; create?: boolean; note: string }> {
-    const c = await current("story", id);
-    const note = !c.after ? "" : c.create ? `${id} is your proposal ${c.after}, a new episode: nothing is on disk until a person accepts it. Edits build on it.` : `This is ${id} with your pending proposal ${c.after}, not saved yet.`;
+  /** A document as this agent reads it: as it would edit it (`current`), with a line saying what is not saved yet. */
+  async function seen(id: string, kind: Kind = "story"): Promise<{ doc: Record<string, unknown>; mtime?: number; create?: boolean; note: string }> {
+    const c = await current(kind, id);
+    const what = kind === "story" ? "episode" : kind;
+    const note = !c.after ? "" : c.create ? `${id} is your proposal ${c.after}, a new ${what}: nothing is on disk until a person accepts it. Edits build on it.` : `This is ${id} with your pending proposal ${c.after}, not saved yet.`;
     return { doc: c.doc, mtime: c.create ? undefined : c.mtime, create: c.create, note };
   }
 
-  /** The answer for an episode that is not on disk: none at all, or one only proposed so far. */
-  const absent = async (id: string, what: string): Promise<Result> => {
-    const p = (await queue.pending()).find(x => x.kind === "story" && x.doc === id && x.create);
-    return fail(p ? `${id} is only proposed (${p.id}), not saved yet: ${what} once a person accepts it` : `there is no story ${id} (list_episodes lists them)`);
+  /** The answer for a document that is not on disk: none at all, or one only proposed so far. */
+  const absent = async (id: string, what: string, kind: Kind = "story"): Promise<Result> => {
+    const p = (await queue.pending()).find(x => x.kind === kind && x.doc === id && x.create);
+    return fail(p ? `${id} is only proposed (${p.id}), not saved yet: ${what} once a person accepts it` : `there is no ${kind} ${id}${kind === "story" ? " (list_episodes lists them)" : ""}`);
   };
 
   const objectAt = (doc: unknown, path: Key[]): Record<string, unknown> => {
@@ -535,7 +540,7 @@ export function createMcp(o: McpOptions): McpServer {
     const aid = arcId(b.season, b.week), arc = se.arcs?.[aid];
     if (!arc) {
       const weeks = Object.keys(se.arcs ?? {}).map(k => Number(k.split("w")[1])).sort((x, y) => x - y);
-      return fail(`season ${sid} has no arc for week ${b.week} (${aid}). ${weeks.length ? `It has arcs for week${weeks.length > 1 ? "s" : ""} ${weeks.join(", ")}: pick one of those` : "It has no arcs at all"}, or ask the person to write week ${b.week}'s theme (its arc) on the Board (you cannot edit a season).`);
+      return fail(`season ${sid} has no arc for week ${b.week} (${aid}). ${weeks.length ? `It has arcs for week${weeks.length > 1 ? "s" : ""} ${weeks.join(", ")}: pick one of those` : "It has no arcs at all"}, or give week ${b.week} a theme first with set_week_theme.`);
     }
     if (!b.title[languagesOf(series).main]) return fail(`the title needs the main language's (${languagesOf(series).main})`);
     const next = skeleton({ id, season: b.season, releaseDate: b.releaseDate, kind: b.kind, week: b.week, arc: { ...arc, id: aid }, place: b.place, cast: b.cast, words: b.words, lessons: b.lessons, title: b.title, summary: b.summary, level: b.level },
@@ -568,6 +573,132 @@ export function createMcp(o: McpOptions): McpServer {
     const nextSeason = { ...se.doc, calendar: { ...((se.doc.calendar ?? {}) as object), [story]: row } };
     const storyPaths = [["releaseDate"], ["kind"], ["arc"]];
     return submit([{ kind: "season", doc: sid, next: nextSeason, base: se.mtime }, st.create ? { kind: "story", doc: story, next, create: true, paths: storyPaths } : { kind: "story", doc: story, next, base: st.mtime, paths: storyPaths }], { summary: `${story} on ${row.date} (${row.kind}, week ${row.week})`, paths: [["calendar", story]], after: st.after });
+  }));
+
+  // ---- the series, its seasons, places and characters --------------------------------------------------------------------
+
+  const TEXT0 = z.record(z.string(), z.string()).describe("Language code → text");
+  const DOC_KIND = z.enum(["series", "season", "place", "character"]).describe("series (id \"series\"), a season (s1), a place, or a character");
+  /** A path in any document (no step shorthand): "title", "arcs/s1w02", "marks/door", "" for the whole document. */
+  const docPath = (p: string): Key[] => p.replace(/^\/+|\/+$/g, "").split("/").filter(x => x !== "").map(x => (/^\d+$/.test(x) ? Number(x) : x));
+
+  server.registerTool("read_doc", {
+    title: "Read a document",
+    description: "Read the series, a season (its titles, launch day, week themes as arcs, calendar), a place (its size, set pieces, marks, props, times, camera) or a character (name, role, bio, look) as JSON, with its mtime. In proposals mode it is the document as you would edit it, your pending proposal on it included. Episodes are read with read_episode.",
+    inputSchema: { kind: DOC_KIND, id: z.string() },
+    annotations: { readOnlyHint: true },
+  }, run("read_doc", async ({ kind, id }) => {
+    const d = await seen(id, kind);
+    return ok(`${d.note ? `${d.note}\n` : ""}${kind} ${id} · mtime ${d.mtime ?? "none (not on disk yet)"}`, d.doc);
+  }));
+
+  server.registerTool("edit_doc", {
+    title: "Edit a document",
+    description: `Change the series, a season, a place or a character by a merge patch at a path: each key of the patch replaces the one there, an object merges into the one there, and null removes a key. The path "" is the document itself; "title" a season's titles; "arcs/s1w02" a week's theme (prefer set_week_theme, which also updates that week's episodes); "marks/door" a place's mark; "name" a character's name. Ids never change. An edit that breaks an episode (a mark it stands on taken away, a character it names) is refused as a new error. ${writeNote}`,
+    inputSchema: { kind: DOC_KIND, id: z.string(), path: z.string().describe('A path in the document, "" for the document itself'), patch: z.record(z.string(), z.unknown()).describe("The keys to change"), mtime: z.number().optional().describe("The mtime read_doc gave; when given, the edit is refused if the file changed since") },
+  }, run("edit_doc", async ({ kind, id, path, patch, mtime }) => {
+    const at = docPath(path);
+    const changed = at.length ? [at] : Object.keys(patch).map(k => [k] as Key[]);
+    return editDoc(kind, id, mtime, `${kind} ${id}: ${at.length ? pathText(at) : Object.keys(patch).join(", ")}`, changed, doc => {
+      if (!at.length) return mergePatch(doc, patch) as Record<string, unknown>;
+      const here = get(doc, at);
+      if (here !== undefined && !isObject(here)) return set(doc, at, patch) as Record<string, unknown>;
+      return set(doc, at, mergePatch(here ?? {}, patch)) as Record<string, unknown>;
+    });
+  }));
+
+  server.registerTool("set_week_theme", {
+    title: "Set a week's theme",
+    description: `Set a week's theme (its arc) in a season: the theme's words in each language, and the mechanics it practises. Like the board, it is written in the season and in every episode of that week, together. A week without an arc gets one, so an episode can then be started in it. ${writeNote}`,
+    inputSchema: { season: z.union([z.number().int().positive(), z.string()]), week: z.number().int().nonnegative(), texts: z.record(z.string(), z.string()).describe("Language code → the theme"), mechanics: z.array(z.string()).optional().describe("What the week practises (default: what it had, else [\"say\"])") },
+  }, run("set_week_theme", async ({ season, week, texts, mechanics }) => {
+    const why = readOnly();
+    if (why) return fail(why);
+    const n = Number(String(season).replace(/^s/, "")), sid = `s${n}`;
+    const se = await current("season", sid);
+    const was = ((se.doc as unknown as SeasonDoc).arcs ?? {})[arcId(n, week)] as Record<string, unknown> | undefined;
+    const arc = { ...(was ?? {}), ...texts, mechanics: mechanics ?? (was?.mechanics as string[] | undefined) ?? ["say"] } as NonNullable<SeasonDoc["arcs"]>[string];
+    const t = themed(se.doc as unknown as SeasonDoc, week, arc);
+    const edits: ProposalEdit[] = [{ kind: "season", doc: sid, next: t.season, base: se.mtime }];
+    for (const id of idsOf("story").filter(x => seasonOf(x) === n)) {
+      const st = await current("story", id);
+      const next = t.story(st.doc as { arc?: { id?: string } });
+      if (next) edits.push({ kind: "story", doc: id, next, base: st.mtime, paths: [["arc"]] });
+    }
+    return submit(edits, { summary: `week ${week} of ${sid}: “${textOf(arc as unknown as Record<string, string>, ctx().langs.main) ?? Object.values(texts)[0]}”${edits.length > 1 ? `, with ${edits.length - 1} episode${edits.length > 2 ? "s" : ""}` : ""}`, paths: [["arcs", t.aid]], after: se.after });
+  }));
+
+  server.registerTool("create_season", {
+    title: "Start a season",
+    description: `Start a new season: its number (the next free one), its titles, its launch day, and the themes of its first weeks. Then plan its weeks with set_week_theme and start episodes in them. ${writeNote}`,
+    inputSchema: { n: z.number().int().positive().optional().describe("Default: the next free number"), title: TEXT0, launch: z.string().optional().describe("YYYY-MM-DD, a Monday"), weeks: z.record(z.string(), z.record(z.string(), z.string())).optional().describe("Week number → its theme by language, e.g. { \"1\": { \"tr\": \"…\" } }") },
+  }, run("create_season", async ({ n, title, launch, weeks }) => {
+    const nn = n ?? Math.max(0, ...idsOf("season").map(x => Number(x.slice(1)))) + 1, id = `s${nn}`;
+    if (exists("season", id)) return fail(`season ${id} exists already: pick another number`);
+    const arcs = Object.fromEntries(Object.entries(weeks ?? { 1: Object.fromEntries(Object.keys(title).map(l => [l, "…"])) }).map(([w, t]) => [arcId(nn, Number(w)), { ...t, mechanics: ["say"] }]));
+    const doc = { v: 1, id, n: nn, title, ...(launch ? { launch } : {}), arcs, calendar: {} };
+    return submit([{ kind: "season", doc: id, next: doc, create: true }], { summary: `start season ${nn}`, paths: [[]] });
+  }));
+
+  server.registerTool("create_character", {
+    title: "Add a character",
+    description: `Add a character to the cast: an id (a-z, 0-9, _; permanent), a name, a role and a short bio in the series' languages, a level, and a colour. Their look starts as the stand-in's; a person shapes it on their page (you cannot draw it). ${writeNote}`,
+    inputSchema: { id: z.string().regex(/^[a-z][a-z0-9_]*$/), name: TEXT0, role: TEXT0.optional(), bio: TEXT0.optional(), level: z.string().optional(), color: z.string().optional().describe("#RRGGBB") },
+  }, run("create_character", async ({ id, name, role, bio, level, color }) => {
+    if (exists("character", id)) return fail(`${id} is a character already: ids are permanent, pick a new one`);
+    const w = listing(), chars = w.characters as Record<string, { kind?: string; order?: number; avatar?: unknown }>;
+    const order = Math.max(0, ...Object.values(chars).filter(c => c.kind !== "extra").map(c => Number(c.order ?? 0))) + 1;
+    const base = chars[(w.series as SeriesDoc | undefined)?.standin ?? ""]?.avatar;
+    const doc = { id, order, name, kind: "cast", role: role ?? { en: "…" }, bio: bio ?? { en: "…" }, color: color ?? "#7A6A58", level: level ?? "A1", ...(base ? { avatar: base } : {}) };
+    return submit([{ kind: "character", doc: id, next: doc, create: true }], { summary: `add the character ${id}`, paths: [[]] });
+  }));
+
+  server.registerTool("create_place", {
+    title: "Add a place",
+    description: `Add a place: an id (a-z, 0-9, _; permanent) and its name, as an empty room or a copy of another place (its set pieces, marks and props). Then change its marks and props with edit_doc; a person arranges it on its stage. ${writeNote}`,
+    inputSchema: { id: z.string().regex(/^[a-z0-9_]+$/), name: TEXT0, from: z.string().optional().describe("A place to copy") },
+  }, run("create_place", async ({ id, name, from }) => {
+    if (exists("place", id)) return fail(`${id} is a place already: ids are permanent, pick a new one`);
+    let doc: Record<string, unknown> = { v: 1, id, name, size: { w: 6, d: 4 }, pieces: [], marks: { a: { x: 0, z: 0 } } };
+    if (from) { const b = docOf("place", from).doc; const { site: _site, ...rest } = structuredClone(b); doc = { ...rest, id, name }; }
+    return submit([{ kind: "place", doc: id, next: doc, create: true }], { summary: `add the place ${id}${from ? ` (a copy of ${from})` : ""}`, paths: [[]] });
+  }));
+
+  server.registerTool("find_uses", {
+    title: "Where it is used",
+    description: "Which episodes use a place (set there, or a scene there), a character (in the cast, or saying a line), or a word card, with the paths that name it. With part (a place's mark or prop id), only the episodes and steps that name that mark or prop. Look before you change or take away a mark, a prop or a character: an episode that names one breaks.",
+    inputSchema: { kind: z.enum(["place", "character", "card"]), id: z.string(), part: z.string().optional() },
+    annotations: { readOnlyHint: true },
+  }, run("find_uses", ({ kind, id, part }) => {
+    const uses = usesOf(kind, id, part);
+    return ok(uses.length ? `${uses.length} episode${uses.length > 1 ? "s" : ""} use ${kind} ${id}${part ? ` · ${part}` : ""}:\n${uses.map(u => `${u.story}: ${u.paths.join(", ")}`).join("\n")}` : `no episode uses ${kind} ${id}${part ? ` · ${part}` : ""}`, uses);
+  }));
+
+  server.registerTool("check_season", {
+    title: "Check a season",
+    description: "A season at a glance, in one call: each episode with its date, its review status and its problems (errors and warnings), the weekdays with no episode yet, and the weeks with no theme. Read this before saying what needs work in a season.",
+    inputSchema: { id: z.union([z.number().int().positive(), z.string()]) },
+    annotations: { readOnlyHint: true },
+  }, run("check_season", ({ id }) => {
+    const n = Number(String(id).replace(/^s/, "")), sid = `s${n}`;
+    const se = docOf("season", sid).doc as unknown as SeasonDoc;
+    const eps = listing().episodes.filter(e => e.season === n);
+    const review = readReview().episodes, probs = allProblems();
+    const weekOf = Object.fromEntries(eps.map(e => [e.id, weekOfArc((docOf("story", e.id).doc as { arc?: { id?: string } }).arc?.id)]).filter(([, w]) => w !== undefined));
+    const weeks = boardOf(se, datesOf(se, eps), 0, weekOf as Record<string, number>);
+    const rows = eps.map(e => {
+      const mine = probs.filter(p => p.doc === `story:${e.id}`);
+      return { id: e.id, date: datesOf(se, [e])[e.id] ?? null, draft: e.draft, status: review[e.id]?.status ?? "draft", errors: mine.filter(p => p.level === "error").map(fmt), warnings: mine.filter(p => p.level === "warning").length };
+    });
+    const empty = weeks.flatMap(w => w.days.filter(d => d.kind === "episode" && !d.episode).map(d => d.date));
+    const noTheme = weeks.map(w => w.week).filter((w): w is number => typeof w === "number" && !se.arcs?.[arcId(n, w)]);
+    const lines = [
+      `${sid}: ${eps.length} episode${eps.length === 1 ? "" : "s"}, ${rows.filter(r => r.errors.length).length} with errors, ${rows.filter(r => r.status === "approved").length} approved`,
+      ...rows.map(r => `${r.id} · ${r.date ?? "no date"} · ${r.status}${r.draft ? " · draft" : ""}${r.errors.length ? ` · ${r.errors.length} error${r.errors.length > 1 ? "s" : ""}` : ""}${r.warnings ? ` · ${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : ""}`),
+      `free weekdays: ${empty.length ? empty.join(", ") : "none"}`,
+      `weeks without a theme: ${noTheme.length ? noTheme.join(", ") : "none"}`,
+    ];
+    return ok(lines.join("\n"), { season: sid, episodes: rows, freeDays: empty, weeksWithoutTheme: noTheme });
   }));
 
   server.registerTool("comment", {

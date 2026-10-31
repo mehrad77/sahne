@@ -142,6 +142,70 @@ test("read-only: every edit is refused, and says why", async () => {
   } finally { await close(); }
 });
 
+test("the series, its seasons, places and characters: read, edited, themed, created, checked and refused as a save would be", async () => {
+  const events = new Events();
+  const { client, close } = await connect({ write: true, agentEdits: "proposals" }, events);
+  const q = proposalsOf(events);
+  try {
+    // read_doc gives any kind as JSON; edit_doc proposes a merge patch at a path
+    const se = await call(client, "read_doc", { kind: "season", id: "s1" });
+    assert.ok(!se.isError, se.text);
+    assert.equal(json(se).id, "s1");
+    const t = await call(client, "edit_doc", { kind: "season", id: "s1", path: "title", patch: { en: "The first season" } });
+    assert.ok(!t.isError, t.text);
+    const pt = q.all().at(-1)!;
+    assert.equal(pt.kind, "season");
+    assert.deepEqual(pt.paths, [["title"]]);
+    assert.equal((pt.next as any).title.en, "The first season");
+    assert.equal((pt.next as any).title.tr, "Birinci sezon");
+    // reading it again is the season as proposed, and a second edit builds on it
+    assert.match((await call(client, "read_doc", { kind: "season", id: "s1" })).text, new RegExp(`pending proposal ${pt.id}`));
+    q.resolve(pt.id, false);
+    // a save's refusals hold for a proposal too: an id never changes
+    const idc = await call(client, "edit_doc", { kind: "place", id: "bakkal", path: "", patch: { id: "market" } });
+    assert.ok(idc.isError);
+    assert.match(idc.text, /ids never change/);
+    // a week's theme reaches the season and every episode of that week, each only at its arc
+    const wt = await call(client, "set_week_theme", { season: 1, week: 0, texts: { tr: "Bir deneme", en: "A try", fa: "یک آزمایش" } });
+    assert.ok(!wt.isError, wt.text);
+    const pw = q.all().at(-1)!;
+    assert.deepEqual(pw.paths, [["arcs", "s1w00"]]);
+    const ep = pw.also!.find(a => a.doc === "s1e00")!;
+    assert.deepEqual(ep.paths, [["arc"]]);
+    assert.equal((ep.next as any).arc.en, "A try");
+    assert.deepEqual((ep.next as any).arc.mechanics, ["say", "explore", "act"]);
+    q.resolve(pw.id, false);
+    // where a place's mark is used, and taking away a mark an episode stands on is a new error
+    const uses = json(await call(client, "find_uses", { kind: "place", id: "bakkal" }));
+    assert.ok(uses.some((u: { story: string }) => u.story === "s1e00"));
+    const doc = JSON.parse(readFileSync(join(root, "places", "bakkal.json"), "utf8"));
+    const counter = json(await call(client, "find_uses", { kind: "place", id: "bakkal", part: "counter" }));
+    assert.ok(counter.length, "s1e00 stands someone at the counter");
+    {
+      const gone = await call(client, "edit_doc", { kind: "place", id: "bakkal", path: "marks", patch: { counter: null } });
+      assert.ok(gone.isError, gone.text);
+      assert.match(gone.text, /story:s1e00/);
+    }
+    // new documents: a season, a place copied from another, a character
+    const ns = await call(client, "create_season", { title: { tr: "İkinci sezon", en: "Season two", fa: "فصل دوم" } });
+    assert.ok(!ns.isError, ns.text);
+    assert.equal(q.all().at(-1)!.doc, "s2");
+    assert.equal(q.all().at(-1)!.create, true);
+    const np = await call(client, "create_place", { id: "dukkan", name: { tr: "Dükkan", en: "Shop", fa: "مغازه" }, from: "bakkal" });
+    assert.ok(!np.isError, np.text);
+    assert.deepEqual(Object.keys((q.all().at(-1)!.next as any).marks), Object.keys(doc.marks));
+    assert.match((await call(client, "read_doc", { kind: "place", id: "dukkan" })).text, /your proposal p\d+, a new place/);
+    assert.match((await call(client, "create_place", { id: "bakkal", name: { tr: "x" } })).text, /a place already/);
+    const nc = await call(client, "create_character", { id: "ayse", name: { tr: "Ayşe", fa: "عایشه" }, role: { en: "a neighbour", fa: "همسایه" }, bio: { en: "Lives upstairs.", fa: "طبقه بالا" } });
+    assert.ok(!nc.isError, nc.text);
+    // the season at a glance
+    const cs = await call(client, "check_season", { id: "s1" });
+    assert.ok(!cs.isError, cs.text);
+    assert.match(cs.text, /s1e00 · /);
+    assert.ok(Array.isArray(json(cs).freeDays));
+    assert.equal(readFileSync(join(root, "seasons", "s1.json"), "utf8").includes("The first season"), false, "nothing is written in proposals mode");
+  } finally { await close(); }
+});
 test("proposals mode: a checked proposal is queued, the file is untouched, and an agent's proposals compose", async () => {
   const events = new Events();
   const seen: string[] = [];
@@ -197,7 +261,7 @@ test("proposals mode: a checked proposal is queued, the file is untouched, and a
     // a week without an arc names the weeks there are
     const nw = await call(client, "create_episode", { season: 1, releaseDate: "2026-09-16", kind: "episode", week: 1, place: "bakkal", cast: ["ismail", "nima"], words: [], lessons: [], title: { tr: "Yok" } });
     assert.ok(nw.isError);
-    assert.match(nw.text, /has arcs for week 0: pick one of those, or ask the person/);
+    assert.match(nw.text, /has arcs for week 0: pick one of those, or give week 1 a theme first with set_week_theme/);
     // the agent reads and goes on editing the episode it proposed; each edit is the new episode again, built on the last
     const rp = await call(client, "read_episode", { id: "s1e01" });
     assert.ok(!rp.isError, rp.text);

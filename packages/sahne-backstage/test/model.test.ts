@@ -230,8 +230,12 @@ test("abilities: by mode, and the page's own first", async () => {
   assert.ok(!ro.can.some(x => /^Edit an episode/.test(x)));
   const place = abilities({ writable: true, agentEdits: "proposals", page: "place" });
   assert.match(place.can[0], /this place/);
-  assert.ok(place.cannot.some(x => /^Change this place/.test(x)));
+  assert.ok(place.can.some(x => /^Change this place's names, marks and props/.test(x)));
+  assert.ok(place.cannot.some(x => /^Arrange the set pieces/.test(x)));
+  // seasons, the series, places and characters are its to change now, everywhere it can write
   assert.ok(!place.cannot.some(x => /^Change places, characters/.test(x)));
+  assert.ok(abilities({ writable: true, agentEdits: "proposals", page: "episode" }).can.some(x => /^Change a season/.test(x)));
+  assert.ok(!ro.can.some(x => /^Change a season/.test(x)));
   const direct = abilities({ writable: true, agentEdits: "direct", page: "episode" });
   assert.ok(direct.can.some(x => /^Set where an episode stands/.test(x)));
   assert.ok(!direct.cannot.some(x => /^Save anything/.test(x)));
@@ -247,4 +251,15 @@ test("tool calls in plain words: labels, paths as places, and a run of calls in 
   assert.equal(toolLabel("web_search", { query: "simit fiyatı" }).kind, "web");
   assert.deepEqual(toolLabel("no_such_tool"), { label: "no such tool", kind: "read" });
   assert.equal(groupSummary([{ name: "read_episode" }, { name: "read_step" }, { name: "check_episode" }, { name: "edit_step", ok: false }]), "2 reads · 1 check · 1 edit · 1 refused");
+});
+
+test("a week's theme: in the season, and in the stories of that week only", async () => {
+  const { themed } = await import("../src/model/board.ts");
+  const season = { v: 1, id: "s1", n: 1, title: { en: "S" }, arcs: { s1w01: { en: "old", mechanics: ["say"] } } } as never;
+  const t = themed(season, 1, { en: "new", mechanics: ["say", "act"] } as never);
+  assert.equal(t.aid, "s1w01");
+  assert.equal((t.season as any).arcs.s1w01.en, "new");
+  assert.deepEqual(t.story({ arc: { id: "s1w01" }, title: "x" } as never), { arc: { id: "s1w01", en: "new", mechanics: ["say", "act"] }, title: "x" });
+  assert.equal(t.story({ arc: { id: "s1w02" } }), null);
+  assert.equal((season as any).arcs.s1w01.en, "old", "the season given is not changed");
 });

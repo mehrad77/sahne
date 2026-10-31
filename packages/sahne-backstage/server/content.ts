@@ -155,13 +155,48 @@ function withEdits(w0: World, edits: Edit[]): World {
   return w;
 }
 
+/**
+ * The stories that use a place or a character, and where: a place they are set in (the episode's own, or a scene's), a
+ * character in their cast or saying a line. With `part` (a place's mark or prop, a word card's id), only the stories
+ * that name it, and the paths that do. The check reads it so a place's or character's edit that breaks a story is a new
+ * error; `find_uses` gives it to agents.
+ */
+export function usesOf(kind: "place" | "character" | "card", id: string, part?: string, w: World = world()): { story: string; paths: string[] }[] {
+  const out: { story: string; paths: string[] }[] = [];
+  for (const d of w.drafts) {
+    const s = d.story as unknown as Record<string, unknown>, steps = (s.steps ?? []) as Record<string, unknown>[];
+    const paths: string[] = [];
+    const scan = (v: unknown, path: string, hit: (x: unknown, key?: string) => boolean, key?: string) => {
+      if (hit(v, key)) { paths.push(path); return; }
+      if (Array.isArray(v)) v.forEach((x, i) => scan(x, `${path}/${i}`, hit));
+      else if (v && typeof v === "object") for (const [k2, x] of Object.entries(v)) scan(x, `${path}/${k2}`, hit, k2);
+    };
+    if (kind === "place") {
+      const here = s.place === id || steps.some(x => x.scene === id);
+      if (!here) continue;
+      if (!part) paths.push(s.place === id ? "place" : `steps/${steps.findIndex(x => x.scene === id)}`);
+      else steps.forEach((x, i) => scan(x, `steps/${i}`, v => v === part || (typeof v === "string" && (v.endsWith(`.${part}`) || v === `obj:${part}` || v.startsWith(`obj:${part}#`)))));
+    } else if (kind === "character") {
+      if (((s.cast ?? []) as string[]).includes(id)) paths.push("cast");
+      steps.forEach((x, i) => scan(x, `steps/${i}`, (v, k2) => k2 === "who" && v === id));
+    } else {
+      if (((s.words ?? []) as string[]).includes(id)) paths.push("words");
+      steps.forEach((x, i) => scan(x, `steps/${i}`, v => v === id));
+    }
+    if (paths.length) out.push({ story: d.id, paths: [...new Set(paths)] });
+  }
+  return out;
+}
+
 /** The problems of the edited documents in a world: each story's own and season rules, each character's, each place's, the series'. */
 function problemsIn(w: World, edits: Edit[], k?: Kit): Problem[] {
   const out: Problem[] = [];
   const o = options(k);
   const sol = (places: Record<string, StoryPlace>) => (k ? Object.fromEntries(Object.entries(places).map(([id, p]) => [id, placeSolids(p, k)])) : solidsOf(places));
   const tag = (doc: string) => (p: CheckProblem): Problem => ({ ...p, doc });
-  const stories = edits.filter(e => e.kind === "story").map(e => e.id);
+  // a place or a character is checked with the stories that use it: a mark taken away, a voice changed, breaks them
+  const users = edits.filter(e => e.kind === "place" || e.kind === "character").flatMap(e => usesOf(e.kind as "place" | "character", e.id, undefined, w).map(u => u.story));
+  const stories = [...new Set([...edits.filter(e => e.kind === "story").map(e => e.id), ...users])];
   if (stories.length) {
     const placed = sol(w.places);
     const opts: CheckOptions = { ...o, solids: Object.fromEntries(stories.map(id => [id, placed])) };
@@ -217,7 +252,7 @@ function currentDoc(w: World, e: Edit): unknown {
 export interface SaveResult { status: 200 | 400 | 403 | 409 | 422; saved?: Record<string, number>; problems?: Problem[]; message?: string }
 
 /** Why an edit may not be made at all: an id of the wrong pattern, a new id that is taken or retired, an old one that is gone. */
-function refuse(e: Edit): string | null {
+export function refuse(e: Edit): string | null {
   if (!ID[e.kind].test(e.id)) return `${e.id} is not a ${e.kind} id`;
   if (!e.doc || typeof e.doc !== "object" || Array.isArray(e.doc)) return `${e.kind} ${e.id}: not a document`;
   const has = exists(e.kind, e.id);

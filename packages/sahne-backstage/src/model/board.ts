@@ -2,7 +2,8 @@
 // special on Saturday; no Sunday), each day with the episode released then. The rows run from the season's launch week
 // or its first episode's, whichever comes first, to its last episode's week, plus one more to plan into. Moving an episode to a day gives its
 // calendar row: the date, the kind the day takes and the week it falls in. A row's week is the one its episodes' calendar
-// rows name (a series may skip a break week, so the n-th row need not be week n), else counted from the first row.
+// rows name (a series may skip a break week, so the n-th row need not be week n), else counted from the first row. A
+// week's theme is its arc: written in the season and in every story of that week (`themed`), by the board and by agents.
 
 import type { CalendarRow, SeasonDoc } from "sahne-story";
 
@@ -69,3 +70,17 @@ export const weekOfArc = (id: string | undefined) => { const m = /w(\d+)$/.exec(
 
 /** The arc id of a season's week. */
 export const arcOfWeek = (n: number, week: number) => `s${n}w${String(week).padStart(2, "0")}`;
+
+type Arc = NonNullable<SeasonDoc["arcs"]>[string];
+/**
+ * A week's theme (its arc) set: the season with it, and how a story of that week takes it (null for a story of another
+ * week). The board writes it where a person types the theme; `set_week_theme` gives agents the same.
+ */
+export function themed(season: SeasonDoc, week: number, arc: Arc): { aid: string; season: SeasonDoc; story: <S extends { arc?: { id?: string } }>(s: S) => S | null } {
+  const aid = arcOfWeek(season.n, week);
+  return {
+    aid,
+    season: { ...season, arcs: { ...(season.arcs ?? {}), [aid]: arc } },
+    story: s => (s.arc?.id === aid ? { ...s, arc: { id: aid, ...arc } } : null),
+  };
+}

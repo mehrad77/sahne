@@ -10,7 +10,7 @@
 import { html } from "htm/preact";
 import { useEffect, useState } from "preact/hooks";
 import { allLanguages, seasonOf, textOf, type SeasonDoc, type StoryDoc } from "sahne-story";
-import { arcOfWeek, boardOf, datesOf, rowOn, weekOfArc, type Day, type Week } from "../model/board.ts";
+import { arcOfWeek, boardOf, datesOf, rowOn, themed, weekOfArc, type Day, type Week } from "../model/board.ts";
 import { set } from "../model/path.ts";
 import { dirty } from "../model/history.ts";
 import { allProblems, change, checked, draftOf, drafts, keyOf, loadAllProblems, openDoc, review, route, saveDocs, say, world } from "../store.ts";
@@ -103,9 +103,9 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
 
   /** A week's theme, written in the season and every story of the week. */
   const theme = (week: number, next: NonNullable<SeasonDoc["arcs"]>[string]) => {
-    const aid = arcOfWeek(se.n, week);
-    change<SeasonDoc>("season", p.id, s => set(s, ["arcs", aid], next), `arc.${aid}`);
-    for (const e of eps) if (story(e.id)?.arc?.id === aid) change<StoryDoc>("story", e.id, s => set(s, ["arc"], { id: aid, ...next }), `arc.${aid}`);
+    const t = themed(se, week, next);
+    change<SeasonDoc>("season", p.id, s => themed(s, week, next).season, `arc.${t.aid}`);
+    for (const e of eps) if (story(e.id) && t.story(story(e.id)!)) change<StoryDoc>("story", e.id, s => t.story(s) ?? s, `arc.${t.aid}`);
   };
   const arcOf = (week: number) => se.arcs?.[arcOfWeek(se.n, week)];
   const blankArc = () => ({ ...Object.fromEntries(allLanguages(langs).map(l => [l, ""])), mechanics: ["say"] }) as unknown as NonNullable<SeasonDoc["arcs"]>[string];
