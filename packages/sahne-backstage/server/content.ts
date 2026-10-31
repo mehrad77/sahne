@@ -7,7 +7,7 @@
 // cards, the needs). The rules across documents (the season's dates and arcs, the cast's order) run over all of them, so an
 // edit that breaks another document is caught. A problem the files already had does not block a save; one the edit brings does.
 
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, rmSync } from "node:fs";
 import { placeSolids, type Kit, type Solid } from "sahne";
 import full from "../../sahne-kit/src/full.ts";
 import { withDrawings, type DrawingDoc, type VariantDoc } from "../../sahne-kit/src/drawing.ts";
@@ -249,7 +249,7 @@ function currentDoc(w: World, e: Edit): unknown {
 
 // ---- saving ------------------------------------------------------------------------------------------------------------------
 
-export interface SaveResult { status: 200 | 400 | 403 | 409 | 422; saved?: Record<string, number>; problems?: Problem[]; message?: string }
+export interface SaveResult { status: 200 | 400 | 403 | 404 | 409 | 422; saved?: Record<string, number>; problems?: Problem[]; message?: string }
 
 /** Why an edit may not be made at all: an id of the wrong pattern, a new id that is taken or retired, an old one that is gone. */
 export function refuse(e: Edit): string | null {
@@ -280,6 +280,25 @@ export function save(edits: Edit[], o: { write: boolean }): SaveResult {
   for (const e of edits) { const u = fileOf(e.kind, e.id); saved[`${e.kind}:${e.id}`] = writeAtomic(u, textFor(u, e.doc)); }
   forget();
   return { status: 200, saved, problems };
+}
+
+/**
+ * Delete a character no one needs: not an extra, not the series' stand-in or narrator, and named by no episode (its cast or
+ * its lines). Its file goes; a new character should still take a new id, as a copy of the root may name this one.
+ */
+export function remove(kind: Kind, id: string, o: { write: boolean }): SaveResult {
+  if (!o.write) return { status: 403, message: IS_SAMPLES ? "the samples are read-only: start backstage with --write to edit them" : "this backstage is read-only (no --write)" };
+  if (kind !== "character") return { status: 400, message: `only a character can be deleted here, not a ${kind}` };
+  if (!ID.character.test(id) || !exists(kind, id)) return { status: 404, message: `no character ${id}` };
+  const w = world(), c = w.cast[id] ?? w.extras[id];
+  if (c?.kind === "extra") return { status: 400, message: `${id} is an extra: extras are written by sahne-story/cast/extras.ts` };
+  const series = w.series as { standin?: string; narrator?: string } | null;
+  if (series?.standin === id || series?.narrator === id) return { status: 400, message: `${id} is the series' ${series.standin === id ? "stand-in" : "narrator"}: pick another in the series settings first` };
+  const uses = usesOf("character", id, undefined, w);
+  if (uses.length) return { status: 409, message: `${uses.length === 1 ? "an episode uses" : `${uses.length} episodes use`} ${id}: ${uses.map(u => u.story).join(", ")}. Take them out of ${uses.length === 1 ? "it" : "those"} first` };
+  rmSync(fileOf(kind, id));
+  forget();
+  return { status: 200 };
 }
 
 let every: Problem[] | null = null;
@@ -320,5 +339,5 @@ export function lessons(): { id: string; ref?: string }[] {
 export function listing() {
   const w = world();
   const episodes = w.drafts.map(d => ({ id: d.id, season: d.story.season, title: d.story.title, kind: d.story.kind, releaseDate: d.story.releaseDate, draft: !!d.story.draft, place: d.story.place, cast: d.story.cast }));
-  return { series: w.series, seasons: w.seasons, episodes, characters: { ...w.cast, ...w.extras } as Record<string, CharacterDoc>, places: w.places, days: w.days, cards: !!w.cards };
+  return { series: w.series, seasons: w.seasons, episodes, characters: { ...w.cast, ...w.extras } as Record<string, CharacterDoc>, places: w.places, days: w.days, cards: !!w.cards, retired: [...RETIRED_CHARACTERS] };
 }

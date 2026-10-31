@@ -119,6 +119,20 @@ test("ids: never renamed, new ones checked, none outside the root", async () => 
   assert.match((await call(rw.url, "POST", "save", { edits: [{ kind: "story", id: "s1e00", doc, create: true }] })).body.message, /exists already/);
 });
 
+test("a character no one needs is deleted; one an episode names, the stand-in or a read-only root's is not", async () => {
+  const w = await call(rw.url, "GET", "world");
+  assert.ok(w.body.retired.includes("ada"), "the retired ids come with the world");
+  const doc = { ...w.body.characters.ismail, id: "spare", order: 99 };
+  assert.equal((await call(rw.url, "POST", "save", { edits: [{ kind: "character", id: "spare", doc, create: true }] })).status, 200);
+  assert.equal((await call(ro.url, "POST", "delete", { kind: "character", id: "spare" })).status, 403);
+  assert.equal((await call(rw.url, "POST", "delete", { kind: "character", id: "spare" })).status, 200);
+  assert.equal((await call(rw.url, "GET", "doc/character/spare")).status, 404);
+  assert.equal((await call(rw.url, "POST", "delete", { kind: "character", id: "spare" })).status, 404);
+  assert.match((await call(rw.url, "POST", "delete", { kind: "character", id: "ismail" })).body.message, /s1e00/);
+  assert.match((await call(rw.url, "POST", "delete", { kind: "character", id: "nima" })).body.message, /stand-in/);
+  assert.equal((await call(rw.url, "POST", "delete", { kind: "place", id: "bakkal" })).status, 400);
+});
+
 test("it answers this machine only, and a write is JSON", async () => {
   assert.equal((await call(rw.url, "GET", "world", undefined, { origin: "https://example.com" })).status, 403);
   const r = await fetch(rw.url + "api/save", { method: "POST", headers: { "content-type": "text/plain" }, body: "{}" });

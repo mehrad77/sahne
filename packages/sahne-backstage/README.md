@@ -121,7 +121,7 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 | `#/new/<season>[/<date>]` | A new episode (on that day), described below |
 | `#/episode/<id>` | An episode, described below |
 | `#/kit/<section>/<shelf>` | The kit as a library: props, set pieces, gestures, emotions, sounds, by shelf |
-| `#/cast` | Everyone of the series as a portrait, the extras on their own tab. *New character* starts one with a new id: ids are permanent, and a retired one is refused |
+| `#/cast` | Everyone of the series as a portrait, the extras on their own tab. *New character* (the first card, or the button) asks who they are: a name in the main language (the id is made from it, `Kırlangıç Ana` → `kirlangic_ana`, and can be edited; ids are permanent, and a taken or retired one is refused), a role, and a look to start from (the stand-in, four random ones, or a copy of someone), then opens their page. With a few words about them and the assistant on, they are saved at once and the assistant drafts their role, bio and names there, as a proposal to accept. A right click on a card opens or deletes them; deleting asks first, and is refused for an extra, the stand-in or the narrator, or one an episode names (their page has the same *Delete*) |
 | `#/character/<id>` | A character, described below |
 | `#/places` | Every place as its wide shot, with how many episodes it opens; *New place* starts one |
 | `#/place/<id>` | A place, described below |

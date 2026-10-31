@@ -10,6 +10,8 @@ export interface World {
   seasons: Record<string, SeasonDoc>;
   episodes: Episode[];
   characters: Record<string, CharacterDoc>;
+  /** Character ids no new character may take. */
+  retired?: string[];
   places: Record<string, StoryPlace>;
   days: Record<string, { date: string; kind: string; week: number }> | null;
   /** Whether the root has word cards (the known-word ratio, the word picker). */
@@ -41,6 +43,7 @@ export const api = {
   head: (kind: Kind, id: string) => call<{ doc: unknown }>("GET", `head/${kind}/${encodeURIComponent(id)}`),
   check: (edits: Edit[]) => call<{ problems: Problem[] }>("POST", "check", { edits }),
   save: (edits: Edit[]) => call<SaveResult>("POST", "save", { edits }),
+  remove: (kind: Kind, id: string) => call<SaveResult>("POST", "delete", { kind, id }),
   thumbs: () => call<{ stale: string[]; command: string }>("GET", "thumbs"),
   reload: () => call<{ ok: boolean }>("POST", "reload", {}),
   post: <T>(path: string, body: unknown) => call<T>("POST", path, body),

@@ -30,6 +30,8 @@ export interface Item {
   badge?: string;
   /** How many kinds it holds (the kit page): the card is drawn as a deck and says so. */
   kinds?: number;
+  /** A class of its own (the cast's card for a new character). */
+  cls?: string;
 }
 
 /** Ask for lazy pictures only near the screen: one observer for every card. */
@@ -67,7 +69,7 @@ export function Tile(p: { item: Item; on?: boolean; playing?: boolean; onPick?(i
     onPointerEnter: (e: PointerEvent) => p.onHover!(i.id, (e.currentTarget as HTMLElement).querySelector(".art")),
     onPointerLeave: () => p.onHover!(i.id, null),
   };
-  return html`<button class=${`tile${i.kinds ? " deck" : ""}${p.on ? " on" : ""}${p.playing ? " playing" : ""}${i.faded ? " faded" : ""}`} role="option" aria-selected=${!!p.on} onClick=${() => p.onPick?.(i.id)} title=${i.sub ? `${i.label}: ${i.sub}` : i.label} ...${hover ?? {}}>${body}${p.on && html`<span class="tick" aria-hidden="true">✓</span>`}</button>`;
+  return html`<button class=${`tile${i.cls ? ` ${i.cls}` : ""}${i.kinds ? " deck" : ""}${p.on ? " on" : ""}${p.playing ? " playing" : ""}${i.faded ? " faded" : ""}`} role="option" aria-selected=${!!p.on} onClick=${() => p.onPick?.(i.id)} title=${i.sub ? `${i.label}: ${i.sub}` : i.label} ...${hover ?? {}}>${body}${p.on && html`<span class="tick" aria-hidden="true">✓</span>`}</button>`;
 }
 
 export function Gallery(p: {

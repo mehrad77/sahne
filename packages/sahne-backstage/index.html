@@ -403,6 +403,26 @@ a.button.primary { background: var(--accent); color: var(--accent-ink); border-c
 .ep-card .badges { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 2px; } .ep-card .badges .chip { font-size: 10.5px; padding: 0 5px; }
 /* the board's view switch (calendar | list), and the list: a week's head, then a row per episode */
 .viewseg { align-self: flex-end; } .viewseg button { display: inline-grid; place-items: center; height: 32px; padding: 0 10px; }
+/* the cast's card for a new character, and its modal: who (a face, the name and its id, a role), then the looks to start from */
+.tile.newcard { border-style: dashed; background: transparent; color: var(--mute); } .tile.newcard .art { background: none; color: var(--accent); } .tile.newcard .art svg { width: 40px; height: 40px; }
+.tile.newcard:hover { color: var(--ink); } .tile.newcard.off { cursor: default; } .tile.newcard.off .art { color: var(--faint); } .tile.newcard.off:hover { border-color: var(--line); box-shadow: none; }
+.newchar { display: grid; gap: 14px; }
+.newchar textarea { resize: vertical; min-height: 52px; }
+button.danger.primary { background: var(--bad); border-color: var(--bad); color: #fff; } button.danger.primary:hover { filter: brightness(1.08); }
+.menu button.danger b { color: var(--bad); } .menu button.danger:disabled b { color: var(--mute); }
+.newchar-who { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 16px; align-items: start; }
+.newchar-face { width: 132px; height: 132px; border-radius: 12px; background: var(--chip); overflow: hidden; display: grid; place-items: center; } .newchar-face svg { width: 100%; height: 100%; }
+.newchar-id { display: flex; align-items: center; gap: 8px; margin-top: 5px; font-size: 12.5px; flex-wrap: wrap; }
+.newchar-id code { background: var(--chip); padding: 1px 7px; border-radius: 6px; } .newchar-id input { max-width: 180px; padding: 2px 6px; font: 12.5px ui-monospace, monospace; }
+.newchar-id .linkish { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font-size: 12.5px; } .newchar-id .bad { color: var(--bad); }
+.newchar-looks { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 6px; }
+.newchar-looks .look { display: grid; gap: 2px; justify-items: center; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); cursor: pointer; }
+.newchar-looks .look:hover { border-color: var(--accent); } .newchar-looks .look.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.newchar-looks .look .art { width: 100%; aspect-ratio: 1; border-radius: 7px; background: var(--chip); overflow: hidden; display: grid; place-items: center; } .newchar-looks .look .art svg { width: 100%; height: 100%; }
+.newchar-looks .look small { font-size: 11px; color: var(--mute); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.newchar-looks .reroll { place-content: center; color: var(--mute); border-style: dashed; } .newchar-looks .reroll:hover { color: var(--ink); }
+.newchar-copy summary { cursor: pointer; color: var(--mute); font-size: 13.5px; margin-bottom: 6px; }
+@media (max-width: 520px) { .newchar-who { grid-template-columns: 1fr; } .newchar-face { width: 110px; height: 110px; } }
 .ep-list { display: grid; gap: 18px; }
 .ep-week { display: grid; gap: 4px; }
 .ep-week h3 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 2px; font-size: 14px; } .ep-week h3 small { color: var(--mute); font-weight: 400; font-size: 12.5px; }

@@ -15,7 +15,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CONTENT, IS_SAMPLES } from "../../sahne-story/paths.ts";
-import { allProblems, check, exists, forget, isKind, kitDocs, lessons, listing, oldShape, readDoc, save, searchCards, type Edit } from "./content.ts";
+import { allProblems, check, exists, forget, isKind, kitDocs, lessons, listing, oldShape, readDoc, remove, save, searchCards, type Edit } from "./content.ts";
 import { headOf } from "./git.ts";
 import { readReview, writeReview } from "./review.ts";
 import { requestOf, runAssistant, usageSummary } from "./assistant.ts";
@@ -194,6 +194,13 @@ export async function serve(o: Options): Promise<Running> {
     }
     if (route === "save" && m === "POST") {
       const r = save(editsOf(await body(req)), { write: o.write });
+      return json(res, r.status, r);
+    }
+    // a character no one needs, deleted (content.ts remove: never one an episode names)
+    if (route === "delete" && m === "POST") {
+      const { kind, id } = await body(req) as { kind?: string; id?: string };
+      if (!kind || !isKind(kind) || typeof id !== "string") throw new Fail(400, "a kind and an id");
+      const r = remove(kind, id, { write: o.write });
       return json(res, r.status, r);
     }
     if (route === "head" && m === "GET" && a && b) {

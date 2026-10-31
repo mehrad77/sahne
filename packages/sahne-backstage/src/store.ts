@@ -31,6 +31,23 @@ export async function loadWorld() {
   world.value = w;
 }
 
+/** Delete a character: a new one never saved is only dropped; one on disk is deleted by the server (refused while used). */
+export async function deleteCharacter(id: string): Promise<boolean> {
+  const k = keyOf("character", id), d = drafts.value[k];
+  if (!world.value?.characters[id]) {
+    const { [k]: _, ...rest } = drafts.value;
+    drafts.value = rest;
+    say(`${id} dropped`);
+    return true;
+  }
+  const r = await api.remove("character", id);
+  if (r.status !== 200) { say(r.message ?? `not deleted (${r.status})`, true); return false; }
+  if (d) { const { [k]: _, ...rest } = drafts.value; drafts.value = rest; }
+  await loadWorld();
+  say(`${id} deleted`);
+  return true;
+}
+
 /** Open a document (from the server, once; again with `fresh`). */
 export async function openDoc(kind: Kind, id: string, fresh = false): Promise<H.Draft | null> {
   const k = keyOf(kind, id);
