@@ -39,6 +39,10 @@ const PATHS: Record<string, string> = {
   drag: "M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01",
   copy: "M8 8h12v12H8zM4 16V4h12",
   trash: "M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13",
+  clip: "M20.5 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8",
+  send: "M12 19V5M6 11l6-6 6 6",
+  stop: "M7 7h10v10H7z",
+  history: "M3.5 12a8.5 8.5 0 1 0 2.5-6M3 4v4h4M12 8v4l3 2",
 };
 
 /** An icon by name, `size` px square. */

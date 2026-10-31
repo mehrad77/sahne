@@ -311,6 +311,10 @@ export function AssistantChat() {
   const [past, setPast] = useState(false);
   const [about, setAbout] = useState(false);
   const [files, setFiles] = useState<Attached[]>([]);
+  const [drop, setDrop] = useState(false);
+  const box = useRef<HTMLTextAreaElement>(null), pick = useRef<HTMLInputElement>(null);
+  // the message box grows with what is typed, up to its CSS max-height, and shrinks back once sent
+  useEffect(() => { const b = box.current; if (b) { b.style.height = "auto"; b.style.height = `${b.scrollHeight}px`; } }, [text]);
   const go = () => { if (!text.trim() && !files.length) return; void send(text.trim() || "Look at what I attached.", { files }); setText(""); setFiles([]); };
   /** Read dropped or pasted files: pictures (up to 5 MB, four at most) and text files (up to 200 KB). */
   const attach = async (list: FileList) => {
@@ -339,15 +343,23 @@ export function AssistantChat() {
       ${busy.value && html`<div class="live-line" role="status" aria-live="polite"><span class="spin" aria-hidden="true"></span>${liveLine(turns.value.at(-1)?.parts ?? [], turns.value.at(-1)?.at ?? Date.now())}</div>`}
       <div ref=${end}></div>
     </div>
-    <form class="chat-input" onSubmit=${(e: Event) => { e.preventDefault(); go(); }}
-      onDragOver=${(e: DragEvent) => { if (e.dataTransfer?.types.includes("Files")) e.preventDefault(); }} onDrop=${(e: DragEvent) => { if (e.dataTransfer?.files.length) { e.preventDefault(); void attach(e.dataTransfer.files); } }}>
-      ${files.length > 0 && html`<div class="files">${files.map((f, i) => html`<span class="chip">📎 ${f.name}<button type="button" class="linkish" aria-label=${`Remove ${f.name}`} onClick=${() => setFiles(files.filter((_, k) => k !== i))}>×</button></span>`)}</div>`}
-      <textarea rows=${2} value=${text} placeholder="Ask the assistant… (paste or drop a picture or a text file)" aria-label="Message" onInput=${(e: Event) => setText((e.target as HTMLTextAreaElement).value)}
-        onPaste=${(e: ClipboardEvent) => { if (e.clipboardData?.files.length) { e.preventDefault(); void attach(e.clipboardData.files); } }}
-        onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); go(); } }} />
-      <div class="row"><button type="button" class="small" disabled=${busy.value || !turns.value.length} onClick=${() => { newChat(); setPast(false); }}>New conversation</button>
-        <button type="button" class="small" aria-expanded=${past} disabled=${!chats.value.length} onClick=${() => setPast(!past)}>History${chats.value.length ? ` (${chats.value.length})` : ""}</button>
-        <span class="grow"></span>${busy.value ? html`<button type="button" class="stop" onClick=${stop} title="Stop the answer: nothing more runs">Stop</button>` : html`<button class="primary" disabled=${!text.trim() && !files.length}>Send</button>`}</div>
+    <form class="chat-input" onSubmit=${(e: Event) => { e.preventDefault(); go(); }}>
+      <div class=${`composer${drop ? " drop" : ""}`} onDragOver=${(e: DragEvent) => { if (e.dataTransfer?.types.includes("Files")) { e.preventDefault(); setDrop(true); } }}
+        onDragLeave=${() => setDrop(false)} onDrop=${(e: DragEvent) => { setDrop(false); if (e.dataTransfer?.files.length) { e.preventDefault(); void attach(e.dataTransfer.files); } }}>
+        ${files.length > 0 && html`<div class="files">${files.map((f, i) => html`<span class="chip">📎 ${f.name}<button type="button" class="linkish" aria-label=${`Remove ${f.name}`} onClick=${() => setFiles(files.filter((_, k) => k !== i))}>×</button></span>`)}</div>`}
+        <textarea ref=${box} rows=${1} value=${text} placeholder="Ask the assistant…" aria-label="Message" onInput=${(e: Event) => setText((e.target as HTMLTextAreaElement).value)}
+          onPaste=${(e: ClipboardEvent) => { if (e.clipboardData?.files.length) { e.preventDefault(); void attach(e.clipboardData.files); } }}
+          onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); go(); } }} />
+        <div class="tools">
+          <button type="button" class="iconbtn" title="Attach a picture or a text file (or paste or drop one here)" aria-label="Attach a file" onClick=${() => pick.current?.click()}><${Icon} name="clip" size=${17} /></button>
+          <input ref=${pick} type="file" multiple hidden accept="image/png,image/jpeg,image/webp,image/gif,text/*,.json,.md,.txt,.csv" onChange=${(e: Event) => { const el = e.target as HTMLInputElement; if (el.files?.length) void attach(el.files); el.value = ""; }} />
+          <span class="hint">Enter sends · Shift+Enter for a new line</span>
+          ${busy.value ? html`<button type="button" class="send stop" onClick=${stop} title="Stop the answer: nothing more runs" aria-label="Stop"><${Icon} name="stop" size=${15} /></button>`
+            : html`<button class="send primary" title="Send" aria-label="Send" disabled=${!text.trim() && !files.length}><${Icon} name="send" size=${17} /></button>`}
+        </div>
+      </div>
+      <div class="meta"><button type="button" class="linkish" disabled=${busy.value || !turns.value.length} onClick=${() => { newChat(); setPast(false); }}><${Icon} name="plus" size=${14} /> New conversation</button>
+        <button type="button" class="linkish" aria-expanded=${past} disabled=${!chats.value.length} onClick=${() => setPast(!past)}><${Icon} name="history" size=${14} /> History${chats.value.length ? ` (${chats.value.length})` : ""}</button></div>
       ${past && html`<div class="chat-history" role="list" aria-label="Past conversations">
         <p class="note">Kept in this browser only, the newest ${KEEP}.</p>
         ${chats.value.map(c => html`<div role="listitem" class=${`chat-past${c.id === chatId.value ? " on" : ""}`}>

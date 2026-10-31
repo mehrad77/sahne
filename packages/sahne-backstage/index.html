@@ -552,7 +552,7 @@ select.tone { width: auto; font-size: 12px; padding: 0 4px; }
 .turn .said.answer { margin-top: 6px; }
 .turn .note.cost { font-size: 11.5px; color: var(--faint); }
 .chat-error { display: flex; align-items: center; gap: 8px; color: var(--bad); background: var(--curtain-soft); padding: 6px 8px; border-radius: 8px; font-size: 13px; }
-.chat-input button.stop { border-color: var(--bad); color: var(--bad); }
+.chat-input button.stop { border: 1px solid var(--bad); color: var(--bad); }
 .turn .confirm { background: var(--new); padding: 6px 8px; border-radius: 8px; }
 .chat-input .files, .turn .files { display: flex; flex-wrap: wrap; gap: 4px; } .chat-input .files .linkish { margin-left: 4px; }
 .turn .sources { display: flex; flex-wrap: wrap; gap: 4px; } .turn .sources .chip { text-decoration: none; font-size: 12px; }
@@ -564,7 +564,20 @@ select.tone { width: auto; font-size: 12px; padding: 0 4px; }
 .chat-past .open { flex: 1; min-width: 0; display: grid; text-align: left; border: 0; background: none; padding: 6px 8px; gap: 1px; }
 .chat-past .open b { font-weight: 600; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .chat-past .open small { color: var(--mute); font-size: 11.5px; }
 /* the composer covers the panel's bottom padding too, so no answer shows through under it */
-.chat-input { position: sticky; bottom: -12px; margin-bottom: -12px; padding: 8px 0 12px; background: var(--panel); display: grid; gap: 6px; border-top: 1px solid var(--line); }
+/* the panel is a column, so the composer sits at its bottom even when the conversation is short */
+.drawer > .body:has(> .chat-input) { display: flex; flex-direction: column; } .drawer > .body:has(> .chat-input) > * { flex-shrink: 0; }
+.chat-input { position: sticky; bottom: -12px; margin: auto 0 -12px; padding: 10px 0 12px; background: var(--panel); display: grid; gap: 6px; }
+.chat-input::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 16px; background: linear-gradient(transparent, var(--panel)); pointer-events: none; }
+.composer { display: grid; gap: 4px; padding: 8px 8px 6px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--raised); transition: border-color .15s, box-shadow .15s; }
+.composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus); } .composer.drop { border-style: dashed; border-color: var(--accent); background: var(--accent-soft); }
+.composer textarea { border: 0; background: none; padding: 4px 0; resize: none; min-height: 0; max-height: 40vh; overflow-y: auto; line-height: 1.45; }
+.composer textarea:focus { outline: 0; }
+.composer .tools { display: flex; align-items: center; gap: 6px; margin-left: -6px; } .composer .tools .iconbtn { width: 30px; height: 30px; }
+.composer .hint { flex: 1; font-size: 11.5px; color: var(--faint); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.composer .send { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 50%; flex: none; }
+.composer .send.stop { background: none; } .composer .send:disabled { opacity: .35; }
+.chat-input .meta { display: flex; gap: 14px; padding: 0 4px; font-size: 12.5px; } .chat-input .meta .linkish { border: 0; background: none; padding: 2px 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; color: var(--mute); }
+.chat-input .meta .linkish:not(:disabled):hover { color: var(--ink); }
 .settings { max-width: 860px; }
 @media (max-width: 1100px) { .studio-split { grid-template-columns: 1fr; } .stage-col { position: static; max-height: none; order: -1; } }
 /* the rail's badge, and the side panel's tabs */
