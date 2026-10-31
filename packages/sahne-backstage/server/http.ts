@@ -182,9 +182,9 @@ export async function serve(o: Options): Promise<Running> {
       if (!o.write && m === "POST") throw new Fail(403, "read-only: start backstage with --write");
       try {
         if (!id && m === "POST") {
-          const v = await body(req) as { goal?: unknown; plan?: Plan; gates?: Partial<Gates> | false; maxUsd?: unknown; concurrency?: unknown };
+          const v = await body(req) as { goal?: unknown; plan?: Plan; gates?: Partial<Gates> | false; maxUsd?: unknown; concurrency?: unknown; mode?: unknown; asks?: unknown };
           if (typeof v?.goal !== "string" || !v.goal.trim()) throw new Fail(400, "expected { goal, plan: { brief, steps }, gates?, maxUsd?, concurrency? }");
-          return json(res, 200, { run: runs.create({ goal: v.goal, plan: v.plan as Plan, gates: v.gates, agentEdits, ...(typeof v.maxUsd === "number" ? { maxUsd: v.maxUsd } : {}), ...(typeof v.concurrency === "number" ? { concurrency: Math.max(1, Math.min(6, v.concurrency)) } : {}) }) });
+          return json(res, 200, { run: runs.create({ goal: v.goal, plan: v.plan as Plan, gates: v.gates, agentEdits, ...(v.mode === "auto" || v.mode === "check" ? { mode: v.mode } : {}), ...(v.asks === "never" || v.asks === "choices" ? { asks: v.asks } : {}), ...(typeof v.maxUsd === "number" ? { maxUsd: v.maxUsd } : {}), ...(typeof v.concurrency === "number" ? { concurrency: Math.max(1, Math.min(6, v.concurrency)) } : {}) }) });
         }
         const run = runs.get(id);
         if (!run) throw new Fail(404, `there is no run ${id}`);

@@ -4,7 +4,9 @@
 // it may create or change only the documents the plan gave it (`owns`; a season and the series are shared). A small
 // scheduler, not one graph, runs the plan: a step starts as soon as the steps it needs are done (up to `concurrency` at
 // once), a step that asks the person waits alone (the others go on), and gates (after the plan, after the cast and places)
-// wait for the person unless they are off. A run started from its goal alone plans itself first: a `plan` step reads the
+// wait for the person unless they are off. A run in `auto` mode (just do it) writes as it goes, every write checked and
+// journaled (journal.ts) so any of it can be undone, with no gates and no proposals, and, if the person says so, no
+// questions either. A run started from its goal alone plans itself first: a `plan` step reads the
 // series and proposes the plan (propose_plan), which the person sees at the plan gate. A run outlives a closed tab and a restart: the runs are in the store, and a
 // step that was running goes on from its last checkpoint.
 
@@ -41,6 +43,8 @@ export interface Step {
   /** What it asks the person, while it is `asking`. */
   question?: Question;
   error?: string;
+  /** It stopped at a budget (the run's, or the day's cap): it goes on by itself once the budget allows. */
+  budget?: boolean;
   usd: number;
   attempts: number;
   /** The proposals it made. */
@@ -50,6 +54,10 @@ export interface Gates { plan: boolean; castAndPlaces: boolean }
 export type Gate = keyof Gates;
 export interface Run {
   id: string; goal: string;
+  /** `check`: proposals, gates and questions; `auto`: it writes as it goes, and the person undoes what they do not want. */
+  mode: "check" | "auto";
+  /** `never`: its steps decide for themselves and say what they chose, instead of asking the person. */
+  asks: "choices" | "never";
   /** The author of every step's edits. */
   by: string;
   status: "running" | "gate" | "paused" | "done" | "stopped";
@@ -131,14 +139,15 @@ export function planProblems(p: Plan): string[] {
 /** The first words of a step: the run's goal and brief, its own brief, what it makes, and what the steps before it said. */
 function stepPrompt(run: Run, s: Step): string {
   const before = run.steps.filter(x => s.needs.includes(x.id));
-  if (s.kind === "plan") return [`The run's goal: ${run.goal}`, s.brief, "Nothing is made in this step: it ends with propose_plan."].join("\n\n");
+  if (s.kind === "plan") return [`The run's goal: ${run.goal}`, run.asks === "never" ? s.brief.replace(/ If something is a real choice[^.]*\./, " Where something is a choice (names, what the episodes teach), decide it yourself and say so in the brief.") : s.brief, "Nothing is made in this step: it ends with propose_plan."].join("\n\n");
   return [
     `The run's goal: ${run.goal}`,
     `The plan's brief, shared by every step:\n${run.brief}`,
     `Your step: ${s.title} (${s.kind}, step ${s.id}).\n${s.brief}`,
     s.owns.length ? `You make: ${s.owns.map(o => `${o.kind} ${o.id}`).join(", ")}. The run's other steps make the rest: read their documents, never change them. A season and the series are shared.` : "You make no document of your own: read, check and report.",
     before.length ? `What the steps before yours did:\n${before.map(x => `- ${x.title}: ${x.summary ?? "(no report)"}`).join("\n")}` : "",
-    "Nothing a step proposes is saved until the person accepts it, but every step of this run sees the run's pending proposals as there. When your work is made and checked, call finish_step with a short report for the steps after yours. If the person must decide something, ask_person: you wait for the answer, and the other steps go on.",
+    run.mode === "auto" ? "What you make is saved as you make it, after the check; the person can undo any of it." : "Nothing a step proposes is saved until the person accepts it, but every step of this run sees the run's pending proposals as there.",
+    `When your work is made and checked, call finish_step with a short report for the steps after yours.${run.asks === "never" ? " Do not wait for the person: decide what is a choice yourself, and say in the report what you chose." : " If the person must decide something, ask_person: you wait for the answer, and the other steps go on."}`,
   ].filter(Boolean).join("\n\n");
 }
 
@@ -197,16 +206,16 @@ export class Runs {
   private settings() { return this.o.settings?.() ?? readSettings(); }
 
   /** Start a run: of a plan, or from its goal alone, a planning step first. */
-  create(v: { goal: string; plan?: Plan; gates?: Partial<Gates> | false; maxUsd?: number; concurrency?: number; agentEdits?: AgentEdits }): Run {
+  create(v: { goal: string; plan?: Plan; gates?: Partial<Gates> | false; maxUsd?: number; concurrency?: number; agentEdits?: AgentEdits; mode?: "check" | "auto"; asks?: "choices" | "never" }): Run {
     const plan: Plan = v.plan ?? { brief: "", steps: [{ id: "plan", kind: "plan", title: "Plan the run", brief: PLANNING }] };
     const bad = planProblems(plan);
     if (bad.length) throw new Error(`the plan: ${bad.join("; ")}`);
-    const s = this.settings(), id = `r${++this.n}`;
-    const gates: Gates = v.gates === false ? { plan: false, castAndPlaces: false } : { plan: v.gates?.plan ?? true, castAndPlaces: v.gates?.castAndPlaces ?? true };
+    const s = this.settings(), id = `r${++this.n}`, mode = v.mode ?? s.runMode ?? "check";
+    const gates: Gates = v.gates === false || mode === "auto" ? { plan: false, castAndPlaces: false } : { plan: v.gates?.plan ?? true, castAndPlaces: v.gates?.castAndPlaces ?? true };
     const run: Run = {
-      id, goal: v.goal, by: `run:${id}`, status: "running", gates, passed: [], usd: 0,
+      id, goal: v.goal, mode, asks: v.asks ?? "choices", by: `run:${id}`, status: "running", gates, passed: [], usd: 0,
       maxUsd: v.maxUsd ?? 10, ...(v.maxUsd !== undefined ? { maxSet: true } : {}), concurrency: v.concurrency ?? (s.provider === "openai" ? 1 : 3),
-      agentEdits: v.agentEdits ?? s.agentEdits ?? "proposals", brief: plan.brief, at: Date.now(),
+      agentEdits: mode === "auto" ? "direct" : v.agentEdits ?? s.agentEdits ?? "proposals", brief: plan.brief, at: Date.now(),
       steps: plan.steps.map(stepOf),
     };
     if (v.plan) this.estimated(run);
@@ -292,6 +301,7 @@ export class Runs {
     if (a.action === "gates") run.gates = { ...run.gates, ...a.gates };
     if (a.action === "budget") { run.maxUsd = a.maxUsd; run.maxSet = true; if (run.status === "paused") { run.status = "running"; delete run.why; } }
     if (a.action === "continue" && run.status === "paused") { run.status = "running"; delete run.why; }
+    if (a.action === "budget" || a.action === "continue") this.healBudget(run);
     this.changed(run);
     this.tick(run);
     return run;
@@ -341,8 +351,18 @@ export class Runs {
 
   private need(id: string): Run { const r = this.get(id); if (!r) throw new Error(`there is no run ${id}`); return r; }
 
+  /** The steps a budget stopped go on when it allows again: the run's own, and the day's and month's caps. */
+  private healBudget(run: Run): boolean {
+    const stopped = run.steps.filter(s => s.budget && (s.status === "failed" || s.status === "waiting"));
+    if (!stopped.length || run.usd >= run.maxUsd) return false;
+    try { guard(this.settings().caps); } catch { return false; }
+    for (const s of stopped) { s.status = "waiting"; s.attempts = 0; delete s.error; delete s.budget; }
+    return true;
+  }
+
   /** Start what can start; note where the run stands. */
   private tick(run: Run): void {
+    if (run.status === "paused" && this.healBudget(run)) { run.status = "running"; delete run.why; }
     if (run.status === "done" || run.status === "stopped" || run.status === "paused") return;
     const steps = run.steps, done = (id: string) => steps.find(s => s.id === id)?.status === "done";
     if (steps.every(s => s.status === "done" || s.status === "skipped" || s.status === "undone")) { run.status = "done"; delete run.gate; this.changed(run); return; }
@@ -406,9 +426,9 @@ export class Runs {
       const st = this.settings(), model = this.modelOf(run, s);
       bs = await backstage({ write: this.o.write, agentEdits: run.agentEdits, shareCards: this.o.shareCards, events: this.o.events, by: run.by, onCall: this.o.onCall, step: { id: s.id, owns: s.owns }, journal: (before, saved) => this.journal.record(run.id, s.id, before, saved) }, run.by);
       const mcp = bs.client;
-      const system = `${systemPrompt({ agentEdits: run.agentEdits, writable: this.o.write, shareCards: this.o.shareCards, web: null, notes: readMemory() })}\n\nYou are one step of a run: a long task split into steps, each done by its own agent with a fresh context. Do your step well and only your step; the person reviews the run's work by step.`;
+      const system = `${systemPrompt({ agentEdits: run.agentEdits, writable: this.o.write, shareCards: this.o.shareCards, web: null, notes: readMemory() })}\n\nYou are one step of a run: a long task split into steps, each done by its own agent with a fresh context. Do your step well and only your step; the person reviews the run's work by step.${run.asks === "never" ? " The person asked not to be asked: where something is a choice (a name, a wording), decide it yourself and say in your report what you chose, so they can change it later." : ""}${run.mode === "auto" ? " Your edits are saved as you make them, each after the check, and the person can undo any of them." : ""}`;
       const graph = agentGraph({
-        model, system, tools: [...bs.tools, STEP_ASK, s.kind === "plan" ? PROPOSE_PLAN : FINISH], maxTurns: STEP_TURNS, ask: "wait",
+        model, system, tools: [...bs.tools, ...(run.asks === "never" ? [] : [STEP_ASK]), s.kind === "plan" ? PROPOSE_PLAN : FINISH], maxTurns: STEP_TURNS, ask: "wait",
         before: () => {
           guard(st.caps);
           if (run.usd >= run.maxUsd) throw new BudgetError(`the run's budget, $${run.maxUsd.toFixed(2)}, is spent`);
@@ -462,6 +482,7 @@ export class Runs {
         s.error = (e as Error).message;
         this.write(run, s, { type: "error", message: s.error });
         // a budget spent is not tried again; anything else once, from its last checkpoint
+        if (e instanceof BudgetError) s.budget = true;
         s.status = e instanceof BudgetError || s.attempts >= 2 ? "failed" : "waiting";
       }
     } finally {

@@ -28,9 +28,9 @@ type Model = import("../server/ai/models.ts").Model;
 
 type Turn = { text?: string; calls?: { name: string; args: Record<string, unknown> }[] };
 /** A model that plays a script per step: each turn by how many it answered before; `wait` holds each turn a little. */
-function scripted(scripts: Record<string, Turn[] | ((seen: BaseMessage[]) => Turn)>, o: { wait?: number; usage?: { input: number; output: number }; seen?: Record<string, BaseMessage[][]>; log?: string[] } = {}) {
+function scripted(scripts: Record<string, Turn[] | ((seen: BaseMessage[]) => Turn)>, o: { wait?: number; usage?: { input: number; output: number }; seen?: Record<string, BaseMessage[][]>; log?: string[]; tools?: Record<string, string[]> } = {}) {
   return (step: Step): Model => ({
-    id: "anthropic", model: "claude-sonnet-5-5", pictures: true, tools: defs => defs.map(t => ({ name: t.name })),
+    id: "anthropic", model: "claude-sonnet-5-5", pictures: true, tools: defs => { if (o.tools) o.tools[step.id] = defs.map(t => t.name); return defs.map(t => ({ name: t.name })); },
     chat: {
       bindTools: () => ({
         async *stream(messages: BaseMessage[]) {
@@ -287,4 +287,28 @@ test("undo: every direct write of a run is journaled; one person, with what was 
   const after = snapshot();
   delete after["places/kutuphane2.json"];
   assert.deepEqual(Object.keys(after).sort(), Object.keys(before).sort());
+});
+
+test("auto mode: no gates and no proposals, every write journaled; never asking leaves out ask_person; a budget stop goes on by itself", async () => {
+  const tools: Record<string, string[]> = {};
+  const { r, events } = runs(scripted({
+    plan: [{ calls: [{ name: "propose_plan", args: { brief: "b", steps: [{ id: "cast_x", kind: "character", title: "Defne", brief: "make her", owns: [{ kind: "character", id: "defne3" }] }] } }] }],
+    cast_x: [{ calls: [{ name: "create_character", args: { ...derya, id: "defne3" } }] }, finish("defne3 made")],
+  }, { tools }));
+  const run = r.create({ goal: "a person", mode: "auto", asks: "never" });
+  assert.deepEqual([run.mode, run.agentEdits, run.gates], ["auto", "direct", { plan: false, castAndPlaces: false }]);
+  await r.idle();
+  assert.equal(run.status, "done", JSON.stringify(run.steps.map(s => [s.id, s.status, s.error])));
+  assert.equal(proposalsOf(events).all().length, 0, "nothing waits");
+  assert.deepEqual(r.journal.made(run.id).map(m => m.id), ["defne3"]);
+  assert.ok(!tools.cast_x.includes("ask_person") && !tools.plan.includes("ask_person"));
+  r.undo(run.id);
+  // a step the run's budget stopped waits, and goes on once the budget is raised
+  const { r: r2 } = runs(scripted({ cast_derya: [finish("a")], place_library: [finish("b")] }, { usage: { input: 1_000_000, output: 0 } }));
+  const run2 = r2.create({ goal: "g", plan: { brief: "b", steps: [{ ...PLAN.steps[0], owns: [] }, { ...PLAN.steps[1], owns: [] }] }, gates: false, maxUsd: 1, concurrency: 1 });
+  await r2.idle();
+  assert.equal(run2.status, "paused");
+  r2.act(run2.id, { action: "budget", maxUsd: 20 });
+  await r2.idle();
+  assert.equal(run2.status, "done", JSON.stringify(run2.steps.map(s => [s.id, s.status, s.error])));
 });

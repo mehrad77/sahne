@@ -808,3 +808,7 @@ select.tone { width: auto; font-size: 12px; padding: 0 4px; }
 <script type="module" src="/dist/app/index.js"></script>
 </body>
 </html>
+.start-run-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 6px 0; }
+.start-run-choices button { display: grid; gap: 3px; text-align: left; padding: 8px 10px; }
+.start-run-choices small { font-weight: 400; opacity: .85; }
+@media (max-width: 520px) { .start-run-choices { grid-template-columns: 1fr; } }

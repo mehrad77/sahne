@@ -207,13 +207,17 @@ export function fold(t: { content: string; parts?: Part[] }, e: { type: string; 
   else { const { at: _at, ...rest } = e; parts.push(rest as Part); }
 }
 
-/** A run the assistant offers for a long task: its goal, its gates, and the person's click that starts it. */
+/**
+ * A run the assistant offers for a long task: its goal, and the person's choice that starts it. Check with me: the plan
+ * and the new cast and places wait for a look, and its work comes as proposals. Just do it: it writes as it goes, within
+ * a budget, and anything it made can be undone; it asks about real choices unless told not to.
+ */
 function StartRunCard(p: { part: Extract<Part, { type: "start_run" }> }) {
-  const [plan, setPlan] = useState(true), [cast, setCast] = useState(true), [busy2, setBusy2] = useState(false);
+  const [budget, setBudget] = useState(10), [quiet, setQuiet] = useState(false), [busy2, setBusy2] = useState(false);
   const x = p.part;
-  const start = async () => {
+  const start = async (mode: "check" | "auto") => {
     setBusy2(true);
-    const r = await api.post<{ run: { id: string } }>("runs", { goal: x.goal, gates: { plan, castAndPlaces: cast } });
+    const r = await api.post<{ run: { id: string } }>("runs", { goal: x.goal, mode, maxUsd: budget, ...(mode === "auto" && quiet ? { asks: "never" } : {}) });
     setBusy2(false);
     if (r.status !== 200) { say((r as { message?: string }).message ?? "the run did not start", true); return; }
     x.started = r.run.id; turns.value = [...turns.value];
@@ -221,11 +225,14 @@ function StartRunCard(p: { part: Extract<Part, { type: "start_run" }> }) {
   };
   return html`<div class="ask-card start-run" role="group" aria-label="A run the assistant offers">
     <b>A run for this</b><blockquote>${x.goal}</blockquote>
-    <p class="note">It plans itself first, then each step (a character, a place, an episode, a review) is done by its own agent, while this editor may be closed. Nothing is saved until you accept it.</p>
-    ${x.started ? html`<a class="button" href=${`#/agents/runs/${x.started}`}>Open run ${x.started}</a>` : html`
-      <label class="row"><input type="checkbox" style="width:auto" checked=${plan} onChange=${(e: Event) => setPlan((e.target as HTMLInputElement).checked)} /> Show me the plan before it starts</label>
-      <label class="row"><input type="checkbox" style="width:auto" checked=${cast} onChange=${(e: Event) => setCast((e.target as HTMLInputElement).checked)} /> Stop after the new cast and places, for me to look</label>
-      <div class="row"><button class="primary" disabled=${busy2} onClick=${() => void start()}>Start the run</button></div>`}
+    ${x.started ? html`<a class="button" href=${`#/agents/runs/${x.started}`}>Follow run ${x.started}</a>` : html`
+      <p class="note">It plans itself, then each part (a person, a place, an episode, a check) is made by its own agent, while this editor may be closed.</p>
+      <div class="start-run-choices">
+        <button disabled=${busy2} onClick=${() => void start("check")}><b>Check with me as it goes</b><small>You see the plan and the new people and places first, and accept what it makes.</small></button>
+        <button class="primary" disabled=${busy2} onClick=${() => void start("auto")}><b>Just do it</b><small>It saves as it goes. You can undo anything it made, or all of it.</small></button>
+      </div>
+      <div class="row wrap"><label class="row">Up to $ <input type="number" min="1" step="1" style="max-width:80px" value=${budget} onInput=${(e: Event) => setBudget(Math.max(1, Number((e.target as HTMLInputElement).value) || 1))} /></label>
+        <label class="row"><input type="checkbox" style="width:auto" checked=${quiet} onChange=${(e: Event) => setQuiet((e.target as HTMLInputElement).checked)} /> Just doing it, don't ask me: decide and tell me</label></div>`}
   </div>`;
 }
 

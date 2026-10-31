@@ -29,6 +29,8 @@ export interface Settings {
   agentEdits?: AgentEdits;
   /** The editor applies the assistant's suggestions without asking (the editor's own preference). */
   applySuggestions?: boolean;
+  /** How a run goes unless its start says otherwise: check with the person as it goes, or just do it (runs/run.ts). */
+  runMode?: "check" | "auto";
   /** How the assistant searches the web: auto or tavily (Tavily, when TAVILY_API_KEY is set), or off. */
   web?: WebMode;
 }
@@ -75,6 +77,7 @@ export function clean(v: unknown): Partial<Settings> {
   if (over !== undefined) out.confirmOverUsd = over;
   if (b.agentEdits === "proposals" || b.agentEdits === "direct") out.agentEdits = b.agentEdits;
   if (typeof b.applySuggestions === "boolean") out.applySuggestions = b.applySuggestions;
+  if (b.runMode === "check" || b.runMode === "auto") out.runMode = b.runMode;
   if (WEB_MODES.includes(b.web as WebMode)) out.web = b.web as WebMode;
   return out;
 }
