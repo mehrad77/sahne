@@ -19,10 +19,10 @@ const HERE: Record<string, (w: boolean) => { can: string[]; cannot: string[] }> 
   }),
   places: w => ({ can: ["Read the places, their marks and props, and say which suits a scene.", ...(w ? ["Add a place, empty or as a copy of another."] : [])], cannot: [] }),
   character: w => ({
-    can: ["Read this character and the episodes they speak in, and describe how they speak.", ...(w ? ["Change their name, role, bio, level and colour."] : [])],
-    cannot: ["Shape their look: you do that here, with the builder."],
+    can: ["Read this character and the episodes they speak in, and describe how they speak.", ...(w ? ["Change their name, role, bio, level and colour.", "Shape their look with the builder's own choices (build and age, hair, clothes, colours)."] : [])],
+    cannot: ["Draw new parts for a look: it picks only from what the builder offers."],
   }),
-  cast: w => ({ can: ["Read the cast and say who suits a scene.", ...(w ? ["Add a character (their look starts as the stand-in's)."] : [])], cannot: [] }),
+  cast: w => ({ can: ["Read the cast and say who suits a scene.", ...(w ? ["Add a character, and shape their look from the builder's choices."] : [])], cannot: [] }),
   review: () => ({ can: ["Read the review notes and the checks, and say what to review first."], cannot: [] }),
 };
 HERE.season = HERE.board;

@@ -70,6 +70,8 @@ const TOOLS: Record<string, { kind: ToolKind; label: (i: In) => string }> = {
   create_episode: { kind: "create", label: i => `Started a new episode${i.id ? ` ${str(i.id)}` : ""} in season ${str(i.season)}` },
   create_season: { kind: "create", label: i => `Started season ${str(i.n)}` },
   create_character: { kind: "create", label: i => `Added the character ${str(i.id)}` },
+  read_look: { kind: "read", label: i => `Read ${str(i.id)}'s look` },
+  set_look: { kind: "edit", label: i => `Shaped ${str(i.id)}'s look` },
   create_place: { kind: "create", label: i => `Added the place ${str(i.id)}${i.from ? ` (from ${str(i.from)})` : ""}` },
   comment: { kind: "comment", label: i => `Commented on ${str(i.id)}${at(i, "step")}` },
   show: { kind: "show", label: i => `Showed ${str(i.id)}${at(i, "step")} in the editor` },

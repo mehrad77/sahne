@@ -26,6 +26,7 @@ import { allProblems, check, refuse, usesOf, exists, forget, idsOf, kit as kitOf
 import { readReview, standingFor, STATUSES, writeReview, type EpisodeReview } from "./review.ts";
 import { fail, ok, Refusal, type Result } from "./result.ts";
 import { pieceRows, registerKitTools } from "./kittools.ts";
+import { registerLookTools } from "./looktools.ts";
 import type { Call } from "./agents.ts";
 import type { Events, Selection } from "./events.ts";
 import { latestOf, proposalsOf, type ProposalEdit, type Queue } from "./proposals.ts";
@@ -653,7 +654,7 @@ export function createMcp(o: McpOptions): McpServer {
 
   server.registerTool("create_character", {
     title: "Add a character",
-    description: `Add a character to the cast: an id (a-z, 0-9, _; permanent), a name, a role and a short bio in the series' languages, a level, and a colour. Their look starts as the stand-in's; a person shapes it on their page (you cannot draw it). ${writeNote}`,
+    description: `Add a character to the cast: an id (a-z, 0-9, _; permanent), a name, a role and a short bio in the series' languages, a level, and a colour. Their look starts as the stand-in's: shape it to fit them with read_look and set_look. ${writeNote}`,
     inputSchema: { id: z.string().regex(/^[a-z][a-z0-9_]*$/), name: TEXT0, role: TEXT0.optional(), bio: TEXT0.optional(), level: z.string().optional(), color: z.string().optional().describe("#RRGGBB") },
   }, run("create_character", async ({ id, name, role, bio, level, color }) => {
     if (exists("character", id)) return fail(`${id} is a character already: ids are permanent, pick a new one`);
@@ -853,6 +854,7 @@ export function createMcp(o: McpOptions): McpServer {
     return ok(`the open editors show ${id}${path ? ` at ${pathText(path)}` : ""}`);
   }));
 
+  registerLookTools(server, { run, seen, editDoc: (kind, id, mtime, summary, paths, fn) => editDoc(kind, id, mtime, summary, paths, fn), writeNote });
   registerKitTools(server, {
     run, readOnly, submit, writeNote,
     latest: async (kind, id) => (o.agentEdits === "proposals" ? latestOf(await queue.pending(), by(), kind, id)?.id : undefined),

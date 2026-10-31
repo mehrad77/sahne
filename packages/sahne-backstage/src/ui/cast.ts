@@ -97,7 +97,7 @@ function NewCharacter(p: { onClose(): void }) {
     if (!await saveDocs([keyOf("character", id)])) return;
     newChat();
     const langs = [l.main, ...l.translations].join(", ");
-    await send(`I just added the character ${id} ("${name.trim()}") to the cast. What they are like: ${about.trim()}\n\nDraft their page from that: read_doc character ${id}, then one edit_doc on it with a role (one line) and a bio (two or three sentences) in ${l.translations.join(" and ") || l.main}, their name in ${langs} (the same name, written as each language writes it), a level if it says, and a colour that suits them. Keep the id, the look and the name in ${l.main} as they are. Then say in one line what you drafted.`);
+    await send(`I just added the character ${id} ("${name.trim()}") to the cast. What they are like: ${about.trim()}\n\nDraft their page from that: read_doc character ${id}, then one edit_doc on it with a role (one line) and a bio (two or three sentences) in ${l.translations.join(" and ") || l.main}, their name in ${langs} (the same name, written as each language writes it), a level if it says, and a colour that suits them. Keep the id and the name in ${l.main} as they are. Then give them their own look, from scratch: read_look ${id}, then one set_look with from "blank" that chooses every section to fit them (body: age and build; face: shape, eyes, brows, nose, mouth; hair and its colour; each piece of clothing and its colour; extras), with values read_look lists. Then say in one line what you drafted.`);
   };
   const pick = (k: string, doc: unknown, label: string) => html`<button type="button" class=${`look${start === k ? " on" : ""}`} aria-pressed=${start === k} onClick=${() => setStart(k)} title=${label}>
     <span class="art" dangerouslySetInnerHTML=${{ __html: svg(doc, 88, "bust") }}></span><small>${label}</small></button>`;
@@ -180,11 +180,15 @@ function Character(p: { id: string }) {
   const [outfit, setOutfit] = useState<string>("");
   const [deleting, setDeleting] = useState(false);
 
+  // the look the builder made last: a look that differs came from outside (an accepted proposal, undo, redo), and the
+  // builder, which cannot be handed a new look, is mounted again on it
+  const made = useRef<unknown>(c.avatar), [outside, setOutside] = useState(0);
+  useEffect(() => { if (c.avatar !== made.current) { made.current = c.avatar; setOutside(n => n + 1); } }, [c.avatar]);
   useEffect(() => {
     if (!host.current || !c.avatar || extra) return;
-    ui.current = mountBuilder(host.current, { kit: KIT, doc: c.avatar, mode: "author", lang: "en", preview: "stage", onChange: doc => edit(x => set(x, ["avatar"], doc), "avatar") });
+    ui.current = mountBuilder(host.current, { kit: KIT, doc: c.avatar, mode: "author", lang: "en", preview: "stage", onChange: doc => { made.current = doc; edit(x => set(x, ["avatar"], doc), "avatar"); } });
     return () => { ui.current?.destroy(); ui.current = null; };
-  }, [p.id, d.create ? "new" : "old"]);
+  }, [p.id, d.create ? "new" : "old", outside]);
 
   useEffect(() => { const t = setTimeout(() => void checkDocs([key]), 600); return () => clearTimeout(t); }, [c]);
 

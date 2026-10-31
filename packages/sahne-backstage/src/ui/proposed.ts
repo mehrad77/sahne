@@ -1,12 +1,15 @@
 // Agents' proposals wherever they land (events.ts keeps the queue): where each one is answered (`hrefOf`), a card for one
 // that changes a season, the series, a place or a character (its places, before and after, in words where they are
-// words), a strip of those cards on that document's page, and the preview of a proposed new place or character, which is
+// words; a character's look as their portrait before and after, and each field that changed by the builder's labels), a
+// strip of those cards on that document's page, and the preview of a proposed new place or character, which is
 // not on disk and so cannot open until it is taken. An episode's proposals have their own bar above the script
 // (studio/proposals.ts) and a new episode its own preview.
 
 import { html } from "htm/preact";
 import { useState } from "preact/hooks";
+import { createBuilder, portrait, type Builder } from "sahne";
 import { textOf } from "sahne-story";
+import { KIT } from "../stage.ts";
 import { diffWords } from "../model/diff.ts";
 import { get, type Path } from "../model/path.ts";
 import { pathWords } from "../model/tools.ts";
@@ -37,6 +40,36 @@ const words = (v: unknown, lang: string): string => {
 /** A text in languages: an object of strings only. */
 const isTexts = (v: unknown) => !!v && typeof v === "object" && !Array.isArray(v) && Object.values(v).every(x => typeof x === "string");
 
+/** A look's fields as a person reads them: field label → its choice's label and colours. */
+function lookWords(b: Builder): Map<string, [string, string]> {
+  const out = new Map<string, [string, string]>();
+  for (const s of b.sections()) for (const f of b.fields(s.id)) {
+    const v = b.get(f.id), opts = f.kind === "number" || f.kind === "color" ? [] : b.options(f.id);
+    const said = Array.isArray(v) ? v.map(x => opts.find(o => o.value === x)?.label ?? x).join(", ") || "none"
+      : f.kind === "number" ? String(v) : f.kind === "color" ? b.colorOptions(f.id).find(c => c.id === v)?.label ?? String(v) : v === null ? "none" : opts.find(o => o.value === v)?.label ?? String(v);
+    const colours = Array.from({ length: f.kind === "color" ? 0 : f.colors }, (_, i) => { const id = b.getColor(f.id, i); return id ? b.colorOptions(f.id, i).find(c => c.id === id)?.label ?? id : ""; }).filter(Boolean).join(", ");
+    out.set(f.label, [said, colours]);
+  }
+  return out;
+}
+
+/** A change of look: the portrait before and after, and each field that changed (Hair style: Short → Long, wavy). */
+function LookDiff(p: { before: unknown; after: unknown }) {
+  const pic = (doc: unknown) => { try { return portrait(doc, KIT, { framing: "full", size: 150, trusted: true }); } catch { return ""; } };
+  let rows: [string, string, string][] = [];
+  try {
+    const a = lookWords(createBuilder(KIT, p.before ?? {}, { trusted: true, cast: true })), b = lookWords(createBuilder(KIT, p.after ?? {}, { trusted: true, cast: true }));
+    const say = (v?: [string, string]) => (v ? `${v[0]}${v[1] ? ` (${v[1]})` : ""}` : "—");
+    rows = [...new Set([...a.keys(), ...b.keys()])].filter(k => say(a.get(k)) !== say(b.get(k))).map(k => [k, say(a.get(k)), say(b.get(k))]);
+  } catch { /* an unreadable look: the pictures say it */ }
+  return html`<div class="lookdiff">
+    <figure><div class="art" dangerouslySetInnerHTML=${{ __html: pic(p.before) }}></div><figcaption>Now</figcaption></figure>
+    <span class="arrow" aria-hidden="true">→</span>
+    <figure><div class="art" dangerouslySetInnerHTML=${{ __html: pic(p.after) }}></div><figcaption>Proposed</figcaption></figure>
+    ${rows.length ? html`<dl>${rows.map(([k, was, now]) => html`<dt>${k}</dt><dd><del>${was}</del> → <ins>${now}</ins></dd>`)}</dl>` : html`<p class="note">The same choices, written anew.</p>`}
+  </div>`;
+}
+
 /** One proposal of a season, the series, a place or a character: what it changes, place by place, with Accept and Reject. */
 export function ProposalCard(p: { x: Proposal }) {
   const { main } = useLangs();
@@ -50,6 +83,7 @@ export function ProposalCard(p: { x: Proposal }) {
       ${fresh.length > 0 && html`<span class="chip bad" title=${fresh.map(q => q.message).join("\n")}>${fresh.length} new error${fresh.length > 1 ? "s" : ""}</span>`}</div>
     ${x.paths.slice(0, 8).flatMap(path => {
       const b0 = get(was, path as Path), a0 = get(x.next, path as Path);
+      if (x.kind === "character" && path.length === 1 && path[0] === "avatar") return [html`<${LookDiff} before=${b0} after=${a0} />`];
       // a text in several languages: each language that changed, on its own line
       const langs = isTexts(b0) || isTexts(a0) ? [...new Set([...Object.keys((b0 ?? {}) as object), ...Object.keys((a0 ?? {}) as object)])].filter(l => (b0 as any)?.[l] !== (a0 as any)?.[l]) : [null];
       return langs.map(l => {
