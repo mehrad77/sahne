@@ -9,7 +9,7 @@
 //   #/places, #/place/<id>   the places, a place's marks, props and set pieces
 //   #/new/<season>[/<date>] a new episode (on that day)
 //   #/kit                   the kit: props, set pieces, gestures, emotions, sounds
-//   #/agents                the agents: how to connect one over MCP, how their edits land, what waits, what they did
+//   #/agents[/activity|/mcp] the assistant in full view; what agents did, what waits, how their edits land; how to connect one over MCP
 //   #/docs[/<guide>[/<at>]] the guides: backstage's README and the story format's
 //   #/settings              the assistant's model, the budget
 
@@ -103,7 +103,9 @@ function commandsOf(): Command[] {
     { id: "assistant", what: "Do", label: "Open the assistant", run: () => toggleSide("assistant") },
     { id: "help", what: "Do", label: "Help about this page", keywords: "docs guide", run: () => toggleSide("docs") },
     { id: "side-agents", what: "Do", label: "Show the agents beside the page", keywords: "mcp proposals", run: () => toggleSide("agents") },
-    { id: "go-agents", what: "Go", label: "Agents: connect one over MCP, how their edits land, what they did", keywords: "mcp claude code proposals activity tools", run: () => go("agents") },
+    { id: "go-assistant", what: "Go", label: "The assistant in full view", keywords: "chat conversation agents", run: () => go("agents") },
+    { id: "go-agents", what: "Go", label: "Agents' activity: what waits, how their edits land, what they did", keywords: "proposals activity sessions", run: () => go("agents", "activity") },
+    { id: "go-connect", what: "Go", label: "Connect an agent over MCP, and its tools", keywords: "mcp claude code tools", run: () => go("agents", "mcp") },
     { id: "go-docs", what: "Go", label: "The guides: backstage and the story format", keywords: "docs help readme keys shortcuts", run: () => go("docs") },
     { id: "settings", what: "Go", label: "Settings: the assistant, the budget", run: () => go("settings") },
   ];

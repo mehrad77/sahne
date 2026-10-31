@@ -627,7 +627,12 @@ select.tone { width: auto; font-size: 12px; padding: 0 4px; }
 .note.model { margin: 0 0 8px; }
 .note.model .linkish { border: 0; background: none; padding: 0; color: var(--accent, inherit); text-decoration: underline; font: inherit; cursor: pointer; }
 .abilities { display: grid; gap: 10px; width: min(404px, calc(92vw - 16px)); padding: 4px 6px; font-size: 12.5px; color: var(--ink, inherit); }
-.drawer > header .about { font-weight: 700; font-size: 15px; } .drawer > header .about[aria-expanded="true"], .model-pick[aria-expanded="true"] { color: var(--accent); }
+.drawer > header .about, .agents-assistant .pagehead .about { font-weight: 700; font-size: 15px; } .about[aria-expanded="true"], .model-pick[aria-expanded="true"] { color: var(--accent); }
+/* the assistant in full view (#/agents): a centred column the page's height, its composer pinned to the bottom */
+.page > main:has(.agents-assistant) { padding-bottom: 0; }
+.agents-assistant { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; min-height: calc(100vh - 52px - 18px); }
+.agents-assistant > *, .assistant-page > * { flex-shrink: 0; } .assistant-page { flex: 1; display: flex; flex-direction: column; }
+.assistant-page .chat-input { bottom: 0; margin: auto 0 0; padding-bottom: 16px; background: var(--bg); } .assistant-page .chat-input::before { background: linear-gradient(transparent, var(--bg)); }
 .model-pick { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 8px; border: 0; border-radius: 8px; background: none; color: var(--mute); font-size: 13px; white-space: nowrap; min-width: 0; }
 .model-pick span { overflow: hidden; text-overflow: ellipsis; } .model-pick:hover { background: var(--chip); color: var(--ink); }
 .model-menu { display: grid; gap: 2px; width: min(300px, 88vw); }

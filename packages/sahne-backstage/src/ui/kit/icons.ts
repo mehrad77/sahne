@@ -46,6 +46,7 @@ const PATHS: Record<string, string> = {
   stop: "M7 7h10v10H7z",
   history: "M3.5 12a8.5 8.5 0 1 0 2.5-6M3 4v4h4M12 8v4l3 2",
   down: "M6 9l6 6 6-6",
+  expand: "M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7",
 };
 
 /** An icon by name, `size` px square. */

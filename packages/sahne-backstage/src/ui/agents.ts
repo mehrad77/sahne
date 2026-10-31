@@ -1,4 +1,5 @@
-// Agents (#/agents, and the side panel's Agents tab): how to connect one over MCP (the commands to copy, for Claude
+// Agents (#/agents): three tabs. The assistant, its conversation in full view (#/agents, the side panel's ⤢ opens it);
+// Activity (#/agents/activity; the side panel's Agents tab holds its essentials) and Connect (#/agents/mcp). Together: how to connect one over MCP (the commands to copy, for Claude
 // Code over HTTP or stdio and for any other client), how their edits land (proposals or written, switched here for the
 // agents that connect next), who is connected, every proposal waiting across the episodes, what agents did lately
 // (each tool call, the assistant's too), and the tools they have. From `GET /api/agents`, read again on each `activity`.
@@ -6,7 +7,8 @@
 import { html } from "htm/preact";
 import { useEffect, useState } from "preact/hooks";
 import { api } from "../api.ts";
-import { say, world } from "../store.ts";
+import { route, say, world } from "../store.ts";
+import { AboutButton, AssistantChat, assistantOpen } from "./assistant.ts";
 import { openProposal } from "./proposed.ts";
 import { accept, acceptAndSave, activity, agentsTick, proposals, reject, type Call, type Proposal } from "../events.ts";
 import { Chip, Icon } from "./kit/index.ts";
@@ -100,7 +102,7 @@ export function Inbox(p: { limit?: number }) {
       <button class="small" onClick=${() => void reject(x)}>Reject</button>
       <button class="small" onClick=${() => void accept(x)}>Accept</button>
       <button class="small primary" onClick=${() => void acceptAndSave(x)}>Accept and save</button></div>`;
-  })}${p.limit && list.length > p.limit ? html`<p class="note">and ${list.length - p.limit} more on <a href="#/agents">the Agents page</a></p>` : ""}</div>`;
+  })}${p.limit && list.length > p.limit ? html`<p class="note">and ${list.length - p.limit} more on <a href="#/agents/activity">the Agents page</a></p>` : ""}</div>`;
 }
 
 export function Activity(p: { limit?: number }) {
@@ -129,24 +131,42 @@ function Tools(p: { v: AgentsView }) {
     <div class="tools"><div><h4>Read</h4><ul>${read.map(row)}</ul></div><div><h4>Edit</h4><ul>${write.map(row)}</ul></div></div>`;
 }
 
+/** The Agents page: the assistant in full view, or the agents over MCP. */
 export function AgentsPage() {
+  const sub = route.value[1], tab = sub === "mcp" ? "connect" : sub === "activity" ? "activity" : "assistant", n = proposals.value.length;
+  // the page shows what the side panel would, so the panel closes on the way in
+  useEffect(() => { assistantOpen.value = false; }, []);
+  const link = (href: string, id: string, label: unknown) => html`<a href=${href} aria-current=${tab === id ? "page" : undefined}>${label}</a>`;
+  return html`<section class=${`agents${tab === "assistant" ? " agents-assistant" : ""}`}>
+    <div class="pagehead"><h2 class="grow">Agents</h2>${tab === "assistant" && html`<${AboutButton} />`}</div>
+    <nav class="season-tabs" aria-label="Agents">${link("#/agents", "assistant", "Assistant")}${link("#/agents/activity", "activity", html`Activity${n ? html` <span class="badge">${n}</span>` : ""}`)}${link("#/agents/mcp", "connect", "Connect")}</nav>
+    ${tab === "assistant" ? html`<div class="assistant-page"><${AssistantChat} /></div>` : tab === "activity" ? html`<${ActivityTab} />` : html`<${ConnectTab} />`}
+  </section>`;
+}
+
+/** What agents do, the assistant included: what waits for you, how their edits land, what they did, who is connected. */
+function ActivityTab() {
+  const v = useView();
+  if (!v.now) return html`<p class="note">Asking backstage about its agents…</p>`;
+  return html`<div class="agents-grid">
+      <div class="step-card"><h3><${Icon} name="note" size=${16} /> Waiting for you ${proposals.value.length ? html`<${Chip} tone="warn">${proposals.value.length}</${Chip}>` : ""}</h3><${Inbox} /></div>
+      <div class="step-card"><h3><${Icon} name="check" size=${16} /> How their edits land</h3><${ModeSwitch} v=${v.now} onChange=${v.set} />
+        <p class="note">Word cards: ${v.now.shareCards ? "agents see a card's main-language word (--share-cards)" : "agents see only their ids and levels (start with --share-cards to show the word)"}. Never a card's translations or lesson text.</p></div>
+      <div class="step-card wide"><h3><${Icon} name="film" size=${16} /> What they did</h3><${Activity} /></div>
+      <div class="step-card wide"><h3><${Icon} name="cast" size=${16} /> Connected</h3><${Sessions} v=${v.now} /></div>
+    </div>`;
+}
+
+/** Setting an agent up over MCP: the commands to connect one, and the tools it gets. */
+function ConnectTab() {
   const v = useView();
   if (!v.now) return html`<p class="note">Asking backstage about its agents…</p>`;
   const w = world.value!;
-  return html`<section class="agents">
-    <div class="pagehead"><h2 class="grow">Agents</h2><span class="note">Agents work on ${w.samples ? "the samples" : "this content root"} through backstage's MCP server, with the same checks as you. <a href="#/docs/backstage/mcp-server-and-agent-edits-servermcpts-serverproposalsts-servereventsts">How it works</a></span></div>
+  return html`<p class="note">Agents work on ${w.samples ? "the samples" : "this content root"} through backstage's MCP server, with the same checks as you. <a href="#/docs/backstage/mcp-server-and-agent-edits-servermcpts-serverproposalsts-servereventsts">How it works</a></p>
     <div class="agents-grid">
-      <div class="step-card"><h3><${Icon} name="plug" size=${16} /> Connect an agent</h3><${Connect} v=${v.now} /></div>
-      <div>
-        <div class="step-card"><h3><${Icon} name="check" size=${16} /> How their edits land</h3><${ModeSwitch} v=${v.now} onChange=${v.set} />
-          <p class="note">Word cards: ${v.now.shareCards ? "agents see a card's main-language word (--share-cards)" : "agents see only their ids and levels (start with --share-cards to show the word)"}. Never a card's translations or lesson text.</p></div>
-        <div class="step-card"><h3><${Icon} name="note" size=${16} /> Waiting for you ${proposals.value.length ? html`<${Chip} tone="warn">${proposals.value.length}</${Chip}>` : ""}</h3><${Inbox} /></div>
-      </div>
-      <div class="step-card"><h3><${Icon} name="cast" size=${16} /> Connected</h3><${Sessions} v=${v.now} /></div>
-      <div class="step-card"><h3><${Icon} name="film" size=${16} /> What they did</h3><${Activity} /></div>
+      <div class="step-card wide"><h3><${Icon} name="plug" size=${16} /> Connect an agent</h3><${Connect} v=${v.now} /></div>
       <div class="step-card wide"><h3><${Icon} name="hand" size=${16} /> Their tools</h3><${Tools} v=${v.now} /></div>
-    </div>
-  </section>`;
+    </div>`;
 }
 
 /** The view, and a newer one a switch of the mode answered with (until the next read). */
@@ -165,7 +185,7 @@ export function AgentsPanel() {
     <h4>How their edits land</h4><${ModeSwitch} v=${v.now} onChange=${v.set} />
     <h4>Connect one</h4>${v.now.sessions.length ? html`<p class="note">${v.now.sessions.map(s => s.client).join(", ")} connected.</p>` : ""}<${Connect} v=${v.now} compact />
     <h4>Lately</h4><${Activity} limit=${6} />
-    <p><a href="#/agents">All of it, with the other ways to connect and the tools →</a></p>
+    <p><a href="#/agents/mcp">All of it, with the other ways to connect and the tools →</a></p>
   </div>`;
 }
 
