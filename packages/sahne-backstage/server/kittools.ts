@@ -280,6 +280,34 @@ function motionOf(row: Row, kit: Kit, params: Record<string, unknown>): { line: 
   return { line: [...seen].map(([k, n]) => `${k}${n > 1 ? ` (${n} flats)` : ""}`).join("; "), period: Math.round(period) };
 }
 
+/** A param that draws the same as without it, in this look, and what other param makes it show (money's currency needs kind: foreign). */
+function inert(row: Row, kit: Kit, params: Record<string, unknown>): string[] {
+  const memo = new Map<string, string>();
+  const draw = (p: Record<string, unknown>) => {
+    const key = JSON.stringify(p);
+    if (!memo.has(key)) { let b = "!"; try { b = pieceBody(kit, row.def, p, `${row.id}/a`, "q", { text: true })?.body ?? ""; } catch {} memo.set(key, b); }
+    return memo.get(key)!;
+  };
+  const specs = row.def.meta?.params ?? {}, out: string[] = [], base = draw(params);
+  for (const [k, v] of Object.entries(params)) {
+    if (["variant", "n", "held"].includes(k) || !specs[k] || JSON.stringify(v) === JSON.stringify(specs[k].default)) continue;
+    const without = { ...params };
+    delete without[k];
+    if (draw(without) !== base) continue;
+    let need = "";
+    for (const [p, s] of Object.entries(specs)) {
+      if (p === k) continue;
+      const now = params[p] ?? s.default, types = [s.type].flat();
+      const tries = s.values?.length ? s.values.filter(x => x !== now).slice(0, 12) : types.includes("bool") ? [!now] : [];
+      for (const x of tries) if (draw({ ...params, [p]: x }) !== draw({ ...without, [p]: x })) { need = word(p, x); break; }
+      if (need) break;
+    }
+    if (!need) for (const vn of Object.keys(row.def.variants ?? {})) if (draw({ ...params, variant: vn }) !== draw({ ...without, variant: vn })) { need = `variant ${vn}`; break; }
+    out.push(`warning [inert] ${row.id}: ${word(k, v)} draws the same as without it${need ? `; it shows with ${need}` : " in this look"}`);
+  }
+  return out;
+}
+
 const CELLS_MAX = 96, PAGE = 24;
 /** A cell that stands for an item it could not draw. */
 const NOTHING: PieceDef = { draw: () => ({ flats: [] }) } as unknown as PieceDef;
@@ -309,7 +337,7 @@ function render(reqs: Req[], o: SheetOpts & { kit?: Kit; whole?: boolean; list?:
     }
     kit = r.kit;
   }
-  const still = new Set<string>(), stray: string[] = [], bad: string[] = [], cells: SheetCell[] = [], lists: string[] = [], warn: string[] = [], motion: string[] = [];
+  const inertAt = new Map<string, number[]>(), still = new Set<string>(), stray: string[] = [], bad: string[] = [], cells: SheetCell[] = [], lists: string[] = [], warn: string[] = [], motion: string[] = [];
   const targets = new Map<string, Target>(), items: { id: string; errors: number; warnings: number; problems: string[]; error?: string }[] = [];
   const views = o.views?.length ? o.views : (["day", "night"] as const);
   reqs.forEach((r, i) => {
@@ -340,6 +368,7 @@ function render(reqs: Req[], o: SheetOpts & { kit?: Kit; whole?: boolean; list?:
         const from = cells.length + 1;
         for (const at of times) for (const v of views) cells.push({ item, label, params, night: v === "night", ...(at !== undefined ? { t: at } : {}), ...(focus ? { focus } : {}), num: cells.length + 1 });
         lists.push(`${from === cells.length ? from : `${from}-${cells.length}`}  ${row.id} · ${label}${times[0] !== undefined ? ` · t ${times.join(", ")} ms` : ""}`);
+        if (Object.keys(params).some(k => !["variant", "n", "held"].includes(k))) for (const w of inert(row, kit, params)) inertAt.set(w, [...(inertAt.get(w) ?? []), from]);
       }
       const key = `${row.slot}:${row.id}:${slot}`;
       if (!targets.has(key)) targets.set(key, { kit, row, slot });
@@ -366,6 +395,8 @@ function render(reqs: Req[], o: SheetOpts & { kit?: Kit; whole?: boolean; list?:
     for (const it of items) if (it.id === t.row.id && !it.error) Object.assign(it, { errors: c.errors, warnings: c.warnings, problems: c.lines });
     if (c.lines.length) lines.push(...(o.whole ? c.lines.map(l => `  ${l}`) : [summary(t.row.id, c), ...c.lines.map(l => `  ${l}`)]));
   }
+  // a param that changed nothing, with the cells it is in when not all of them
+  for (const [w, at] of inertAt) warn.push(at.length === lists.length ? w : w.replace(" draws the same", ` (cell${at.length > 1 ? "s" : ""} ${at.join(", ")}) draws the same`));
   const uniq = [...new Set(warn)];
   warnings += uniq.filter(l => l.startsWith("warning")).length;
   // the pictures: 24 cells to one, a picture per seed; few cells (or a crop) drawn twice as large
@@ -467,7 +498,7 @@ export function registerKitTools(server: McpServer, k: KitToolsCtx): void {
   };
   server.registerTool("kit_render", {
     title: "Render a set piece or prop",
-    description: "A sheet of numbered cells as a PNG, with the kit's checks on it (the same ones the gate runs). Give an `id` (a kit item or one of this series), a `doc` (a drawing not yet saved) or `items` (several on one sheet). One item shows its default, each variant, and for a prop three of it and held; `variant` or `params` picks one look; `vary` draws a cell per value of a param (\"all\" for every value: `{\"vary\": {\"country\": \"all\"}}`, also variant, n, held), applying to every item. Each look is drawn by day and night (`views` for one), at rest or mid-motion (`t` in ms, or `frames`), whole or cropped to a box of cm (`focus`), and zoomed by `zoom` (auto, scene, fit). The answer's text says what each cell number shows, each item's motions with their periods, and its problems as lines. An unknown id or a bad param is a red cell and an error, the rest still drawn; a key in the wrong place is refused with where it belongs. `seeds` (up to 3): a picture per seed. A TypeScript generator is drawn from the source the process read at its start (call.ts --session restarts its server when the source changes).",
+    description: "A sheet of numbered cells as a PNG, with the kit's checks on it (the same ones the gate runs). Give an `id` (a kit item or one of this series), a `doc` (a drawing not yet saved) or `items` (several on one sheet). One item shows its default, each variant, and for a prop three of it and held; `variant` or `params` picks one look; `vary` draws a cell per value of a param (\"all\" for every value: `{\"vary\": {\"country\": \"all\"}}`, also variant, n, held), applying to every item. Each look is drawn by day and night (`views` for one), at rest or mid-motion (`t` in ms, or `frames`), whole or cropped to a box of cm (`focus`), and zoomed by `zoom` (auto, scene, fit). The answer's text says what each cell number shows, each item's motions with their periods, and its problems as lines, including a param that changed nothing in that look and the param it needs. An unknown id or a bad param is a red cell and an error, the rest still drawn; a key in the wrong place is refused with where it belongs. `seeds` (up to 3): a picture per seed. A TypeScript generator is drawn from the source the process read at its start (call.ts --session restarts its server when the source changes).",
     inputSchema: z.looseObject(RENDER),
     annotations: { readOnlyHint: true },
   }, run("kit_render", (a: { id?: string; doc?: Record<string, unknown>; as?: "set" | "prop"; items?: (string | Record<string, unknown>)[]; params?: Record<string, unknown>; variant?: string; views?: ("day" | "night")[]; seeds?: string[]; zoom?: SheetZoom; vary?: Req["vary"]; t?: Times; frames?: number; focus?: CmBox } & Record<string, unknown>) => {
@@ -509,7 +540,7 @@ export function registerKitTools(server: McpServer, k: KitToolsCtx): void {
   const VARIANT = { of: z.string().describe("The generator's id"), name: z.string().describe("x_ then lowercase letters, digits and _"), params: z.record(z.string(), z.unknown()), views: VIEWS.optional(), zoom: ZOOM.optional(), t: TIMES.optional(), frames: FRAMES.optional(), focus: BOX.optional() };
   server.registerTool("draft_variant", {
     title: "Draft a variant",
-    description: "Check a named look of a generator the kit already has (`of`: a set piece or prop, a TypeScript one or a drawing) as a variant document `{ of, name: \"x_…\", params }` would be saved, and render it beside the default: nothing is written. Its params must be ones the generator declares (kit_read lists them), with legal values.",
+    description: "Check a named look of a generator the kit already has (`of`: a set piece or prop, a TypeScript one or a drawing) as a variant document `{ of, name: \"x_…\", params }` would be saved, and render it beside the default: nothing is written. Its params must be ones the generator declares (kit_read lists them), with legal values; a param that changes nothing in that look is a warning.",
     inputSchema: z.looseObject(VARIANT),
     annotations: { readOnlyHint: true },
   }, run("draft_variant", (a: { of: string; name: string; params: Record<string, unknown>; views?: ("day" | "night")[]; zoom?: SheetZoom; t?: Times; frames?: number; focus?: CmBox } & Record<string, unknown>) => {

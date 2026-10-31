@@ -563,6 +563,20 @@ test("kit_render: vary draws a cell per value, t and frames mid-motion, focus a 
   } finally { await close(); }
 });
 
+test("a param that changes nothing in its look is a warning naming the param that makes it show", async () => {
+  const { client, close } = await connect({ write: false, agentEdits: "proposals" });
+  try {
+    const r = await call(client, "kit_render", { id: "money", params: { currency: "dollar" }, views: ["day"] });
+    assert.ok(!r.isError, r.text);
+    assert.match(r.text, /^warning \[inert\] money: currency dollar draws the same as without it; it shows with kind foreign$/m);
+    assert.match(r.text, /^money: 0 errors, 1 warning$/m);
+    assert.doesNotMatch((await call(client, "kit_render", { id: "money", params: { kind: "foreign", currency: "dollar" }, views: ["day"] })).text, /inert/);
+    assert.match((await call(client, "kit_render", { items: [{ id: "money", params: { currency: "dollar" } }] })).text, /inert/);
+    const some = await call(client, "kit_render", { id: "money", params: { currency: "dollar" }, vary: { kind: ["notes", "foreign"] }, views: ["day"] });
+    assert.match(some.text, /^warning \[inert\] money: currency dollar \(cell 1\) draws the same as without it; it shows with kind foreign$/m, "only the looks it changed nothing in");
+  } finally { await close(); }
+});
+
 test("draft_kit_item renders a drawing and writes nothing; a bad drawing is refused with what to fix", async () => {
   const { client, close } = await connect({ write: false, agentEdits: "proposals" });
   try {
