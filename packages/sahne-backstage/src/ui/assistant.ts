@@ -349,8 +349,9 @@ function ModelPicker(p: { ai: { provider: string; model?: string } }) {
     ${at && html`<${Popover} above x=${at.x} y=${at.y} label="The assistant's model" onClose=${close}><div class="model-menu" role="menu">
       ${p.ai.provider === "anthropic" ? CLAUDE.map(m => html`<button type="button" role="menuitemradio" aria-checked=${m.id === now} onClick=${() => void pick(m.id)}>
         <span><b>${m.name}</b><small>${m.note}</small></span>${m.id === now && html`<${Icon} name="check" size=${16} />`}</button>`)
-        : html`<button type="button" role="menuitemradio" aria-checked="true" onClick=${close}><span><b>${modelName(p.ai)}</b><small>A local model, on its own server</small></span><${Icon} name="check" size=${16} /></button>`}
-      <a class="model-more" href="#/settings" onClick=${close}><${Icon} name="settings" size=${14} /> Another provider or model, and the budget</a></div></${Popover}>`}`;
+        : html`<form class="model-local" onSubmit=${(e: Event) => { e.preventDefault(); const v = ((e.currentTarget as HTMLFormElement).elements.namedItem("m") as HTMLInputElement).value.trim(); if (v) void pick(v); }}>
+          <label for="model-id">The model's id on the local server</label><input id="model-id" name="m" value=${p.ai.model ?? ""} placeholder="qwen3-coder, llama3.1…" autofocus /></form>`}
+      <a class="model-more" href="#/settings" onClick=${close}><${Icon} name="settings" size=${14} /> Another provider, and the budget</a></div></${Popover}>`}`;
 }
 
 /** The conversation, in the side panel's Assistant tab. */

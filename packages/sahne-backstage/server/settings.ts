@@ -115,6 +115,8 @@ export function writeSettings(v: unknown): Settings {
   const cur = fileSettings(), next = clean(v);
   const merged: Partial<Settings> = { ...cur, ...next, ...(next.caps ? { caps: next.caps } : {}) };
   if ((merged.provider ?? DEFAULTS.provider) === "openai" && !merged.baseUrl) merged.baseUrl = LOCAL_BASE;
+  // a model of the other provider goes when the provider changes (the chat's picker names one for the new provider)
+  if (merged.model && /^claude-/.test(merged.model) !== ((merged.provider ?? DEFAULTS.provider) === "anthropic")) delete merged.model;
   const f = settingsFile();
   mkdirSync(configDir(), { recursive: true });
   const tmp = `${f}.tmp-${process.pid}`;

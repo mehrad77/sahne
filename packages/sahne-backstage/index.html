@@ -615,7 +615,19 @@ select.tone { width: auto; font-size: 12px; padding: 0 4px; }
 .composer .send.stop { background: none; } .composer .send:disabled { opacity: .35; }
 .chat-input .meta { display: flex; gap: 14px; padding: 0 4px; font-size: 12.5px; } .chat-input .meta .linkish { border: 0; background: none; padding: 2px 0; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; color: var(--mute); }
 .chat-input .meta .linkish:not(:disabled):hover { color: var(--ink); }
-.settings { max-width: 860px; }
+.settings { max-width: 860px; } .settings .pagehead { align-items: center; gap: 14px; }
+.switch { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--mute); cursor: pointer; white-space: nowrap; }
+.switch input { appearance: none; width: 30px; height: 18px; padding: 0; margin: 0; border-radius: 99px; border: 1px solid var(--line); background: var(--chip); position: relative; cursor: pointer; transition: background .15s; }
+.switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--mute); transition: transform .15s, background .15s; }
+.switch input:checked { background: var(--accent); border-color: var(--accent); } .switch input:checked::after { transform: translateX(12px); background: var(--accent-ink); }
+/* a read-only editor (kit/json.ts): a frame, a bar with the file and a lock, numbered lines, dimmed like a disabled field */
+.json-editor { border: 1px solid var(--line); border-radius: 10px; background: var(--bg); overflow: hidden; cursor: default; }
+.json-bar { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--line); background: var(--chip); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--mute); }
+.json-ro { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); font: 11px system-ui, sans-serif; color: var(--faint); }
+.json-editor pre.json { margin: 0; padding: 10px 0; max-height: 70vh; overflow: auto; font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; opacity: .82; filter: saturate(.75); outline: 0; }
+.json-line { display: flex; }
+.json-ln { flex: none; width: 3.2em; padding-right: 14px; margin-right: 12px; text-align: right; color: var(--faint); border-right: 1px solid var(--line); user-select: none; }
+.json-key { color: var(--accent); } .json-str { color: var(--suggest); } .json-num { color: var(--curtain); } .json-lit { color: var(--curtain); font-style: italic; } .json-punct { color: var(--faint); }
 @media (max-width: 1100px) { .studio-split { grid-template-columns: 1fr; } .stage-col { position: static; max-height: none; order: -1; } }
 /* the rail's badge, and the side panel's tabs */
 .rail a { position: relative; }
@@ -635,7 +647,7 @@ select.tone { width: auto; font-size: 12px; padding: 0 4px; }
 .assistant-page .chat-input { bottom: 0; margin: auto 0 0; padding-bottom: 16px; background: var(--bg); } .assistant-page .chat-input::before { background: linear-gradient(transparent, var(--bg)); }
 .model-pick { display: inline-flex; align-items: center; gap: 5px; height: 30px; padding: 0 8px; border: 0; border-radius: 8px; background: none; color: var(--mute); font-size: 13px; white-space: nowrap; min-width: 0; }
 .model-pick span { overflow: hidden; text-overflow: ellipsis; } .model-pick:hover { background: var(--chip); color: var(--ink); }
-.model-menu { display: grid; gap: 2px; width: min(300px, 88vw); }
+.model-menu { display: grid; gap: 2px; width: min(300px, 88vw); } .model-local { display: grid; gap: 4px; padding: 6px 8px; } .model-local label { font-size: 12px; color: var(--mute); }
 .model-menu button { display: flex; align-items: center; gap: 10px; text-align: left; border: 0; background: none; padding: 7px 10px; border-radius: 8px; color: var(--ink); }
 .model-menu button span { flex: 1; display: grid; gap: 1px; } .model-menu button b { font-weight: 500; font-size: 13.5px; } .model-menu button small { color: var(--mute); font-size: 12px; }
 .model-menu button:hover, .model-menu button[aria-checked="true"] { background: var(--chip); }

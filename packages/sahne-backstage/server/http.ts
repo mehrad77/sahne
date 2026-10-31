@@ -84,7 +84,7 @@ export async function serve(o: Options): Promise<Running> {
     return r.ready ? { ready: true, provider: r.provider, model: r.model ?? (r.provider === "anthropic" ? MODELS.full : "local"), web: webOf(readSettings()) } : false;
   };
   /** The settings for the editor: what is in effect, where the file is, what the environment overrides, and whether keys are set (never the keys). */
-  const settingsView = () => ({ settings: readSettings(), file: settingsFile(), overrides: overrides(), keys: { anthropic: !!process.env.ANTHROPIC_API_KEY, openai: !!process.env.OPENAI_API_KEY, tavily: !!process.env.TAVILY_API_KEY }, ai: readiness(), web: webOf(readSettings()) });
+  const settingsView = () => ({ settings: readSettings(), file: settingsFile(), overrides: overrides(), keys: { anthropic: !!process.env.ANTHROPIC_API_KEY, openai: !!process.env.OPENAI_API_KEY, tavily: !!process.env.TAVILY_API_KEY }, ai: readiness(), web: webOf(readSettings()), raw: existsSync(settingsFile()) ? readFileSync(settingsFile(), "utf8") : null });
 
   // ---- MCP over Streamable HTTP: a session per client, made by its initialize request ----
   const sessions = new Map<string, { server: McpServer; transport: StreamableHTTPServerTransport }>();

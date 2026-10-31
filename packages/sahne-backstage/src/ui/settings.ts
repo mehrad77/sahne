@@ -1,5 +1,5 @@
-// Settings (#/settings): the assistant's model (Claude, or any OpenAI-compatible server such as LM Studio or Ollama, by
-// its base URL), the budget (caps per day and month, in dollars and in tokens, which hold for local models too, and the
+// Settings (#/settings): the assistant's provider (Claude, or any OpenAI-compatible server such as LM Studio or Ollama, by
+// its base URL; the model itself is picked in the chat), the budget (caps per day and month, in dollars and in tokens, which hold for local models too, and the
 // cost above which an ask waits for a yes), and whether the rules' staging suggestions are taken as you leave a line. They are kept in this person's config folder
 // (`~/.config/sahne-backstage/settings.json`), never in the content root; API keys stay in the environment.
 
@@ -8,13 +8,14 @@ import { useEffect, useState } from "preact/hooks";
 import { api } from "../api.ts";
 import { loadWorld, say } from "../store.ts";
 import { usage } from "../events.ts";
+import { JsonCode } from "./kit/json.ts";
 
 export interface Settings {
   provider: "anthropic" | "openai"; model?: string; baseUrl?: string;
   caps: { dayUsd?: number; monthUsd?: number; dayTokens?: number; monthTokens?: number };
   confirmOverUsd?: number; agentEdits?: "proposals" | "direct"; applySuggestions?: boolean; web?: "auto" | "anthropic" | "tavily" | "off";
 }
-interface Answer { settings: Settings; file: string; overrides: Record<string, string>; keys: { anthropic: boolean; openai: boolean; tavily?: boolean }; web?: "anthropic" | "tavily" | null }
+interface Answer { settings: Settings; file: string; overrides: Record<string, string>; keys: { anthropic: boolean; openai: boolean; tavily?: boolean }; web?: "anthropic" | "tavily" | null; /** The file as it is on disk, null before the first save. */ raw?: string | null }
 
 /** The settings as last read (the studio reads `applySuggestions`). */
 let current: Settings | null = null;
@@ -34,7 +35,7 @@ function Memory() {
 }
 
 export function SettingsPage() {
-  const [a, setA] = useState<Answer | null>(null), [s, setS] = useState<Settings | null>(null);
+  const [a, setA] = useState<Answer | null>(null), [s, setS] = useState<Settings | null>(null), [raw, setRaw] = useState(false);
   useEffect(() => { void loadSettings().then(r => { if (r.status === 200) { setA(r); setS(r.settings); } }); }, []);
   if (!a || !s) return html`<p class="note">Opening the settings…</p>`;
   const put = (k: keyof Settings, v: unknown) => setS({ ...s, [k]: v } as Settings);
@@ -49,7 +50,10 @@ export function SettingsPage() {
   const over = (k: string) => a.overrides?.[k] ? html` <small class="note">(set by ${a.overrides[k]})</small>` : "";
   const u = usage.value;
   return html`<section class="settings">
-    <div class="pagehead"><h2 class="grow">Settings</h2><span class="note">Kept in <code>${a.file}</code>, for you only.</span></div>
+    <div class="pagehead"><h2 class="grow">Settings</h2><span class="note">Kept in <code>${a.file}</code>, for you only.</span>
+      <label class="switch"><input type="checkbox" role="switch" checked=${raw} onChange=${(e: Event) => setRaw((e.target as HTMLInputElement).checked)} /> Raw JSON</label></div>
+    ${raw ? html`<div class="step-card"><p class="note">${a.raw == null ? "No file yet: the defaults are in effect, shown here as they would be saved." : "The file as saved, read-only. Edit the settings with the form."}${Object.keys(a.overrides ?? {}).length ? ` The environment sets ${Object.values(a.overrides).join(", ")} over it.` : ""}</p>
+      <${JsonCode} class="settings-raw" name=${a.file.split("/").pop()} label="The settings file, read-only" text=${a.raw ?? JSON.stringify(a.settings, null, 2)} /></div>` : html`
     <div class="step-card fields"><h3>The assistant's model</h3>
       <div class="segmented" role="group" aria-label="Provider">
         <button aria-pressed=${s.provider === "anthropic"} onClick=${() => put("provider", "anthropic")}>Claude</button>
@@ -59,7 +63,7 @@ export function SettingsPage() {
         ? html`<p class="note">${a.keys.anthropic ? "The API key is set (ANTHROPIC_API_KEY)." : html`No key: start backstage with <code>ANTHROPIC_API_KEY</code> set. Keys never go in a file.`}</p>`
         : html`<div class="field"><label>Base URL${over("baseUrl")}</label><input value=${s.baseUrl ?? ""} placeholder="http://localhost:1234/v1" onInput=${(e: Event) => put("baseUrl", (e.target as HTMLInputElement).value || undefined)} /></div>
           <p class="note">LM Studio serves at <code>http://localhost:1234/v1</code>, Ollama at <code>http://localhost:11434/v1</code>. Use a model that calls tools.${a.keys.openai ? " OPENAI_API_KEY is set." : ""}</p>`}
-      <div class="field"><label>Model${over("model")}</label><input value=${s.model ?? ""} placeholder=${s.provider === "anthropic" ? "claude-sonnet-5-5 (claude-opus-5-5 for drafts and reviews)" : "the model's id on the server"} onInput=${(e: Event) => put("model", (e.target as HTMLInputElement).value || undefined)} /></div>
+      <p class="note">The model is picked in the assistant's chat, beside the message box${a.overrides?.model ? html` (now set by <code>${a.overrides.model}</code>)` : ""}.</p>
     </div>
     <div class="step-card fields"><h3>The budget</h3>
       ${u && html`<p>Today ${"$"}${u.today.usd.toFixed(3)} and ${u.today.tokens.toLocaleString()} tokens; this month ${"$"}${u.month.usd.toFixed(2)}.</p>`}
@@ -81,6 +85,6 @@ export function SettingsPage() {
     <div class="step-card fields"><h3>Staging suggestions</h3>
       <label class="row"><input type="checkbox" style="width:auto" checked=${!!s.applySuggestions} onChange=${(e: Event) => put("applySuggestions", (e.target as HTMLInputElement).checked)} /> Take the rules' staging suggestions as I leave each line</label>
     </div>
-    <div class="row"><span class="grow"></span><button class="primary" onClick=${() => void save()}>Save the settings</button></div>
+    <div class="row"><span class="grow"></span><button class="primary" onClick=${() => void save()}>Save the settings</button></div>`}
   </section>`;
 }

@@ -388,6 +388,9 @@ test("settings: a round trip in the config folder, no keys kept, the environment
   assert.equal(readSettings().provider, "anthropic");
   delete process.env.SAHNE_AI_MODEL; delete process.env.SAHNE_AI_PROVIDER;
   assert.equal(writeSettings({ model: "qwen3.5" }).provider, "openai", "a save merges over the file");
+  assert.equal(writeSettings({ provider: "anthropic" }).model, undefined, "a local model goes when the provider becomes Claude");
+  assert.equal(writeSettings({ model: "claude-sonnet-5-5" }).model, "claude-sonnet-5-5");
+  assert.equal(writeSettings({ provider: "openai" }).model, undefined, "a Claude model goes when the provider becomes local");
 });
 
 function start(args: string[], env: Record<string, string>): Promise<{ url: string; p: ChildProcess }> {
