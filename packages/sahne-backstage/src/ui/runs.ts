@@ -102,6 +102,8 @@ function GateCard(p: { run: Run }) {
   const redoPlan = async () => { setBusy(true); const e = await actStep(run.id, "plan", { action: "redo", note: change }); setBusy(false); if (e) say(e, true); else setChange(""); };
   if (run.gate === "plan") return html`<div class="ask-card gate-card" role="group" aria-label="The plan waits for you">
     <b>The plan: ${planWords(run, main)}${run.estimateUsd !== undefined ? `. About ${usd(run.estimateUsd)}` : ""}.</b>
+    <ol class="plan-steps">${run.steps.filter(s => s.kind !== "plan").map(s => html`<li><b>${s.title}</b><${Markdown} text=${s.brief} /></li>`)}</ol>
+    ${run.brief && html`<details class="plan-brief" open><summary>What every step reads first: the plan's brief</summary><${Markdown} text=${run.brief} /></details>`}
     <div class="row wrap"><button class="primary" onClick=${() => void go()}>Start</button></div>
     <form class="row" onSubmit=${(e: Event) => { e.preventDefault(); if (change.trim()) void redoPlan(); }}>
       <input placeholder="Or change something: say what, and it plans again…" value=${change} onInput=${(e: Event) => setChange((e.target as HTMLInputElement).value)} />
