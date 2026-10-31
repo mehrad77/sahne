@@ -3,9 +3,9 @@
 // credits and the generated files, and --check tells fresh from stale; a story that still names its x_ id stages through the alias;
 // --pr works with `gh` stubbed (no GitHub is ever reached). Never touches this checkout's src/.
 
-import { test } from "node:test";
+import { after, test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -18,6 +18,11 @@ import { PROP_SHELVES, SET_SHELVES } from "../../sahne-backstage/src/model/kitgr
 import { check as promoteCheck, coAuthorEmail, creditOf, prText } from "../drawing/promote.ts";
 
 const REPO = resolve(import.meta.dirname, "../../..");
+
+/** A temp folder, removed when the file's tests are done (each copy of the packages is ~190 MB). */
+const temps: string[] = [];
+const tmp = (prefix: string) => { const d = mkdtempSync(join(realpathSync(tmpdir()), prefix)); temps.push(d); return d; };
+after(() => { for (const d of temps) rmSync(d, { recursive: true, force: true }); });
 
 /** A good drawing under its content id: a small prop. */
 const cookie = (): DrawingDoc => ({
@@ -141,7 +146,7 @@ test("what promote.ts generates is current (node packages/sahne-kit/drawing/prom
 
 /** A throwaway copy of the packages (modules linked), so promote.ts changes the copy and never this checkout. */
 function copyRepo(): string {
-  const dir = mkdtempSync(join(realpathSync(tmpdir()), "sahne-promote-test-"));
+  const dir = tmp("sahne-promote-test-");
   cpSync(join(REPO, "packages"), join(dir, "packages"), { recursive: true, verbatimSymlinks: true, filter: s => !/sahne-gallery\/golden|promote-out|\/\.cache/.test(s) });
   symlinkSync(join(REPO, "node_modules"), join(dir, "node_modules"));
   return dir;
@@ -278,12 +283,12 @@ function fakeOrigin(): { root: string; origin: string } {
   git(root, "init", "-q", "-b", "main");
   writeFileSync(join(root, ".gitignore"), "node_modules\n");
   git(root, "add", "-A"); git(root, "commit", "-q", "-m", "base");
-  const origin = join(mkdtempSync(join(realpathSync(tmpdir()), "sahne-origin-")), "origin.git");
+  const origin = join(tmp("sahne-origin-"), "origin.git");
   assert.equal(git(root, "clone", "-q", "--bare", ".", origin).status, 0);
   return { root, origin };
 }
 const prRun = (root: string, origin: string, env: Record<string, string>, extra: string[] = []) => {
-  const outside = mkdtempSync(join(realpathSync(tmpdir()), "sahne-app-")), src = write(join(outside, "kit/pieces/x_butter_cookie.json"), cookie());
+  const outside = tmp("sahne-app-"), src = write(join(outside, "kit/pieces/x_butter_cookie.json"), cookie());
   const gh = stubGh(outside);
   const r = runIn(root, outside, promoteArgs(src, ["--consent", "--pr", ...extra]), { PATH: `${gh.bin}:${process.env.PATH}`, SAHNE_REPO_URL: `file://${origin}`, SAHNE_PUSH_URL: `file://${origin}`, GIT_AUTHOR_NAME: "T", GIT_AUTHOR_EMAIL: "t@example.org", GIT_COMMITTER_NAME: "T", GIT_COMMITTER_EMAIL: "t@example.org", ...env });
   return { r, outside, log: existsSync(gh.log) ? readFileSync(gh.log, "utf8") : "" };
@@ -307,7 +312,7 @@ test("--pr from an app's folder works in a clone: a branch art/<id>, a commit cr
 
 test("--pr without write access forks and pushes there; without gh it leaves a patch and the text, and says what to do", () => {
   const { root, origin } = fakeOrigin();
-  const fork = join(mkdtempSync(join(realpathSync(tmpdir()), "sahne-fork-")), "fork.git");
+  const fork = join(tmp("sahne-fork-"), "fork.git");
   assert.equal(git(root, "clone", "-q", "--bare", ".", fork).status, 0);
   const a = prRun(root, origin, { GH_PUSH: "false", SAHNE_FORK_URL: `file://${fork}` });
   assert.equal(a.r.status, 0, a.r.stdout + a.r.stderr);
@@ -326,7 +331,7 @@ test("--pr without write access forks and pushes there; without gh it leaves a p
 
 test("from an app's folder without --pr, the change is a patch of the clone, and the checkout is untouched", () => {
   const { root, origin } = fakeOrigin();
-  const outside = mkdtempSync(join(realpathSync(tmpdir()), "sahne-app-")), src = write(join(outside, "kit/pieces/x_butter_cookie.json"), cookie());
+  const outside = tmp("sahne-app-"), src = write(join(outside, "kit/pieces/x_butter_cookie.json"), cookie());
   const r = runIn(root, outside, promoteArgs(src, ["--consent"]), { SAHNE_REPO_URL: `file://${origin}` });
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /is ready as a patch: .*butter_cookie\.patch/);

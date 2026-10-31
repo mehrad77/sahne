@@ -295,19 +295,21 @@ const sh = (cmd: string, args: string[], cwd: string, input?: string) => spawnSy
 /** Whether this process is in the Sahne checkout it was started from (so it may change it), as `cwd` sits inside it. */
 const inCheckout = (cwd = process.cwd()) => existsSync(join(ROOT, ".git")) && (cwd === ROOT || cwd.startsWith(ROOT + sep));
 
-/** A clone of the repository in a temp folder, with this checkout's node_modules linked in (or installed). Returns its root. */
+/** A clone of the repository in a temp folder, with this checkout's node_modules linked in (or installed). Returns its root;
+ *  the caller removes its folder (`dirname(root)`), and a clone that fails is removed here. */
 function cloneRepo(): string {
   const url = process.env.SAHNE_REPO_URL ?? (existsSync(join(ROOT, ".git")) ? sh("git", ["remote", "get-url", "origin"], ROOT).stdout.trim() || REPO_URL : REPO_URL);
   const dir = mkdtempSync(join(realpathSync(tmpdir()), "sahne-promote-")), root = join(dir, "sahne");
+  const fail = (why: string) => { rmSync(dir, { recursive: true, force: true }); return new Error(why); };
   const c = sh("git", ["clone", "--quiet", "--depth", "1", url, root], dir);
-  if (c.status !== 0) throw new Error(`could not clone ${url}: ${c.stderr.trim()}`);
+  if (c.status !== 0) throw fail(`could not clone ${url}: ${c.stderr.trim()}`);
   if (existsSync(join(ROOT, "node_modules"))) {
     // the same lockfile, so the same modules: link them rather than install
     symlinkSync(join(ROOT, "node_modules"), join(root, "node_modules"));
     for (const p of readdirSync(join(root, "packages"))) if (existsSync(join(ROOT, "packages", p, "node_modules"))) symlinkSync(join(ROOT, "packages", p, "node_modules"), join(root, "packages", p, "node_modules"));
   } else {
     const i = sh("pnpm", ["install", "--frozen-lockfile"], root);
-    if (i.status !== 0) throw new Error(`pnpm install failed in the clone:\n${i.stderr.trim()}`);
+    if (i.status !== 0) throw fail(`pnpm install failed in the clone:\n${i.stderr.trim()}`);
   }
   return root;
 }
@@ -357,8 +359,13 @@ export async function promote(o: Options): Promise<Outcome> {
     return out;
   }
 
-  // in a clone: this checkout is left alone
+  // in a clone: this checkout is left alone, and the clone is removed after (what it made is in outDir)
   const root = cloneRepo();
+  try { return inClone(o, doc, out, outDir, root); } finally { rmSync(dirname(root), { recursive: true, force: true }); }
+}
+
+/** The rest of a promotion, in the clone at `root`: run there, then a patch, and with --pr a branch, a push and a pull request. */
+function inClone(o: Options, doc: DrawingDoc, out: Outcome, outDir: string, root: string): Outcome {
   const cli = join(root, "packages/sahne-kit/drawing/promote.ts"), src = join(dirname(root), "source.json");
   writeFileSync(src, JSON.stringify(typeof o.source === "string" ? JSON.parse(readFileSync(o.source, "utf8")) : o.source));
   const args = [cli, src, `--id=${o.id}`, `--family=${o.family}`, `--by=${o.by}`, `--contact=${o.contact}`, "--consent", `--date=${doc.credit!.date}`, `--out=${outDir}`, ...(o.story ? [`--story=${o.story}`] : [])]; // --k=v: a value may start with "-"
