@@ -23,7 +23,7 @@ import { IS_SAMPLES } from "../../sahne-story/paths.ts";
 import { arcId } from "../../sahne-story/check/rules.ts";
 import { allLanguages, langFor, languagesOf, seasonOf, suggest, textOf, type Languages, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
 import { allProblems, check, refuse, usesOf, exists, forget, idsOf, kit as kitOf, listing, oldShape, readDoc, save, searchCards, type Edit, type Kind, type Problem } from "./content.ts";
-import { readReview, STATUSES, writeReview, type EpisodeReview } from "./review.ts";
+import { readReview, standingFor, STATUSES, writeReview, type EpisodeReview } from "./review.ts";
 import { fail, ok, Refusal, type Result } from "./result.ts";
 import { pieceRows, registerKitTools } from "./kittools.ts";
 import type { Call } from "./agents.ts";
@@ -699,7 +699,8 @@ export function createMcp(o: McpOptions): McpServer {
     const weeks = boardOf(se, datesOf(se, eps), 0, weekOf as Record<string, number>);
     const rows = eps.map(e => {
       const mine = probs.filter(p => p.doc === `story:${e.id}`);
-      return { id: e.id, date: datesOf(se, [e])[e.id] ?? null, draft: e.draft, status: review[e.id]?.status ?? "draft", errors: mine.filter(p => p.level === "error").map(fmt), warnings: mine.filter(p => p.level === "warning").length };
+      const st = standingFor(e.id, probs, review[e.id]);
+      return { id: e.id, date: datesOf(se, [e])[e.id] ?? null, draft: e.draft, status: review[e.id]?.status ?? "draft", stage: st.stage, reviewed: `${st.done}/${st.total}`, missing: st.missing, errors: mine.filter(p => p.level === "error").map(fmt), warnings: mine.filter(p => p.level === "warning").length };
     });
     const empty = weeks.flatMap(w => w.days.filter(d => d.kind === "episode" && !d.episode).map(d => d.date));
     const noTheme = weeks.map(w => w.week).filter((w): w is number => typeof w === "number" && !se.arcs?.[arcId(n, w)]);
@@ -731,7 +732,7 @@ export function createMcp(o: McpOptions): McpServer {
     title: "Set where an episode stands",
     description: o.agentEdits === "proposals"
       ? `Ask the person to set an episode's review status (${STATUSES.join(", ")}): in proposals mode a person decides where an episode stands${o.by === "assistant" ? ", with one click on the card this puts in the conversation" : ", on the Review page; tell them what you suggest and why"}.`
-      : `Set an episode's review status: ${STATUSES.join(", ")}.`,
+      : `Set an episode's review status: ${STATUSES.join(", ")}. "approved" is a sign-off, refused until the episode is ready (every block reviewed and its translations checked, no errors, no open comments: check_season says what is missing).`,
     inputSchema: { id: ID, status: z.enum(STATUSES as [string, ...string[]]) },
   }, run("set_review", async ({ id, status }) => {
     if (!o.write) return fail(readOnly() ?? "read-only");
@@ -742,6 +743,8 @@ export function createMcp(o: McpOptions): McpServer {
       : ok(`not set: in proposals mode a person decides where an episode stands. Tell them you suggest ${status} for ${id}, and why; they set it on the Review page`);
     const cur: EpisodeReview = readReview().episodes[id] ?? {};
     writeReview({ id, review: { ...cur, status } });
+    // approving is a sign-off on a Ready episode, for agents as for the person (model/review.ts)
+    if (status === "approved") { const st = standingFor(id, allProblems(), cur); if (st.missing.length) return fail(`not approved: ${id} is not ready (${st.missing.join(", ")})`); }
     return ok(`${id} is ${status}`);
   }));
 

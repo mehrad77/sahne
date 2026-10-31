@@ -562,6 +562,42 @@ select.tone { width: auto; font-size: 12px; padding: 0 4px; }
 .gut-btn.on { color: var(--ok); }
 .tcheck { border: 0; background: none; padding: 0; font-size: 11px; color: var(--faint); opacity: .3; }
 .blk:hover .tcheck, .blk.on .tcheck, .tcheck.on { opacity: 1; } .tcheck.on { color: var(--ok); }
+/* a mark made before its block changed (model/review.ts): amber, and back to the review queue */
+.gut-btn.stale, .tcheck.stale { opacity: 1; color: var(--warn); }
+/* review stages: a chip, a stepper, the toolbar's button */
+.stage-chip { display: inline-block; padding: 1px 9px; border-radius: 99px; font-size: 12px; white-space: nowrap; background: var(--chip); color: var(--mute); }
+.stage-chip.in-review { color: var(--ink); } .stage-chip.ready { color: var(--accent); background: var(--accent-soft); } .stage-chip.approved { color: var(--accent-ink); background: var(--accent); } .stage-chip.changed { color: var(--warn); background: var(--curtain-soft); }
+.stage-btn.ready { border-color: var(--accent); color: var(--accent); } .stage-btn.approved { color: var(--accent); } .stage-btn.changed { color: var(--warn); }
+.stepper { display: flex; list-style: none; margin: 0; padding: 0; gap: 0; font-size: 12.5px; }
+.stepper li { flex: 1; padding: 5px 8px 6px; border-bottom: 3px solid var(--line); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stepper li.past { border-color: var(--accent); color: var(--mute); } .stepper li.now { border-color: var(--accent); color: var(--ink); font-weight: 600; }
+.stepper.changed li.now { border-color: var(--warn); color: var(--warn); }
+/* a strip of an episode's blocks, one cell each: reviewed, changed since, partly, to review, an error, a comment */
+.block-strip { display: flex; flex-wrap: wrap; gap: 2px; align-items: center; }
+.block-strip .cell { position: relative; width: 9px; height: 16px; border-radius: 2px; background: var(--chip); border: 1px solid var(--line); }
+.block-strip .cell.sub { width: 6px; height: 11px; }
+.block-strip .cell.done, .block-strip .cell.unverified { background: var(--ok); border-color: var(--ok); } .block-strip .cell.unverified { opacity: .6; }
+.block-strip .cell.partial { background: linear-gradient(var(--chip) 50%, var(--ok) 50%); } .block-strip .cell.changed { background: var(--warn); border-color: var(--warn); }
+.block-strip .cell.err { box-shadow: 0 0 0 1.5px var(--bad); } .block-strip .cell.talk::after { content: ""; position: absolute; top: -4px; right: -3px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+.block-strip .cell:hover { transform: scaleY(1.2); }
+/* each translation's checks as a ring */
+.passes { display: inline-flex; gap: 8px; margin-left: 8px; } .pass { display: inline-flex; align-items: center; gap: 4px; font-variant-numeric: tabular-nums; }
+.pass i { width: 11px; height: 11px; border-radius: 50%; background: conic-gradient(var(--ok) calc(var(--p) * 1%), var(--line) 0); } .pass.full { color: var(--ok); }
+/* the review page: filters, a season's stage bar, the next launch, and a row per episode */
+.review-page .filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; } .review-page .filters .chip { border: 1px solid transparent; cursor: pointer; }
+.review-page .filters .chip.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.review-season { margin-bottom: 24px; } .review-season h3 { margin: 0 0 6px; }
+.stage-bar { display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: var(--chip); gap: 2px; }
+.stage-bar span, .stage-legend i { background: var(--line); } .stage-bar .approved, .stage-legend i.approved { background: var(--accent); } .stage-bar .ready, .stage-legend i.ready { background: color-mix(in srgb, var(--accent) 55%, transparent); }
+.stage-bar .in-review, .stage-legend i.in-review { background: var(--mute); } .stage-bar .changed, .stage-legend i.changed { background: var(--warn); }
+.stage-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 6px 0 8px; font-size: 12px; } .stage-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+.next-launch { margin: 0 0 10px; font-size: 13.5px; color: var(--mute); } .next-launch.soon { color: var(--warn); }
+.review-list { display: grid; gap: 6px; }
+.review-row { display: grid; grid-template-columns: minmax(170px, 1.1fr) auto minmax(0, 2fr) auto; gap: 14px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.review-row .who { min-width: 0; } .review-row .who .note { font-size: 12px; } .review-row .strip-col { display: grid; gap: 5px; min-width: 0; } .review-row .strip-col .note { font-size: 12px; }
+.review-row .bad { color: var(--bad); }
+@media (max-width: 760px) { .review-row { grid-template-columns: 1fr auto; } .review-row .strip-col { grid-column: 1 / -1; } }
+.review-panel .row.wrap { flex-wrap: wrap; gap: 8px; } .review-panel .linkish { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; }
 .comment { border-left: 3px solid var(--line); padding: 4px 8px; } .comment.done { opacity: .55; }
 .proposals { display: grid; gap: 8px; margin-bottom: 12px; }
 .proposal { border: 1px solid var(--warn); border-radius: 12px; padding: 10px 12px; background: color-mix(in srgb, var(--new) 60%, var(--panel)); display: grid; gap: 6px; }

@@ -19,6 +19,7 @@ import { taken, type Ghost, type Suggest } from "../../model/autostage.ts";
 import { KIT } from "../../stage.ts";
 import { history, review, say, world } from "../../store.ts";
 import { checkedOf, markStep, rowKey } from "../review.ts";
+import { sigAt } from "../../model/review.ts";
 import { Icon, Popover } from "../kit/index.ts";
 import { Picker } from "../galleries.ts";
 import { inLang, langName, useLangs } from "../lang.ts";
@@ -169,11 +170,12 @@ function Grow(p: { value: string; lang: string; main?: boolean; placeholder?: st
 /** The translations of a block's text, as small rows. */
 function Translations(p: Common & { at: Path }) {
   const langs = useLangs(), v = (get(p.story, p.at) ?? {}) as Record<string, unknown>;
-  const checked = checkedOf(review.value[p.id]?.steps?.[rowKey(p.b.path)]);
+  const note = review.value[p.id]?.steps?.[rowKey(p.b.path)], checked = checkedOf(note);
+  const stale = !!note?.sig && note.sig !== sigAt(p.story, p.b.path);
   return html`<div class="trans">${langs.translations.map(l => html`<div class="trow"><span class="lang-tag" title=${langName(l)}>${l}</span>
     <${Grow} value=${String(v[l] ?? "")} lang=${l} label=${`${langName(l)}`} placeholder=${`${langName(l)}…`} onInput=${(x: string) => p.edit(s => set(s, [...p.at, l], x), `${key(p.at)}.${l}`)} />
     ${!v[l] ? html`<span class="missing" title=${`No ${langName(l)} yet`}>·</span>`
-    : html`<button class=${`tcheck${checked.includes(l) ? " on" : ""}`} aria-pressed=${checked.includes(l)} title=${checked.includes(l) ? `${langName(l)} checked` : `Mark the ${langName(l)} checked`} onClick=${() => markStep(p.id, p.b.path, l, !checked.includes(l))}>✓</button>`}</div>`)}</div>`;
+    : html`<button class=${`tcheck${checked.includes(l) ? (stale ? " stale" : " on") : ""}`} aria-pressed=${checked.includes(l) && !stale} title=${checked.includes(l) ? (stale ? `${langName(l)} checked before the block changed (click to check it again)` : `${langName(l)} checked`) : `Mark the ${langName(l)} checked`} onClick=${() => markStep(p.id, p.story, p.b.path, l, stale || !checked.includes(l))}>✓</button>`}</div>`)}</div>`;
 }
 
 /** The staging written on a block, as chips (× clears one), and the parenthetical field that adds to it. */

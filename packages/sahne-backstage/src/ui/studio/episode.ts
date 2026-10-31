@@ -9,12 +9,13 @@ import { html } from "htm/preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { allLanguages, langFor, lintStory, seasonOf, suggest, textOf, type StoryDoc } from "sahne-story";
 import type { Run } from "sahne";
-import { checkDocs, checked, change, draftOf, history, keyOf, openDoc, review, saveDocs, world } from "../../store.ts";
+import { checkDocs, checked, change, draftOf, history, keyOf, openDoc, review, route, saveDocs, world } from "../../store.ts";
 import { cueOf, cuePath, type Path } from "../../model/path.ts";
 import { flagsIn, wordsOnly } from "../../model/steps.ts";
 import { dirty } from "../../model/history.ts";
 import { KIT, Preview, solidsOf } from "../../stage.ts";
-import { ReviewGutter, ReviewPanel } from "../review.ts";
+import { pathOfKey, ReviewGutter, ReviewPanel } from "../review.ts";
+import { blocksOf, standingOf, STAGE_NAME } from "../../model/review.ts";
 import { NotesPanel } from "./notes.ts";
 import { ChangesPanel } from "../changes.ts";
 import { AskMenu } from "../assistant.ts";
@@ -158,21 +159,24 @@ function Studio(p: { id: string }) {
   const edit = (fn: (s: StoryDoc) => StoryDoc, field?: string) => change<StoryDoc>("story", p.id, fn, field);
   // an agent pointed here
   useEffect(() => { const s = agentShown.value; if (s && s.id === p.id && s.step) select(s.step, true); }, [agentShown.value?.n]);
+  // from the review page: a block (#/episode/<id>/at/<key>), or the episode's review (#/episode/<id>/review)
+  useEffect(() => { const [, , sub, k] = route.value; if (sub === "at" && k) select(pathOfKey(k), true); if (sub === "review") setTab("review"); }, [route.value.join("/")]);
   const mine = proposals.value.filter(x => (x.kind === "story" && x.doc === p.id) || x.also?.some(a => a.kind === "story" && a.doc === p.id));
   const conflict = conflicts.value.has(key);
   const problems = [...(checked.value[key] ?? []), ...lints];
   const marks: Record<number, { errors: number; warnings: number }> = {};
   for (const x of problems) if (x.step !== undefined && (x.level === "error" || x.level === "warning")) { const m = (marks[x.step] ??= { errors: 0, warnings: 0 }); if (x.level === "error") m.errors++; else m.warnings++; }
-  const status = review.value[p.id]?.status ?? "draft", comments = review.value[p.id]?.comments?.length ?? 0;
+  const comments = review.value[p.id]?.comments?.length ?? 0;
   const allFlags = flagsIn(story);
   const errors = problems.filter(x => x.level === "error").length;
+  const standing = standingOf(review.value[p.id], blocksOf(story, langs), { errors, translations: langs.translations });
   const save = () => void saveDocs([key, keyOf("season", `s${seasonOf(p.id)}`)]);
 
   return html`<section class="studio-episode" onKeyDown=${(e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); } }}>
     <div class="toolbar row">
       <div class="grow" style="min-width:0"><h2 style="margin:0"><span class="note">${p.id}</span> <span ...${inLang(langs.main)}>${textOf(story.title, langs.main)}</span></h2>
         <span class="note">${[langs.translations[0] && html`<span ...${inLang(langs.translations[0])}>${textOf(story.title, langs.translations[0]) ?? ""}</span>`, story.kind === "special" && "special", story.releaseDate, story.draft && "draft"].filter(Boolean).map((x, k) => html`${k ? " · " : ""}${x}`)}</span></div>
-      <button onClick=${() => setTab("review")} title="Its status and comments">${status === "draft" ? "To review" : status}${comments ? ` · ${comments} 💬` : ""}</button>
+      <button class=${`stage-btn ${standing.stage}`} onClick=${() => setTab("review")} title=${`Its review: ${standing.done} of ${standing.total} blocks reviewed${standing.missing.length ? `; not ready: ${standing.missing.join(", ")}` : ""}`}>${STAGE_NAME[standing.stage]}${comments ? ` · ${comments} 💬` : ""}</button>
       <button class="iconbtn" onClick=${() => history("story", p.id, "undo")} disabled=${!d.past.length} title=${`Undo (${MOD} Z)`} aria-label="Undo"><${Icon} name="undo" /></button>
       <button class="iconbtn" onClick=${() => history("story", p.id, "redo")} disabled=${!d.future.length} title=${`Redo (⇧${MOD} Z)`} aria-label="Redo"><${Icon} name="redo" /></button>
       <button onClick=${() => history("story", p.id, "revert")} disabled=${!dirty(d)}>Revert</button>
@@ -187,7 +191,7 @@ function Studio(p: { id: string }) {
       <div class="script-col">
         <${EpisodeHead} story=${story} saved=${saved} edit=${edit} />
         <${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} ghosts=${ghosts} suggestions=${suggestions}
-          gutter=${(b: { path: Path }) => html`<${ReviewGutter} id=${p.id} path=${b.path} onComments=${() => { select(b.path); setTab("review"); }} />`} />
+          gutter=${(b: { path: Path }) => html`<${ReviewGutter} id=${p.id} story=${story} path=${b.path} onComments=${() => { select(b.path); setTab("review"); }} />`} />
         <${Quiz} story=${story} saved=${saved} edit=${edit} />
         <${Glosses} story=${story} saved=${saved} edit=${edit} />
       </div>
@@ -205,7 +209,7 @@ function Studio(p: { id: string }) {
         </div>
         ${tab === "problems" && html`<label class="row note"><input type="checkbox" style="width:auto" checked=${here} onChange=${(e: Event) => setHere((e.target as HTMLInputElement).checked)} /> only the selected block</label>
           <${NotesPanel} problems=${problems} path=${path} select=${select} edit=${edit} onlyHere=${here} />`}
-        ${tab === "review" && html`<${ReviewPanel} id=${p.id} story=${story} path=${path} />`}
+        ${tab === "review" && html`<${ReviewPanel} id=${p.id} story=${story} path=${path} standing=${standing} />`}
         ${tab === "changes" && html`<${ChangesPanel} id=${p.id} story=${story} savedAt=${d.mtime} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} select=${(x: Path) => select(x, true)} />`}
       </div>
     </div>

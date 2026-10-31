@@ -17,7 +17,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CONTENT, IS_SAMPLES } from "../../sahne-story/paths.ts";
 import { allProblems, check, exists, forget, isKind, kitDocs, lessons, listing, oldShape, readDoc, remove, save, searchCards, type Edit } from "./content.ts";
 import { headOf } from "./git.ts";
-import { readReview, writeReview } from "./review.ts";
+import { blocksFor, readReview, writeReview } from "./review.ts";
 import { requestOf, runAssistant, usageSummary } from "./assistant.ts";
 import { MODELS } from "./ai/providers/anthropic.ts";
 import { localModels } from "./ai/providers/openai.ts";
@@ -212,6 +212,8 @@ export async function serve(o: Options): Promise<Running> {
     if (route === "lessons" && m === "GET") return json(res, 200, { lessons: lessons() });
     if (route === "kit" && m === "GET") return json(res, 200, kitDocs());
     if (route === "problems" && m === "GET") return json(res, 200, { problems: allProblems() });
+    // each episode's blocks as saved (model/review.ts): the Review page's strips and stages
+    if (route === "review" && a === "blocks" && m === "GET") return json(res, 200, { episodes: Object.fromEntries(listing().episodes.map(e => [e.id, blocksFor(e.id).map(({ path: _p, ...b }) => b)])) });
     if (route === "review" && m === "GET") return json(res, 200, readReview());
     if (route === "review" && m === "POST") {
       if (!o.write) throw new Fail(403, "read-only: start backstage with --write");

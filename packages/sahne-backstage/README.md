@@ -125,7 +125,7 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 | `#/character/<id>` | A character, described below |
 | `#/places` | Every place as its wide shot, with how many episodes it opens; *New place* starts one |
 | `#/place/<id>` | A place, described below |
-| `#/review` | Where every episode stands: status, blocks reviewed, each translation checked, errors, warnings, the known-word ratio (when the root has cards), open comments; *Export the notes* downloads them as markdown |
+| `#/review` | What needs a person's eye, nearest launch first (filters: needs you, has errors, launches this week, changed since review, AI-written): each season's stage bar and its next launch, and each episode's stage, a strip of its blocks (reviewed, changed since, partly, to review, an error, a comment; a click opens the block), each translation's checks, errors, open comments and the known-word ratio (when the root has cards); *Export the notes* downloads them as markdown |
 
 **The board** (`src/ui/board.ts`, its dates in `src/model/board.ts`):
 - **The seasons are tabs at its top** (*Season 1*, *Season 2*, with each title), and *+ Season* starts the next one. The top bar names only the series.
@@ -177,7 +177,7 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 - **Details** opens the selected block's full staging in a drawer (`details.ts`, the forms in `src/ui/staging.ts`): every field with a picker of what is valid there (the kit's emotions, gestures and sounds; the engine's cameras, moves, prop ops and voices; the place's marks and props; the cast), a scene's time, weather and states, a line's note for the learner, the flags that gate it, and the step as JSON.
 - **Notes, review and changes** are tabs under the stage.
   - **Notes** (`notes.ts`, `src/model/notes.ts`): every problem as a stage manager's note in plain words ("İsmail speaks but isn't in the cast", "The line has no Persian yet"), the ones the last edit brought first, each with *Go* to its block and, where one is obvious, a fix (*Add İsmail*, *Stage it*, *Gloss them*); for the whole episode or only the selected block. The stage lints (`lintStory`, in the series' story language) run as you type, the full story check a moment later on the server. A block with problems has a dot in its gutter.
-  - **Review** is in the script itself: ✓ in a block's gutter marks it reviewed, ✓ beside a translation marks that language checked, 💬 opens its comments. The Review tab holds the episode's status (to review, reviewed, approved), whether AI wrote it, how much is reviewed and checked per language, and the comments on the episode or the selected block.
+  - **Review** is in the script itself: ✓ in a block's gutter marks it reviewed, ✓ beside a translation marks that language checked, 💬 opens its comments. A mark remembers the block as it was: when the block changes, its ✓ turns amber and the block is back in the queue. The Review tab holds the episode's stage, worked out from the evidence (`src/model/review.ts`, which check_season and set_review use too): *Draft*, *In review*, *Ready* (every block reviewed and the translations it holds checked, no errors, no open comments; a series with one language has no translation passes), *Approved* (a sign-off, possible once it is Ready, or before with a reason that becomes a comment; an agent's `set_review` is refused until it is Ready) and *Changed since approved*. It says what keeps the episode from Ready, holds whether AI wrote it, and the comments on the episode or the selected block. Marks are keyed by step index, so inserting a step shifts the blocks after it, and their marks show as changed; marks from before signatures count as reviewed, unverified.
   - **Changes**: each changed step against git's HEAD, with *Put back as committed*. A person commits; backstage never does.
 - **Undo, redo, revert and save.** Typing into one field is one undo step. Save is refused when the edit brings an error; problems the file already had do not block it.
 
@@ -286,7 +286,7 @@ Review state is editors' notes, so it is not part of a story: a story's root tak
 
 ```json
 { "v": 1, "episodes": { "s1e01": { "status": "reviewed", "ai": true, "reviewer": "…",
-  "steps": { "4": { "reviewed": true, "checked": ["en", "fa"] }, "12.0.1": { "reviewed": true } },
+  "steps": { "4": { "reviewed": true, "checked": ["en", "fa"], "sig": "1a2b3c4d" }, "12.0.1": { "reviewed": true } },
   "comments": [{ "id": "…", "at": "4", "by": "…", "text": "…", "date": "2026-10-29 10:00", "done": true }] } } }
 ```
 

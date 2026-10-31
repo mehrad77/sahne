@@ -409,6 +409,12 @@ test("direct mode: an edit is saved; a stale read is refused (409) and a new err
     assert.match(readFileSync(story, "utf8"), /In you come/);
     const ok = await call(client, "set_review", { id: "s1e00", status: "reviewed" });
     assert.ok(!ok.isError, ok.text);
+    // approving is a sign-off on a Ready episode, for an agent too
+    const early = await call(client, "set_review", { id: "s1e00", status: "approved" });
+    assert.ok(early.isError);
+    assert.match(early.text, /not approved: s1e00 is not ready \(\d+ of \d+ blocks to review/);
+    const season = await call(client, "check_season", { id: 1 });
+    assert.match(season.text, /s1e00 · .* · in-review \(0\/\d+ blocks reviewed\)|s1e00 · .* · draft \(0\/\d+ blocks reviewed\)/);
   } finally { await close(); }
 });
 

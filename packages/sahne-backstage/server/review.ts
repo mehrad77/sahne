@@ -8,13 +8,12 @@
 import { existsSync } from "node:fs";
 import { REVIEW } from "../../sahne-story/paths.ts";
 import { plain, readFile, textFor, writeAtomic } from "../../sahne-story/json.ts";
+import { languagesOf, type SeriesDoc, type StoryDoc } from "../../sahne-story/src/index.ts";
+import { blocksOf, standingOf, type Block, type Comment, type EpisodeReview, type Standing, type Status, type StepNote } from "../src/model/review.ts";
+import { exists, readDoc, type Problem } from "./content.ts";
 
-export type Status = "draft" | "reviewed" | "approved";
+export type { Comment, EpisodeReview, Status, StepNote };
 export const STATUSES: Status[] = ["draft", "reviewed", "approved"];
-
-export interface Comment { id: string; at?: string; by: string; text: string; date: string; done?: boolean }
-export interface StepNote { reviewed?: boolean; /** The translations checked, by language code. */ checked?: string[]; /** Its Persian checked (notes written before `checked`). */ persian?: boolean }
-export interface EpisodeReview { status?: Status; ai?: boolean; reviewer?: string; steps?: Record<string, StepNote>; comments?: Comment[] }
 export interface Review { v: 1; episodes: Record<string, EpisodeReview> }
 
 const EMPTY: Review = { v: 1, episodes: {} };
@@ -40,6 +39,7 @@ function clean(e: unknown): EpisodeReview {
       const n = v as StepNote, s: StepNote = {};
       if (n.reviewed) s.reviewed = true;
       if (n.persian) s.persian = true;
+      if (typeof n.sig === "string" && /^[0-9a-f]{8}$/.test(n.sig)) s.sig = n.sig;
       if (Array.isArray(n.checked)) { const c = [...new Set(n.checked.filter((l): l is string => typeof l === "string" && /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(l)))].sort(); if (c.length) s.checked = c; }
       if (Object.keys(s).length) steps[k] = s;
     }
@@ -66,3 +66,15 @@ export function writeReview(body: unknown): Review {
   return doc;
 }
 
+
+/** An episode's blocks as saved (the Review page and check_season compare marks with the saved file, so unsaved edits show as changed). */
+export function blocksFor(id: string): Block[] {
+  const series = exists("series", "series") ? readDoc("series", "series").doc as SeriesDoc : null;
+  return blocksOf(readDoc("story", id).doc as StoryDoc, languagesOf(series));
+}
+
+/** Where an episode stands, from its saved file, its notes and its problems (model/review.ts). */
+export function standingFor(id: string, problems: Problem[], r: EpisodeReview | undefined = readReview().episodes[id]): Standing {
+  const series = exists("series", "series") ? readDoc("series", "series").doc as SeriesDoc : null;
+  return standingOf(r, blocksFor(id), { errors: problems.filter(p => p.doc === `story:${id}` && p.level === "error").length, translations: languagesOf(series).translations });
+}

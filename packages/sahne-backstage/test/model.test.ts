@@ -268,3 +268,42 @@ test("a week's theme: in the season, and in the stories of that week only", asyn
   assert.equal(t.story({ arc: { id: "s1w02" } }), null);
   assert.equal((season as any).arcs.s1w01.en, "old", "the season given is not changed");
 });
+
+test("review: a block's signature ignores key order and the blocks inside it; the stage follows the evidence", async () => {
+  const { blocksOf, hashOf, sigAt, stateOf, standingOf } = await import("../src/model/review.ts");
+  assert.equal(hashOf({ a: 1, b: 2 }), hashOf({ b: 2, a: 1 }));
+  const langs = { main: "tr", translations: ["en", "fa"] };
+  const blocks = blocksOf(STORY, langs);
+  assert.ok(blocks.length > 3);
+  for (const b of blocks) assert.equal(b.sig, sigAt(STORY, b.path), `${b.key}: the same signature listed or alone`);
+  const line = blocks.find(b => b.kind === "line")!;
+  assert.deepEqual(line.langs.filter(l => l !== "fa" && l !== "en"), [], "a line's checks are the translations it holds");
+  assert.equal(blocksOf(STORY, { main: "tr", translations: [] }).every(b => !b.langs.length), true, "a series with one language has no translation passes");
+  // a choice's signature does not change when one of its options does
+  const choice = blocks.find(b => b.kind === "choice");
+  if (choice) {
+    const edited = structuredClone(STORY) as any;
+    edited.steps[choice.step].choice.options[0].tr = "something else";
+    assert.equal(sigAt(edited, choice.path), choice.sig);
+    assert.notEqual(sigAt(edited, [...choice.path, "choice", "options", 0]), sigAt(STORY, [...choice.path, "choice", "options", 0]));
+  }
+  // a block's states
+  assert.equal(stateOf(line, undefined), "todo");
+  assert.equal(stateOf(line, { reviewed: true }), line.langs.length ? "partial" : "unverified", "reviewed with its translations unchecked");
+  assert.equal(stateOf(line, { reviewed: true, checked: line.langs }), "unverified", "marks from before signatures count, unverified");
+  assert.equal(stateOf(line, { reviewed: true, checked: line.langs, sig: line.sig }), "done");
+  assert.equal(stateOf(line, { reviewed: true, checked: line.langs, sig: "00000000" }), "changed");
+  // the stage
+  const all = (sig = true) => Object.fromEntries(blocks.map(b => [b.key, { reviewed: true, checked: b.langs, ...(sig ? { sig: b.sig } : {}) }]));
+  const o = { errors: 0, translations: langs.translations };
+  assert.equal(standingOf(undefined, blocks, o).stage, "draft");
+  assert.equal(standingOf({ steps: { [line.key]: { reviewed: true } } }, blocks, o).stage, "in-review");
+  assert.equal(standingOf({ steps: all() }, blocks, o).stage, "ready");
+  assert.deepEqual(standingOf({ steps: all() }, blocks, { ...o, errors: 2 }).missing, ["2 errors"], "an error keeps it from Ready");
+  assert.equal(standingOf({ steps: all(), comments: [{ id: "c", by: "x", text: "y", date: "d" }] }, blocks, o).stage, "in-review", "an open comment keeps it from Ready");
+  assert.equal(standingOf({ steps: all(false) }, blocks, o).stage, "ready", "old marks still make it ready");
+  assert.equal(standingOf({ status: "approved", steps: all() }, blocks, o).stage, "approved");
+  assert.equal(standingOf({ status: "approved", steps: { ...all(), [line.key]: { reviewed: true, checked: line.langs, sig: "00000000" } } }, blocks, o).stage, "changed", "approved, then a block changed");
+  const p = standingOf({ steps: all() }, blocks, o).passes;
+  assert.deepEqual(Object.keys(p).sort(), ["en", "fa"].filter(l => blocks.some(b => b.langs.includes(l))).sort());
+});

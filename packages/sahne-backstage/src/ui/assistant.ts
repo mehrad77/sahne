@@ -273,7 +273,10 @@ function AskCard(p: { part: AskPart; latest: boolean }) {
     ${x.save && html`<ul class="ask-list">${x.save.map(id => { const q = proposals.value.find(y => y.id === id); return html`<li>${q ? html`${q.summary} <span class="note">(${q.kind} ${q.doc})</span>` : html`<span class="note">${id}: answered already</span>`}</li>`; })}</ul>`}
     ${x.answered ? html`<div class="note">${x.answered}</div>` : html`<div class="row wrap">
       ${x.remember && html`<button class="primary" disabled=${busy2} onClick=${async () => { setBusy2(true); const r = await fetch("/api/memory", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: x.remember }) }); setBusy2(false); answer(r.ok ? "Kept for later conversations." : "Not kept: backstage could not write it."); }}>Keep it</button>`}
-      ${x.review && html`<button class="primary" disabled=${!p.latest || busy2} onClick=${() => { void setReview(x.review!.id, r => ({ ...r, status: x.review!.status as never })); answer(`Marked ${x.review!.id} ${x.review!.status}.`); }}>Mark ${x.review.status}</button>`}
+      ${x.review && (x.review.status === "approved"
+        // approving is a sign-off on a Ready episode: it happens on the episode's Review tab, which says what is missing
+        ? html`<a class="button primary" href=${`#/episode/${x.review.id}/review`}>Open ${x.review.id}'s review</a>`
+        : html`<button class="primary" disabled=${!p.latest || busy2} onClick=${() => { void setReview(x.review!.id, r => ({ ...r, status: x.review!.status as never })); answer(`Marked ${x.review!.id} ${x.review!.status}.`); }}>Mark ${x.review.status}</button>`)}
       ${waiting.length > 0 && html`<button class="primary" disabled=${busy2} onClick=${async () => { setBusy2(true); let n = 0; for (const q of waiting) if (await acceptAndSave(q)) n++; setBusy2(false); answer(n ? `Accepted and saved ${n} proposal${n > 1 ? "s" : ""}.` : "Nothing was saved."); }}>Accept and save ${waiting.length > 1 ? `all ${waiting.length}` : "it"}</button>`}
       ${(x.options ?? []).map(o => html`<button disabled=${!open} onClick=${() => { answer(`You answered: ${o}`); void send(o); }}>${o}</button>`)}
       ${(x.review || x.remember || waiting.length > 0) && html`<button disabled=${!open} onClick=${() => answer("Not now.")}>Not now</button>`}

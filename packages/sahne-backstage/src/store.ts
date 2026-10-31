@@ -5,6 +5,7 @@
 import { batch, computed, signal } from "@preact/signals";
 import { api, type Edit, type Kind, type Problem, type World } from "./api.ts";
 import * as H from "./model/history.ts";
+import type { Comment, EpisodeReview, Status, StepNote } from "./model/review.ts";
 import { loadKitDocs } from "./kitdocs.ts";
 
 export const world = signal<World | null>(null);
@@ -119,11 +120,7 @@ export async function saveDocs(keys: string[]): Promise<boolean> {
 
 // ---- review notes (server/review.ts) -------------------------------------------------------------------------------
 
-export type Status = "draft" | "reviewed" | "approved";
-export interface Comment { id: string; at?: string; by: string; text: string; date: string; done?: boolean }
-/** A step's review: reviewed, and which translations were checked (`persian`: notes from before `checked`). */
-export interface StepNote { reviewed?: boolean; checked?: string[]; persian?: boolean }
-export interface EpisodeReview { status?: Status; ai?: boolean; reviewer?: string; steps?: Record<string, StepNote>; comments?: Comment[] }
+export type { Comment, EpisodeReview, Status, StepNote };
 
 export const review = signal<Record<string, EpisodeReview>>({});
 export const allProblems = signal<Problem[] | null>(null);
