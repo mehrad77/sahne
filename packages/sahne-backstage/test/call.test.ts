@@ -11,7 +11,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ask, callDir, pngName, privateDir, sockOf, timeoutOf } from "../server/call.ts";
+import { ask, callDir, notStarted, pngName, privateDir, setupOf, sockOf, timeoutOf } from "../server/call.ts";
 
 const SAMPLES = fileURLToPath(new URL("../../sahne-story/samples/", import.meta.url));
 const CALL = fileURLToPath(new URL("../server/call.ts", import.meta.url));
@@ -34,20 +34,26 @@ const status = () => /pid (\d+)/.exec(spawnSync(process.execPath, [CALL, "--sess
 
 after(() => { spawnSync(process.execPath, [CALL, "--session", NAME, "--stop"], { env: ENV }); for (const d of [root, out, watch]) rmSync(d, { recursive: true, force: true }); });
 
-test("kit_render of one item saves its sheet as a PNG and prints the path", () => {
+test("kit_render of one item saves its sheet as a PNG and prints the path first, also as latest.png; the JSON only with --json", () => {
   const r = call("kit_render", JSON.stringify({ id: "chair" }));
   assert.equal(r.status, 0, r.stderr);
   const files = pngs(r.stdout);
   assert.equal(files.length, 1);
   assert.ok(isPng(files[0]), "the file is a PNG");
+  assert.match(r.stdout, /^image: /, "the picture's path is the first line");
+  assert.deepEqual(readFileSync(join(out, "latest.png")), readFileSync(files[0]), "latest.png is the newest picture");
+  assert.doesNotMatch(r.stdout, /^\{/m, "no JSON block by default");
+  assert.match(r.stdout, /^data: \{"id":"chair",.*\}$/m, "the data on one line");
+  assert.match(call("kit_render", JSON.stringify({ id: "chair" }), "--json").stdout, /^\{\n "id": "chair"/m);
+  assert.match(call("kit_search", JSON.stringify({ query: "cup" })).stdout, /"id": "cup"/, "an answer with no picture still prints its data");
 });
 
 test("kit_render of a list of items draws one sheet, with the problems of each", () => {
   const r = call("kit_render", JSON.stringify({ items: [{ id: "chair" }, { id: "frontage", variant: "firin" }, { doc: doc("x_board_a", "Menu") }] }));
   assert.equal(r.status, 0, r.stderr);
   assert.equal(pngs(r.stdout).length, 1, "one picture for three items");
-  assert.match(r.stdout, /3 items on one sheet/);
-  for (const id of ["chair", "frontage", "x_board_a"]) assert.match(r.stdout, new RegExp(`^${id}: 0 errors`, "m"));
+  assert.match(r.stdout, /^3 items, 6 cells on one sheet: 0 errors, 0 warnings$/m);
+  for (const [n, id] of [["1-2", "chair"], ["3-4", "frontage · firin"], ["5-6", "x_board_a"]]) assert.match(r.stdout, new RegExp(`^  ${n}  ${id}`, "m"), "each cell's number says what it shows");
 });
 
 test("draft_kit_item takes one drawing or a list, from the argument, a file or stdin", () => {
@@ -59,7 +65,7 @@ test("draft_kit_item takes one drawing or a list, from the argument, a file or s
   const two = call("draft_kit_item", `@${file}`);
   assert.equal(two.status, 0, two.stderr);
   assert.equal(pngs(two.stdout).length, 1);
-  assert.match(two.stdout, /2 items on one sheet/);
+  assert.match(two.stdout, /^2 items, 4 cells on one sheet/m);
   const piped = spawnSync(process.execPath, [CALL, "draft_kit_item", "-", "--content", root, "--out", out], { encoding: "utf8", env: ENV, input: JSON.stringify({ doc: doc("x_board_c", "Oui") }) });
   assert.equal(piped.status, 0, piped.stderr);
   assert.match(piped.stdout, /^x_board_c: 0 errors/m);
@@ -69,14 +75,20 @@ test("a tool error is exit code 1 with the answer on stderr; list and read work"
   const bad = call("kit_render", JSON.stringify({ id: "no_such_thing" }));
   assert.equal(bad.status, 1);
   assert.match(bad.stderr, /no set piece or prop no_such_thing/);
+  const some = call("kit_render", JSON.stringify({ items: ["chair", "chiar"] }));
+  assert.equal(some.status, 1);
+  assert.equal(pngs(some.stdout).length, 1, "the sheet's path on stdout, though the call failed");
+  assert.match(some.stderr, /^error: item 2: there is no set piece or prop chiar/m);
   const notJson = call("kit_render", "{nope");
   assert.equal(notJson.status, 1);
   assert.match(notJson.stderr, /not JSON/);
   const list = call("list");
   assert.equal(list.status, 0, list.stderr);
-  assert.match(list.stdout, /^kit_render\n/m);
-  assert.match(list.stdout, /input: \{/);
-  assert.match(call("list", "kit_render").stdout, /^kit_render/);
+  assert.match(list.stdout, /^usage: call\.ts <tool>/, "list starts with the usage");
+  assert.match(list.stdout, /^kit_render +A sheet of numbered cells/m, "a line a tool");
+  assert.doesNotMatch(list.stdout, /input: \{/, "no schemas in the list");
+  assert.ok(list.stdout.split("\n").length < 60, "the list is short");
+  assert.match(call("list", "kit_render").stdout, /^kit_render\n.*\n  input: \{/);
   assert.match(call("read", "sahne://kit-guide").stdout, /\S/);
   assert.equal(call("kit_save_nothing").status, 1);
 });
@@ -90,6 +102,7 @@ test("a write tool needs --write; with it a saved drawing is seen by the next ca
   assert.equal(yes.status, 0, yes.stderr);
   assert.ok(existsSync(join(root, "kit", "pieces", "x_saved_board.json")));
   assert.equal(call("kit_render", JSON.stringify({ id: "x_saved_board" })).status, 0);
+  assert.match(call("kit_read", JSON.stringify({ id: "x_saved_board" })).stdout, /^data: .*"doc":\{"id":"x_saved_board"/m, "a saved drawing's document, without --json");
 });
 
 test("--session keeps one server process, restarts it when a watched source changed, and stops on request", () => {
@@ -102,10 +115,12 @@ test("--session keeps one server process, restarts it when a watched source chan
   assert.ok(pid, "running after the first call");
   assert.equal(call("kit_render", args, "--session", NAME).status, 0);
   assert.equal(status(), pid, "the same process served the second call");
-  // a session serves one setup: asking for --write of a read-only one is refused, not served wrongly
-  const wrong = call("save_kit_item", JSON.stringify({ doc: doc("x_late_board", "Oui") }), "--session", NAME, "--write");
-  assert.equal(wrong.status, 1);
-  assert.match(wrong.stderr, /--stop/);
+  // --write on a read-only session is served by the same process, as asked; a call without it stays read-only
+  const late = JSON.stringify({ doc: doc("x_late_board", "Oui") });
+  assert.match(call("save_kit_item", late, "--session", NAME).stderr, /read-only/);
+  const written = call("save_kit_item", late, "--session", NAME, "--write");
+  assert.equal(written.status, 0, written.stderr);
+  assert.equal(status(), pid, "the same process served the --write call");
   // an edit to a watched TypeScript source starts a new process
   const later = new Date(Date.now() + 5000);
   utimesSync(join(watch, "gen.ts"), later, later);
@@ -115,6 +130,48 @@ test("--session keeps one server process, restarts it when a watched source chan
   assert.notEqual(status(), pid, "a new process drew it");
   assert.match(spawnSync(process.execPath, [CALL, "--session", NAME, "--stop"], { encoding: "utf8", env: ENV }).stdout, /stopped/);
   assert.equal(status(), undefined);
+});
+
+test("a session's setup sticks: a call without flags takes the running session's; another content root restarts it, saying so", () => {
+  const s = `${NAME}-s`, other = mkdtempSync(join(tmpdir(), "backstage-call-other-")), bare = (...a: string[]) => spawnSync(process.execPath, [CALL, ...a, "--out", out], { encoding: "utf8", env: ENV });
+  cpSync(SAMPLES, other, { recursive: true });
+  try {
+    assert.equal(call("kit_search", JSON.stringify({ query: "cup" }), "--session", s, "--write").status, 0);
+    // no --content, no --write: the session's root and --write
+    const saved = bare("save_kit_item", JSON.stringify({ doc: doc("x_sticky_board", "Oui") }), "--session", s);
+    assert.equal(saved.status, 0, saved.stderr);
+    assert.ok(existsSync(join(root, "kit", "pieces", "x_sticky_board.json")), "saved in the session's content root");
+    // a restart for a changed source keeps the setup
+    const later = new Date(Date.now() + 10_000);
+    utimesSync(join(watch, "gen.ts"), later, later);
+    const again = bare("save_kit_item", JSON.stringify({ doc: doc("x_sticky_board_2", "Non") }), "--session", s);
+    assert.equal(again.status, 0, again.stderr);
+    assert.ok(existsSync(join(root, "kit", "pieces", "x_sticky_board_2.json")), "the restarted session kept its root and --write");
+    // $SAHNE_CONTENT is where a session starts, never a reason to move a running one
+    const env = spawnSync(process.execPath, [CALL, "kit_search", JSON.stringify({ query: "cup" }), "--session", s, "--out", out], { encoding: "utf8", env: { ...ENV, SAHNE_CONTENT: other } });
+    assert.equal(env.status, 0, env.stderr);
+    assert.doesNotMatch(env.stderr, /restarted/);
+    assert.match(bare("--session", s, "--status").stdout, new RegExp(`${root.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\(--write`), "still the first root, writing");
+    // --content asks for another root: the session restarts there, without the old --write
+    const moved = bare("save_kit_item", JSON.stringify({ doc: doc("x_moved_board", "Oui") }), "--session", s, "--content", other);
+    assert.equal(moved.status, 1);
+    assert.match(moved.stderr, /restarted for .*backstage-call-other-/);
+    assert.match(moved.stderr, /read-only/);
+    assert.ok(!existsSync(join(other, "kit", "pieces", "x_moved_board.json")), "nothing saved in the other root");
+    assert.doesNotMatch(bare("--session", s, "--status").stdout, /--write/);
+  } finally { spawnSync(process.execPath, [CALL, "--session", s, "--stop"], { env: ENV }); rmSync(other, { recursive: true, force: true }); }
+  // --write alone makes a one-shot's edits direct; a session's own mode stays unless the call changes --write
+  const base = { content: "/r", write: false, agentEdits: "proposals" as const, shareCards: false };
+  assert.equal(setupOf({ write: true }, base).agentEdits, "direct");
+  assert.deepEqual(setupOf({}, { ...base, write: true, agentEdits: "direct" }), { ...base, write: true, agentEdits: "direct" });
+  assert.equal(setupOf({ write: true, agentEdits: "proposals" }, base).agentEdits, "proposals");
+});
+
+test("a session that did not start says why: the last lines of its log", () => {
+  const log = join(watch, "fail.log");
+  writeFileSync(log, "starting\nTypeError: x is not defined\n    at gen.ts:3\n");
+  assert.match(notStarted("kit", log), /did not start:\n[^]*TypeError: x is not defined[^]*the whole log: /);
+  assert.match(notStarted("kit", join(watch, "none.log")), /did not start \(the whole log/);
 });
 
 test("a running --write session reads the content root's kit fresh on every call", () => {

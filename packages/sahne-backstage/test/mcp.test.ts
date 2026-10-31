@@ -570,10 +570,84 @@ test("kit_render takes a list of items and draft_kit_item a list of drawings: on
     const d = await call(client, "draft_kit_item", { docs: [chalkboard(), { ...chalkboard(), id: "x_cafe_chalkboard_two" }] });
     assert.ok(!d.isError, d.text);
     assert.equal(d.images.length, 1);
-    assert.match(d.text, /^x_cafe_chalkboard_two: 0 errors/m);
+    assert.match(d.text, /^2 items, 4 cells on one sheet: 0 errors/);
+    assert.match(d.text, /^ {2}3-4 {2}x_cafe_chalkboard_two · default$/m, "each number says what its cell shows");
     assert.match((await call(client, "kit_render", { items: [{ id: "chair" }], id: "chair" })).text, /not both/);
     assert.match((await call(client, "kit_render", { items: [{ id: "chair", variant: "nope" }] })).text, /no variant nope/);
     assert.ok(!existsSync(kitFile("pieces", "x_cafe_chalkboard_two.json")), "a draft writes nothing");
+  } finally { await close(); }
+});
+
+test("kit_render's inputs are strict: a misplaced key says where it goes, an unknown id names the closest and the rest is drawn", async () => {
+  const { client, close } = await connect({ write: false, agentEdits: "proposals" });
+  try {
+    const refused = async (a: Record<string, unknown>, re: RegExp) => { const r = await call(client, "kit_render", a); assert.ok(r.isError, JSON.stringify(a)); assert.match(r.text, re); assert.equal(r.images.length, 0); };
+    await refused({ items: [{ id: "money", currency: "dollar" }] }, /^item 1: currency is a param of money: put it under params \(\{"params": \{"currency": "dollar"\}\}\)/);
+    await refused({ id: "money", kind: "foreign" }, /kind is a param of money: put it under params .* or name its variant \(\{"variant": "foreign"\}\)/);
+    await refused({ ids: ["chair"] }, /ids: give "items"/);
+    await refused({ id: "chair", seed: "b" }, /"seeds"/);
+    await refused({ id: "chair", zom: "fit" }, /zom is not a key this takes \(did you mean zoom\?\)/);
+    await refused({ id: "tea", held: true }, /held is a look, not a key: put it under params/);
+    await refused({ id: "chiar" }, /there is no set piece or prop chiar \(closest: chair/);
+    await refused({ id: "money", params: { value: 20 } }, /value: 20 .*: give it as the string "20"/);
+    await refused({ items: [{ doc: chalkboard() }, { doc: { ...chalkboard(), about: "Another." } }] }, /two different drawings share the id x_cafe_chalkboard/);
+    // plain ids; the same drawing twice, in two looks
+    const plain = await call(client, "kit_render", { items: ["chair", "tea"], views: ["day"] });
+    assert.ok(!plain.isError, plain.text);
+    assert.equal(json(plain).cells.length, 2);
+    const twice = await call(client, "kit_render", { items: [{ doc: chalkboard() }, { doc: chalkboard(), params: { held: true } }], views: ["day"] });
+    assert.ok(!twice.isError, twice.text);
+    // an unknown id among others: a red cell and an error, the others drawn
+    const some = await call(client, "kit_render", { items: ["chair", "chiar"], views: ["day"] });
+    assert.ok(some.isError);
+    assert.equal(some.images.length, 1, "the sheet is still drawn");
+    assert.match(some.text, /^error: item 2: there is no set piece or prop chiar \(closest: chair/m);
+    assert.deepEqual(json(some).cells.map((c: { id: string; error?: string }) => [c.id, !!c.error]), [["chair", false], ["chiar", true]]);
+  } finally { await close(); }
+});
+
+test("kit_render: vary draws a cell per value, t and frames mid-motion, focus a box, fit a large item; 24 cells to a picture", async () => {
+  const { client, close } = await connect({ write: false, agentEdits: "proposals" });
+  try {
+    const cells = async (a: Record<string, unknown>) => { const r = await call(client, "kit_render", a); assert.ok(!r.isError, r.text); return { r, cells: json(r).cells as { n: number; id: string; look: Record<string, unknown>; view: string; t?: number }[] }; };
+    const values = await cells({ id: "money", vary: { value: "all" }, views: ["day"] });
+    assert.deepEqual(values.cells.map(c => c.look.value), ["5", "10", "20", "50", "100", "200"]);
+    assert.match(values.r.text, /^ {2}6 {2}money · value 200$/m);
+    const held = await cells({ items: ["tea", "cup"], vary: { held: "all" }, views: ["day"] });
+    assert.deepEqual(held.cells.map(c => `${c.id} ${!!c.look.held}`), ["tea false", "tea true", "cup false", "cup true"]);
+    assert.match(held.r.text, /^ {2}1 {2}tea · not held$/m);
+    const frontage = await cells({ id: "frontage", vary: { variant: "all" }, views: ["day"] });
+    assert.equal(frontage.cells.length, 1 + Object.keys(fullKit.set.frontage.variants ?? {}).length, "the default and each variant");
+    const both = await cells({ id: "money", vary: { kind: ["notes", "foreign"], currency: "all" }, views: ["day"] });
+    assert.equal(both.cells.length, 4, "every combination");
+    // mid-motion: the motions and their periods, then a cell per time
+    const flag = await cells({ items: ["flag"], frames: 4, views: ["day"] });
+    assert.match(flag.r.text, /^motion: flag: sway (\d+) ms/m);
+    const period = Number(/sway (\d+) ms/.exec(flag.r.text)![1]);
+    assert.deepEqual(flag.cells.map(c => c.t), [0, 1, 2, 3].map(i => Math.round(i * period / 4)));
+    assert.match((await cells({ items: ["flag", "tea"], t: 500, views: ["day"] })).r.text, /^still: tea has no moving flat/m);
+    assert.match((await call(client, "kit_read", { id: "flag" })).text, /^motion: sway \d+ ms/m, "kit_read says it moves");
+    // a crop and fit are drawn; past 24 cells, more pictures; past 96, refused
+    assert.equal((await cells({ id: "frontage", focus: [-60, -360, 60, -330], views: ["day"] })).r.images.length, 1);
+    assert.equal((await cells({ id: "frontage", zoom: "fit", views: ["day"] })).r.images.length, 1);
+    const many = await cells({ items: ["money", "tea", "cup", "chair", "frontage"], vary: { held: "all", n: "all" } });
+    assert.equal(many.cells.length, 40);
+    assert.equal(many.r.images.length, 2, "40 cells on two pictures");
+    assert.match((await call(client, "kit_render", { id: "money", vary: { value: "all", kind: "all", held: "all" } })).text, /^120 cells is more than 96/);
+  } finally { await close(); }
+});
+
+test("a param that changes nothing in its look is a warning naming the param that makes it show", async () => {
+  const { client, close } = await connect({ write: false, agentEdits: "proposals" });
+  try {
+    const r = await call(client, "kit_render", { id: "money", params: { currency: "dollar" }, views: ["day"] });
+    assert.ok(!r.isError, r.text);
+    assert.match(r.text, /^warning \[inert\] money: currency dollar draws the same as without it; it shows with kind foreign$/m);
+    assert.match(r.text, /^money: 0 errors, 1 warning$/m);
+    assert.doesNotMatch((await call(client, "kit_render", { id: "money", params: { kind: "foreign", currency: "dollar" }, views: ["day"] })).text, /inert/);
+    assert.match((await call(client, "kit_render", { items: [{ id: "money", params: { currency: "dollar" } }] })).text, /inert/);
+    const some = await call(client, "kit_render", { id: "money", params: { currency: "dollar" }, vary: { kind: ["notes", "foreign"] }, views: ["day"] });
+    assert.match(some.text, /^warning \[inert\] money: currency dollar \(cell 1\) draws the same as without it; it shows with kind foreign$/m, "only the looks it changed nothing in");
   } finally { await close(); }
 });
 

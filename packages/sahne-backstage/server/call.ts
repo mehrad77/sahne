@@ -5,15 +5,17 @@
 //   node packages/sahne-backstage/server/call.ts list [<tool>] --content <root>     the tools, with their input schemas
 //   node packages/sahne-backstage/server/call.ts read <resource uri> --content <root>   e.g. sahne://kit-guide
 //
-// Text and JSON results go to stdout; each image result is saved as a PNG under --out (default a temp dir) and its path is
-// printed as `image: <path>`, so the caller can Read it. The exit code is 1 when the tool answered with an error.
+// Each image result is saved as a PNG under --out (default a temp dir), copied to <out>/latest.png, and its path printed
+// first as `image: <path>`, so the caller can Read it; then the answer's text. An answer with pictures leaves out its JSON
+// (the text says the same) unless --json; one without prints it. The exit code is 1 when the tool answered with an error.
 // Flags: --write (else every write tool refuses), --agent-edits direct|proposals (default direct with --write: a one-shot
 // process has no editor to accept a proposal), --share-cards, --out <dir>.
 //
 // --session <name> keeps one server process alive across calls (started on first use, on a unix socket in a private folder),
-// so the kit and resvg load once; it stops after 15 idle minutes, with `--session <name> --stop`, and restarts itself when a
-// TypeScript source of the kit, the engine, the story package or backstage changed, so an edit to a generator shows in the
-// next render. `--session <name> --status` says whether it runs. Drawings (kit/*.json) are read fresh on every call.
+// so the kit and resvg load once. A call that leaves out --content, --write, --agent-edits or --share-cards takes the running
+// session's; one that gives --write or another mode is served by the same process; another content root restarts it. It
+// stops after 15 idle minutes, with `--session <name> --stop`, and restarts itself when a TypeScript source of the kit, the
+// engine, the story package or backstage changed, so an edit to a generator shows in the next render. `--session <name> --status` says whether it runs. Drawings (kit/*.json) are read fresh on every call.
 // The socket, the session's log and the default --out live in a folder only this user can open (privateDir); a call waits
 // at most --timeout seconds (default 120, or SAHNE_CALL_TIMEOUT_MS) for its session to answer.
 
@@ -37,6 +39,17 @@ export const TIMEOUT_MS = 120_000;
 type Block = { type: "text"; text: string } | { type: "image"; data: string; mimeType: string };
 interface Answer { isError: boolean; content: Block[] }
 interface Config { content: string; write: boolean; agentEdits: "direct" | "proposals"; shareCards: boolean }
+/** What a call asked for: the flags it gave (a session fills in the rest from its own). */
+type Want = Partial<Config>;
+
+/** A call's setup: what it gave over `base` (a running session's, or the defaults); --write alone makes edits direct, as a one-shot's are. */
+export function setupOf(want: Want, base: Config): Config {
+  const write = want.write ?? base.write;
+  const agentEdits = want.agentEdits ?? (want.write !== undefined && want.write !== base.write ? (write ? "direct" : "proposals") : base.agentEdits);
+  return { content: want.content ?? base.content, write, agentEdits, shareCards: want.shareCards ?? base.shareCards };
+}
+const DEFAULTS: Config = { content: "", write: false, agentEdits: "proposals", shareCards: false };
+const said = (c: Config) => `${c.content || "the samples"}${c.write ? ` (--write, ${c.agentEdits})` : ""}`;
 type Command = { kind: "tool"; name: string; args: Record<string, unknown> } | { kind: "list"; name?: string } | { kind: "read"; uri: string };
 
 // ---- the server, in this process --------------------------------------------------------------------------------------------
@@ -63,9 +76,14 @@ async function perform(client: Booted, cmd: Command): Promise<Answer> {
   if (cmd.kind === "list") {
     const tools = (await client.listTools()).tools.filter(t => !cmd.name || t.name === cmd.name);
     if (cmd.name && !tools.length) return { isError: true, content: [{ type: "text", text: `no tool ${cmd.name}: \`list\` names them` }] };
-    const text = tools.map(t => `${t.name}\n  ${(t.description ?? "").replace(/\n/g, " ")}\n  input: ${JSON.stringify(t.inputSchema)}`).join("\n\n");
+    if (cmd.name) {
+      const t = tools[0];
+      return { isError: false, content: [{ type: "text", text: `${t.name}\n  ${(t.description ?? "").replace(/\n/g, " ")}\n  input: ${JSON.stringify(t.inputSchema)}` }] };
+    }
+    // one line a tool (its first sentence); `list <tool>` gives the whole description and the input schema
+    const lines = tools.map(t => `${t.name.padEnd(16)} ${((t.description ?? "").replace(/\n/g, " ").match(/^.*?[.:](\s|$)/)?.[0] ?? t.description ?? "").trim().slice(0, 150)}`);
     const res = (await client.listResources()).resources.map(r => `${r.uri}  ${r.description ?? r.name}`);
-    return { isError: false, content: [{ type: "text", text: cmd.name ? text : `${tools.length} tools\n\n${text}\n\nresources (call.ts read <uri>)\n${res.join("\n")}` }] };
+    return { isError: false, content: [{ type: "text", text: `${USAGE}\n\n${tools.length} tools (call.ts list <tool>: its description and input)\n${lines.join("\n")}\n\nresources (call.ts read <uri>)\n${res.join("\n")}` }] };
   }
   const r = await client.readResource({ uri: cmd.uri });
   return { isError: false, content: r.contents.map(x => ({ type: "text" as const, text: "text" in x ? String(x.text) : `(${x.mimeType ?? "binary"} resource)` })) };
@@ -116,7 +134,10 @@ export function newest(dirs: string[] = (process.env.SAHNE_CALL_WATCH ? process.
 /** The session process: serves requests (one at a time) on the socket until idle or stopped. */
 async function serve(name: string, c: Config) {
   const path = sockOf(name), built = newest(), started = Date.now();
-  const client = await boot(c);
+  // a client per setup asked for (with or without --write, the mode): one process, one kit, one content root
+  const clients = new Map<string, Promise<Booted>>([[JSON.stringify(c), boot(c)]]);
+  const clientOf = (x: Config) => { const k = JSON.stringify(x); if (!clients.has(k)) clients.set(k, boot(x)); return clients.get(k)!; };
+  await clientOf(c);
   let idle: NodeJS.Timeout, chain: Promise<unknown> = Promise.resolve();
   const bye = (code = 0) => { try { unlinkSync(path); } catch {} process.exit(code); };
   const tick = () => { clearTimeout(idle); idle = setTimeout(() => bye(), Number(process.env.SAHNE_CALL_IDLE_MS) || IDLE_MS); };
@@ -137,12 +158,13 @@ async function serve(name: string, c: Config) {
     let reply: unknown;
     let exit = false;
     try {
-      const req = JSON.parse(line) as { op: "stop" | "status" | "run"; config?: Config; cmd?: Command };
+      const req = JSON.parse(line) as { op: "stop" | "status" | "run"; want?: Want; cmd?: Command };
+      const x = setupOf(req.want ?? {}, c);
       if (req.op === "stop") { reply = { stopped: true }; exit = true; }
       else if (req.op === "status") reply = { pid: process.pid, up: Math.round((Date.now() - started) / 1000), config: c, stale: newest() > built };
-      else if (JSON.stringify(req.config) !== JSON.stringify(c)) reply = { mismatch: `session ${name} serves ${c.content || "the samples"}${c.write ? " (--write)" : ""}: stop it first (--session ${name} --stop)` };
-      else if (newest() > built) { reply = { restart: true }; exit = true; }
-      else reply = await perform(client, req.cmd!);
+      else if (x.content !== c.content) reply = { mismatch: c };
+      else if (newest() > built) { reply = { restart: true, config: c }; exit = true; }
+      else reply = await perform(await clientOf(x), req.cmd!);
     } catch (e) { reply = { isError: true, content: [{ type: "text", text: `failed: ${(e as Error).message}` }] }; }
     if (exit) { try { unlinkSync(path); } catch {} }
     sock.end(`${JSON.stringify(reply)}\n`, () => { if (exit) process.exit(0); });
@@ -183,6 +205,13 @@ export function ask(path: string, req: unknown, ms = timeoutOf(), name = "this")
   });
 }
 
+/** Why a session did not start: the last lines of its log (where its error is), and where the log is. */
+export function notStarted(name: string, log: string): string {
+  let tail = "";
+  try { tail = readFileSync(log, "utf8").trimEnd().split("\n").slice(-6).join("\n"); } catch {}
+  return `the session ${name} did not start${tail ? `:\n${tail}\n` : " "}(the whole log: ${log})`;
+}
+
 async function startSession(name: string, c: Config, flags: string[]) {
   const path = sockOf(name), log = join(callDir(), `${name.replace(/\W/g, "_")}.log`);
   const fd = openSync(log, "a");
@@ -193,17 +222,30 @@ async function startSession(name: string, c: Config, flags: string[]) {
     if (p.exitCode !== null) break;
     await new Promise(r => setTimeout(r, 50));
   }
-  throw new Error(`the session ${name} did not start (see ${log})`);
+  throw new Error(notStarted(name, log));
 }
 
-/** The answer of a session process, starting or restarting it when it is not running or its source is stale. */
-async function viaSession(name: string, c: Config, flags: string[], cmd: Command, ms: number): Promise<Answer> {
+/** A session's start flags for a setup (the session process reads them as a call does). */
+const flagsOf = (c: Config) => ["--content", c.content, ...(c.write ? ["--write"] : []), "--agent-edits", c.agentEdits, ...(c.shareCards ? ["--share-cards"] : [])];
+
+/** The answer of a session process, starting or restarting it when it is not running, its source is stale, or it serves another content root. */
+async function viaSession(name: string, want: Want, cmd: Command, ms: number, home: Config): Promise<Answer> {
   const path = sockOf(name);
+  // the setup a new process starts with: the one a restarted process had (its source changed), else the defaults ($SAHNE_CONTENT's root)
+  let base = home;
   for (let attempt = 0; attempt < 3; attempt++) {
-    let r = await ask(path, { op: "run", config: c, cmd }, ms, name);
-    if (r === null) { await startSession(name, c, flags); r = await ask(path, { op: "run", config: c, cmd }, ms, name); }
-    if (r === null || r.restart) continue;
-    if (r.mismatch) throw new Error(String(r.mismatch));
+    let r = await ask(path, { op: "run", want, cmd }, ms, name);
+    if (r === null) { const c = setupOf(want, base); await startSession(name, c, flagsOf(c)); r = await ask(path, { op: "run", want, cmd }, ms, name); }
+    if (r?.restart) { base = (r.config as Config) ?? base; continue; }
+    if (r === null) continue;
+    if (r.mismatch) {
+      // another root: never with the old session's --write, only with this call's own
+      const next = setupOf(want, DEFAULTS);
+      console.error(`call.ts: session ${name} served ${said(r.mismatch as Config)}; restarted for ${said(next)}`);
+      await ask(path, { op: "stop" }, ms, name);
+      await startSession(name, next, flagsOf(next));
+      continue;
+    }
     return r as unknown as Answer;
   }
   throw new Error(`the session ${name} would not answer`);
@@ -226,53 +268,75 @@ export function pngName(tool: string, n: number, at = new Date()): string {
   return `${stamp}-${process.pid}-${n}-${randomBytes(2).toString("hex")}-${tool.replace(/\W+/g, "_")}.png`;
 }
 
-/** The pictures of an answer saved as PNGs under `dir` (never over another file), and its text with each picture's path where it came. */
-function emit(a: Answer, dir: string, tool: string): string {
+/**
+ * An answer as the shell prints it: each picture saved as a PNG under `dir` (never over another file) and its path first
+ * (`image: <path>`), the first also as <dir>/latest.png; then the text. The JSON block (the last, after the pictures: the text says
+ * the same, but a drawing's document is only there) on one line as `data: {…}`, whole with `json`; with no pictures, as it is.
+ */
+export function emit(a: Answer, dir: string, tool: string, json = false): { images: string; text: string } {
   mkdirSync(dir, { recursive: true });
   let n = 0;
-  return a.content.map(b => {
-    if (b.type === "text") return b.text;
-    const file = join(dir, pngName(tool, ++n));
-    writeFileSync(file, Buffer.from(b.data, "base64"), { flag: "wx" });
-    return `image: ${file}`;
-  }).join("\n");
+  const images: string[] = [], texts: string[] = [];
+  a.content.forEach((b, i) => {
+    if (b.type === "image") {
+      const file = join(dir, pngName(tool, ++n)), bytes = Buffer.from(b.data, "base64");
+      writeFileSync(file, bytes, { flag: "wx" });
+      if (n === 1) writeFileSync(join(dir, "latest.png"), bytes);
+      images.push(`image: ${file}`);
+      return;
+    }
+    const data = i === a.content.length - 1 && i > 0 && a.content.some(x => x.type === "image") && /^[[{]/.test(b.text);
+    texts.push(!data ? b.text : json ? JSON.stringify(JSON.parse(b.text), null, 1) : `data: ${JSON.stringify(JSON.parse(b.text))}`);
+  });
+  return { images: images.join("\n"), text: texts.join("\n") };
 }
+
+const USAGE = `usage: call.ts <tool> ['<json args>' | @file.json | -] [--content <abs folder>] [--write] [--session <name>] [--out <dir>] [--json] [--timeout <s>]
+       call.ts list [<tool>]   call.ts read <uri>   call.ts --session <name> --stop|--status
+  pictures: printed first as image: <path> (on stdout, even with an error), the first also <out>/latest.png; then the text,
+  and its data on one line (data: {…}); --json prints the data whole`;
 
 async function main(): Promise<"serving" | void> {
   const { values: o, positionals: pos } = parseArgs({
     allowPositionals: true,
     options: {
-      content: { type: "string" }, write: { type: "boolean", default: false }, out: { type: "string" }, session: { type: "string" }, stop: { type: "boolean", default: false },
-      status: { type: "boolean", default: false }, serve: { type: "boolean", default: false }, "agent-edits": { type: "string" }, "share-cards": { type: "boolean", default: false },
-      timeout: { type: "string" },
+      content: { type: "string" }, write: { type: "boolean" }, out: { type: "string" }, session: { type: "string" }, stop: { type: "boolean", default: false },
+      status: { type: "boolean", default: false }, serve: { type: "boolean", default: false }, "agent-edits": { type: "string" }, "share-cards": { type: "boolean" },
+      timeout: { type: "string" }, json: { type: "boolean", default: false },
     },
   });
-  const content = o.content ?? process.env.SAHNE_CONTENT ?? "";
-  if (content && !isAbsolute(content)) throw new Error(`--content is an absolute folder, not ${content}`);
-  const agentEdits = (o["agent-edits"] ?? (o.write ? "direct" : "proposals")) as "direct" | "proposals";
-  if (agentEdits !== "direct" && agentEdits !== "proposals") throw new Error("--agent-edits is direct or proposals");
-  const config: Config = { content: content ? resolve(content) : "", write: o.write, agentEdits, shareCards: o["share-cards"] };
-  // the flags a session process is started with (it reads the same ones)
-  const flags = [...(config.content ? ["--content", config.content] : []), ...(config.write ? ["--write"] : []), "--agent-edits", agentEdits, ...(config.shareCards ? ["--share-cards"] : [])];
+  // only --content asks for a root; $SAHNE_CONTENT is where a one-shot or a new session starts, never a reason to move a running one
+  const content = o.content, env = process.env.SAHNE_CONTENT;
+  for (const c of [content, env]) if (c && !isAbsolute(c)) throw new Error(`--content (or SAHNE_CONTENT) is an absolute folder, not ${c}`);
+  const home: Config = { ...DEFAULTS, content: env ? resolve(env) : "" };
+  if (o["agent-edits"] !== undefined && o["agent-edits"] !== "direct" && o["agent-edits"] !== "proposals") throw new Error("--agent-edits is direct or proposals");
+  // what this call asked for; a session fills in the rest from its own setup, a one-shot from the defaults
+  const want: Want = {
+    ...(content !== undefined ? { content: content ? resolve(content) : "" } : {}), ...(o.write !== undefined ? { write: o.write } : {}),
+    ...(o["agent-edits"] !== undefined ? { agentEdits: o["agent-edits"] as Config["agentEdits"] } : {}), ...(o["share-cards"] !== undefined ? { shareCards: o["share-cards"] } : {}),
+  };
+  const config = setupOf(want, home);
 
   const ms = timeoutOf(o.timeout);
   if (o.serve) { if (!o.session) throw new Error("--serve is for a session"); await serve(o.session, config); return "serving"; }
   if (o.session && (o.stop || o.status)) {
     const r = await ask(sockOf(o.session), { op: o.stop ? "stop" : "status" }, ms, o.session);
     if (o.stop) console.log(r ? `session ${o.session} stopped` : `session ${o.session} was not running`);
-    else console.log(r ? `session ${o.session}: pid ${r.pid}, up ${r.up} s, ${(r.config as Config).content || "the samples"}${(r.config as Config).write ? " (--write)" : ""}${r.stale ? ", its source changed (the next call restarts it)" : ""}` : `session ${o.session} is not running`);
+    else console.log(r ? `session ${o.session}: pid ${r.pid}, up ${r.up} s, ${said(r.config as Config)}${r.stale ? ", its source changed (the next call restarts it)" : ""}` : `session ${o.session} is not running`);
     return;
   }
   const [verb, ...rest] = pos;
   if (!verb) {
-    console.error("usage: call.ts <tool> ['<json args>' | @file | -] --content <abs folder> [--write] [--out <dir>] [--session <name>] [--timeout <s>]\n       call.ts list [<tool>]   call.ts read <uri>   call.ts --session <name> --stop|--status");
+    console.error(USAGE);
     process.exit(2);
   }
   const cmd: Command = verb === "list" ? { kind: "list", name: rest[0] } : verb === "read" ? { kind: "read", uri: rest[0] ?? "sahne://kit-guide" } : { kind: "tool", name: verb, args: await argsOf(rest[0]) };
   // the default --out: a private folder (a session's own, kept; else a new one per call)
   const out = o.out ?? (o.session ? privateDir(join(callDir(), `out-${o.session.replace(/\W/g, "_")}`)) : mkdtempSync(join(callDir(), "out-")));
-  const a = o.session ? await viaSession(o.session, config, flags, cmd, ms) : await perform(await boot(config), cmd);
-  const text = emit(a, out, verb);
+  const a = o.session ? await viaSession(o.session, want, cmd, ms, home) : await perform(await boot(config), cmd);
+  const { images, text } = emit(a, out, verb, o.json);
+  // the pictures on stdout even with an error (a sheet with one bad item draws the rest); the error's text on stderr
+  if (images) console.log(images);
   if (a.isError) { console.error(text); process.exitCode = 1; } else console.log(text);
 }
 

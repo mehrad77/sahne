@@ -62,7 +62,17 @@ Every id a content root adds starts with `x_`, and `test/drawing.test.ts` assert
 Backstage's MCP tools (this file is its `sahne://kit-guide` resource) do the plumbing, so the effort goes to the drawing: `kit_search` for what exists, `kit_read` a neighbour, `draft_kit_item` and look at the sheet, revise until there are no problems, then `save_kit_item`. An agent with no MCP set up reaches the very same tools from the shell and reads the PNGs it prints:
 
 ```bash
-node packages/sahne-backstage/server/call.ts draft_kit_item @doc.json --content <root> --session kit
+node packages/sahne-backstage/server/call.ts kit_read '{"id":"flag"}' --content <root> --write --session kit   # the first call sets the session up
+node packages/sahne-backstage/server/call.ts kit_render '{"id":"money","vary":{"value":"all"},"views":["day"]}' --session kit
+node packages/sahne-backstage/server/call.ts draft_kit_item @doc.json --session kit
 ```
 
-`kit_render` and `draft_kit_item` take a list (`items`, `docs`) and answer ONE sheet with a labelled cell per item, so a batch or a family is judged in one look. Each cell prints its scale (`1 cm = 16 px · grid 1 cm`): a thing under 60 cm fills its cell with a scale bar (a held one with a red cross at its grip), a larger one stands beside a 170 cm adult; pass `"zoom": "scene"` to draw every cell at one scale beside the adult and compare sizes. `--session kit` keeps the server alive between calls (a render in about half the time, a search in a sixth: the numbers are in that README) and restarts it when TypeScript of the kit changed, so a generator you edited draws as edited. The flags and the tool list are in sahne-backstage's README (*Calling a tool from the shell*).
+Each call prints the picture's path first (`image: <path>`, also `<out>/latest.png`), then the problems as lines and what each numbered cell shows. A later call needs only `--session kit`: it takes the session's content root and `--write`.
+
+- **Many at once.** `kit_render` and `draft_kit_item` take a list (`items`: ids or `{ id | doc, as?, variant?, params?, … }`; `docs`) and answer numbered cells, 24 to a picture, so a batch or a family is judged in one look. `vary` draws a cell per value instead of a call each: `{"vary": {"value": "all"}}` (an enum's values, a bool's two; also `variant`, `n`, `held`: `{"vary": {"held": "all"}}` shows every item of a list held).
+- **Params go under `params`.** `{"id": "money", "params": {"currency": "dollar"}}`, never beside the id: a key in the wrong place is refused with where it goes. A param that draws the same as without it is a `warning [inert]` naming the param it needs (`currency` shows only with `kind: foreign`). An enum's values are strings (`"20"`, not `20`).
+- **Scale.** Each cell prints its scale under the art (`1 cm = 16 px · grid 1 cm`): a thing under 60 cm fills its cell with a scale bar (a held one with a red cross at its grip; a thing that sits on the palm stands a little above it), a larger one stands beside a 170 cm adult. `"zoom": "scene"` draws every cell at one scale beside the adult to compare sizes; `"zoom": "fit"` fills each cell with its item, however tall or long.
+- **Closer.** `"focus": [x0, y0, x1, y1]` crops every cell to that box of cm (path-data units: up is negative), magnified, to judge an emblem or small words.
+- **Motion.** The text lists each moving item's motions and periods (`motion: flag: sway 2241 ms`). `"t": 600` (ms, or a list) draws every moving flat where it is then, a sway turned about the flat's origin; `"frames": 4` spreads four times over the longest motion.
+
+`--session kit` keeps the server alive between calls (a render in about half the time, a search in a sixth: the numbers are in that README) and restarts it when TypeScript of the kit changed, so a generator you edited draws as edited. The flags and the tool list are in sahne-backstage's README (*Calling a tool from the shell*, *Piece sheets as PNG*).
