@@ -46,8 +46,8 @@ test("kit_render of a list of items draws one sheet, with the problems of each",
   const r = call("kit_render", JSON.stringify({ items: [{ id: "chair" }, { id: "frontage", variant: "firin" }, { doc: doc("x_board_a", "Menu") }] }));
   assert.equal(r.status, 0, r.stderr);
   assert.equal(pngs(r.stdout).length, 1, "one picture for three items");
-  assert.match(r.stdout, /3 items on one sheet/);
-  for (const id of ["chair", "frontage", "x_board_a"]) assert.match(r.stdout, new RegExp(`^${id}: 0 errors`, "m"));
+  assert.match(r.stdout, /^3 items, 6 cells on one sheet: 0 errors, 0 warnings$/m);
+  for (const [n, id] of [["1-2", "chair"], ["3-4", "frontage · firin"], ["5-6", "x_board_a"]]) assert.match(r.stdout, new RegExp(`^  ${n}  ${id}`, "m"), "each cell's number says what it shows");
 });
 
 test("draft_kit_item takes one drawing or a list, from the argument, a file or stdin", () => {
@@ -59,7 +59,7 @@ test("draft_kit_item takes one drawing or a list, from the argument, a file or s
   const two = call("draft_kit_item", `@${file}`);
   assert.equal(two.status, 0, two.stderr);
   assert.equal(pngs(two.stdout).length, 1);
-  assert.match(two.stdout, /2 items on one sheet/);
+  assert.match(two.stdout, /^2 items, 4 cells on one sheet/m);
   const piped = spawnSync(process.execPath, [CALL, "draft_kit_item", "-", "--content", root, "--out", out], { encoding: "utf8", env: ENV, input: JSON.stringify({ doc: doc("x_board_c", "Oui") }) });
   assert.equal(piped.status, 0, piped.stderr);
   assert.match(piped.stdout, /^x_board_c: 0 errors/m);
