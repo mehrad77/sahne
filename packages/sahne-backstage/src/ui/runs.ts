@@ -97,18 +97,22 @@ function planWords(run: Run, main: string): string {
 
 function GateCard(p: { run: Run }) {
   const run = p.run, { main } = useLangs();
-  const [change, setChange] = useState(""), [busy, setBusy] = useState(false);
+  const [change, setChange] = useState(""), [busy, setBusy] = useState(false), [editing, setEditing] = useState(false);
   const go = async () => { const e = await act(run.id, { action: "continue" }); if (e) say(e, true); };
-  const redoPlan = async () => { setBusy(true); const e = await actStep(run.id, "plan", { action: "redo", note: change }); setBusy(false); if (e) say(e, true); else setChange(""); };
+  const redoPlan = async () => { setBusy(true); const e = await actStep(run.id, "plan", { action: "redo", note: change }); setBusy(false); if (e) say(e, true); else { setChange(""); setEditing(false); } };
   if (run.gate === "plan") return html`<div class="ask-card gate-card" role="group" aria-label="The plan waits for you">
     <b>The plan: ${planWords(run, main)}${run.estimateUsd !== undefined ? `. About ${usd(run.estimateUsd)}` : ""}.</b>
     <ol class="plan-steps">${run.steps.filter(s => s.kind !== "plan").map(s => html`<li><b>${s.title}</b>${s.about && html`<span class="plan-about">${s.about}</span>`}
       <details class="plan-agent"><summary>What its agent is told</summary><${Markdown} text=${s.brief} /></details></li>`)}</ol>
     ${run.brief && html`<details class="plan-brief"><summary>What every step reads first: the plan's brief</summary><${Markdown} text=${run.brief} /></details>`}
-    <div class="row wrap"><button class="primary" onClick=${() => void go()}>Start</button></div>
-    <form class="row" onSubmit=${(e: Event) => { e.preventDefault(); if (change.trim()) void redoPlan(); }}>
-      <input placeholder="Or change something: say what, and it plans again…" value=${change} onInput=${(e: Event) => setChange((e.target as HTMLInputElement).value)} />
-      <button disabled=${busy || !change.trim()}>Plan again</button></form></div>`;
+    <div class="gate-actions">
+      ${editing ? html`<form class="gate-change" onSubmit=${(e: Event) => { e.preventDefault(); if (change.trim()) void redoPlan(); }}>
+          <input autoFocus placeholder="What should change? It plans again with your words." value=${change} onInput=${(e: Event) => setChange((e.target as HTMLInputElement).value)} onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Escape") setEditing(false); }} />
+          <button class="primary" disabled=${busy || !change.trim()}>Plan again</button>
+          <button type="button" class="linkish" onClick=${() => { setEditing(false); setChange(""); }}>Cancel</button></form>`
+        : html`<button class="linkish" onClick=${() => setEditing(true)}>Change the plan…</button><span class="grow"></span>
+          <button class="primary" onClick=${() => void go()}>Start</button>`}
+    </div></div>`;
   return html`<div class="ask-card gate-card" role="group" aria-label="The new people and places wait for you">
     <b>The new people and places are made: look at them below.</b>
     <p class="note">The episodes are written next, with them.</p>
