@@ -237,12 +237,12 @@ export function Meter() {
 }
 
 /** What the assistant can and cannot do here: the same list its instructions hold (model/abilities.ts). */
-function Abilities() {
+function Abilities(p: { open?: boolean }) {
   const w = world.value!;
   const a = abilities({ writable: w.writable, agentEdits: w.agentEdits ?? "proposals", shareCards: w.shareCards, cards: w.cards, page: pageNow(), web: typeof w.ai === "object" ? w.ai.web : null });
-  return html`<div class="abilities">
+  return html`<details class="abilities" open=${p.open}><summary>What it can and cannot do here</summary>
     <div><b>It can</b><ul>${a.can.map(x => html`<li>${x}</li>`)}</ul></div>
-    <div><b>It cannot</b><ul>${a.cannot.map(x => html`<li>${x}${/word cards/.test(x) ? html` <a href="#/agents">Share them</a>` : ""}</li>`)}</ul></div></div>`;
+    <div><b>It cannot</b><ul>${a.cannot.map(x => html`<li>${x}${/word cards/.test(x) ? html` <a href="#/agents">Share them</a>` : ""}</li>`)}</ul></div></details>`;
 }
 
 const KIND_WORD: Record<string, string> = { story: "episode", season: "season", series: "series", place: "place", character: "character" };
@@ -329,7 +329,7 @@ export function AssistantChat() {
   const empty = !turns.value.length;
   return html`${ai ? html`<p class="note model">${ai.provider === "anthropic" ? "Claude" : "A local model"} · ${ai.model ?? ""} · <a href="#/settings">change</a>
       ${!empty && html` · <button type="button" class="linkish" aria-expanded=${about} onClick=${() => setAbout(!about)}>What it can do</button>`}</p>` : ""}
-    ${w.ai && about && !empty && html`<${Abilities} />`}
+    ${w.ai && about && !empty && html`<${Abilities} open />`}
     ${!w.ai ? html`<p>The assistant is off. Set up Claude (an API key) or a local model (LM Studio, Ollama) in <a href="#/settings">Settings</a>.</p>` : html`
     <div class="chat">
       ${empty && html`<div class="note">Ask anything about the series, or pick an ask. It sees ${ctx.id ? html`${ctx.kind === "season" ? "season " : ctx.kind === "place" ? "the place " : ctx.kind === "character" ? "the character " : ""}<b>${ctx.id}</b>${(ctx as { path?: Path }).path ? html` at <b>${(ctx as { path: Path }).path.slice(1).join(".")}</b>` : ""}` : `the ${ctx.page} page`}.<${Abilities} /><${AskMenu} /></div>`}
