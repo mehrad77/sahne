@@ -12,6 +12,18 @@
     "from": "x_apple_strudel"
   },
   {
+    "id": "bread_basket",
+    "family": "bakery",
+    "kind": "prop",
+    "by": "Sahne kit (drawn by its agents)",
+    "contact": "github:mehrad77",
+    "story": "samples boulangerie",
+    "date": "2026-10-31",
+    "licence": "CC-BY-4.0",
+    "consent": "project",
+    "from": "x_bread_basket"
+  },
+  {
     "id": "doughnut",
     "family": "bakery",
     "kind": "prop",

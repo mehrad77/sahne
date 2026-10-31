@@ -137,6 +137,7 @@ export const PROP_FAMILY: Record<string, string> = {
   bowl: "food",
   box: "misc",
   bread: "props",
+  bread_basket: "bakery",
   cafe_drink: "bakery",
   cake: "food",
   candle: "food",
