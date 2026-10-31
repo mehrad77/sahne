@@ -805,6 +805,27 @@ select.tone { width: auto; font-size: 12px; padding: 0 4px; }
 </head>
 <body>
 <div id="app"></div>
+.run-goal { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.run-progress { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.run-progress .bar { flex: 0 1 220px; height: 6px; border-radius: 3px; background: var(--chip); overflow: hidden; }
+.run-progress .bar span { display: block; height: 100%; background: var(--accent); transition: width .4s; }
+.needs-you { border: 1px solid var(--warn); border-radius: 12px; padding: 8px 12px 2px; margin-bottom: 14px; background: var(--panel); }
+.needs-you h4 { margin: 0 0 6px; display: flex; gap: 6px; align-items: center; }
+.needs-you .ask-card { margin: 0 0 8px; }
+.run-finished { display: flex; gap: 10px; align-items: center; padding: 8px 12px; border-radius: 10px; background: var(--accent-soft); margin-bottom: 12px; }
+.run-results section { margin-bottom: 14px; }
+.run-results h4 { margin: 0 0 6px; color: var(--mute); font-size: 13px; text-transform: uppercase; letter-spacing: .04em; }
+.result-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.result-card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: grid; }
+.result-card .pic, .result-card img, .result-card svg { width: 100%; }
+.result-card.being-made { border-color: var(--accent); }
+.result-card.waits-for-you, .result-card.asks-you { border-color: var(--warn); }
+.result-card.undone { opacity: .55; }
+.result-card.to-come { opacity: .7; }
+.result-body { padding: 6px 10px 8px; display: grid; gap: 3px; min-width: 0; }
+.result-body b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.run-work { margin-top: 6px; }
+.run-work > summary { cursor: pointer; color: var(--mute); padding: 6px 0; }
 <script type="module" src="/dist/app/index.js"></script>
 </body>
 </html>
