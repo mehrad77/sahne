@@ -5,13 +5,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
-import kit from "../../sahne-kit/src/full.ts";
+import full from "../../sahne-kit/src/full.ts";
+import { withDrawings } from "../../sahne-kit/src/drawing.ts";
 import { placeSolids } from "sahne";
-import { loadCards } from "../load.ts";
+import { loadCards, loadContentKit } from "../load.ts";
 import { loadNeeds } from "../load.ts";
 import { PLACES } from "../paths.ts";
 import { lintPlace, lintStory, type CardIndex, type Needs, type PlaceRule, type StoryDoc, type StoryPlace } from "../src/index.ts";
 
+const kit = full; // the kit as it is; the content root's own drawings are added only where a root's places are read
 const cards: CardIndex = JSON.parse(readFileSync(new URL("./fixtures/cards.json", import.meta.url), "utf8"));
 const needs: Needs = {
   dukkan: { stories: ["s1e99"], places: { dukkan: { why: "a test shop", stories: ["s1e99"], times: ["day", "night"],
@@ -119,10 +121,10 @@ test("the story's place rule: unknown places, marks, perches and times are error
 });
 
 test("every place document has no errors", () => {
-  const real = loadNeeds(), index = loadCards();
+  const real = loadNeeds(), index = loadCards(), rootKit = withDrawings(full, loadContentKit({ kit: full }).docs); // a place may use the root's own kit items
   for (const f of readdirSync(PLACES).filter(f => f.endsWith(".json") && f !== "needs.json")) {
     const doc: StoryPlace = JSON.parse(readFileSync(new URL(f, PLACES), "utf8"));
-    assert.deepEqual(lintPlace(doc, { kit, cards: index, needs: real }).filter(p => p.level === "error"), [], f);
+    assert.deepEqual(lintPlace(doc, { kit: rootKit, cards: index, needs: real }).filter(p => p.level === "error"), [], f);
   }
 });
 

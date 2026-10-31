@@ -26,7 +26,7 @@ A story format for the [Sahne](../sahne/README.md) stage: story documents (the f
 Every node reader (the story check, the place checker, the extras' generator, the tests, the kit's set build and tests, the gallery's server and scripts) finds the story data through `paths.ts`, never through a path of its own. The data is in a **content root**:
 
 - the folder named by the env var `SAHNE_CONTENT` (an absolute path), for example Kumru's `data/`: `SAHNE_CONTENT=$PWD/data pnpm sahne dev`;
-- without it, `samples/` in this package: the sample series, one short sample story (`s1e00`), its characters (Kerim, Nima, İsmail) with the generated extras, and two places (`bakkal`, `metro_m11`).
+- without it, `samples/` in this package: the sample series, one short sample story (`s1e00`), its characters (Kerim, Nima, İsmail) with the generated extras, and three places (`bakkal`, `metro_m11`, and `boulangerie`, a Paris corner bakery that uses the sample drawings in `samples/kit/`: a chalkboard and a bread basket, an `x_` bunting variant of `flag`).
 
 | In the content root | What | Needed |
 |---|---|---|

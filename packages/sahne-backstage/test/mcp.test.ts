@@ -20,8 +20,9 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { LABELLED } from "../src/model/tools.ts";
 
 const SAMPLES = fileURLToPath(new URL("../../sahne-story/samples/", import.meta.url));
+// the samples own a few kit drawings (the bakery's); these tests start from a root with none
 const CLI = fileURLToPath(new URL("../server/cli.ts", import.meta.url));
-const copy = (tag: string) => { const r = mkdtempSync(join(tmpdir(), `backstage-mcp-${tag}-`)); cpSync(SAMPLES, r, { recursive: true }); return r; };
+const copy = (tag: string) => { const r = mkdtempSync(join(tmpdir(), `backstage-mcp-${tag}-`)); cpSync(SAMPLES, r, { recursive: true, filter: s => !s.endsWith("/samples/kit") }); return r; };
 
 const root = copy("mem"), http1 = copy("http"), cards = copy("cards"), config = mkdtempSync(join(tmpdir(), "backstage-mcp-config-"));
 mkdirSync(join(cards, "cards"));

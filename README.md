@@ -61,7 +61,7 @@ pnpm check    # types, sizes, determinism, the story checks, every test, the gol
 
 `pnpm sahne <script>` runs any script of the gallery (`pnpm sahne golden:update`, `pnpm sahne thumbs`).
 
-**Stories and places come from a content root.** Without configuration, it is `packages/sahne-story/samples/`: one short sample story, three characters with the generated extras, and two places. To play another app's stories in the gallery, point `SAHNE_CONTENT` at its data folder (an absolute path):
+**Stories and places come from a content root.** Without configuration, it is `packages/sahne-story/samples/`: one short sample story, three characters with the generated extras, and three places. To play another app's stories in the gallery, point `SAHNE_CONTENT` at its data folder (an absolute path):
 
 ```bash
 SAHNE_CONTENT=/path/to/kumru/data pnpm dev

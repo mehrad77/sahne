@@ -13,9 +13,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const SAMPLES = fileURLToPath(new URL("../../sahne-story/samples/", import.meta.url));
+// the samples own a few kit drawings (the bakery's); these tests start from a root with none
 const CLI = fileURLToPath(new URL("../server/cli.ts", import.meta.url));
 const root = mkdtempSync(join(tmpdir(), "backstage-"));
-cpSync(SAMPLES, root, { recursive: true });
+cpSync(SAMPLES, root, { recursive: true, filter: s => !s.endsWith("/samples/kit") });
 // the person's settings, for the servers this file starts: a folder of its own, never the real one
 const config = mkdtempSync(join(tmpdir(), "backstage-config-"));
 process.env.SAHNE_BACKSTAGE_CONFIG = config;
@@ -165,7 +166,7 @@ test("a new episode's skeleton, with its calendar row, passes the story check an
 test("a series started on a root with stories writes its seasons with it", async () => {
   const { startSeries } = await import("../src/model/series.ts");
   const bare = mkdtempSync(join(tmpdir(), "backstage-bare-"));
-  cpSync(SAMPLES, bare, { recursive: true });
+  cpSync(SAMPLES, bare, { recursive: true, filter: s => !s.endsWith("/samples/kit") });
   rmSync(join(bare, "series.json")); rmSync(join(bare, "seasons"), { recursive: true });
   const b = await start(["--content", bare, "--write"]);
   try {
@@ -191,7 +192,7 @@ test("the page and its bundle are served", async () => {
 
 test("a root in the old language shape opens upgraded and read-only, even with --write", async () => {
   const old = mkdtempSync(join(tmpdir(), "backstage-old-"));
-  cpSync(SAMPLES, old, { recursive: true });
+  cpSync(SAMPLES, old, { recursive: true, filter: s => !s.endsWith("/samples/kit") });
   const f = join(old, "series.json"), sr = JSON.parse(readFileSync(f, "utf8"));
   const { title, ...rest } = sr;
   writeFileSync(f, JSON.stringify({ ...rest, title: title.tr, titleEn: title.en, titleFa: title.fa }, null, 2) + "\n");
