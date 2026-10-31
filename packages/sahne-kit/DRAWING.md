@@ -67,7 +67,7 @@ node packages/sahne-backstage/server/call.ts kit_render '{"id":"money","vary":{"
 node packages/sahne-backstage/server/call.ts draft_kit_item @doc.json --content <root> --session kit
 ```
 
-Each answer gives the problems as lines and what each numbered cell shows.
+Each call prints the picture's path first (`image: <path>`, also `<out>/latest.png`), then the problems as lines and what each numbered cell shows.
 
 - **Many at once.** `kit_render` and `draft_kit_item` take a list (`items`: ids or `{ id | doc, as?, variant?, params?, … }`; `docs`) and answer numbered cells, 24 to a picture, so a batch or a family is judged in one look. `vary` draws a cell per value instead of a call each: `{"vary": {"value": "all"}}` (an enum's values, a bool's two; also `variant`, `n`, `held`: `{"vary": {"held": "all"}}` shows every item of a list held).
 - **Params go under `params`.** `{"id": "money", "params": {"currency": "dollar"}}`, never beside the id: a key in the wrong place is refused with where it goes. A param that draws the same as without it is a `warning [inert]` naming the param it needs (`currency` shows only with `kind: foreign`). An enum's values are strings (`"20"`, not `20`).

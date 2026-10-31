@@ -5,8 +5,9 @@
 //   node packages/sahne-backstage/server/call.ts list [<tool>] --content <root>     the tools, with their input schemas
 //   node packages/sahne-backstage/server/call.ts read <resource uri> --content <root>   e.g. sahne://kit-guide
 //
-// Text and JSON results go to stdout; each image result is saved as a PNG under --out (default a temp dir) and its path is
-// printed as `image: <path>`, so the caller can Read it. The exit code is 1 when the tool answered with an error.
+// Each image result is saved as a PNG under --out (default a temp dir), copied to <out>/latest.png, and its path printed
+// first as `image: <path>`, so the caller can Read it; then the answer's text. An answer with pictures leaves out its JSON
+// (the text says the same) unless --json; one without prints it. The exit code is 1 when the tool answered with an error.
 // Flags: --write (else every write tool refuses), --agent-edits direct|proposals (default direct with --write: a one-shot
 // process has no editor to accept a proposal), --share-cards, --out <dir>.
 //
@@ -63,9 +64,14 @@ async function perform(client: Booted, cmd: Command): Promise<Answer> {
   if (cmd.kind === "list") {
     const tools = (await client.listTools()).tools.filter(t => !cmd.name || t.name === cmd.name);
     if (cmd.name && !tools.length) return { isError: true, content: [{ type: "text", text: `no tool ${cmd.name}: \`list\` names them` }] };
-    const text = tools.map(t => `${t.name}\n  ${(t.description ?? "").replace(/\n/g, " ")}\n  input: ${JSON.stringify(t.inputSchema)}`).join("\n\n");
+    if (cmd.name) {
+      const t = tools[0];
+      return { isError: false, content: [{ type: "text", text: `${t.name}\n  ${(t.description ?? "").replace(/\n/g, " ")}\n  input: ${JSON.stringify(t.inputSchema)}` }] };
+    }
+    // one line a tool (its first sentence); `list <tool>` gives the whole description and the input schema
+    const lines = tools.map(t => `${t.name.padEnd(16)} ${((t.description ?? "").replace(/\n/g, " ").match(/^.*?[.:](\s|$)/)?.[0] ?? t.description ?? "").trim().slice(0, 150)}`);
     const res = (await client.listResources()).resources.map(r => `${r.uri}  ${r.description ?? r.name}`);
-    return { isError: false, content: [{ type: "text", text: cmd.name ? text : `${tools.length} tools\n\n${text}\n\nresources (call.ts read <uri>)\n${res.join("\n")}` }] };
+    return { isError: false, content: [{ type: "text", text: `${USAGE}\n\n${tools.length} tools (call.ts list <tool>: its description and input)\n${lines.join("\n")}\n\nresources (call.ts read <uri>)\n${res.join("\n")}` }] };
   }
   const r = await client.readResource({ uri: cmd.uri });
   return { isError: false, content: r.contents.map(x => ({ type: "text" as const, text: "text" in x ? String(x.text) : `(${x.mimeType ?? "binary"} resource)` })) };
@@ -183,6 +189,13 @@ export function ask(path: string, req: unknown, ms = timeoutOf(), name = "this")
   });
 }
 
+/** Why a session did not start: the last lines of its log (where its error is), and where the log is. */
+export function notStarted(name: string, log: string): string {
+  let tail = "";
+  try { tail = readFileSync(log, "utf8").trimEnd().split("\n").slice(-6).join("\n"); } catch {}
+  return `the session ${name} did not start${tail ? `:\n${tail}\n` : " "}(the whole log: ${log})`;
+}
+
 async function startSession(name: string, c: Config, flags: string[]) {
   const path = sockOf(name), log = join(callDir(), `${name.replace(/\W/g, "_")}.log`);
   const fd = openSync(log, "a");
@@ -193,7 +206,7 @@ async function startSession(name: string, c: Config, flags: string[]) {
     if (p.exitCode !== null) break;
     await new Promise(r => setTimeout(r, 50));
   }
-  throw new Error(`the session ${name} did not start (see ${log})`);
+  throw new Error(notStarted(name, log));
 }
 
 /** The answer of a session process, starting or restarting it when it is not running or its source is stale. */
@@ -226,17 +239,33 @@ export function pngName(tool: string, n: number, at = new Date()): string {
   return `${stamp}-${process.pid}-${n}-${randomBytes(2).toString("hex")}-${tool.replace(/\W+/g, "_")}.png`;
 }
 
-/** The pictures of an answer saved as PNGs under `dir` (never over another file), and its text with each picture's path where it came. */
-function emit(a: Answer, dir: string, tool: string): string {
+/**
+ * An answer as the shell prints it: each picture saved as a PNG under `dir` (never over another file) and its path first
+ * (`image: <path>`), the first also as <dir>/latest.png; then the text. The JSON block (the last, after the pictures: the text says
+ * the same, but a drawing's document is only there) on one line as `data: {…}`, whole with `json`; with no pictures, as it is.
+ */
+export function emit(a: Answer, dir: string, tool: string, json = false): { images: string; text: string } {
   mkdirSync(dir, { recursive: true });
   let n = 0;
-  return a.content.map(b => {
-    if (b.type === "text") return b.text;
-    const file = join(dir, pngName(tool, ++n));
-    writeFileSync(file, Buffer.from(b.data, "base64"), { flag: "wx" });
-    return `image: ${file}`;
-  }).join("\n");
+  const images: string[] = [], texts: string[] = [];
+  a.content.forEach((b, i) => {
+    if (b.type === "image") {
+      const file = join(dir, pngName(tool, ++n)), bytes = Buffer.from(b.data, "base64");
+      writeFileSync(file, bytes, { flag: "wx" });
+      if (n === 1) writeFileSync(join(dir, "latest.png"), bytes);
+      images.push(`image: ${file}`);
+      return;
+    }
+    const data = i === a.content.length - 1 && i > 0 && a.content.some(x => x.type === "image") && /^[[{]/.test(b.text);
+    texts.push(!data ? b.text : json ? JSON.stringify(JSON.parse(b.text), null, 1) : `data: ${JSON.stringify(JSON.parse(b.text))}`);
+  });
+  return { images: images.join("\n"), text: texts.join("\n") };
 }
+
+const USAGE = `usage: call.ts <tool> ['<json args>' | @file.json | -] [--content <abs folder>] [--write] [--session <name>] [--out <dir>] [--json] [--timeout <s>]
+       call.ts list [<tool>]   call.ts read <uri>   call.ts --session <name> --stop|--status
+  pictures: printed first as image: <path> (on stdout, even with an error), the first also <out>/latest.png; then the text,
+  and its data on one line (data: {…}); --json prints the data whole`;
 
 async function main(): Promise<"serving" | void> {
   const { values: o, positionals: pos } = parseArgs({
@@ -244,7 +273,7 @@ async function main(): Promise<"serving" | void> {
     options: {
       content: { type: "string" }, write: { type: "boolean", default: false }, out: { type: "string" }, session: { type: "string" }, stop: { type: "boolean", default: false },
       status: { type: "boolean", default: false }, serve: { type: "boolean", default: false }, "agent-edits": { type: "string" }, "share-cards": { type: "boolean", default: false },
-      timeout: { type: "string" },
+      timeout: { type: "string" }, json: { type: "boolean", default: false },
     },
   });
   const content = o.content ?? process.env.SAHNE_CONTENT ?? "";
@@ -265,14 +294,16 @@ async function main(): Promise<"serving" | void> {
   }
   const [verb, ...rest] = pos;
   if (!verb) {
-    console.error("usage: call.ts <tool> ['<json args>' | @file | -] --content <abs folder> [--write] [--out <dir>] [--session <name>] [--timeout <s>]\n       call.ts list [<tool>]   call.ts read <uri>   call.ts --session <name> --stop|--status");
+    console.error(USAGE);
     process.exit(2);
   }
   const cmd: Command = verb === "list" ? { kind: "list", name: rest[0] } : verb === "read" ? { kind: "read", uri: rest[0] ?? "sahne://kit-guide" } : { kind: "tool", name: verb, args: await argsOf(rest[0]) };
   // the default --out: a private folder (a session's own, kept; else a new one per call)
   const out = o.out ?? (o.session ? privateDir(join(callDir(), `out-${o.session.replace(/\W/g, "_")}`)) : mkdtempSync(join(callDir(), "out-")));
   const a = o.session ? await viaSession(o.session, config, flags, cmd, ms) : await perform(await boot(config), cmd);
-  const text = emit(a, out, verb);
+  const { images, text } = emit(a, out, verb, o.json);
+  // the pictures on stdout even with an error (a sheet with one bad item draws the rest); the error's text on stderr
+  if (images) console.log(images);
   if (a.isError) { console.error(text); process.exitCode = 1; } else console.log(text);
 }
 

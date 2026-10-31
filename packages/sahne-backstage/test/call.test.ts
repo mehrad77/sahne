@@ -11,7 +11,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ask, callDir, pngName, privateDir, sockOf, timeoutOf } from "../server/call.ts";
+import { ask, callDir, notStarted, pngName, privateDir, sockOf, timeoutOf } from "../server/call.ts";
 
 const SAMPLES = fileURLToPath(new URL("../../sahne-story/samples/", import.meta.url));
 const CALL = fileURLToPath(new URL("../server/call.ts", import.meta.url));
@@ -34,12 +34,18 @@ const status = () => /pid (\d+)/.exec(spawnSync(process.execPath, [CALL, "--sess
 
 after(() => { spawnSync(process.execPath, [CALL, "--session", NAME, "--stop"], { env: ENV }); for (const d of [root, out, watch]) rmSync(d, { recursive: true, force: true }); });
 
-test("kit_render of one item saves its sheet as a PNG and prints the path", () => {
+test("kit_render of one item saves its sheet as a PNG and prints the path first, also as latest.png; the JSON only with --json", () => {
   const r = call("kit_render", JSON.stringify({ id: "chair" }));
   assert.equal(r.status, 0, r.stderr);
   const files = pngs(r.stdout);
   assert.equal(files.length, 1);
   assert.ok(isPng(files[0]), "the file is a PNG");
+  assert.match(r.stdout, /^image: /, "the picture's path is the first line");
+  assert.deepEqual(readFileSync(join(out, "latest.png")), readFileSync(files[0]), "latest.png is the newest picture");
+  assert.doesNotMatch(r.stdout, /^\{/m, "no JSON block by default");
+  assert.match(r.stdout, /^data: \{"id":"chair",.*\}$/m, "the data on one line");
+  assert.match(call("kit_render", JSON.stringify({ id: "chair" }), "--json").stdout, /^\{\n "id": "chair"/m);
+  assert.match(call("kit_search", JSON.stringify({ query: "cup" })).stdout, /"id": "cup"/, "an answer with no picture still prints its data");
 });
 
 test("kit_render of a list of items draws one sheet, with the problems of each", () => {
@@ -69,14 +75,20 @@ test("a tool error is exit code 1 with the answer on stderr; list and read work"
   const bad = call("kit_render", JSON.stringify({ id: "no_such_thing" }));
   assert.equal(bad.status, 1);
   assert.match(bad.stderr, /no set piece or prop no_such_thing/);
+  const some = call("kit_render", JSON.stringify({ items: ["chair", "chiar"] }));
+  assert.equal(some.status, 1);
+  assert.equal(pngs(some.stdout).length, 1, "the sheet's path on stdout, though the call failed");
+  assert.match(some.stderr, /^error: item 2: there is no set piece or prop chiar/m);
   const notJson = call("kit_render", "{nope");
   assert.equal(notJson.status, 1);
   assert.match(notJson.stderr, /not JSON/);
   const list = call("list");
   assert.equal(list.status, 0, list.stderr);
-  assert.match(list.stdout, /^kit_render\n/m);
-  assert.match(list.stdout, /input: \{/);
-  assert.match(call("list", "kit_render").stdout, /^kit_render/);
+  assert.match(list.stdout, /^usage: call\.ts <tool>/, "list starts with the usage");
+  assert.match(list.stdout, /^kit_render +A sheet of numbered cells/m, "a line a tool");
+  assert.doesNotMatch(list.stdout, /input: \{/, "no schemas in the list");
+  assert.ok(list.stdout.split("\n").length < 60, "the list is short");
+  assert.match(call("list", "kit_render").stdout, /^kit_render\n.*\n  input: \{/);
   assert.match(call("read", "sahne://kit-guide").stdout, /\S/);
   assert.equal(call("kit_save_nothing").status, 1);
 });
@@ -90,6 +102,7 @@ test("a write tool needs --write; with it a saved drawing is seen by the next ca
   assert.equal(yes.status, 0, yes.stderr);
   assert.ok(existsSync(join(root, "kit", "pieces", "x_saved_board.json")));
   assert.equal(call("kit_render", JSON.stringify({ id: "x_saved_board" })).status, 0);
+  assert.match(call("kit_read", JSON.stringify({ id: "x_saved_board" })).stdout, /^data: .*"doc":\{"id":"x_saved_board"/m, "a saved drawing's document, without --json");
 });
 
 test("--session keeps one server process, restarts it when a watched source changed, and stops on request", () => {
@@ -115,6 +128,13 @@ test("--session keeps one server process, restarts it when a watched source chan
   assert.notEqual(status(), pid, "a new process drew it");
   assert.match(spawnSync(process.execPath, [CALL, "--session", NAME, "--stop"], { encoding: "utf8", env: ENV }).stdout, /stopped/);
   assert.equal(status(), undefined);
+});
+
+test("a session that did not start says why: the last lines of its log", () => {
+  const log = join(watch, "fail.log");
+  writeFileSync(log, "starting\nTypeError: x is not defined\n    at gen.ts:3\n");
+  assert.match(notStarted("kit", log), /did not start:\n[^]*TypeError: x is not defined[^]*the whole log: /);
+  assert.match(notStarted("kit", join(watch, "none.log")), /did not start \(the whole log/);
 });
 
 test("a running --write session reads the content root's kit fresh on every call", () => {
