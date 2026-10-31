@@ -11,6 +11,7 @@
 //   sources { list: [{ url, title? }] }   the pages a web search found (Tavily)
 //   ask { question, options?, save?, review? }   a card for the person: buttons that answer, proposals to accept and
 //     save at once, or a review status to set; the answer comes as their next message (ask_person, set_review)
+//   start_run { goal }   a card offering a run (runs/run.ts) for a long task: the person starts it, with its gates
 //   confirm { estimateUsd, why }   a big ask (drafting or reviewing a season): nothing ran; re-send with confirm: true
 //   done { usage: { input, output, usd } } · error { message }
 // `fresh: true` is the second reader: a new conversation of the last message alone, never given the drafting history.
@@ -44,6 +45,7 @@ export type AssistantEvent =
   | { type: "remembered"; id: string; text: string }
   | { type: "ask"; question: string; options?: string[]; save?: string[]; review?: { id: string; status: string }; remember?: string }
   | { type: "confirm"; estimateUsd: number; why: string }
+  | { type: "start_run"; goal: string }
   | { type: "done"; usage: { input: number; output: number; usd: number } }
   | { type: "error"; message: string };
 
@@ -68,6 +70,9 @@ export interface AssistantOptions {
 const OWN: ToolDef[] = [
   { name: "ask_person", description: "Ask the person to choose, with buttons, and end your turn: their click comes back as their next message. Use it for a real choice (two titles, which week, whether to go on), not for something you can decide. With save: the ids of your proposals, and the card offers to accept and save them at once.", schema: { type: "object", properties: { question: { type: "string" }, options: { type: "array", items: { type: "string" }, maxItems: 6, description: "The answers, as short as a button" }, save: { type: "array", items: { type: "string" }, description: "Proposal ids to offer to accept and save" } }, required: ["question"] } },
 ];
+
+/** A long task as a run of steps (runs/run.ts): the assistant offers it on a card, and the person starts it. */
+const START_RUN: ToolDef = { name: "start_run", description: "Offer to do a long task as a run: a plan of steps (each new character, place, season and episode, then a review), each done by its own agent with a fresh context, that goes on when the editor is closed. Use it when the task is more than a few edits (a week of episodes, a new season with its cast and places); do small tasks yourself. The person sees a card and starts the run; it plans itself first. Say in one sentence what the run will do, then end your turn.", schema: { type: "object", properties: { goal: { type: "string", description: "The task, in full: what the person asked for, with every detail they gave" } }, required: ["goal"] } };
 
 /** What it remembers (memory.ts): keep a note of a lasting decision, or forget one. */
 const MEMORY_TOOLS: ToolDef[] = [
@@ -190,7 +195,7 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
     const agentEdits = s.agentEdits ?? o.agentEdits;
     const bs = await backstage({ write: o.write, agentEdits, shareCards: o.shareCards, events: o.events, by: "assistant", onCall: o.onCall });
     client = bs.client;
-    const tools: ToolDef[] = bs.tools.concat(OWN, o.write ? MEMORY_TOOLS : [], web === "tavily" ? TAVILY_TOOLS : []);
+    const tools: ToolDef[] = bs.tools.concat(OWN, o.write ? [...MEMORY_TOOLS, START_RUN] : [], web === "tavily" ? TAVILY_TOOLS : []);
     // after it has read the web in this ask, its edits are proposals even in direct mode: a page could have steered it
     let webRead = false, proposer: Client | null = null;
     const proposing = async () => (proposer ??= proposerOf = (await backstage({ write: o.write, agentEdits: "proposals", shareCards: o.shareCards, events: o.events, by: "assistant", onCall: o.onCall })).client);
@@ -201,6 +206,10 @@ export async function runAssistant(req: AssistantRequest, send: (e: AssistantEve
     const mcp = client;
 
     async function run(c: Call, signal?: AbortSignal): Promise<Outcome> {
+      if (c.name === "start_run") {
+        const goal = String((c.input as { goal?: unknown }).goal ?? "").slice(0, 4000);
+        return { text: "Offered: the person starts the run from the card. End your turn now.", isError: false, detail: "", after: [{ type: "start_run", goal }], end: true };
+      }
       if (c.name === "remember" || c.name === "forget") {
         const i = c.input as { text?: unknown; id?: unknown };
         try {

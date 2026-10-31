@@ -4,7 +4,8 @@
 // it may create or change only the documents the plan gave it (`owns`; a season and the series are shared). A small
 // scheduler, not one graph, runs the plan: a step starts as soon as the steps it needs are done (up to `concurrency` at
 // once), a step that asks the person waits alone (the others go on), and gates (after the plan, after the cast and places)
-// wait for the person unless they are off. A run outlives a closed tab and a restart: the runs are in the store, and a
+// wait for the person unless they are off. A run started from its goal alone plans itself first: a `plan` step reads the
+// series and proposes the plan (propose_plan), which the person sees at the plan gate. A run outlives a closed tab and a restart: the runs are in the store, and a
 // step that was running goes on from its last checkpoint.
 
 import { Command } from "@langchain/langgraph";
@@ -61,6 +62,10 @@ export interface Run {
   agentEdits: AgentEdits;
   brief: string;
   steps: Step[];
+  /** What the plan may cost (USD), from its steps: `estimate`. */
+  estimateUsd?: number;
+  /** The budget was set by the person (else it follows the estimate). */
+  maxSet?: boolean;
   at: number;
 }
 
@@ -80,6 +85,24 @@ export interface RunsOptions {
 const STEP_TURNS = 60;
 
 const STEP_ASK: ToolDef = { name: "ask_person", description: "Ask the person a question and wait for the answer: this step waits, the run's other steps go on. Use it for a real choice (a name, what they study, which of two places), not for what you can decide. With options, they answer with a button.", schema: { type: "object", properties: { question: { type: "string" }, options: { type: "array", items: { type: "string" }, maxItems: 6 } }, required: ["question"] } };
+const PLAN_STEPS = { type: "array", items: { type: "object", properties: {
+  id: { type: "string", description: "a-z, 0-9, _: cast_derya, place_library, ep_s2e01, review" },
+  kind: { type: "string", enum: ["season", "character", "place", "episode", "review", "task"] },
+  title: { type: "string" }, brief: { type: "string", description: "What this step makes, in enough detail for an agent who has read only this and the run's brief" },
+  needs: { type: "array", items: { type: "string" }, description: "The steps it must wait for (an episode: the cast and places it uses, and the season)" },
+  owns: { type: "array", items: { type: "object", properties: { kind: { type: "string", enum: ["season", "character", "place", "story", "kit_piece", "kit_variant"] }, id: { type: "string" } }, required: ["kind", "id"] }, description: "The documents it creates or changes, by their new ids" },
+}, required: ["id", "kind", "title", "brief"] } };
+const PROPOSE_PLAN: ToolDef = { name: "propose_plan", description: "Set this run's plan, once you have read what it needs: a brief every step reads (the story, the people and their names, the places, what each episode teaches and how they connect) and the steps. One step for each new season, character and place, one for each episode (owning its story id, and needing the cast, places and season it uses), and a review step at the end that needs every episode. Ids must be new. The person sees the plan before any step runs, unless they turned that off.", schema: { type: "object", properties: { brief: { type: "string" }, steps: PLAN_STEPS }, required: ["brief", "steps"] } };
+/** The planner's own brief. */
+const PLANNING = "Plan this run. Read the series first (series_overview), the season it goes in, and the cast and places there are (kit_search characters, places), so the plan reuses what exists and makes only what is missing. Pick the new ids (free ones: a character's from its name, episodes the season's next numbers). Then call propose_plan. If something is a real choice for the person (names, which season, what the episodes teach), ask_person before you propose.";
+
+/** What a run of these steps may cost, by kind, on Claude (a local model costs nothing): a rough guide, shown at the plan gate. */
+export function estimate(steps: Pick<Step, "kind" | "model">[], provider: string): number {
+  if (provider === "openai") return 0;
+  const USD: Record<StepKind, number> = { plan: 0.6, season: 0.1, character: 0.25, place: 0.3, episode: 0.8, review: 0.8, task: 0.2 };
+  return Math.round(steps.reduce((t, s) => t + USD[s.kind] * (s.model && /opus/.test(s.model) && s.kind !== "plan" && s.kind !== "review" ? 2 : 1), 0) * 100) / 100;
+}
+
 const FINISH: ToolDef = { name: "finish_step", description: "End this step once its work is made and checked: a short report for the steps after it (the ids you made, names, marks, what they must know). Then end your turn.", schema: { type: "object", properties: { summary: { type: "string", maxLength: 2000 } }, required: ["summary"] } };
 
 /** What is wrong with a plan, or nothing: ids new and unique, needs that exist and make no cycle, no document made twice. */
@@ -107,6 +130,7 @@ export function planProblems(p: Plan): string[] {
 /** The first words of a step: the run's goal and brief, its own brief, what it makes, and what the steps before it said. */
 function stepPrompt(run: Run, s: Step): string {
   const before = run.steps.filter(x => s.needs.includes(x.id));
+  if (s.kind === "plan") return [`The run's goal: ${run.goal}`, s.brief, "Nothing is made in this step: it ends with propose_plan."].join("\n\n");
   return [
     `The run's goal: ${run.goal}`,
     `The plan's brief, shared by every step:\n${run.brief}`,
@@ -116,6 +140,8 @@ function stepPrompt(run: Run, s: Step): string {
     "Nothing a step proposes is saved until the person accepts it, but every step of this run sees the run's pending proposals as there. When your work is made and checked, call finish_step with a short report for the steps after yours. If the person must decide something, ask_person: you wait for the answer, and the other steps go on.",
   ].filter(Boolean).join("\n\n");
 }
+
+const stepOf = (p: PlanStep): Step => ({ id: p.id, kind: p.kind, title: p.title, brief: p.brief, needs: p.needs ?? [], owns: p.owns ?? [], ...(p.model ? { model: p.model } : {}), status: "waiting", usd: 0, attempts: 0, proposals: [] });
 
 export class Runs {
   private readonly o: RunsOptions;
@@ -139,22 +165,43 @@ export class Runs {
   private changed(run: Run) { this.keep(); this.o.events.emit("run", { run }); }
   private settings() { return this.o.settings?.() ?? readSettings(); }
 
-  /** Start a run of a plan. */
-  create(v: { goal: string; plan: Plan; gates?: Partial<Gates> | false; maxUsd?: number; concurrency?: number; agentEdits?: AgentEdits }): Run {
-    const bad = planProblems(v.plan);
+  /** Start a run: of a plan, or from its goal alone, a planning step first. */
+  create(v: { goal: string; plan?: Plan; gates?: Partial<Gates> | false; maxUsd?: number; concurrency?: number; agentEdits?: AgentEdits }): Run {
+    const plan: Plan = v.plan ?? { brief: "", steps: [{ id: "plan", kind: "plan", title: "Plan the run", brief: PLANNING }] };
+    const bad = planProblems(plan);
     if (bad.length) throw new Error(`the plan: ${bad.join("; ")}`);
     const s = this.settings(), id = `r${++this.n}`;
     const gates: Gates = v.gates === false ? { plan: false, castAndPlaces: false } : { plan: v.gates?.plan ?? true, castAndPlaces: v.gates?.castAndPlaces ?? true };
     const run: Run = {
       id, goal: v.goal, by: `run:${id}`, status: "running", gates, passed: [], usd: 0,
-      maxUsd: v.maxUsd ?? 10, concurrency: v.concurrency ?? (s.provider === "openai" ? 1 : 3),
-      agentEdits: v.agentEdits ?? s.agentEdits ?? "proposals", brief: v.plan.brief, at: Date.now(),
-      steps: v.plan.steps.map(p => ({ id: p.id, kind: p.kind, title: p.title, brief: p.brief, needs: p.needs ?? [], owns: p.owns ?? [], ...(p.model ? { model: p.model } : {}), status: "waiting", usd: 0, attempts: 0, proposals: [] })),
+      maxUsd: v.maxUsd ?? 10, ...(v.maxUsd !== undefined ? { maxSet: true } : {}), concurrency: v.concurrency ?? (s.provider === "openai" ? 1 : 3),
+      agentEdits: v.agentEdits ?? s.agentEdits ?? "proposals", brief: plan.brief, at: Date.now(),
+      steps: plan.steps.map(stepOf),
     };
+    if (v.plan) this.estimated(run);
     this.list.push(run);
     this.changed(run);
     this.tick(run);
     return run;
+  }
+
+  /** The plan's estimate, and the budget from it when the person set none: three times the estimate, at least $2. */
+  private estimated(run: Run): void {
+    run.estimateUsd = estimate(run.steps.filter(s => s.kind !== "plan"), this.settings().provider);
+    if (!run.maxSet) run.maxUsd = Math.max(2, Math.round(run.estimateUsd * 3 * 100) / 100 + run.usd);
+  }
+
+  /** A plan for the steps that have not started (the planner's, or the person's at the plan gate): checked, then set. */
+  private setPlan(run: Run, plan: Plan): string[] {
+    const kept = run.steps.filter(s => s.kind === "plan" || s.status !== "waiting");
+    const planner = kept.find(s => s.kind === "plan");
+    const steps = plan.steps.map(p => ({ ...p, needs: [...new Set([...(p.needs ?? []), ...(planner ? [planner.id] : [])])] }));
+    const bad = planProblems({ brief: plan.brief, steps: [...kept, ...steps] });
+    if (bad.length) return bad;
+    run.brief = plan.brief;
+    run.steps = [...kept, ...steps.map(stepOf)];
+    this.estimated(run);
+    return [];
   }
 
   /** After a restart: every run that was going goes on, its running steps from their last checkpoint. */
@@ -167,8 +214,15 @@ export class Runs {
   }
 
   /** The person's answer at a gate (go on, or stop), or new gates. */
-  act(id: string, a: { action: "continue" } | { action: "stop" } | { action: "gates"; gates: Partial<Gates> } | { action: "budget"; maxUsd: number }): Run {
+  act(id: string, a: { action: "continue" } | { action: "stop" } | { action: "gates"; gates: Partial<Gates> } | { action: "budget"; maxUsd: number } | { action: "plan"; plan: Plan }): Run {
     const run = this.need(id);
+    if (a.action === "plan") {
+      if (run.status !== "gate" || run.gate !== "plan") throw new Error("the plan can change at the plan gate only");
+      const bad = this.setPlan(run, a.plan);
+      if (bad.length) throw new Error(`the plan: ${bad.join("; ")}`);
+      this.changed(run);
+      return run;
+    }
     if (a.action === "stop") {
       run.status = "stopped";
       for (const s of run.steps) { if (s.status === "running") this.live.get(`${run.id}:${s.id}`)?.abort(); if (s.status === "waiting" || s.status === "asking" || s.status === "running") s.status = "stopped"; }
@@ -177,7 +231,7 @@ export class Runs {
     }
     if (a.action === "continue" && run.status === "gate" && run.gate) { run.passed.push(run.gate); delete run.gate; run.status = "running"; }
     if (a.action === "gates") run.gates = { ...run.gates, ...a.gates };
-    if (a.action === "budget") { run.maxUsd = a.maxUsd; if (run.status === "paused") { run.status = "running"; delete run.why; } }
+    if (a.action === "budget") { run.maxUsd = a.maxUsd; run.maxSet = true; if (run.status === "paused") { run.status = "running"; delete run.why; } }
     if (a.action === "continue" && run.status === "paused") { run.status = "running"; delete run.why; }
     this.changed(run);
     this.tick(run);
@@ -217,11 +271,13 @@ export class Runs {
     if (run.status === "done" || run.status === "stopped" || run.status === "paused") return;
     const steps = run.steps, done = (id: string) => steps.find(s => s.id === id)?.status === "done";
     if (steps.every(s => s.status === "done" || s.status === "skipped")) { run.status = "done"; delete run.gate; this.changed(run); return; }
-    if (run.gates.plan && !run.passed.includes("plan")) { if (run.status !== "gate") { run.status = "gate"; run.gate = "plan"; this.changed(run); } return; }
+    // a run that plans itself runs its planner first; then the plan waits at its gate
+    const planning = steps.some(s => s.kind === "plan" && s.status !== "done" && s.status !== "skipped");
+    if (!planning && run.gates.plan && !run.passed.includes("plan")) { if (run.status !== "gate") { run.status = "gate"; run.gate = "plan"; this.changed(run); } return; }
     if (run.usd >= run.maxUsd) { run.status = "paused"; run.why = `its budget, $${run.maxUsd.toFixed(2)}, is spent: raise it to go on`; this.changed(run); return; }
     const first = steps.filter(s => FIRST.includes(s.kind));
     const castGate = run.gates.castAndPlaces && first.length > 0 && !run.passed.includes("castAndPlaces");
-    const ready = steps.filter(s => s.status === "waiting" && s.needs.every(done) && !(castGate && !FIRST.includes(s.kind)));
+    const ready = steps.filter(s => s.status === "waiting" && s.needs.every(done) && !(castGate && !FIRST.includes(s.kind)) && (!planning || s.kind === "plan"));
     const running = steps.filter(s => s.status === "running").length;
     for (const s of ready.slice(0, Math.max(0, run.concurrency - running))) void this.go(run, s);
     const busy = steps.some(s => s.status === "running" || s.status === "asking");
@@ -276,7 +332,7 @@ export class Runs {
       const mcp = bs.client;
       const system = `${systemPrompt({ agentEdits: run.agentEdits, writable: this.o.write, shareCards: this.o.shareCards, web: null, notes: readMemory() })}\n\nYou are one step of a run: a long task split into steps, each done by its own agent with a fresh context. Do your step well and only your step; the person reviews the run's work by step.`;
       const graph = agentGraph({
-        model, system, tools: [...bs.tools, STEP_ASK, FINISH], maxTurns: STEP_TURNS, ask: "wait",
+        model, system, tools: [...bs.tools, STEP_ASK, s.kind === "plan" ? PROPOSE_PLAN : FINISH], maxTurns: STEP_TURNS, ask: "wait",
         before: () => {
           guard(st.caps);
           if (run.usd >= run.maxUsd) throw new BudgetError(`the run's budget, $${run.maxUsd.toFixed(2)}, is spent`);
@@ -288,6 +344,14 @@ export class Runs {
           this.o.events.emit("usage", usageSummary(st.caps));
         },
         run: async c => {
+          if (c.name === "propose_plan" && s.kind === "plan") {
+            const v = c.input as { brief?: unknown; steps?: unknown };
+            const bad = this.setPlan(run, { brief: String(v.brief ?? ""), steps: Array.isArray(v.steps) ? v.steps as PlanStep[] : [] });
+            if (bad.length) return { text: `The plan is not set; fix this and propose it again:\n${bad.map(b => `- ${b}`).join("\n")}`, isError: true };
+            s.summary = `The plan: ${run.steps.filter(x => x.kind !== "plan").map(x => x.title).join("; ")}.`;
+            this.changed(run);
+            return { text: `The plan is set: ${run.steps.length - 1} steps, about $${run.estimateUsd?.toFixed(2)}. ${run.gates.plan ? "The person sees it before any step runs." : "The steps start now."}`, isError: false, end: true };
+          }
           if (c.name === "finish_step") { s.summary = String((c.input as { summary?: unknown }).summary ?? "").slice(0, 2000); this.keep(); return { text: "Noted: your step is done.", isError: false, end: true }; }
           return callTool(mcp, c);
         },

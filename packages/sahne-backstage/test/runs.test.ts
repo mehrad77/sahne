@@ -192,3 +192,25 @@ test("after a restart, a step that was running goes on", async () => {
   await two.idle();
   assert.deepEqual([two.get(run.id)!.status, two.get(run.id)!.steps[0].summary], ["done", "made after the restart"]);
 });
+
+test("a run from its goal alone plans itself: the planner proposes, the plan waits at its gate with an estimate, and the person may change it", async () => {
+  const proposed = { brief: "Derya at the library.", steps: [PLAN.steps[0], { ...PLAN.steps[1], needs: [] }, PLAN.steps[2]] };
+  const { r } = runs(scripted({
+    plan: [{ calls: [{ name: "propose_plan", args: { brief: "x", steps: [{ id: "a", kind: "task", title: "A", brief: "a", needs: ["b"] }] } }] }, { calls: [{ name: "propose_plan", args: proposed }] }],
+  }));
+  const run = r.create({ goal: "A week at the library" });
+  assert.deepEqual(run.steps.map(s => s.kind), ["plan"]);
+  await r.idle();
+  // the first plan is refused with why; the second is set, each step after the planner
+  assert.match(JSON.stringify(r.log(run.id, "plan")), /The plan is not set; fix this and propose it again:\\n- step a needs b, which is not a step/);
+  assert.deepEqual([run.status, run.gate], ["gate", "plan"]);
+  assert.deepEqual(run.steps.map(s => s.id), ["plan", "cast_derya", "place_library", "ep_books"]);
+  assert.ok(run.steps.slice(1).every(s => s.needs.includes("plan")));
+  assert.equal(run.brief, "Derya at the library.");
+  assert.equal(run.estimateUsd, 0.25 + 0.3 + 0.8);
+  assert.ok(Math.abs(run.maxUsd - (Math.max(2, 1.35 * 3) + run.usd)) < 1e-6, "three times the estimate");
+  // at the gate the person drops the episode
+  r.act(run.id, { action: "plan", plan: { brief: "Only the cast.", steps: [PLAN.steps[0]] } });
+  assert.deepEqual(run.steps.map(s => s.id), ["plan", "cast_derya"]);
+  assert.throws(() => r.act(run.id, { action: "plan", plan: { brief: "b", steps: [{ ...PLAN.steps[0], needs: ["ghost"] }] } }), /needs ghost/);
+});

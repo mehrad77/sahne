@@ -487,6 +487,8 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 
 A run is a long task (a week of episodes, with the new cast and places they need) as a plan of steps. Each step is done by a sub-agent with a fresh context: the agent graph (`server/agent/graph.ts`) on a LangGraph thread of its own, checkpointed in the store.
 - **A plan** is `{ brief, steps: [{ id, kind, title, brief, needs?, owns?, model? }] }`. `kind` is `plan`, `season`, `character`, `place`, `episode`, `review` or `task`. `needs` names the steps whose reports it reads first. `owns` is the documents it creates or changes (`{ kind, id }`). `planProblems` refuses ids that are not `a-z0-9_` or are there twice, needs that are not steps or make a cycle, and a document two steps would make.
+- **A run from its goal alone plans itself.** Its first step is a `plan` step (Opus): it reads the series, the season, the cast and places, may ask the person (names, which season), and ends with `propose_plan { brief, steps }`. A plan that does not hold is refused with why, and it proposes again. Every step it plans needs it, so each reads its report. The plan then waits at the plan gate with its estimate (`estimate`: a rough cost by step kind, on Claude), and the person may change it there (`{ action: "plan", plan }`). The budget is three times the estimate (at least $2) unless the person set one.
+- **The assistant offers a run** for a long task (`start_run { goal }`, its own tool): the chat shows a card, and the person starts it. The turn ends there.
 - **One author.** Every step edits as `run:<id>`, so each builds on the run's pending proposals, and each proposal names its `step`. A step creates or changes only what it `owns`; a season, the series and kit drawings are shared, one call at a time (`inTurn`). Anything else is refused with what the step makes.
 - **A step starts fresh**: the run's goal and the plan's brief, its own brief, what it makes, and the reports of the steps it needs. It ends with `finish_step { summary }`, its report for the steps after it, which ends its graph. It may `ask_person`: the step waits for the answer (a LangGraph `interrupt`), and the others go on.
 - **The scheduler** (`Runs`, `server/runs/run.ts`) starts every step whose needs are done, up to `concurrency` at once (3 on Claude, 1 on a local model), as soon as it can. It does not wait for a batch.
@@ -500,9 +502,9 @@ A run is a long task (a week of episodes, with the new cast and places they need
 | Request | Answer |
 |---|---|
 | `GET /api/runs` | `{ runs }` |
-| `POST /api/runs` `{ goal, plan, gates?, maxUsd?, concurrency? }` | `{ run }`, started; 400 with the plan's problems |
+| `POST /api/runs` `{ goal, plan?, gates?, maxUsd?, concurrency? }` | `{ run }`, started (without a plan, it plans itself); 400 with the plan's problems |
 | `GET /api/runs/<id>` | `{ run }`: `{ id, goal, by, status (running, gate, paused, done, stopped), gate?, why?, gates, passed, maxUsd, usd, concurrency, agentEdits, brief, steps }` |
-| `POST /api/runs/<id>` `{ action: "continue" \| "stop" }`, `{ action: "gates", gates }`, `{ action: "budget", maxUsd }` | `{ run }`: past a gate or a pause, stopped, its gates or its budget changed |
+| `POST /api/runs/<id>` `{ action: "continue" \| "stop" }`, `{ action: "gates", gates }`, `{ action: "budget", maxUsd }`, `{ action: "plan", plan }` | `{ run }`: past a gate or a pause, stopped, its gates, its budget or (at the plan gate) its plan changed |
 | `POST /api/runs/<id>/steps/<step>` `{ action: "answer", answer }`, `{ action: "stop" }`, `{ action: "retry" }` | `{ run }` |
 | `GET /api/runs/<id>/steps/<step>/log?after=<seq>` | `{ events: [{ seq, event }] }`: the step's log, as the assistant's events |
 

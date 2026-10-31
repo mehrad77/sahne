@@ -46,6 +46,7 @@ export function abilities(o: AbilitiesOf): Abilities {
       `Ask you to choose with buttons (two titles, which week)${proposing ? ", and offer its proposals to accept and save at once" : ""}.`,
       "See which of its proposals you took or turned down, and take back one of its own.",
       "Remember lasting decisions and preferences for later conversations (notes kept in the series, which you see and delete in Settings).",
+      "Do a long task (a week of episodes, a new season with its cast and places) as a run: it offers it on a card, you start it, it plans itself, and each step is done by its own agent while the editor may be closed. You see the plan first, and the run asks you when a step needs a choice.",
     ] : []),
     "Open an episode at a step in the editor, to show you what it means.",
     ...(o.web ? [`Search the web and read pages (Tavily), with its sources shown: for words, customs, prices and places.`] : []),

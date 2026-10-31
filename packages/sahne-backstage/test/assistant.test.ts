@@ -169,6 +169,16 @@ test("ask_person: a card for the person ends the turn; set_review in proposals m
   assert.deepEqual(rv.find(e => e.type === "ask")!.review, { id: "s1e00", status: "reviewed" });
 });
 
+test("start_run: a long task is offered on a card, and the turn ends there", async () => {
+  process.env.ANTHROPIC_API_KEY = "test-key";
+  answers(toolTurn("toolu_run", "start_run", { goal: "A new season: two friends text, meet and study at the library." }));
+  const evs = await ask("Make a new season with two episodes about two friends at the library.");
+  assert.deepEqual(evs.find(e => e.type === "start_run"), { type: "start_run", goal: "A new season: two friends text, meet and study at the library." });
+  assert.equal(sent.length, 1, "nothing more runs until the person starts it");
+  assert.ok(sent[0].body.tools.some((t: { name: string }) => t.name === "start_run"));
+  assert.equal(evs.at(-1)!.type, "done");
+});
+
 test("the conversation goes back as it was: an earlier tool's picture is not rewritten", async () => {
   // Claude signs its thinking against everything before it, and the request is cached: changing an earlier message breaks both
   answers(toolTurn("toolu_p1", "read_look", { id: "ismail" }), toolTurn("toolu_p2", "read_look", { id: "ismail", section: "hair" }), textTurn("Looked."));
