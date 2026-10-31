@@ -1,4 +1,5 @@
-// Agents' edits waiting for a person (Node only): an in-memory queue, one per backstage process, never written to disk.
+// Agents' edits waiting for a person (Node only): a queue, one per backstage process, kept in the person's store
+// (runs/store.ts) when the server gives one, so a restart loses none; never written to the content root.
 // In proposals mode (the default) an agent's write tool (mcp.ts) computes the whole new document, checks it, and queues
 // it here; the open editor shows it (`proposal` events, `GET /api/proposals`), and a person accepts or rejects it
 // (`POST /api/proposals/<id>`). The browser applies an accepted proposal itself, as an edit like any other (Undo, the
@@ -8,10 +9,12 @@
 // agent's own latest pending proposal on it (`after` names that one), so each holds the ones before it. Accepting one
 // therefore applies those it was built on as well (they are resolved with it); rejecting one drops those built on it.
 // Proposals of different agents are independent, each against the disk. `base` is the mtime the proposal was computed
-// from, so the editor can tell when the file changed since.
+// from, so the editor can tell when the file changed since. The same author proposing the same documents again (a step
+// of a run that starts over after a restart) gets the proposal it made, not a second one.
 
 import type { Kind, Problem } from "./content.ts";
 import type { Events } from "./events.ts";
+import type { Store } from "./runs/store.ts";
 
 /** A document that changes with a proposal's main one (a season's calendar row with its episode's date). */
 /** A document a proposal changes. `paths` (for one that changes with the main one) are its changed places: accepting it
@@ -41,6 +44,8 @@ export interface Proposal {
   problems: Problem[];
   /** The pending proposal of the same agent on the same document it was built on. */
   after?: string;
+  /** The step of a run that made it (runs/). */
+  step?: string;
 }
 
 export type NewProposal = Omit<Proposal, "id" | "at">;
@@ -67,8 +72,14 @@ export class Proposals implements Queue {
   private n = 0;
   readonly where: string;
   private readonly events: Events;
+  private readonly store?: Store;
 
-  constructor(events: Events, where = "the open backstage editor") { this.events = events; this.where = where; }
+  constructor(events: Events, where = "the open backstage editor", store?: Store) {
+    this.events = events; this.where = where; this.store = store;
+    const kept = store?.get<{ n: number; pending: Proposal[]; done: Resolved[] } | null>("proposals", null);
+    if (kept) { this.n = kept.n; this.done = kept.done; for (const p of kept.pending) this.list.set(p.id, p); }
+  }
+  private keep() { this.store?.set("proposals", { n: this.n, pending: this.all(), done: this.done }); }
 
   all(): Proposal[] { return [...this.list.values()]; }
   get(id: string): Proposal | undefined { return this.list.get(id); }
@@ -76,8 +87,11 @@ export class Proposals implements Queue {
   async resolved(): Promise<Resolved[]> { return [...this.done]; }
 
   async add(p: NewProposal): Promise<Proposal> {
+    const same = this.all().find(q => q.by === p.by && q.kind === p.kind && q.doc === p.doc && JSON.stringify([q.next, q.also ?? []]) === JSON.stringify([p.next, p.also ?? []]));
+    if (same) return same;
     const out: Proposal = { ...p, id: `p${++this.n}`, at: Date.now() };
     this.list.set(out.id, out);
+    this.keep();
     this.events.emit("proposal", { action: "added", proposal: out });
     return out;
   }
@@ -106,6 +120,7 @@ export class Proposals implements Queue {
       this.events.emit("proposal", { action: "resolved", proposal: g, accepted, ...(withdrawn ? { withdrawn: true } : {}), ...(g === p ? {} : { with: p.id }) });
     }
     this.done.length = Math.min(this.done.length, KEEP_RESOLVED);
+    this.keep();
     return gone;
   }
 
@@ -123,10 +138,10 @@ export const latestOf = (list: Proposal[], by: string, kind: Kind, doc: string):
   list.filter(p => p.by === by && p.kind === kind && p.doc === doc).sort((a, b) => b.at - a.at || Number(b.id.slice(1)) - Number(a.id.slice(1)))[0];
 
 const queues = new WeakMap<Events, Proposals>();
-/** The process's queue: one per event bus (http.ts makes one bus; the assistant and /mcp share it). */
-export function proposalsOf(events: Events): Proposals {
+/** The process's queue: one per event bus (http.ts makes one bus, with its store; the assistant and /mcp share it). */
+export function proposalsOf(events: Events, store?: Store): Proposals {
   let q = queues.get(events);
-  if (!q) { q = new Proposals(events); queues.set(events, q); }
+  if (!q) { q = new Proposals(events, undefined, store); queues.set(events, q); }
   return q;
 }
 

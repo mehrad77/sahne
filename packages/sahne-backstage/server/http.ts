@@ -26,6 +26,7 @@ import { Agents, callOf } from "./agents.ts";
 import { createMcp, type AgentEdits } from "./mcp.ts";
 import { proposalsOf, type NewProposal, type ProposalEdit } from "./proposals.ts";
 import { looksOf } from "./look.ts";
+import { Store } from "./runs/store.ts";
 import { DOCS } from "./guides.ts";
 import { forgetNote, readMemory, remember } from "./memory.ts";
 
@@ -76,7 +77,9 @@ export async function serve(o: Options): Promise<Running> {
   // how agents' edits land: --agent-edits, else the person's settings; changed on the Agents page for agents that connect after
   let agentEdits: AgentEdits = o.agentEdits ?? readSettings().agentEdits ?? "proposals";
   const shareCards = o.shareCards === true;
-  const events = new Events(), proposals = proposalsOf(events), agents = new Agents(events), looks = looksOf(events);
+  // what lasts across a restart: the proposals waiting for a person (runs/store.ts)
+  const store = new Store();
+  const events = new Events(), proposals = proposalsOf(events, store), agents = new Agents(events), looks = looksOf(events);
   const writable = () => o.write && !oldShape().length;
   /** The assistant, as `GET /api/world` gives it: false when it cannot run, so a plain truthiness check still works. */
   const aiOf = () => {
@@ -324,6 +327,7 @@ export async function serve(o: Options): Promise<Running> {
       server.closeAllConnections(); // the event streams and MCP streams stay open otherwise
       await closed;
       await ctx.dispose();
+      store.close();
     },
   };
 }

@@ -388,17 +388,20 @@ claude mcp add sahne-backstage -- node packages/sahne-backstage/server/cli.ts mc
 - **TypeScript generators** are read when the process starts, so a render shows the source of the worktree it started from. `kit_read` and `kit_render` say when the kit's source changed after that; a new process sees it (a one-shot client that starts a process per call always does).
 - **Kit item saves** go through `submit()`, so `--write`, proposals and direct mode and `--backstage` forwarding behave as for an episode. A proposal's `kind` is `kit_piece` or `kit_variant`.
 
-**Proposals** (`server/proposals.ts`, in memory, one queue per backstage process, never on disk).
-- A proposal is `{ id, kind, doc, next, base?, create?, also?, paths, summary, by, at, problems, after? }`:
+**Proposals** (`server/proposals.ts`, one queue per backstage process). The server keeps it in the person's store (`server/runs/store.ts`: `node:sqlite`, one file per content root at `<config>/runs/<hash>.sqlite`, never in the content root), so what is pending, what was answered and the next id outlive a restart. The stdio MCP server and the tests keep theirs in memory.
+- A proposal is `{ id, kind, doc, next, base?, create?, also?, paths, summary, by, at, problems, after?, step? }`:
   - `next` is the whole proposed document, `base` the mtime it was computed from, and `create` marks a new document;
   - `also` lists the documents that change with it, each `{ kind, doc, next, base?, create?, paths? }` (a season's calendar with its episode). They are saved in the same save. A carried document's `paths` are its own changed places (`["calendar", "s1e04"]`; a story's `releaseDate`, `kind` and `arc`): accepting sets only those, so neither a person's unsaved edits nor an earlier accepted proposal on it are undone;
-  - `paths` are the changed places, and `by` is `assistant` or the MCP client's name;
+  - `paths` are the changed places, and `by` is `assistant`, `run:<id>` (a run of the assistant, every step of it) or the MCP client's name (`src/model/who.ts` says it for a person);
   - `problems` is the check of `next` and `also`.
 - **A proposal is refused as a save would be**, whatever the check says: an id changed, an extra edited, a new id that is taken (`refuse` in `server/content.ts`).
 - **They compose simply.** An agent's proposal is computed from the file plus that agent's own latest pending proposal on the document. `after` names that proposal. So each proposal holds the ones before it:
   - accepting one also resolves those it was built on;
   - rejecting one also drops those built on it.
   A document the agent's pending proposals only carry (the season a new episode's calendar row goes in) is read as the latest of those, so its next proposal builds on it instead of undoing it. Different agents' proposals are independent, each against the file.
+- **The same author proposing the same documents again** gets the proposal there is, not a second one (a step of a run that starts over after a restart).
+- **An author's pending documents are there for its next edits.** The check takes them as there though they are not on disk (`check(edits, context)` in `server/content.ts`), and `create_episode`, `kit_search` and `suggest_staging` see its pending season, characters and places. So a run's episode can be set in the place the same run proposed.
+- **One author's tool calls run one at a time** (`inTurn` in `server/mcp.ts`), whichever server they come through, so two steps of a run editing one season never undo each other's edit. `look`, which waits on an open editor, is left out.
 - **The browser applies an accepted proposal itself**, as an edit (Undo, the check, Save). Backstage never saves a proposal. *Accept and save* does both in one click; when the document already has the person's own unsaved edits it asks first, since they are saved too (`acceptAndSave` in `src/events.ts`). An editor with unsaved edits of the same document applies only the proposal's `paths`, so nothing typed is lost.
 
 **In the editor** (`src/events.ts`, `src/ui/studio/proposals.ts`, `src/ui/proposed.ts`). The page listens to `/api/events`:
@@ -509,7 +512,7 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
   - `content.ts` (kinds, files, checks, saves);
   - `git.ts`;
   - `review.ts`;
-  - `mcp.ts` (the MCP server: its tools and resources), `kittools.ts` (its kit tools: search, read, render, draft and save kit items), `result.ts` (what a tool answers: text, pictures, data), `render.ts` (SVG to PNG), `call.ts` (any tool from the shell, with sessions), `proposals.ts` (agents' edits waiting for a person), `events.ts` (the editors' event stream and selection) and `agents.ts` (the connected agents and their calls);
+  - `mcp.ts` (the MCP server: its tools and resources), `kittools.ts` (its kit tools: search, read, render, draft and save kit items), `result.ts` (what a tool answers: text, pictures, data), `render.ts` (SVG to PNG), `call.ts` (any tool from the shell, with sessions), `proposals.ts` (agents' edits waiting for a person), `runs/store.ts` (what lasts across a restart), `events.ts` (the editors' event stream and selection) and `agents.ts` (the connected agents and their calls);
   - `assistant.ts` (the assistant and its system prompt), `agent/graph.ts` (an agent as a LangGraph graph), `settings.ts` (the person's AI settings), and `ai/`: `models.ts` (the LangChain chat models, the local server's models), `provider.ts` (tools, pictures, errors, the network), `web.ts` (Tavily) and `budget.ts` (the prices, the caps and the usage log).
 - The server reads sahne-story's Node-only files (`paths.ts`, `check/`, `load.ts`) by path. The package exports only `"."`.
 - **`src/`** is the browser side (the studio's shared parts in `src/ui/kit/`: icons, chips, drawers, popovers, the palette; the theme in `src/ui/theme.ts`), built with Preact and htm tagged templates (no JSX, so the source stays erasable TypeScript). It contains:

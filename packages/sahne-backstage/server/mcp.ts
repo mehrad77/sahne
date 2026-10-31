@@ -37,6 +37,7 @@ import { DOCS, guideText, headingsOf, sectionOf } from "./guides.ts";
 import { suggestionsOf } from "../src/model/autostage.ts";
 import { boardOf, datesOf, themed, weekOfArc } from "../src/model/board.ts";
 import { skeleton } from "../src/model/skeleton.ts";
+import { isAssistant } from "../src/model/who.ts";
 
 export type AgentEdits = "proposals" | "direct";
 
@@ -192,6 +193,20 @@ const docOf = (kind: Kind, id: string): { doc: Record<string, unknown>; mtime: n
   return readDoc(kind, id) as { doc: Record<string, unknown>; mtime: number };
 };
 
+/**
+ * One author's tool calls, one at a time, whichever server instance they come through: each reads a document as it would
+ * edit it and queues the new one, so two steps of a run (one author) adding calendar rows to one season never undo each
+ * other. `look` waits on an open editor and is left out.
+ */
+const turns = new Map<string, Promise<unknown>>();
+function inTurn<T>(author: string, fn: () => Promise<T>): Promise<T> {
+  const p = (turns.get(author) ?? Promise.resolve()).then(fn);
+  const rest = p.catch(() => {});
+  turns.set(author, rest);
+  void rest.then(() => { if (turns.get(author) === rest) turns.delete(author); });
+  return p;
+}
+
 // ---- the server ------------------------------------------------------------------------------------------------------------
 
 export function createMcp(o: McpOptions): McpServer {
@@ -206,7 +221,7 @@ export function createMcp(o: McpOptions): McpServer {
     if (o.fresh) forget();
     const t0 = Date.now();
     let r: Result;
-    try { r = await fn(a); } catch (e) { r = fail(e instanceof Refusal ? e.message : `failed: ${(e as Error).message}`); }
+    try { r = await (tool === "look" ? fn(a) : inTurn(by(), async () => fn(a))); } catch (e) { r = fail(e instanceof Refusal ? e.message : `failed: ${(e as Error).message}`); }
     o.onCall?.({ at: t0, by: by(), tool, ok: !r.isError, ms: Date.now() - t0, summary: (r.content[0]?.type === "text" ? r.content[0].text : "").split("\n")[0].slice(0, 300), label: toolLabel(tool, a).label });
     return r;
   };
@@ -240,6 +255,20 @@ export function createMcp(o: McpOptions): McpServer {
     return disk;
   }
 
+  /**
+   * This agent's pending documents of a kind, newest first wins, in proposals mode: the season, characters and places a
+   * run proposed are there for its later steps (an episode set in its new place) before a person accepts them.
+   */
+  async function mine(kind?: Kind): Promise<Map<string, ProposalEdit>> {
+    const out = new Map<string, ProposalEdit>();
+    if (o.agentEdits !== "proposals") return out;
+    for (const p of (await queue.pending()).filter(x => x.by === by()).sort((a, b) => a.at - b.at))
+      for (const e of [{ kind: p.kind, doc: p.doc, next: p.next, create: p.create }, ...(p.also ?? [])]) if (!kind || e.kind === kind) out.set(kind ? e.doc : `${e.kind}:${e.doc}`, e);
+    return out;
+  }
+  /** The world's documents of a kind with this agent's pending ones over them. */
+  const withMine = async <T,>(kind: Kind, disk: Record<string, T>): Promise<Record<string, T>> => ({ ...disk, ...Object.fromEntries([...(await mine(kind))].map(([id, e]) => [id, e.next as T])) });
+
   /** Propose or save a set of documents (the first is the one edited; the rest change with it). */
   async function submit(edits: ProposalEdit[], m: { summary: string; paths: Key[][]; after?: string }): Promise<Result> {
     const why = readOnly();
@@ -260,7 +289,8 @@ export function createMcp(o: McpOptions): McpServer {
     }
     // what a save would refuse whatever the check says (an id changed, an extra edited, a taken new id), a proposal is refused too
     for (const e of list) { const no = refuse(e); if (no) return fail(`not proposed: ${no}`); }
-    const problems = check(list);
+    // the agent's own pending documents are there for the check (a run's new characters, before its episodes use them)
+    const problems = check(list, [...(await mine()).values()].map(e => ({ kind: e.kind, id: e.doc, doc: e.next, create: e.create })));
     const errs = problems.filter(p => p.new && p.level === "error");
     if (errs.length) return fail(`not proposed: the edit brings ${errs.length} error${errs.length > 1 ? "s" : ""}. Fix ${errs.length > 1 ? "them" : "it"} and try again:\n${errs.map(fmt).join("\n")}`);
     const [main, ...also] = edits;
@@ -381,8 +411,8 @@ export function createMcp(o: McpOptions): McpServer {
       as: z.enum(["set", "prop", "both"]).optional().describe("props and set only: whether it is a set piece, a prop or both"),
     },
     annotations: { readOnlyHint: true },
-  }, run("kit_search", ({ kind, query, limit, family, tag, as }) => {
-    const c = ctx(), w = listing();
+  }, run("kit_search", async ({ kind, query, limit, family, tag, as }) => {
+    const c = ctx(), l = listing(), w = { characters: await withMine("character", l.characters), places: await withMine("place", l.places as Record<string, StoryPlace>) };
     let rows: ({ id: string; about: string } & Record<string, unknown>)[] = [];
     if (kind === "characters") rows = Object.entries(w.characters).map(([id, ch]) => ({ id, about: `${textOf(ch.name, c.langs.main) ?? id}${ch.kind ? ` (${ch.kind})` : ""}${ch.role ? `: ${textOf(ch.role, ...c.langs.translations, c.langs.main)}` : ""}` }));
     else if (kind === "places") rows = Object.entries(w.places as Record<string, StoryPlace>).map(([id, p]) => {
@@ -537,8 +567,9 @@ export function createMcp(o: McpOptions): McpServer {
   }, run("create_episode", async b => {
     const why = readOnly();
     if (why) return fail(why);
-    const w = listing(), sid = `s${b.season}`, se = (w.seasons as Record<string, SeasonDoc>)[sid];
-    if (!se) return fail(`season ${sid} has no document: start it in the editor first`);
+    const w = listing(), sid = `s${b.season}`, se = (await withMine("season", w.seasons as Record<string, SeasonDoc>))[sid];
+    if (!se) return fail(`season ${sid} has no document: start it with create_season first`);
+    const places = await withMine("place", w.places as Record<string, StoryPlace>);
     const series = w.series as SeriesDoc | undefined;
     if (!series) return fail("the content root has no series.json: start the series in the editor first");
     let id = b.id;
@@ -548,7 +579,7 @@ export function createMcp(o: McpOptions): McpServer {
     }
     if (seasonOf(id) !== b.season) return fail(`${id} is not an episode id of season ${b.season} (s${b.season}eNN)`);
     if (exists("story", id)) return fail(`${id} exists already: ids are permanent, pick a new one`);
-    if (!(w.places as Record<string, unknown>)[b.place]) return fail(`there is no place ${b.place} (kit_search places)`);
+    if (!places[b.place]) return fail(`there is no place ${b.place} (kit_search places)`);
     const aid = arcId(b.season, b.week), arc = se.arcs?.[aid];
     if (!arc) {
       const weeks = Object.keys(se.arcs ?? {}).map(k => Number(k.split("w")[1])).sort((x, y) => x - y);
@@ -556,7 +587,7 @@ export function createMcp(o: McpOptions): McpServer {
     }
     if (!b.title[languagesOf(series).main]) return fail(`the title needs the main language's (${languagesOf(series).main})`);
     const next = skeleton({ id, season: b.season, releaseDate: b.releaseDate, kind: b.kind, week: b.week, arc: { ...arc, id: aid }, place: b.place, cast: b.cast, words: b.words, lessons: b.lessons, title: b.title, summary: b.summary, level: b.level },
-      { narrator: series.narrator, standin: series.standin, places: w.places as Record<string, StoryPlace> });
+      { narrator: series.narrator, standin: series.standin, places });
     const edits: ProposalEdit[] = [{ kind: "story", doc: id, next, create: true }];
     if (se.calendar) {
       const s = await current("season", sid);
@@ -732,14 +763,14 @@ export function createMcp(o: McpOptions): McpServer {
   server.registerTool("set_review", {
     title: "Set where an episode stands",
     description: o.agentEdits === "proposals"
-      ? `Ask the person to set an episode's review status (${STATUSES.join(", ")}): in proposals mode a person decides where an episode stands${o.by === "assistant" ? ", with one click on the card this puts in the conversation" : ", on the Review page; tell them what you suggest and why"}.`
+      ? `Ask the person to set an episode's review status (${STATUSES.join(", ")}): in proposals mode a person decides where an episode stands${isAssistant(o.by ?? "") ? ", with one click on the card this puts in the conversation" : ", on the Review page; tell them what you suggest and why"}.`
       : `Set an episode's review status: ${STATUSES.join(", ")}. "approved" is a sign-off, refused until the episode is ready (every block reviewed and its translations checked, no errors, no open comments: check_season says what is missing).`,
     inputSchema: { id: ID, status: z.enum(STATUSES as [string, ...string[]]) },
   }, run("set_review", async ({ id, status }) => {
     if (!o.write) return fail(readOnly() ?? "read-only");
     if (!exists("story", id)) return absent(id, "it has a review status");
     // proposals mode: the person decides; the assistant's conversation shows them a card to do it with one click
-    if (o.agentEdits === "proposals") return o.by === "assistant"
+    if (o.agentEdits === "proposals") return isAssistant(o.by ?? "")
       ? ok(`asked the person to mark ${id} ${status}: a card in the conversation does it when they click it`, { ask: { question: `Mark ${id} as ${status}?`, review: { id, status } } })
       : ok(`not set: in proposals mode a person decides where an episode stands. Tell them you suggest ${status} for ${id}, and why; they set it on the Review page`);
     const cur: EpisodeReview = readReview().episodes[id] ?? {};
@@ -769,7 +800,7 @@ export function createMcp(o: McpOptions): McpServer {
   }, run("suggest_staging", async ({ id }) => {
     const d = await seen(id), w = listing(), c = ctx(), k = kitOf();
     const lang = langFor(c.langs.main);
-    const o = { places: w.places as Record<string, StoryPlace>, characters: w.characters, kit: k, lang };
+    const o = { places: await withMine("place", w.places as Record<string, StoryPlace>), characters: await withMine("character", w.characters), kit: k, lang };
     const story = d.doc as unknown as StoryDoc;
     const sugg = suggestionsOf(story, { lang, lints: suggest(story, o as never), gestures: Object.keys(k.gestures), emotions: Object.keys(k.face.emotions), narrator: (w.series as SeriesDoc | undefined)?.narrator ?? "kerim", standin: (w.series as SeriesDoc | undefined)?.standin ?? "nima" });
     const rows = Object.entries(sugg).flatMap(([path, ss]) => ss.map(sg => ({ path, staging: sg.fix, why: sg.why, from: sg.from })));

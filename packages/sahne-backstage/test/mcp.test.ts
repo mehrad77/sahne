@@ -339,7 +339,10 @@ test("proposals mode: a checked proposal is queued, the file is untouched, and a
     assert.ok(!rp.isError, rp.text);
     assert.match(rp.text, new RegExp(`s1e01 is your proposal ${pe.id}, a new episode`));
     assert.match(rp.text, /mtime none/);
-    const ep = await call(client, "edit_step", { id: "s1e01", path: "", patch: { level: "A1" } });
+    // proposing the same document again (a step that starts over) gets the proposal there is
+    const same = await call(client, "edit_step", { id: "s1e01", path: "", patch: { level: "A1" } });
+    assert.equal(json(same).proposal, pe.id);
+    const ep = await call(client, "edit_step", { id: "s1e01", path: "", patch: { title: { tr: "Ekmek var mı?", en: "Is there bread?" } } });
     assert.ok(!ep.isError, ep.text);
     const pe2 = q.all().at(-1)!;
     assert.equal(pe2.create, true);
@@ -416,6 +419,34 @@ test("direct mode: an edit is saved; a stale read is refused (409) and a new err
     const season = await call(client, "check_season", { id: 1 });
     assert.match(season.text, /s1e00 · .* · in-review \(0\/\d+ blocks reviewed\)|s1e00 · .* · draft \(0\/\d+ blocks reviewed\)/);
   } finally { await close(); }
+});
+
+test("one author through two servers: edits to one document queue one after the other, and its pending documents are there for its next ones", async () => {
+  const events = new Events();
+  const one = await connect({ write: true, agentEdits: "proposals" }, events), two = await connect({ write: true, agentEdits: "proposals" }, events);
+  try {
+    const q = proposalsOf(events), before = q.all().length;
+    // two steps of a run edit the season at once: the second builds on the first, so neither undoes the other
+    const [a, b] = await Promise.all([
+      call(one.client, "edit_doc", { kind: "season", id: "s1", path: "", patch: { title: { tr: "Birinci sezon", en: "Season one" } } }),
+      call(two.client, "edit_doc", { kind: "season", id: "s1", path: "", patch: { summary: { en: "The first season." } } }),
+    ]);
+    assert.ok(!a.isError && !b.isError, a.text + b.text);
+    const last = q.all().filter(p => p.kind === "season").at(-1)!;
+    assert.equal((last.next as any).title.en, "Season one");
+    assert.equal((last.next as any).summary.en, "The first season.");
+    // a character and a place it proposed are there for its episode, though nothing is saved yet
+    const ch = await call(one.client, "create_character", { id: "derya", name: { tr: "Derya" }, role: { en: "a student", fa: "دانشجو" }, bio: { en: "She studies.", fa: "درس می‌خواند." } });
+    assert.ok(!ch.isError, ch.text);
+    const pl = await call(two.client, "create_place", { id: "kutuphane_yeni", name: { tr: "Kütüphane", en: "Library", fa: "کتابخانه" }, from: "bakkal" });
+    assert.ok(!pl.isError, pl.text);
+    assert.match((await call(one.client, "kit_search", { kind: "characters", query: "derya" })).text, /derya/);
+    const ep = await call(two.client, "create_episode", { season: 1, id: "s1e05", releaseDate: "2026-09-17", kind: "episode", week: 0, place: "kutuphane_yeni", cast: ["derya", "nima"], words: ["a1-w-ekmek", "a1-w-su", "a1-w-cay", "a1-w-peynir", "a1-w-zeytin"], lessons: ["g_a1_2_var_yok"], title: { tr: "Kitaplar" }, level: "A1" });
+    assert.ok(!ep.isError, ep.text);
+    assert.equal(q.all().at(-1)!.doc, "s1e05");
+    assert.ok(!existsSync(join(root, "characters", "derya.json")), "nothing is written");
+    for (const p of q.all().slice(before)) q.resolve(p.id, false);
+  } finally { await one.close(); await two.close(); }
 });
 
 test("over HTTP: a proposal reaches the editors under the client's name, and a person resolves it", async () => {

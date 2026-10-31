@@ -11,6 +11,7 @@ import { rows } from "../../model/steps.ts";
 import { accept, acceptAndSave, proposals, reject, type Proposal } from "../../events.ts";
 import { world } from "../../store.ts";
 import { inLang, useLangs } from "../lang.ts";
+import { who } from "../../model/who.ts";
 
 /** The words of a place in a document, in a language (a step's text, a title), or its JSON. */
 const wordsAt = (doc: unknown, path: Path, lang: string): string => {
@@ -27,7 +28,7 @@ export function ProposalsBar(p: { list: Proposal[]; story: StoryDoc; select(path
     ${p.list.map(x => {
       const fresh = x.problems.filter(q => q.new && q.level === "error").length;
       return html`<div class="proposal">
-        <div class="row"><b class="grow">${x.by === "assistant" ? "The assistant" : x.by} proposes: ${x.summary}</b>
+        <div class="row"><b class="grow">${who(x.by)} proposes: ${x.summary}</b>
           ${fresh > 0 && html`<span class="chip bad" title=${x.problems.filter(q => q.new).map(q => q.message).join("\n")}>${fresh} new error${fresh > 1 ? "s" : ""}</span>`}</div>
         ${x.paths.slice(0, 6).map(path => {
           const was = wordsAt(p.story, path, main), now = wordsAt(x.next, path, main);
@@ -59,7 +60,7 @@ export function ProposedEpisode(p: { x: Proposal }) {
   return html`<section class="proposed-ep">
     <div class="toolbar row">
       <div class="grow"><h2 style="margin:0"><span class="note">${p.x.doc}</span> <span ...${inLang(main)}>${textOf(doc.title, main) ?? p.x.doc}</span></h2>
-        <span class="note">A new episode ${p.x.by === "assistant" ? "the assistant" : p.x.by} proposes${gloss && textOf(doc.title, gloss) ? html` · <span ...${inLang(gloss)}>${textOf(doc.title, gloss)}</span>` : ""}</span></div>
+        <span class="note">A new episode ${who(p.x.by, true)} proposes${gloss && textOf(doc.title, gloss) ? html` · <span ...${inLang(gloss)}>${textOf(doc.title, gloss)}</span>` : ""}</span></div>
       <button disabled=${busy} onClick=${() => { setBusy(true); void reject(firstOf(p.x)).then(() => history.back()); }}>Reject</button>
       <button class="primary" disabled=${busy} onClick=${() => { setBusy(true); void accept(p.x); }}>Accept and open</button>
     </div>

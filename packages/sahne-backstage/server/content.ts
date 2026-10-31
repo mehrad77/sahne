@@ -226,13 +226,19 @@ function problemsIn(w: World, edits: Edit[], k?: Kit): Problem[] {
 
 const key = (p: CheckProblem) => `${p.rule}|${p.level}|${p.story}|${p.step ?? ""}|${p.message}`;
 
-/** Check edited documents: every problem of theirs, the ones the edit brought marked `new`. */
-export function check(edits: Edit[]): Problem[] {
-  const w0 = world();
+/**
+ * Check edited documents: every problem of theirs, the ones the edit brought marked `new`. `context` is what the check
+ * takes as there though it is not on disk (an agent's own pending proposals: the characters and places a run made before
+ * its episodes): its documents are in the world, and only `edits` are checked.
+ */
+export function check(edits: Edit[], context: Edit[] = []): Problem[] {
+  const keys = new Set(edits.map(e => `${e.kind}:${e.id}`)), around = context.filter(e => !keys.has(`${e.kind}:${e.id}`));
+  const w0 = around.length ? withEdits(world(), around) : world();
   const before = new Set(problemsIn(w0, edits.filter(e => !e.create && exists(e.kind, e.id) && !isKitKind(e.kind)).map(e => ({ ...e, doc: currentDoc(w0, e) }))).map(key));
-  const withKit = edits.some(e => isKitKind(e.kind)) ? kitWithEdits(edits) : null;
+  const kitAround = around.filter(e => isKitKind(e.kind));
+  const withKit = edits.some(e => isKitKind(e.kind)) || kitAround.length ? kitWithEdits([...kitAround, ...edits]) : null;
   const after = problemsIn(withEdits(w0, edits), edits, withKit?.kit);
-  return [...(withKit?.problems ?? []).map(p => ({ ...p, new: true })), ...after.map(p => (before.has(key(p)) ? p : { ...p, new: true }))];
+  return [...(withKit?.problems ?? []).filter(p => keys.has(p.doc ?? "")).map(p => ({ ...p, new: true })), ...after.map(p => (before.has(key(p)) ? p : { ...p, new: true }))];
 }
 
 /** The document a kind and id have in the world now (what an edit replaces). */

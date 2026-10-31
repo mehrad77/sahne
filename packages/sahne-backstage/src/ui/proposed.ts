@@ -17,6 +17,7 @@ import { accept, acceptAndSave, proposals, reject, type Proposal } from "../even
 import type { Kind } from "../api.ts";
 import { draftOf, go } from "../store.ts";
 import { inLang, useLangs } from "./lang.ts";
+import { who } from "../model/who.ts";
 
 /** The page a document is answered on, as a route: an episode, a season's board, the board for the series, a place, a character. */
 export const routeOf = (kind: string, id: string): [string, string?] =>
@@ -79,7 +80,7 @@ export function ProposalCard(p: { x: Proposal }) {
   const fresh = x.problems.filter(q => q.new && q.level === "error");
   const act = (fn: () => Promise<void>) => { setBusy(true); void fn().finally(() => setBusy(false)); };
   return html`<div class="proposal">
-    <div class="row"><b class="grow">${x.by === "assistant" ? "The assistant" : x.by} proposes: ${x.summary}</b>
+    <div class="row"><b class="grow">${who(x.by)} proposes: ${x.summary}</b>
       ${fresh.length > 0 && html`<span class="chip bad" title=${fresh.map(q => q.message).join("\n")}>${fresh.length} new error${fresh.length > 1 ? "s" : ""}</span>`}</div>
     ${x.paths.slice(0, 8).flatMap(path => {
       const b0 = get(was, path as Path), a0 = get(x.next, path as Path);
@@ -122,7 +123,7 @@ export function ProposedDoc(p: { x: Proposal }) {
   return html`<section class="proposed-ep">
     <div class="toolbar row">
       <div class="grow"><h2 style="margin:0"><span class="note">${p.x.doc}</span> <span ...${inLang(main)}>${textOf(doc.name as Record<string, string>, main) ?? p.x.doc}</span></h2>
-        <span class="note">A new ${what} ${p.x.by === "assistant" ? "the assistant" : p.x.by} proposes</span></div>
+        <span class="note">A new ${what} ${who(p.x.by, true)} proposes</span></div>
       <button disabled=${busy} onClick=${() => { setBusy(true); void reject(firstOf(p.x)).then(() => history.back()); }}>Reject</button>
       <button class="primary" disabled=${busy} onClick=${() => { setBusy(true); void accept(p.x); }}>Accept and open</button>
     </div>

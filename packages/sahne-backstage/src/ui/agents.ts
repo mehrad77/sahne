@@ -12,6 +12,7 @@ import { AboutButton, AssistantChat, assistantOpen } from "./assistant.ts";
 import { openProposal } from "./proposed.ts";
 import { accept, acceptAndSave, activity, agentsTick, proposals, reject, type Call, type Proposal } from "../events.ts";
 import { Chip, Icon } from "./kit/index.ts";
+import { who } from "../model/who.ts";
 
 type Mode = "proposals" | "direct";
 interface Session { id: string; client: string; version?: string; agentEdits: Mode; since: number; lastAt?: number; calls: number }
@@ -63,7 +64,6 @@ export function ago(at: number, now = Date.now()) {
   return new Date(at).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", ...(s > 86400 ? { month: "short", day: "numeric" } : {}) });
 }
 
-const who = (by: string) => (by === "assistant" ? "The assistant" : by);
 
 export function Connect(p: { v: AgentsView; compact?: boolean }) {
   const list = connections(p.v);
