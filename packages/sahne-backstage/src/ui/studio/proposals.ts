@@ -1,6 +1,7 @@
-// Agents' proposed edits of this episode (events.ts): each with who proposed it and what it changes, every changed
-// place with its words before and after (word by word), the problems it would bring, and Show, Accept and Reject. An
-// accepted proposal is an edit like any other: undo takes it back, the check judges it, Save writes it.
+// Agents' proposed edits of this episode (events.ts): each with who proposed it and what it changes, its steps step by
+// step as the script reads them (ui/stepdiff.ts; a link to its preview when most of the episode changes), its other
+// changed places with their words before and after (word by word), the problems it would bring, and Accept and Reject.
+// An accepted proposal is an edit like any other: undo takes it back, the check judges it, Save writes it.
 
 import { html } from "htm/preact";
 import { useState } from "preact/hooks";
@@ -13,6 +14,10 @@ import { world } from "../../store.ts";
 import { inLang, useLangs } from "../lang.ts";
 import { who } from "../../model/who.ts";
 import { NeedsNote } from "../proposed.ts";
+import { afterAccepting, StepDiff } from "../stepdiff.ts";
+
+/** A proposal of this episode read as a whole, in the preview a new episode has (`#/episode/<id>/proposal/<n>`). */
+export const previewHref = (x: Proposal) => `#/episode/${x.doc}${x.create ? "" : `/proposal/${x.id}`}`;
 
 /** The words of a place in a document, in a language (a step's text, a title), or its JSON. */
 const wordsAt = (doc: unknown, path: Path, lang: string): string => {
@@ -31,12 +36,14 @@ export function ProposalsBar(p: { list: Proposal[]; story: StoryDoc; select(path
       return html`<div class="proposal">
         <div class="row"><b class="grow">${who(x.by)} proposes: ${x.summary}</b>
           ${fresh > 0 && html`<span class="chip bad" title=${x.problems.filter(q => q.new).map(q => q.message).join("\n")}>${fresh} new error${fresh > 1 ? "s" : ""}</span>`}</div>
-        ${x.paths.slice(0, 6).map(path => {
+        ${x.kind === "story" && x.paths.some(path => path[0] === "steps") && html`<${StepDiff} was=${p.story} now=${afterAccepting(x, p.story)} preview=${previewHref(x)}
+          go=${(at: { was?: number }) => { if (at.was !== undefined) p.select(["steps", at.was], true); }} />`}
+        ${x.paths.filter(path => path[0] !== "steps").slice(0, 6).map(path => {
           const was = wordsAt(p.story, path, main), now = wordsAt(x.next, path, main);
           return html`<div class="diff" ...${inLang(main)}><button class="small" onClick=${() => p.select(path, true)}>${path.filter(k => typeof k === "number").join(".") || path.join(".")}</button>
             ${diffWords(was, now).map(d => (d.op === "=" ? d.text : d.op === "-" ? html`<del>${d.text}</del>` : html`<ins>${d.text}</ins>`))}</div>`;
         })}
-        ${x.paths.length > 6 && html`<p class="note">and ${x.paths.length - 6} more places</p>`}
+        ${x.paths.filter(path => path[0] !== "steps").length > 6 && html`<p class="note">and ${x.paths.filter(path => path[0] !== "steps").length - 6} more places</p>`}
         <${NeedsNote} x=${x} />
         <div class="row"><span class="grow"></span><button onClick=${() => void reject(x)}>Reject</button><button disabled=${turnedDown(x).length > 0} onClick=${() => void accept(x)} title="Take it into the script; you save it">Accept</button><button class="primary" onClick=${() => void acceptAndSave(x)}>Accept and save</button></div>
       </div>`;
@@ -49,7 +56,7 @@ const firstOf = (x: Proposal): Proposal => { let a = x; for (let b; a.after && (
 
 /**
  * A new episode an agent proposes (`create_episode`): it is not on disk, so it cannot open in the studio until it is
- * taken. Its page shows what it would be (its titles, place, cast and date, the problems the check finds, and its steps in
+ * taken. (A proposal that rewrites most of an episode opens here too, from its bar's link, to be read as a whole.) Its page shows what it would be (its titles, place, cast and date, the problems the check finds, and its steps in
  * the main language with the first translation), with Reject, and Accept, which opens it in the studio as a new,
  * unsaved episode.
  */
@@ -62,12 +69,12 @@ export function ProposedEpisode(p: { x: Proposal }) {
   return html`<section class="proposed-ep">
     <div class="toolbar row">
       <div class="grow"><h2 style="margin:0"><span class="note">${p.x.doc}</span> <span ...${inLang(main)}>${textOf(doc.title, main) ?? p.x.doc}</span></h2>
-        <span class="note">A new episode ${who(p.x.by, true)} proposes${gloss && textOf(doc.title, gloss) ? html` · <span ...${inLang(gloss)}>${textOf(doc.title, gloss)}</span>` : ""}</span></div>
+        <span class="note">${p.x.create ? "A new episode" : "The episode as"} ${who(p.x.by, true)} proposes${gloss && textOf(doc.title, gloss) ? html` · <span ...${inLang(gloss)}>${textOf(doc.title, gloss)}</span>` : ""}</span></div>
       <button disabled=${busy} onClick=${() => { setBusy(true); void reject(firstOf(p.x)).then(() => history.back()); }}>Reject</button>
-      <button class="primary" disabled=${busy || turnedDown(p.x).length > 0} onClick=${() => { setBusy(true); void accept(p.x); }}>Accept and open</button>
+      <button class="primary" disabled=${busy || turnedDown(p.x).length > 0} onClick=${() => { setBusy(true); void accept(p.x).then(() => { if (!p.x.create) history.back(); }); }}>${p.x.create ? "Accept and open" : "Accept"}</button>
     </div>
     <${NeedsNote} x=${p.x} />
-    <p class="banner">Not written yet: nothing changes until you accept it, and then it is a new, unsaved episode you can edit before you save.</p>
+    <p class="banner">${p.x.create ? "Not written yet: nothing changes until you accept it, and then it is a new, unsaved episode you can edit before you save." : "Not taken yet: accepting puts it in the script, unsaved, to edit before you save."}</p>
     <div class="proposed-facts">
       <span><b>Place</b> ${doc.place ? textOf(w.places[doc.place]?.name, main) ?? doc.place : "—"}</span>
       <span><b>Cast</b> ${(doc.cast ?? []).map(name).join(", ") || "—"}</span>

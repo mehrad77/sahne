@@ -307,3 +307,36 @@ test("review: a block's signature ignores key order and the blocks inside it; th
   const p = standingOf({ steps: all() }, blocks, o).passes;
   assert.deepEqual(Object.keys(p).sort(), ["en", "fa"].filter(l => blocks.some(b => b.langs.includes(l))).sort());
 });
+
+test("step diff: inserted, moved, restaged and reworded steps, and when it is a preview instead", async () => {
+  const { stepDiff } = await import("../src/model/stepdiff.ts");
+  const o = { main: "tr", langs: ["tr", "en"] };
+  const L = (who: string, tr: string, more: Record<string, unknown> = {}) => ({ who, tr, en: `${tr} (en)`, ...more });
+  const was = { steps: [{ scene: "kafe", at: {} }, L("ali", "Merhaba!"), L("ayse", "Nasılsın?"), L("ali", "İyiyim, sen?"), L("ayse", "Ben de iyiyim.")] } as never;
+  const st = (d: ReturnType<typeof stepDiff>) => d.steps.map(x => x.status);
+  // an inserted step leaves the rest the same
+  const ins = { steps: [...(was as { steps: unknown[] }).steps.slice(0, 2), L("ali", "Bir çay lütfen."), ...(was as { steps: unknown[] }).steps.slice(2)] } as never;
+  const a = stepDiff(was, ins, o);
+  assert.deepEqual(st(a), ["same", "same", "added", "same", "same", "same"]);
+  assert.deepEqual([a.counts.added, a.counts.removed, a.counts.changed, a.preview], [1, 0, 0, false]);
+  assert.deepEqual(a.steps[2].texts.map(t => [t.lang, t.parts]), [["tr", [{ op: "+", text: "Bir çay lütfen." }]], ["en", [{ op: "+", text: "Bir çay lütfen. (en)" }]]]);
+  // a moved step
+  const s = (was as { steps: unknown[] }).steps;
+  const mv = stepDiff(was, { steps: [s[0], s[1], s[3], s[2], s[4]] } as never, o);
+  assert.equal(mv.counts.moved, 1);
+  assert.deepEqual(mv.steps.map(x => [x.status, x.was, x.now]), [["same", 0, 0], ["same", 1, 1], ["same", 3, 2], ["moved", 2, 3], ["same", 4, 4]]);
+  // a staging change gives chips, the words the same
+  const sg = stepDiff(was, { steps: [s[0], L("ali", "Merhaba!", { do: "wave", emo: "happy" }), s[2], s[3], s[4]] } as never, o);
+  assert.deepEqual(st(sg), ["same", "changed", "same", "same", "same"]);
+  assert.deepEqual(sg.steps[1].chips, { kept: [], added: ["wave", "happy"], removed: [] });
+  assert.equal(sg.steps[1].texts.some(t => t.changed), false);
+  assert.equal(sg.counts.staging, 1);
+  // a line whose words changed is changed, diffed word by word, not removed and added
+  const rw = stepDiff(was, { steps: [s[0], s[1], L("ayse", "Nasılsın bugün?"), s[3], s[4]] } as never, o);
+  assert.deepEqual(st(rw), ["same", "same", "changed", "same", "same"]);
+  assert.deepEqual(rw.steps[2].texts[0].parts, [{ op: "-", text: "Nasılsın?" }, { op: "+", text: "Nasılsın bugün?" }]);
+  // a preview: a new episode, or more than half of the steps not the same (2 of 5 is a diff, 3 of 5 a preview)
+  assert.equal(stepDiff(null, was, o).preview, true);
+  assert.equal(stepDiff(was, { steps: [s[0], s[1], s[2], L("ali", "Çok iyi."), L("ayse", "Güle güle.")] } as never, o).preview, false);
+  assert.equal(stepDiff(was, { steps: [s[0], s[1], L("ayse", "Kahve?"), L("ali", "Çok iyi."), L("ayse", "Güle güle.")] } as never, o).preview, true);
+});

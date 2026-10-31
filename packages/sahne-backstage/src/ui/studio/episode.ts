@@ -49,6 +49,9 @@ export function Episode(p: { id?: string }) {
   const read = proposalsRead.value;
   useEffect(() => { setMissing(false); if (read && !draftOf("story", id) && !proposed) void openDoc("story", id).then(d => setMissing(!d)); }, [id, !!proposed, read]);
   const d = draftOf("story", id);
+  // a proposal's link to read it as a whole (studio/proposals.ts)
+  const [, , sub, pid] = route.value, whole = sub === "proposal" ? proposals.value.find(x => x.id === pid && x.kind === "story" && x.doc === id) : undefined;
+  if (whole) return html`<${ProposedEpisode} x=${whole} />`;
   if (d) return html`<${Studio} key=${id} id=${id} />`;
   if (proposed) return html`<${ProposedEpisode} x=${proposed} />`;
   return html`<p class="note">${missing ? html`There is no episode ${id}. <a href="#/board">Back to the board</a>` : `Opening ${id}…`}</p>`;

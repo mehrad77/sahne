@@ -2,22 +2,24 @@
 // that changes a season, the series, a place or a character (its places, before and after, in words where they are
 // words; a character's look as their portrait before and after, and each field that changed by the builder's labels), a
 // strip of those cards on that document's page, and the preview of a proposed new place or character, which is
-// not on disk and so cannot open until it is taken. An episode's proposals have their own bar above the script
+// not on disk and so cannot open until it is taken. A card of an episode's proposal shows its steps step by step
+// (ui/stepdiff.ts). An episode's proposals have their own bar above the script
 // (studio/proposals.ts) and a new episode its own preview.
 
 import { html } from "htm/preact";
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { createBuilder, portrait, type Builder } from "sahne";
-import { textOf } from "sahne-story";
+import { textOf, type StoryDoc } from "sahne-story";
 import { KIT } from "../stage.ts";
 import { diffWords } from "../model/diff.ts";
 import { get, type Path } from "../model/path.ts";
 import { pathWords } from "../model/tools.ts";
 import { accept, acceptAndSave, neededFirst, proposals, reject, turnedDown, type Proposal } from "../events.ts";
-import type { Kind } from "../api.ts";
+import { api, type Kind } from "../api.ts";
 import { draftOf, go } from "../store.ts";
 import { inLang, useLangs } from "./lang.ts";
 import { who } from "../model/who.ts";
+import { afterAccepting, StepDiff } from "./stepdiff.ts";
 
 /** The page a document is answered on, as a route: an episode, a season's board, the board for the series, a place, a character. */
 export const routeOf = (kind: string, id: string): [string, string?] =>
@@ -78,6 +80,17 @@ export function NeedsNote(p: { x: Proposal }) {
   return first.length ? html`<p class="note">Accepting this also accepts what it needs: ${first.map(q => q.summary).join("; ")}.</p>` : null;
 }
 
+/** An episode's steps as a proposal would make them, against the episode as it is open here, else as it is on disk. */
+function ProposedSteps(p: { x: Proposal }) {
+  const open = draftOf("story", p.x.doc)?.doc as StoryDoc | undefined;
+  const [disk, setDisk] = useState<StoryDoc | null | undefined>(undefined);
+  useEffect(() => { if (!open && !p.x.create) void api.doc("story", p.x.doc).then(r => setDisk(r.status === 200 ? (r.doc as StoryDoc) : null)); }, [p.x.doc, !!open]);
+  const was = p.x.create ? null : open ?? disk;
+  if (was === undefined) return html`<p class="note">Reading the episode…</p>`;
+  return html`<${StepDiff} was=${was} now=${was && open ? afterAccepting(p.x, was) : p.x.next as StoryDoc} preview=${hrefOf("story", p.x.doc) + (p.x.create ? "" : `/proposal/${p.x.id}`)}
+    go=${(at: { was?: number; now?: number }) => { if (at.was !== undefined && !p.x.create) location.hash = `#/episode/${p.x.doc}/at/${at.was}`; }} />`;
+}
+
 /** One proposal of a season, the series, a place or a character: what it changes, place by place, with Accept and Reject. */
 export function ProposalCard(p: { x: Proposal }) {
   const { main } = useLangs();
@@ -89,7 +102,8 @@ export function ProposalCard(p: { x: Proposal }) {
   return html`<div class="proposal">
     <div class="row"><b class="grow">${who(x.by)} proposes: ${x.summary}</b>
       ${fresh.length > 0 && html`<span class="chip bad" title=${fresh.map(q => q.message).join("\n")}>${fresh.length} new error${fresh.length > 1 ? "s" : ""}</span>`}</div>
-    ${x.paths.slice(0, 8).flatMap(path => {
+    ${x.kind === "story" && x.paths.some(path => path[0] === "steps") && html`<${ProposedSteps} x=${x} />`}
+    ${x.paths.filter(path => x.kind !== "story" || path[0] !== "steps").slice(0, 8).flatMap(path => {
       const b0 = get(was, path as Path), a0 = get(x.next, path as Path);
       if (x.kind === "character" && path.length === 1 && path[0] === "avatar") return [html`<${LookDiff} before=${b0} after=${a0} />`];
       // a text in several languages: each language that changed, on its own line

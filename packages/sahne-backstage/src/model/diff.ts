@@ -1,5 +1,6 @@
-// What changed in an episode: the rows of its step list whose content differs between two versions (the last commit and
-// now), and a word-by-word diff of a text. Pure (test/model.test.ts).
+// What changed in an episode: its fields and the rows of its step list whose content differs between two versions (the
+// last commit and now; the Changes tab reads its fields from it, and its steps from stepdiff.ts), and a word-by-word diff
+// of a text. Pure (test/model.test.ts).
 
 import type { StoryDoc } from "sahne-story";
 import { equal, get, type Path } from "./path.ts";
