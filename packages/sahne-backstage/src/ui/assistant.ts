@@ -91,7 +91,7 @@ function keep() {
 }
 turns.subscribe(() => { if (loadedFor) keep(); });
 /** Start a new conversation (the one open stays in the history). */
-export function newChat() { chatId.value = newId(); turns.value = []; }
+export function newChat() { loadChats(); chatId.value = newId(); turns.value = []; }
 function openChat(id: string) { const c = chats.value.find(x => x.id === id); if (c && !busy.value) { chatId.value = c.id; turns.value = c.turns; } }
 function forgetChat(id: string) {
   chats.value = chats.value.filter(c => c.id !== id);
@@ -144,6 +144,8 @@ export function stop() { stopper?.abort(); }
 /** Send a message (or an ask), streaming the answer into the conversation. */
 export async function send(content: string, o: { fresh?: boolean; confirm?: boolean; files?: Attached[] } = {}) {
   if (busy.value || !content.trim()) return;
+  // the kept conversations are read before this one grows (an ask from a page can come before the panel ever opened)
+  loadChats();
   assistantOpen.value = true;
   sideTab.value = "assistant";
   // an answer with no words (only tools, or stopped) is not sent again

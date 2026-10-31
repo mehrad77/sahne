@@ -18,7 +18,7 @@ import { idFrom, idProblem } from "../model/newid.ts";
 import { dirty } from "../model/history.ts";
 import { KIT } from "../stage.ts";
 import { change, checkDocs, checked, createDoc, deleteCharacter, draftOf, go, history, keyOf, openDoc, saveDocs, world } from "../store.ts";
-import { assistantOpen, send, sideTab } from "./assistant.ts";
+import { newChat, send } from "./assistant.ts";
 import { NumberField, Problems, Section, Select, tx } from "./fields.ts";
 import { ProposalsStrip, ProposedDoc, proposedNew } from "./proposed.ts";
 import { Gallery, type Item } from "./kit/gallery.ts";
@@ -92,13 +92,12 @@ function NewCharacter(p: { onClose(): void }) {
     go("character", id);
     if (about.trim() && w.ai) void draftWith(id);
   };
-  /** Saved first (the assistant edits what is on disk), then the assistant drafts their page as a proposal. */
+  /** Saved first (the assistant edits what is on disk), then the assistant drafts their page, as a proposal, in a conversation of its own. */
   const draftWith = async (id: string) => {
     if (!await saveDocs([keyOf("character", id)])) return;
-    sideTab.value = "assistant";
-    assistantOpen.value = true;
+    newChat();
     const langs = [l.main, ...l.translations].join(", ");
-    await send(`I just added the character ${id} ("${name.trim()}") to the cast. What they are like: ${about.trim()}\n\nDraft their page from that: read_doc character ${id}, then one edit_doc on it with a role (one line) and a bio (two or three sentences) in ${l.translations.join(" and ") || l.main}, their name in ${langs} (the same name, written as each language writes it), a level if it says, and a colour that suits them. Keep the id, the look and the name in ${l.main} as they are. Then say in one line what you drafted.`, { fresh: true });
+    await send(`I just added the character ${id} ("${name.trim()}") to the cast. What they are like: ${about.trim()}\n\nDraft their page from that: read_doc character ${id}, then one edit_doc on it with a role (one line) and a bio (two or three sentences) in ${l.translations.join(" and ") || l.main}, their name in ${langs} (the same name, written as each language writes it), a level if it says, and a colour that suits them. Keep the id, the look and the name in ${l.main} as they are. Then say in one line what you drafted.`);
   };
   const pick = (k: string, doc: unknown, label: string) => html`<button type="button" class=${`look${start === k ? " on" : ""}`} aria-pressed=${start === k} onClick=${() => setStart(k)} title=${label}>
     <span class="art" dangerouslySetInnerHTML=${{ __html: svg(doc, 88, "bust") }}></span><small>${label}</small></button>`;
