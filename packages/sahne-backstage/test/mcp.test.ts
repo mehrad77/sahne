@@ -174,6 +174,22 @@ test("look: an open editor draws the frame (the agent's own proposal in it); non
   } finally { await close(); }
 });
 
+test("search_lines finds words across the episodes; read_guide gives a guide's headings or one section", async () => {
+  const { client, close } = await connect({ write: false, agentEdits: "proposals" });
+  try {
+    const sl = await call(client, "search_lines", { query: "portakal var", who: "nima" });
+    assert.ok(!sl.isError, sl.text);
+    assert.ok(json(sl).length >= 1 && json(sl).every((h: { story: string }) => h.story === "s1e00"), sl.text);
+    assert.match((await call(client, "search_lines", { query: "zzzz-nothing" })).text, /no line holds/);
+    const toc = await call(client, "read_guide", { name: "format" });
+    assert.match(toc.text, /^The story format \(packages\/sahne-story\/README\.md\)/);
+    const part = await call(client, "read_guide", { name: "backstage", section: "MCP server" });
+    assert.ok(!part.isError, part.text);
+    assert.match(part.text, /^## MCP server/);
+    assert.ok((await call(client, "read_guide", { name: "format", section: "no such heading at all" })).isError);
+  } finally { await close(); }
+});
+
 test("the proposals an agent sees: waiting and answered; it takes back only its own", async () => {
   const events = new Events();
   const a = await connect({ write: true, agentEdits: "proposals" }, events);

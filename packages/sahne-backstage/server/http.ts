@@ -26,14 +26,12 @@ import { Agents, callOf } from "./agents.ts";
 import { createMcp, type AgentEdits } from "./mcp.ts";
 import { proposalsOf, type NewProposal, type ProposalEdit } from "./proposals.ts";
 import { looksOf } from "./look.ts";
+import { DOCS } from "./guides.ts";
+import { forgetNote, readMemory, remember } from "./memory.ts";
 
 const HERE = new URL("../", import.meta.url);
 const CLI_PATH = fileURLToPath(new URL("cli.ts", import.meta.url));
-/** The guides the editor shows (#/docs), by id: each a README of the repo, with its path there for its links. */
-export const DOCS: Record<string, { title: string; file: URL; path: string }> = {
-  backstage: { title: "Backstage", file: new URL("README.md", HERE), path: "packages/sahne-backstage/README.md" },
-  format: { title: "The story format", file: new URL("../sahne-story/README.md", HERE), path: "packages/sahne-story/README.md" },
-};
+export { DOCS } from "./guides.ts";
 const SOUNDS = new URL("../../sahne-kit/sounds/", import.meta.url);
 const FONTS = new URL("node_modules/@fontsource/comic-neue/files/", HERE);
 
@@ -238,6 +236,18 @@ export async function serve(o: Options): Promise<Running> {
       const d = Object.hasOwn(DOCS, a) ? DOCS[a] : undefined;
       if (!d) throw new Fail(404, `no guide ${a}`);
       return json(res, 200, { id: a, title: d.title, path: d.path, markdown: readFileSync(d.file, "utf8") });
+    }
+    // what the assistant remembers (memory.ts): read, kept and deleted from Settings
+    if (route === "memory" && m === "GET") return json(res, 200, { notes: readMemory() });
+    if (route === "memory" && m === "POST") {
+      if (!o.write) throw new Fail(403, "read-only: start backstage with --write");
+      const v = await body(req) as { text?: unknown };
+      try { return json(res, 200, { note: remember(String(v?.text ?? "")), notes: readMemory() }); } catch (e) { throw new Fail(400, (e as Error).message); }
+    }
+    if (route === "memory" && m === "DELETE" && a) {
+      if (!o.write) throw new Fail(403, "read-only: start backstage with --write");
+      if (!forgetNote(a)) throw new Fail(404, `no note ${a}`);
+      return json(res, 200, { notes: readMemory() });
     }
     if (route === "usage" && m === "GET") return json(res, 200, usageSummary(readSettings().caps));
     if (route === "thumbs" && m === "GET") return json(res, 200, { stale: await staleThumbs(), command: "node packages/sahne-gallery/thumbs.mjs (in the Sahne repo, with SAHNE_CONTENT set)" });

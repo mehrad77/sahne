@@ -210,6 +210,40 @@ test("the web on Claude: Anthropic's search runs on its side; a paused turn goes
   assert.match(sent[0].body.system, /Browse the web: Settings turns it on/);
 });
 
+test("memory: a kept note is in every later prompt; forgotten, it goes; never a key; after the web, the person decides", async () => {
+  process.env.ANTHROPIC_API_KEY = "test-key";
+  const { readMemory, remember: keep } = await import("../server/memory.ts");
+  answers(toolTurn("toolu_m", "remember", { text: "Titles are in sentence case." }), textTurn("Noted."));
+  const evs = await ask("Always write titles in sentence case.");
+  const kept = evs.find(e => e.type === "remembered")!;
+  assert.equal(kept.text, "Titles are in sentence case.");
+  assert.deepEqual(readMemory().map(n => n.text), ["Titles are in sentence case."]);
+  answers(textTurn("Hi."));
+  await ask("Hello");
+  assert.match(sent[0].body.system, new RegExp(`${kept.id}: Titles are in sentence case\\.`));
+  assert.throws(() => keep("the api key is sk-ant-abc"), /never holds a key/);
+  answers(toolTurn("toolu_f", "forget", { id: kept.id }), textTurn("Forgotten."));
+  await ask("Forget that.");
+  assert.deepEqual(readMemory(), []);
+  // after a web search in the ask, a note waits for the person, and a direct-mode edit becomes a proposal
+  const webTurn = () => anthropicSse([
+    { type: "message_start", message: { model: "claude-opus-5-5", usage: { input_tokens: 10, output_tokens: 1 } } },
+    { type: "content_block_start", index: 0, content_block: { type: "server_tool_use", id: "srvtoolu_w", name: "web_search", input: {} } },
+    { type: "content_block_stop", index: 0 },
+    { type: "content_block_start", index: 1, content_block: { type: "tool_use", id: "toolu_r2", name: "remember", input: {} } },
+    { type: "content_block_delta", index: 1, delta: { type: "input_json_delta", partial_json: "{\"text\":\"Simit is 20 lira.\"}" } },
+    { type: "content_block_stop", index: 1 },
+    { type: "message_delta", delta: { stop_reason: "tool_use" }, usage: { output_tokens: 5 } },
+    { type: "message_stop" },
+  ]);
+  answers(webTurn, toolTurn("toolu_e", "set_texts", { id: "s1e00", path: "steps/4", texts: { en: "Good evening, friend." } }), textTurn("Done."));
+  const wv = await ask("Look it up and remember the price, then fix the line.", { agentEdits: "direct" });
+  assert.equal(wv.find(e => e.type === "ask")!.remember, "Simit is 20 lira.");
+  assert.deepEqual(readMemory(), []);
+  assert.ok(wv.some(e => e.type === "proposal"), "the edit after the web is a proposal, not saved");
+  assert.doesNotMatch(readFileSync(join(root, "stories", "s1e00.json"), "utf8"), /Good evening, friend/);
+});
+
 test("an edit by the assistant is a proposal, by \"assistant\"; a quick ask takes the faster model", async () => {
   const events = new Events();
   answers(toolTurn("toolu_2", "set_texts", { id: "s1e00", path: "steps/4", texts: { en: "Good evening! Come on in." } }), textTurn("I proposed a warmer line."));

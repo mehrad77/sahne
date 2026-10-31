@@ -94,6 +94,8 @@ export const kitVariantIds = (root: URL = KIT_VARIANTS): { of: string; name: str
 
 /** Editors' notes beside the content, never read by the app or the checks: sahne-backstage's review state. */
 export const REVIEW = new URL(".backstage/review.json", CONTENT);
+/** What the editor's assistant keeps between conversations (lasting decisions, preferences): beside the review notes, shared. */
+export const MEMORY = new URL(".backstage/memory.json", CONTENT);
 
 /** The JSON schemas of stories, characters and places (stay in the package). */
 export const SCHEMA = new URL("schema/", HERE);

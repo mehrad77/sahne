@@ -26,9 +26,9 @@ import { hrefOf } from "./proposed.ts";
 import { hostOf } from "../model/tools.ts";
 import { liveLine, ThinkingBlock, tick, ToolGroup, type Thinking, type ToolPart } from "./chat/parts.ts";
 
-type Part = { type: "text"; text: string } | Thinking | ToolPart | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number } | { type: "stopped" } | AskPart | { type: "sources"; list: { url: string; title?: string }[] };
+type Part = { type: "text"; text: string } | Thinking | ToolPart | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number } | { type: "stopped" } | AskPart | { type: "sources"; list: { url: string; title?: string }[] } | { type: "remembered"; id: string; text: string; undone?: boolean };
 /** A question the assistant put to the person (ask_person, set_review): buttons that answer, proposals to accept and save, a status to set. */
-type AskPart = { type: "ask"; question: string; options?: string[]; save?: string[]; review?: { id: string; status: string }; answered?: string };
+type AskPart = { type: "ask"; question: string; options?: string[]; save?: string[]; review?: { id: string; status: string }; remember?: string; answered?: string };
 interface Turn { role: "user" | "assistant"; content: string; parts?: Part[]; fresh?: boolean; at?: number; /** The files the person attached (their names; the pictures are not kept). */ files?: string[] }
 /** A file attached to a message: a picture sent as it is, a text file as words in the message. */
 interface Attached { name: string; mediaType: string; data: string; text?: string }
@@ -262,13 +262,14 @@ function AskCard(p: { part: AskPart; latest: boolean }) {
   const answer = (said: string) => { x.answered = said; turns.value = [...turns.value]; };
   const waiting = (x.save ?? []).map(id => proposals.value.find(q => q.id === id)).filter((q): q is NonNullable<typeof q> => !!q);
   return html`<div class="ask-card" role="group" aria-label="The assistant asks">
-    <b>${x.question}</b>
+    <b>${x.question}</b>${x.remember && html`<blockquote>${x.remember}</blockquote>`}
     ${x.save && html`<ul class="ask-list">${x.save.map(id => { const q = proposals.value.find(y => y.id === id); return html`<li>${q ? html`${q.summary} <span class="note">(${q.kind} ${q.doc})</span>` : html`<span class="note">${id}: answered already</span>`}</li>`; })}</ul>`}
     ${x.answered ? html`<div class="note">${x.answered}</div>` : html`<div class="row wrap">
+      ${x.remember && html`<button class="primary" disabled=${busy2} onClick=${async () => { setBusy2(true); const r = await fetch("/api/memory", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text: x.remember }) }); setBusy2(false); answer(r.ok ? "Kept for later conversations." : "Not kept: backstage could not write it."); }}>Keep it</button>`}
       ${x.review && html`<button class="primary" disabled=${!p.latest || busy2} onClick=${() => { void setReview(x.review!.id, r => ({ ...r, status: x.review!.status as never })); answer(`Marked ${x.review!.id} ${x.review!.status}.`); }}>Mark ${x.review.status}</button>`}
       ${waiting.length > 0 && html`<button class="primary" disabled=${busy2} onClick=${async () => { setBusy2(true); let n = 0; for (const q of waiting) if (await acceptAndSave(q)) n++; setBusy2(false); answer(n ? `Accepted and saved ${n} proposal${n > 1 ? "s" : ""}.` : "Nothing was saved."); }}>Accept and save ${waiting.length > 1 ? `all ${waiting.length}` : "it"}</button>`}
       ${(x.options ?? []).map(o => html`<button disabled=${!open} onClick=${() => { answer(`You answered: ${o}`); void send(o); }}>${o}</button>`)}
-      ${(x.review || waiting.length > 0) && html`<button disabled=${!open} onClick=${() => answer("Not now.")}>Not now</button>`}
+      ${(x.review || x.remember || waiting.length > 0) && html`<button disabled=${!open} onClick=${() => answer("Not now.")}>Not now</button>`}
     </div>`}
   </div>`;
 }
@@ -293,6 +294,7 @@ function Answer(p: { turn: Turn; live: boolean }) {
     else if (x.type === "proposal") out.push(html`<${Proposed} id=${x.id} />`);
     else if (x.type === "confirm") out.push(html`<div class="confirm">${x.why} It would cost about ${fmtUsd(x.estimateUsd)}. <button class="small primary" onClick=${() => { const q = [...turns.value].reverse().find(y => y.role === "user"); if (q) void send(q.content, { confirm: true, fresh: q.fresh }); }}>Go ahead</button></div>`);
     else if (x.type === "error") out.push(html`<div class="chat-error"><span class="grow">${x.message}</span>${!p.live && p.turn === turns.value.at(-1) && html`<button type="button" class="small" onClick=${retry}>Try again</button>`}</div>`);
+    else if (x.type === "remembered") out.push(html`<div class="tool ok remembered">${x.undone ? html`Forgot: ${x.text}` : html`Remembered for later conversations: ${x.text} <button type="button" class="linkish" onClick=${async () => { const r = await fetch(`/api/memory/${x.id}`, { method: "DELETE" }); if (r.ok) { x.undone = true; turns.value = [...turns.value]; } }}>Undo</button>`}</div>`);
     else if (x.type === "sources") out.push(html`<div class="sources" aria-label="Sources">${x.list.map(s => html`<a class="chip" href=${s.url} target="_blank" rel="noreferrer" title=${s.title ?? s.url}>${hostOf(s.url)}</a>`)}</div>`);
     else if (x.type === "ask") out.push(html`<${AskCard} part=${x} latest=${p.turn === turns.value.at(-1)} />`);
     else if (x.type === "stopped") out.push(html`<div class="note">Stopped. Nothing more ran after that.</div>`);

@@ -45,6 +45,7 @@ export function abilities(o: AbilitiesOf): Abilities {
       proposing ? "Suggest where an episode stands (reviewed, approved): you set it with one click on its card." : "Set where an episode stands (draft, reviewed, approved).",
       `Ask you to choose with buttons (two titles, which week)${proposing ? ", and offer its proposals to accept and save at once" : ""}.`,
       "See which of its proposals you took or turned down, and take back one of its own.",
+      "Remember lasting decisions and preferences for later conversations (notes kept in the series, which you see and delete in Settings).",
     ] : []),
     "Open an episode at a step in the editor, to show you what it means.",
     ...(o.web ? [`Search the web and read pages (${o.web === "tavily" ? "Tavily" : "Anthropic's search"}), with its sources shown: for words, customs, prices and places.`] : []),
@@ -57,7 +58,7 @@ export function abilities(o: AbilitiesOf): Abilities {
     ...(o.cards && !o.shareCards ? ["See the words on the word cards, only their ids (the Agents tab can share them)."] : []),
     ...(o.web ? [] : ["Browse the web: Settings turns it on (Anthropic's search on Claude, or Tavily with TAVILY_API_KEY in backstage's environment)."]),
     "Read files outside this content root, unless you attach them.",
-    "Remember other conversations: each starts from what is on screen and in the files.",
+    ...(o.writable ? ["Remember a whole conversation: only the notes it keeps carry over."] : ["Remember other conversations: backstage is read-only, so it keeps no notes."]),
   ];
   return { can, cannot };
 }

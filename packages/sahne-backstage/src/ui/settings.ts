@@ -21,6 +21,18 @@ let current: Settings | null = null;
 export const settingsNow = () => current;
 export async function loadSettings() { const r = await api.get<Answer>("settings"); if (r.status === 200) current = r.settings; return r; }
 
+/** What the assistant remembers: the notes kept in the series (.backstage/memory.json), each to delete. */
+function Memory() {
+  const [notes, setNotes] = useState<{ id: string; text: string; at: number }[] | null>(null);
+  useEffect(() => { void fetch("/api/memory").then(r => r.json()).then(j => setNotes(j.notes ?? [])).catch(() => setNotes([])); }, []);
+  const drop = async (id: string) => { const r = await fetch(`/api/memory/${id}`, { method: "DELETE" }); if (r.ok) setNotes((await r.json()).notes); else say("not deleted: backstage is read-only", true); };
+  return html`<div class="step-card fields"><h3>What the assistant remembers</h3>
+    <p class="note">Notes it keeps between conversations, in the series (<code>.backstage/memory.json</code>): everyone who works on it shares them, and they are committed with it.</p>
+    ${notes === null ? html`<p class="note">Reading…</p>` : !notes.length ? html`<p class="note">Nothing yet. Tell it a preference and it may keep it.</p>`
+      : html`<ul class="memory">${notes.map(n => html`<li class="row"><span class="grow">${n.text} <small class="note">${new Date(n.at).toLocaleDateString()}</small></span><button class="small" onClick=${() => void drop(n.id)}>Delete</button></li>`)}</ul>`}
+  </div>`;
+}
+
 export function SettingsPage() {
   const [a, setA] = useState<Answer | null>(null), [s, setS] = useState<Settings | null>(null);
   useEffect(() => { void loadSettings().then(r => { if (r.status === 200) { setA(r); setS(r.settings); } }); }, []);
@@ -65,6 +77,7 @@ export function SettingsPage() {
         ${([["auto", "Automatic"], ["anthropic", "Anthropic's search"], ["tavily", "Tavily"], ["off", "Off"]] as const).map(([k, label]) => html`<button aria-pressed=${(s.web ?? "auto") === k} onClick=${() => put("web", k)}>${label}</button>`)}</div>
       <p class="note">${a.web ? html`In effect: <b>${a.web === "tavily" ? "Tavily" : "Anthropic's search"}</b>. ` : "In effect: no web. "}Automatic takes Tavily when <code>TAVILY_API_KEY</code> is set${a.keys.tavily ? " (it is)" : ""}, else Anthropic's own search on Claude (a cent a search), and none with a local model and no Tavily key. Keys come from backstage's environment, never a file.</p>
     </div>
+    <${Memory} />
     <div class="step-card fields"><h3>Suggestions and agents</h3>
       <p class="note">How the assistant's and other agents' edits land, and how to connect an agent over MCP, are on the <a href="#/agents">Agents</a> page.</p>
       <label class="row"><input type="checkbox" style="width:auto" checked=${!!s.applySuggestions} onChange=${(e: Event) => put("applySuggestions", (e.target as HTMLInputElement).checked)} /> Take the rules' staging suggestions as I leave each line</label>

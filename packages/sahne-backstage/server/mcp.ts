@@ -32,6 +32,7 @@ import { latestOf, proposalsOf, type ProposalEdit, type Queue } from "./proposal
 import { get, insert, move, set, type Key } from "../src/model/path.ts";
 import { toolLabel } from "../src/model/tools.ts";
 import { lookAt } from "./look.ts";
+import { DOCS, guideText, headingsOf, sectionOf } from "./guides.ts";
 import { suggestionsOf } from "../src/model/autostage.ts";
 import { boardOf, datesOf, themed, weekOfArc } from "../src/model/board.ts";
 import { skeleton } from "../src/model/skeleton.ts";
@@ -769,6 +770,37 @@ export function createMcp(o: McpOptions): McpServer {
     const sugg = suggestionsOf(story, { lang, lints: suggest(story, o as never), gestures: Object.keys(k.gestures), emotions: Object.keys(k.face.emotions), narrator: (w.series as SeriesDoc | undefined)?.narrator ?? "kerim", standin: (w.series as SeriesDoc | undefined)?.standin ?? "nima" });
     const rows = Object.entries(sugg).flatMap(([path, ss]) => ss.map(sg => ({ path, staging: sg.fix, why: sg.why, from: sg.from })));
     return ok(rows.length ? `${rows.length} suggestion${rows.length > 1 ? "s" : ""} for ${id}:\n${rows.map(r => `${r.path}: ${JSON.stringify(r.staging)} (${r.why})`).join("\n")}` : `the rules suggest nothing more for ${id}`, rows);
+  }));
+
+  server.registerTool("search_lines", {
+    title: "Search the lines",
+    description: "Find words across every episode: each script line (as read_episode gives it, with its path, speaker and translations) that holds the words, in any language, optionally said by one character. For consistency (how a word was used before), recurring jokes, and what a character has said.",
+    inputSchema: { query: z.string().min(1), who: z.string().optional().describe("A character id: only their lines"), limit: z.number().int().positive().max(200).optional() },
+    annotations: { readOnlyHint: true },
+  }, run("search_lines", ({ query, who, limit }) => {
+    const c = ctx(), low = (t: string) => t.toLocaleLowerCase(c.langs.main), q = low(query);
+    const hits: { story: string; line: string }[] = [];
+    for (const id of idsOf("story")) {
+      for (const line of script(docOf("story", id).doc, c).split("\n")) {
+        if (!/^\s*(steps|quiz)\//.test(line) || !low(line).includes(q)) continue;
+        if (who && !new RegExp(`\\b${who.replace(/[^a-z0-9_]/gi, "")}\\b`).test(line)) continue;
+        hits.push({ story: id, line: line.trim() });
+      }
+    }
+    const shown = hits.slice(0, limit ?? 60);
+    return ok(hits.length ? `${hits.length} line${hits.length > 1 ? "s" : ""}${hits.length > shown.length ? ` (the first ${shown.length})` : ""}:\n${shown.map(h => `${h.story} ${h.line}`).join("\n")}` : `no line holds “${query}”${who ? ` said by ${who}` : ""}`, shown);
+  }));
+
+  server.registerTool("read_guide", {
+    title: "Read a guide",
+    description: `The guides the editor shows: ${Object.entries(DOCS).map(([id, d]) => `${id} (${d.title})`).join(", ")}. Without a section, the guide's headings; with one (words of a heading), that section. Read the story format's guide before you write something new in an episode.`,
+    inputSchema: { name: z.enum(Object.keys(DOCS) as [string, ...string[]]), section: z.string().optional() },
+    annotations: { readOnlyHint: true },
+  }, run("read_guide", ({ name, section }) => {
+    const md = guideText(name);
+    if (!section) return ok(`${DOCS[name].title} (${DOCS[name].path}). Its sections:\n${headingsOf(md).join("\n")}`);
+    const part = sectionOf(md, section);
+    return part ? ok(part.length > 12000 ? `${part.slice(0, 12000)}\n…` : part) : fail(`no section of ${name} names “${section}”: read it without a section for its headings`);
   }));
 
   server.registerTool("list_proposals", {
