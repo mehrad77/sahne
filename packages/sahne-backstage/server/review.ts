@@ -9,7 +9,9 @@ import { existsSync } from "node:fs";
 import { REVIEW } from "../../sahne-story/paths.ts";
 import { plain, readFile, textFor, writeAtomic } from "../../sahne-story/json.ts";
 import { languagesOf, type SeriesDoc, type StoryDoc } from "../../sahne-story/src/index.ts";
-import { blocksOf, standingOf, type Block, type Comment, type EpisodeReview, type Standing, type Status, type StepNote } from "../src/model/review.ts";
+import { blocksOf, type Block, type Comment, type EpisodeReview, type Standing, type Status, type StepNote } from "../src/model/review.ts";
+import { episodeSig, progressOf } from "../src/model/progress.ts";
+import { storyPluginsOf } from "../src/model/plugins.ts";
 import { exists, readDoc, type Problem } from "./content.ts";
 
 export type { Comment, EpisodeReview, Status, StepNote };
@@ -61,6 +63,8 @@ export function writeReview(body: unknown): Review {
   if (typeof b?.id !== "string" || !/^s[1-9][0-9]?e[0-9]{2}$/.test(b.id)) throw Object.assign(new Error("expected { id: <episode id>, review }"), { status: 400 });
   const all = readReview();
   const next = clean(b.review);
+  // an approval vouches for the episode as it is saved now (model/progress.ts episodeSig), whoever approves it
+  if (next.status === "approved" && !next.sig && exists("story", b.id)) next.sig = episodeSig(readDoc("story", b.id).doc as StoryDoc);
   const episodes = { ...all.episodes };
   if (Object.keys(next).length) episodes[b.id] = next; else delete episodes[b.id];
   const doc: Review = { v: 1, episodes: Object.fromEntries(Object.entries(episodes).sort(([a], [c]) => a.localeCompare(c))) };
@@ -75,8 +79,23 @@ export function blocksFor(id: string): Block[] {
   return blocksOf(readDoc("story", id).doc as StoryDoc, languagesOf(series));
 }
 
-/** Where an episode stands, from its saved file, its notes and its problems (model/review.ts). */
+/**
+ * Where an episode stands, from its saved file, its notes and its problems: the stages of the work, as its page shows them
+ * (model/progress.ts), in the shape check_season and set_review read. Ready is every stage before Review done (a plugin's
+ * stage done when its check finds no error), no errors and no open comments; `done` and `total` count those stages.
+ */
 export function standingFor(id: string, problems: Problem[], r: EpisodeReview | undefined = readReview().episodes[id]): Standing {
   const series = exists("series", "series") ? readDoc("series", "series").doc as SeriesDoc : null;
-  return standingOf(r, blocksFor(id), { errors: problems.filter(p => p.doc === `story:${id}` && p.level === "error").length, translations: languagesOf(series).translations });
+  const story = readDoc("story", id).doc as StoryDoc, langs = languagesOf(series);
+  const mine = problems.filter(p => p.doc === `story:${id}`), errors = mine.filter(p => p.level === "error").length;
+  const stages = storyPluginsOf(series).map(pl => {
+    const n = mine.filter(p => p.plugin === pl.id && p.level === "error").length;
+    return { key: pl.id, name: pl.id.charAt(0).toUpperCase() + pl.id.slice(1), done: n === 0, state: n ? `${n} problem${n > 1 ? "s" : ""}` : "All checks pass" };
+  });
+  const p = progressOf({ story, langs, review: r, errors, suggestions: {}, stages });
+  const before = p.stages.filter(x => x.key !== "review"), left = before.filter(x => !x.done);
+  const missing = [...left.map(x => `${x.name.toLowerCase()}: ${x.state}`), errors ? `${errors} error${errors === 1 ? "" : "s"}` : "", p.openComments ? `${p.openComments} open comment${p.openComments === 1 ? "" : "s"}` : ""].filter(Boolean);
+  const stage: Standing["stage"] = p.approved ? "approved" : p.changedSinceApproved ? "changed" : !missing.length ? "ready" : before.some(x => x.done && x.key !== "brief") || (r?.comments?.length ?? 0) > 0 ? "in-review" : "draft";
+  const passes = Object.fromEntries(p.langs.map(l => [l.lang, { done: l.done, total: l.total }]));
+  return { stage, total: before.length, done: before.length - left.length, changed: p.changedSinceApproved ? 1 : 0, todo: left.length, passes, errors, openComments: p.openComments, missing, states: {} };
 }

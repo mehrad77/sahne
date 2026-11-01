@@ -415,9 +415,10 @@ test("direct mode: an edit is saved; a stale read is refused (409) and a new err
     // approving is a sign-off on a Ready episode, for an agent too
     const early = await call(client, "set_review", { id: "s1e00", status: "approved" });
     assert.ok(early.isError);
-    assert.match(early.text, /not approved: s1e00 is not ready \(\d+ of \d+ blocks to review/);
+    // ready is every stage of the work done (model/progress.ts): the sample's translations are not checked yet
+    assert.match(early.text, /not approved: s1e00 is not ready \(translate: EN \d+\/\d+ · FA \d+\/\d+/);
     const season = await call(client, "check_season", { id: 1 });
-    assert.match(season.text, /s1e00 · .* · in-review \(0\/\d+ blocks reviewed\)|s1e00 · .* · draft \(0\/\d+ blocks reviewed\)/);
+    assert.match(season.text, /s1e00 · .* · in-review \(\d+\/\d+ /);
   } finally { await close(); }
 });
 
