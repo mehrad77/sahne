@@ -126,3 +126,39 @@ test("a reply cue names its index in the option's reply list", () => {
     assert.ok(r.reply !== undefined && s.choice.options[r.option!].reply![r.reply] !== undefined);
   }
 });
+
+/** Wait until `f` holds, giving the player's timers their turns. */
+async function until(f: () => boolean, ms = 2000) {
+  for (const t0 = Date.now(); !f(); ) { if (Date.now() - t0 > ms) assert.fail("timed out"); await new Promise(r => setTimeout(r, 1)); }
+}
+
+test("a watch-only story plays on time alone, to its end, with no card", async () => {
+  const { stage, log } = fakeStage();
+  const watch = { ...structuredClone(STORY), play: "watch" as const };
+  const adapted = adaptStory(watch, { places, characters });
+  assert.equal(adapted.play, "watch");
+  assert.deepEqual(adapted.turns, [], "nothing waits for the viewer");
+  const p = storyPlayer(stage, adapted, { hold: () => 0 });
+  assert.equal(p.auto, true);
+  const seen = new Set<string>();
+  await until(() => { seen.add(p.footer().kind); return p.footer().kind === "end"; });
+  assert.ok(!seen.has("turn"));
+  assert.equal(log.filter(l => l.startsWith("play ")).length, adapted.perform().info.length - 1, "every cue after the opening scene played once");
+});
+
+test("any story runs on by itself in auto, and stops at a card", async () => {
+  const { stage } = fakeStage();
+  const p = storyPlayer(stage, adaptStory(STORY, { places, characters }), { hold: () => 0 });
+  assert.equal(p.auto, false, "an interactive story waits for Devam");
+  await new Promise(r => setTimeout(r, 5));
+  assert.equal(p.next, 1);
+  p.setAuto(true);
+  await until(() => p.footer().kind === "turn");
+  const at = p.next;
+  await new Promise(r => setTimeout(r, 5));
+  assert.equal(p.next, at, "it waits at the card");
+  p.setAuto(false);
+  p.say();
+  await new Promise(r => setTimeout(r, 5));
+  assert.equal(p.next, at + 1, "off again, it stops after the cue it plays");
+});

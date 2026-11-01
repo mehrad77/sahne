@@ -16,7 +16,7 @@ import fa from "sahne-fa";
 import tr from "sahne-tr";
 import { world } from "./store.ts";
 import { adaptStory, languagesOf, storyPlayer, type CharacterDoc, type Languages, type StoryDoc, type StoryPlace, type StoryPlayer, type StoryStage } from "sahne-story";
-import type { StoryPlugin } from "sahne-story";
+import { playOf, type PlayMode, type StoryPlugin } from "sahne-story";
 
 export const KIT: Kit = { ...full, puppets: { ...full.puppets, ...kerimPuppets, ...animals } };
 /** The language plugins, by the code of a series' main language. */
@@ -47,6 +47,8 @@ export interface PreviewOptions {
   languages?: Languages;
   /** The series' story plugins (model/plugins.ts): their steps play too. */
   plugins?: readonly StoryPlugin[];
+  /** The series' default of how its episodes play (sahne-story src/play.ts); a story's own `play` wins. */
+  play?: PlayMode;
   onChange?(): void;
 }
 
@@ -68,7 +70,7 @@ export class Preview {
     this.load(story);
   }
 
-  private adapt(story: StoryDoc) { return adaptStory(story, { places: this.o.places, characters: this.o.characters, flags: this.o.flags, languages: this.o.languages, plugins: this.o.plugins }); }
+  private adapt(story: StoryDoc) { return adaptStory(story, { places: this.o.places, characters: this.o.characters, flags: this.o.flags, languages: this.o.languages, plugins: this.o.plugins, play: playOf(story, { play: this.o.play }) }); }
 
   /** Adapt and load the story, at its opening scene. */
   load(story: StoryDoc) {
@@ -76,6 +78,8 @@ export class Preview {
     this.adapted = this.adapt(story);
     const p: StoryPlayer = storyPlayer(this.stage, this.adapted, {
       loadOptions: { narratorEl: this.kerim, onNarratorTalk: kerimOnTalk(this.kerim), narratorSound: "coo" },
+      // the editor never runs away while you work: a watch-only episode plays on Play (setAuto)
+      auto: false,
       onChange: () => { if (this.player === p) this.o.onChange?.(); },
     });
     this.player = p;

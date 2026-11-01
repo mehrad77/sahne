@@ -10,7 +10,8 @@ A story format for the [Sahne](../sahne/README.md) stage: story documents (the f
 |---|---|
 | `adaptStory(story, options)` | A story document (`STORIES_SCHEMA.md`) becomes a Sahne script with its reply cards: the turns, what `Stage.load` needs (cast, with Kerim as the kit's bird puppet when her document has `puppet`, the characters' `terms`, the wardrobe its `looks` need, each place with the story's props that stand there, kept from place to place, the other branches' cues), `perform(picks)` and the default picks (`STORIES_STAGE.md` §3). Translations stay off the stage, in the cue info for the log and the card. Each cue's info names the story step it came from (`step`), and a choice's cues their `option`, and a reply its index in that option's `reply` list (`reply`), so an editor can map a cue back to its place in the document |
 | `personalise` (an option of `adaptStory`) | The host's personalising (Kumru's `personalizeStr`): the name and hometown tokens become the learner's, in every text that reaches the stage (lines, link keys, sound words, prop labels, phone screens, an act's prompt, display names) |
-| `storyPlayer(stage, adapted, hooks)` | The player's logic without a screen: what the footer offers (`busy`, `devam`, a `turn` card, `end`), `devam`, `say`, `choose(index)` (re-plans from its own cue), `act()` (its answer re-plans what follows), `restart`, `jump(i)` (an editor's scrubber: a cue with a card waits for it, any other plays), `replace(adapted)` (an edited adaptation of the same story, re-directed with the picks kept and no reload), `tick` for a hidden tab, and `run` (the cue playing, an act's with its `result`, for the host's act card). Kumru's reader and the gallery draw on it (`src/player.ts`, `test/player.test.ts`) |
+| `storyPlayer(stage, adapted, hooks)` | The player's logic without a screen: what the footer offers (`busy`, `devam`, a `turn` card, `end`), `devam`, `say`, `choose(index)` (re-plans from its own cue), `act()` (its answer re-plans what follows), `restart`, `jump(i)` (an editor's scrubber: a cue with a card waits for it, any other plays), `replace(adapted)` (an edited adaptation of the same story, re-directed with the picks kept and no reload), `tick` for a hidden tab, and `run` (the cue playing, an act's with its `result`, for the host's act card). Auto (`auto`, `setAuto`): it runs on by itself, each cue after the last ends and a hold for reading (`holdFor`), and still stops at a card; a watch-only story starts in it. Kumru's reader and the gallery draw on it (`src/player.ts`, `test/player.test.ts`) |
+| `playOf(story, series)` | How a story plays: `interactive` or `watch` (`src/play.ts`): see *Watch-only episodes* below |
 | `flagsOf`, `warmthOf`, `albumBand`, `metIn`, `unlockedOf` | What the stories remember of a learner, derived from the picks the app keeps per story (`st[id].ch`) and never stored: flags (§4.7), warmth and Kerim's album (§4.8), the avatar unlock tokens (`src/memory.ts`) |
 | `storyProps(story, place)` | The story's own props that stand in `place` (`at` a point or mark in the opening place, or a map of places), with `at` resolved and `keep` set (`STORIES_SCHEMA.md` §3) |
 | `dressing(story, avatars, characters, ok)` | Who wears what, step by step (`src/looks.ts`, `STORIES_SCHEMA.md` §5.2): the cast's starting documents, the wardrobe, and the costume changes per step; the learner wears only a coat and a hat |
@@ -70,7 +71,7 @@ The JSON schemas stay in `schema/`. `kit-piece.json` and `kit-variant.json` hold
 
 ## Series, seasons, episodes
 
-A content root holds one **series**: its story world. `series.json` names it (`title`, an optional `summary`), its `languages` ([Languages](#languages)), the story `plugins` it turns on ([Plugins](#plugins)) and its `narrator` and `standin` (the stage casts `NARRATOR` and `STANDIN`, `src/types.ts`; another id is an error for now). A series has **seasons**, one `seasons/s<n>.json` each: `id` (`s<n>`, the file name), `n`, the titles and summaries, an optional `launch` date, the weeks' `arcs` by arc id (`s<n>wNN`) and the release `calendar` by story id (`{ date, kind, week }`, the shape of `days.json`). The **episodes** are the story documents: `s<n>eNN` is episode NN of season n (`seasonOf`), ordered by id; a story's `kind` says whether it is a weekday episode or a Saturday special. A series and its seasons have no level: a story's own `level` and `ref` are its own.
+A content root holds one **series**: its story world. `series.json` names it (`title`, an optional `summary`), its `languages` ([Languages](#languages)), the story `plugins` it turns on ([Plugins](#plugins)), how its episodes `play` by default ([Watch-only episodes](#watch-only-episodes)) and its `narrator` and `standin` (the stage casts `NARRATOR` and `STANDIN`, `src/types.ts`; another id is an error for now). A series has **seasons**, one `seasons/s<n>.json` each: `id` (`s<n>`, the file name), `n`, the titles and summaries, an optional `launch` date, the weeks' `arcs` by arc id (`s<n>wNN`) and the release `calendar` by story id (`{ date, kind, week }`, the shape of `days.json`). The **episodes** are the story documents: `s<n>eNN` is episode NN of season n (`seasonOf`), ordered by id; a story's `kind` says whether it is a weekday episode or a Saturday special. A series and its seasons have no level: a story's own `level` and `ref` are its own.
 
 `checkSeries` (in `stories.ts --check`): each document against its schema and its file name; the narrator and stand-in have character documents of that kind; every story's season has a document; where a season has a calendar, a row for each of its stories and a story for each row (one not written yet is a warning); each story's `arc` equals its season's `arcs` entry; while `days.json` is still written beside the calendars, a difference is a warning: the seasons are the source, and `days.json` is regenerated from them. A story's own calendar rules read the season's row: its `releaseDate` and `kind`, and its arc id from the week (`arcId`). Types: `SeriesDoc`, `SeasonDoc`, `CalendarRow` (`src/types.ts`); paths: `SERIES`, `SEASONS`, `seasonFile`, `seasonIds` (`paths.ts`).
 
@@ -131,6 +132,23 @@ Without its plugin, a plugin's step or field is a schema error, and the adapter 
 
 Without the plugin, a spot plays nothing and a lesson field is a schema error. Kumru's `kumru/app/features/stories/reader.ts` and `state.ts` are the files to change.
 
+## Watch-only episodes
+
+An episode either asks the viewer to take part or only asks them to watch. `play` says which:
+- **`interactive`** (the default): the viewer says the stand-in's lines, chooses and acts, and the story waits for them.
+- **`watch`**: the episode plays on time alone. There are no cards, no choices, no taps and no Devam, only time.
+
+A series sets the default in `series.json` (`"play": "watch"` for a series of short films), and an episode's own `play` wins (a watch-only special in an interactive series). `playOf(story, series)` resolves it, story first, then series, then interactive (`src/play.ts`).
+
+**What changes in a watch-only episode:**
+- **The adapter** (`play` in its options, `StoryStage.play`) makes no turn. The stand-in's lines are plain lines, a choice plays its first option, and an act plays only its reaction.
+- **The player** starts in auto. Each cue follows the last after a hold for reading: the time to read its line beyond the time to say it, so a spot's card, which takes no time on the stage, still stays up long enough. A host shows no Devam while the player is in auto. An editor passes `auto: false` and plays it with `setAuto`.
+- **The lints** ask for no learner's turns (`standin`).
+- **The check** refuses a choice, an act and an arc mechanic that needs the viewer (`say`, `act`, `explore`, `aloud`) with the `play` rule, and skips the choice and act counts.
+- **A plugin** sees the mode in its contexts (`play`) and decides what its own parts do. The lesson plugin does not yet treat a watch-only episode differently.
+
+`test/watch.test.ts` and the auto tests in `test/player.test.ts` cover it.
+
 ## Places
 
 The place documents are read by the gallery, the stories and the tests from `places/` of the content root. The checker prints every place against the standard:
@@ -163,7 +181,8 @@ Errors:
 - the characters (above), schema, ids
 - calendar: with `days.json`, release date, kind and arc against it; always, no Sunday, no break week, specials on Saturdays
 - cast limits (`CAST_ALLOW` holds s1e45's six)
-- counts: the choices, and each choice id once
+- counts: the choices, and each choice id once (no choice count in a watch-only episode)
+- play: in a watch-only episode, no choice, no act and no arc mechanic that needs the viewer
 - flags: each read flag set by the earlier story it names, once that story is written
 - missing places and characters
 - every `lintStory` error

@@ -13,6 +13,7 @@ import type { Problem } from "./lint.ts";
 import type { CharacterDoc, SeriesDoc, Step, StoryDoc, StoryStaging } from "./types.ts";
 import type { Languages } from "./texts.ts";
 import type { StoryLang } from "./lang.ts";
+import type { PlayMode } from "./play.ts";
 
 /** A text a story lacks in one of the series' languages: where it is (a JSON path) and what is missing. */
 export interface PluginGap { path: string; message: string }
@@ -23,6 +24,8 @@ export interface AdaptContext {
   step: number;
   /** The series' main language: the one that reaches the stage. */
   main: string;
+  /** How the story plays (src/play.ts): in `watch`, a step must not wait for the viewer. */
+  play: PlayMode;
   /** A main-language text personalised for the stage. */
   p(text: string): string;
   /** A step's main-language text. */
@@ -59,6 +62,8 @@ export interface PluginCheckContext {
   world: unknown;
   languages: Languages;
   lang: StoryLang;
+  /** How the story plays (src/play.ts): a plugin decides what its parts do in a watch-only episode. */
+  play: PlayMode;
   /** Every main-language text of the story with its step (check/rules.ts `texts`). */
   texts: { tr: string; step: number; kind: string; who?: string; narr?: boolean }[];
   /** The names the story may use as words: the characters', the places', the language's own (a hometown token). */
@@ -99,7 +104,7 @@ export interface StoryPlugin {
   /** What a line adds to its cue's info for the host (a note for the learner), from the line's own fields. */
   lineInfo?(line: object, personalise: (text: string, lang: string) => string): Partial<CueInfo>;
   /** Lints on one story (staging against the text, as `lintStory`'s). */
-  lint?(story: StoryDoc, o: { lang: StoryLang }): Problem[];
+  lint?(story: StoryDoc, o: { lang: StoryLang; play: PlayMode }): Problem[];
   /** The plugin's texts a story must have in the series' languages (`/gl/akşam` …), as the core's `storyLanguageGaps`. */
   languageGaps?(story: StoryDoc, languages: Languages): PluginGap[];
   /** What the assistant should know when the plugin is on: a few sentences, added to its prompt. */

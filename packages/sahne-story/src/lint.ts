@@ -7,7 +7,7 @@
 //   via       a phone or video line needs its speaker off stage
 //   silent    voice "silent" only on a stand-in line whose text is "…"
 //   link      every link key is a word of its line, and every obj: target is a prop on stage
-//   standin   no two stand-in lines in a row; the learner's first turn within the first four lines
+//   standin   no two stand-in lines in a row; the learner's first turn within the first four lines (none in a watch-only story)
 //   mechanics an act needs `act` among the arc's mechanics
 //   props     a story prop stands only in places the story visits, on marks they have, and shadows no place's own prop
 //   place     every scene's place exists (a site names one of its places); its `at`, `kerim`, every move's `to` and every
@@ -22,6 +22,7 @@
 import { applyLook, inState, placeState, route, detour, WEATHER, CLOTHING_FIELDS, lookFields, normalize, type AvatarDoc, type AvatarNote, type KitManifest, type Look, type PlaceDoc, type PropRef, type Solid, type Staging, type Target, type Vec3 } from "sahne";
 import { langFor, motivated, type LineContext, type StoryLang } from "./lang.ts";
 import type { StoryPlugin } from "./plugin.ts";
+import { playOf, type PlayMode } from "./play.ts";
 import { DEIXIS_GESTURES } from "./langs/tr.ts";
 import { placesOf, storyProps } from "./props.ts";
 import { canon, dress, forLearner, LEARNER_FIELDS, looksOf } from "./looks.ts";
@@ -55,6 +56,8 @@ export interface LintOptions {
   lang?: StoryLang;
   /** The series' story plugins (src/plugin.ts): their lints run after these. */
   plugins?: readonly StoryPlugin[];
+  /** How the story plays (src/play.ts): a watch-only story has no learner's turns to place. The story's own `play` without it. */
+  play?: PlayMode;
 }
 
 export { NEAR, FAR } from "./langs/tr.ts";
@@ -250,10 +253,12 @@ export function lintStory(story: StoryDoc, o: LintOptions): Problem[] {
 
   // ---- the stand-in's turns, and the mechanics
   let lines = 0, lastStandin = false, firstTurn = -1;
+  // in a watch-only story the stand-in's lines are plain lines, not turns (src/play.ts)
+  const play = o.play ?? playOf(story);
   const turn = (standin: boolean, step: number, isLineLike: boolean) => {
     if (!isLineLike) return;
     lines++;
-    if (standin && lastStandin) out.push({ rule: "standin", level: "error", step, message: "two stand-in lines in a row: each turn is one card" });
+    if (standin && lastStandin && play !== "watch") out.push({ rule: "standin", level: "error", step, message: "two stand-in lines in a row: each turn is one card" });
     if (standin && firstTurn < 0) firstTurn = lines;
     lastStandin = standin;
   };
@@ -295,8 +300,9 @@ export function lintStory(story: StoryDoc, o: LintOptions): Problem[] {
   });
   out.push(...lintRefs(story, o));
   out.push(...lintLooks(story, o));
-  for (const pl of o.plugins ?? []) out.push(...(pl.lint?.(story, { lang }) ?? []));
-  if (firstTurn < 0 || firstTurn > 4) out.push({ rule: "standin", level: "error", step: 0, message: firstTurn < 0 ? "the learner never has a turn" : `the learner's first turn is line ${firstTurn}: it must come within the first four lines` });
+  for (const pl of o.plugins ?? []) out.push(...(pl.lint?.(story, { lang, play }) ?? []));
+  // a watch-only story waits for no one: the learner has no turns (the story check refuses its choices and acts)
+  if (play !== "watch" && (firstTurn < 0 || firstTurn > 4)) out.push({ rule: "standin", level: "error", step: 0, message: firstTurn < 0 ? "the learner never has a turn" : `the learner's first turn is line ${firstTurn}: it must come within the first four lines` });
   return out;
 }
 

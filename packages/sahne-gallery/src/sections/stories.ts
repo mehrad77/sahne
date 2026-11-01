@@ -158,7 +158,8 @@ function play(host: HTMLElement, ctx: Ctx, draft: Draft, PLACES: Record<string, 
       footer.append(card);
       return;
     }
-    if (f.kind === "busy" || f.kind === "devam") footer.append(primary("Devam ▸", () => player.devam()));
+    // a watch-only story runs on by itself: no Devam, only time (sahne-story src/play.ts)
+    if (f.kind === "busy" || f.kind === "devam") { if (!player.auto) footer.append(primary("Devam ▸", () => player.devam())); }
     else if (f.kind === "end") footer.append(primary("Baştan ↺", restart));
     else footer.append(cardFor(f.cue, f.turn));
   }

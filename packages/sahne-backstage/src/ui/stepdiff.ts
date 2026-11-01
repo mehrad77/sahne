@@ -6,7 +6,7 @@
 
 import { html } from "htm/preact";
 import { useMemo, useRef, useState } from "preact/hooks";
-import { adaptStory, languagesOf, textOf, type StoryDoc } from "sahne-story";
+import { adaptStory, languagesOf, playOf, textOf, type StoryDoc } from "sahne-story";
 import type { Part } from "../model/diff.ts";
 import { dirty } from "../model/history.ts";
 import { get, set } from "../model/path.ts";
@@ -34,7 +34,7 @@ const parts = (ps: Part[]) => ps.map(d => (d.op === "=" ? d.text : d.op === "-" 
 const pictureOf = (doc: StoryDoc, i: number) => async (): Promise<string | null> => {
   try {
     const w = world.value!;
-    const a = adaptStory(doc, { places: w.places, characters: w.characters, languages: languagesOf(w.series), plugins: storyPluginsOf(w.series) });
+    const a = adaptStory(doc, { places: w.places, characters: w.characters, languages: languagesOf(w.series), plugins: storyPluginsOf(w.series), play: playOf(doc, w.series) });
     const perf = a.perform();
     const k = perf.info.map(c => c.step).lastIndexOf(i);
     return k < 0 ? null : await cueThumb(perf.script.cues, k, a.load);

@@ -13,9 +13,10 @@ import { validateDoc, type SchemaKind } from "./schema.ts";
 import { characterLanguageGaps, languageCodeGaps, seasonLanguageGaps, seriesLanguageGaps, storyLanguageGaps } from "./languages.ts";
 import { langFor, type Resolver, type StoryLang } from "../src/lang.ts";
 import { missingPlugins, pluginsOf, type StoryPlugin } from "../src/plugin.ts";
+import { INTERACTIVE_MECHANICS, playOf } from "../src/play.ts";
 import type { Draft, World } from "./world.ts";
 
-export type CheckRule = "schema" | "id" | "series" | "calendar" | "ref" | "cast" | "counts" | "flags" | "quiz" | "mistake" | "text" | "words" | "recycle" | "character" | "lint" | "place";
+export type CheckRule = "schema" | "id" | "series" | "calendar" | "ref" | "cast" | "counts" | "play" | "flags" | "quiz" | "mistake" | "text" | "words" | "recycle" | "character" | "lint" | "place";
 export interface CheckProblem { rule: CheckRule | string; level: "error" | "warning" | "info"; story: string; step?: number; message: string }
 /**
  * `kit` is a whole `Kit` (sahne-kit's full.ts) when the cast's avatars are to be composed; a bare manifest
@@ -96,7 +97,7 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   const add = (rule: CheckProblem["rule"], level: CheckProblem["level"], message: string, step?: number) => out.push({ rule, level, story: id, step, message });
 
   const langs = languagesOf(world.series), lang = langOf(world), norm = normIn(lang);
-  const plugins = pluginsOf(world.series, o.plugins ?? []);
+  const plugins = pluginsOf(world.series, o.plugins ?? []), play = playOf(s, world.series);
   for (const p of [...validateDoc("story", s, plugins), ...storyLanguageGaps(s, langs), ...plugins.flatMap(pl => pl.languageGaps?.(s, langs) ?? [])]) add("schema", "error", `${p.path}: ${p.message}`);
   for (const [cid, c] of Object.entries(d.characters)) for (const p of [...validateDoc("character", c), ...characterLanguageGaps(c, langs)]) add("schema", "error", `character ${cid} ${p.path}: ${p.message}`);
   if (s.id !== d.id) add("id", "error", `the folder is ${d.id} but the story's id is ${s.id}`);
@@ -135,9 +136,19 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   // counts: the choices and acts (the lesson plugin counts the target words, the spots and the lines)
   const special = s.kind === "special";
   const choices = s.steps.filter(isChoice).length;
-  if (special ? choices !== 2 : choices < 1 || choices > 2) add("counts", "error", `${choices} choices; ${special ? "a special has 2" : "an episode has 1-2"}`);
   const acts = s.steps.filter(isAct).length;
-  if (acts > 2 && day && day.week >= 2) add("counts", "warning", `${acts} acts; at most 2 from week 2 (Kumru's STORIES_STAGE.md §5, proposed)`);
+  if (play === "watch") {
+    // a watch-only episode plays on time alone (src/play.ts): nothing in it may wait for the viewer
+    s.steps.forEach((st, i) => {
+      if (isChoice(st)) add("play", "error", "a choice in a watch-only episode: the viewer only watches, so write the line that is said instead", i);
+      if (isAct(st)) add("play", "error", "an act in a watch-only episode: the viewer only watches, so stage what happens instead", i);
+    });
+    const asks = (s.arc?.mechanics ?? []).filter(m => (INTERACTIVE_MECHANICS as readonly string[]).includes(m));
+    if (asks.length) add("play", "error", `the arc's mechanics ${asks.join(", ")} need the viewer, but the episode is watch-only`);
+  } else {
+    if (special ? choices !== 2 : choices < 1 || choices > 2) add("counts", "error", `${choices} choices; ${special ? "a special has 2" : "an episode has 1-2"}`);
+    if (acts > 2 && day && day.week >= 2) add("counts", "warning", `${acts} acts; at most 2 from week 2 (Kumru's STORIES_STAGE.md §5, proposed)`);
+  }
   const ids = s.steps.filter(isChoice).map(c => c.choice.id);
   for (const cid of ids) if (ids.indexOf(cid) !== ids.lastIndexOf(cid)) add("counts", "error", `choice id ${cid} is used twice`);
 
@@ -151,7 +162,7 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   const missing = [s.place, ...s.steps.filter(isScene).map(x => x.scene)].filter(p => !places[p]);
   for (const p of new Set(missing)) add("place", "error", `place ${p} has no document in places/`);
   if (!missing.length) {
-    for (const p of lintStory(s, { places, characters: d.characters, kit: o.kit, solids: o.solids?.[id], lang, plugins })) {
+    for (const p of lintStory(s, { places, characters: d.characters, kit: o.kit, solids: o.solids?.[id], lang, plugins, play })) {
       out.push({ rule: p.rule, level: p.level, story: id, step: p.step, message: p.message });
     }
     if (o.kit) {
@@ -162,7 +173,7 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   }
   // the series' plugins check what they add
   const names = [...nameWords(d, world, s), ...Object.values(d.characters).map(c => textOf(c.name, langs.main) ?? "")];
-  for (const pl of plugins) pl.check?.({ story: s, characters: d.characters, world, languages: langs, lang, texts: all, names, norm, add });
+  for (const pl of plugins) pl.check?.({ story: s, characters: d.characters, world, languages: langs, lang, play, texts: all, names, norm, add });
   return out;
 }
 

@@ -134,6 +134,12 @@
     },
     "draft": {
       "const": true
+    },
+    "play": {
+      "enum": [
+        "interactive",
+        "watch"
+      ]
     }
   },
   "additionalProperties": false,

@@ -114,6 +114,8 @@ export interface StoryDoc {
   names?: Record<string, string>;
   steps: Step[];
   draft?: true;
+  /** How it plays (src/play.ts): `watch` on time alone, with no cards, choices or acts; the series' default without it. */
+  play?: "interactive" | "watch";
   [k: string]: unknown;
 }
 
@@ -130,6 +132,8 @@ export interface SeriesDoc {
   standin: string;
   /** The story plugins the series turns on, by id (src/plugin.ts): `["lesson"]`. A host passes the plugins it has. */
   plugins?: string[];
+  /** How its episodes play unless one says otherwise (src/play.ts): interactive without it. */
+  play?: "interactive" | "watch";
 }
 
 /** One release of an episode: its date, whether it is a weekday episode or a Saturday special, and its week. */

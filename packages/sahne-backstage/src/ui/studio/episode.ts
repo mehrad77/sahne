@@ -81,7 +81,7 @@ function Studio(p: { id: string }) {
 
   // the stage, once
   useEffect(() => {
-    const pv = new Preview(box.current!, story, { places: w.places, characters: w.characters, onChange: redraw, languages: langs, plugins: storyPluginsOf(w.series) });
+    const pv = new Preview(box.current!, story, { places: w.places, characters: w.characters, onChange: redraw, languages: langs, plugins: storyPluginsOf(w.series), play: w.series?.play });
     preview.current = pv;
     shown.current = story;
     window.backstage = { preview: pv, select: x => select(x, true) };
