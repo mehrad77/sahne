@@ -274,6 +274,14 @@ export function refuse(e: Edit): string | null {
   return null;
 }
 
+/** The translations a series edit adds to the series' languages (none when the edits leave the series alone). */
+function addedLanguages(edits: Edit[]): string[] {
+  const e = edits.find(x => x.kind === "series");
+  if (!e || !existsSync(SERIES)) return [];
+  const was = languagesOf(JSON.parse(readFile(SERIES).text) as SeriesDoc), now = languagesOf(e.doc as SeriesDoc);
+  return now.translations.filter(l => !was.translations.includes(l));
+}
+
 /** A document as it was just before a save wrote it: its file's text, or null when the save created it (a run's journal). */
 export interface Before { kind: Kind; id: string; text: string | null }
 
@@ -288,7 +296,10 @@ export function save(edits: Edit[], o: { write: boolean; before?: (b: Before[]) 
   for (const e of edits) { const why = refuse(e); if (why) return { status: 400, message: why }; }
   for (const e of edits) if (!e.create && e.mtime !== undefined && readFile(fileOf(e.kind, e.id)).mtime !== e.mtime) return { status: 409, message: `${e.kind} ${e.id} changed on disk since it was opened: reload it` };
   const problems = check(edits);
-  if (problems.some(p => p.new && p.level === "error")) return { status: 422, problems, message: "the edit brings errors" };
+  // a language the series starts translating into is missing everywhere: that is the translation work, not a broken file
+  const added = addedLanguages(edits);
+  const gap = (p: Problem) => added.some(l => p.message.endsWith(` has no ${l} text`));
+  if (problems.some(p => p.new && p.level === "error" && !gap(p))) return { status: 422, problems, message: "the edit brings errors" };
   const saved: Record<string, number> = {};
   o.before?.(edits.map(e => { const u = fileOf(e.kind, e.id); return { kind: e.kind, id: e.id, text: existsSync(u) ? readFile(u).text : null }; }));
   for (const e of edits) { const u = fileOf(e.kind, e.id); saved[`${e.kind}:${e.id}`] = writeAtomic(u, textFor(u, e.doc)); }

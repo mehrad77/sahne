@@ -6,7 +6,7 @@
 
 import { html } from "htm/preact";
 import { useEffect, useState } from "preact/hooks";
-import { allLanguages, textOf, type SeasonDoc, type SeriesDoc, type StoryDoc } from "sahne-story";
+import { allLanguages, languagesOf, LANGS, textOf, type SeasonDoc, type SeriesDoc, type StoryDoc } from "sahne-story";
 import { set } from "../model/path.ts";
 import { dirty } from "../model/history.ts";
 import { change, checked, createDoc, draftOf, go, keyOf, openDoc, saveDocs, world } from "../store.ts";
@@ -32,8 +32,12 @@ export function SeriesSettings() {
   return html`<div class="fields">
     <${Texts} label="Title" value=${s.title} saved=${was.title} onInput=${(l: string, v?: string) => put("title", { ...s.title, [l]: v ?? "" })} />
     <${Texts} label="Summary" multi value=${s.summary} saved=${was.summary} onInput=${(l: string, v?: string) => put("summary", { ...s.summary, [l]: v ?? "" })} />
-    <div class="field"><label>Languages</label><div class="row">${allLanguages(langs).map((l, i) => html`<span class="chip" title=${l}>${langName(l)}${i === 0 ? " · main" : ""}</span>`)}</div>
-      <p class="note">The main language is the one the stage plays; the others are its translations. They are set in series.json.</p></div>
+    <${SeriesLanguages} s=${s} put=${put} />
+    <div class="field"><label>How its episodes play</label>
+      <div class="segmented" role="group" aria-label="How its episodes play">
+        <button aria-pressed=${(s.play ?? "interactive") === "interactive"} onClick=${() => put("play", undefined)}>Interactive</button>
+        <button aria-pressed=${s.play === "watch"} onClick=${() => put("play", "watch")}>Watch only</button></div>
+      <p class="note">${s.play === "watch" ? "Its episodes play on time alone: no choices, nothing to do, no cards. An episode can still be interactive (its Brief)." : "The viewer says the stand-in's lines, chooses and acts. An episode can be watch-only instead (its Brief)."}</p></div>
     <div class="row">
       <div class="grow"><${Select} label="Narrator" value=${s.narrator} options=${people} onInput=${(v?: string) => v && put("narrator", v)} /></div>
       <div class="grow"><${Select} label="Stand-in (the learner)" value=${s.standin} options=${people} onInput=${(v?: string) => v && put("standin", v)} /></div>
@@ -41,6 +45,24 @@ export function SeriesSettings() {
     <div class="row"><span class="grow"></span><${SaveButton} disabled=${!dirty(d)} onSave=${() => void saveDocs([key])} label="Save the series" /></div>
     <${Problems} problems=${checked.value[key] ?? []} empty="" />
   </div>`;
+}
+
+/** The series' languages: the one it is written in (the stage plays it), and its translations, which every episode,
+ * character and place is translated into. A translation is added from the languages Sahne has a story language for
+ * (sahne-story `LANGS`); a removed one keeps its texts in the files, but nothing asks for them any more. */
+function SeriesLanguages(p: { s: SeriesDoc; put(k: string, v: unknown): void }) {
+  const langs = languagesOf(p.s), [pick, setPick] = useState("");
+  const free = Object.keys(LANGS).filter(l => l !== langs.main && !langs.translations.includes(l));
+  const setTr = (translations: string[]) => p.put("languages", { main: langs.main, translations });
+  return html`<div class="field"><label>Languages</label>
+    <div class="row">
+      <span class="chip ok" title=${langs.main}>${langName(langs.main)} · written in, the stage plays it</span>
+      ${langs.translations.map(l => html`<span class="schip set" title=${l}>${langName(l)}<button aria-label=${`Stop translating into ${langName(l)}`} onClick=${() => setTr(langs.translations.filter(x => x !== l))}>×</button></span>`)}
+    </div>
+    ${free.length > 0 && html`<div class="row" style="margin-top:6px">
+      <select value=${pick || free[0]} aria-label="A language to translate into" onChange=${(e: Event) => setPick((e.target as HTMLSelectElement).value)}>${free.map(l => html`<option value=${l}>${langName(l)}</option>`)}</select>
+      <button onClick=${() => { setTr([...langs.translations, pick || free[0]]); setPick(""); }}>+ Translate into it</button></div>`}
+    <p class="note">Every episode, character and place is translated into these. A new one starts empty: each text gets a row for it, and Translate shows how far along it is. Removing one keeps its texts in the files but stops asking for them. The language it is written in is changed in series.json.</p></div>`;
 }
 
 /** A content root with no series.json yet: start one. */

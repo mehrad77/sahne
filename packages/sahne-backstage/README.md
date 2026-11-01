@@ -140,7 +140,9 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 - **Each row starts with its week's theme** (its arc), edited in place in the main language; its menu edits it in every language and what the learner does that week (`mechanics`). A theme is written in the season and in every story of the week, saved together.
 - Episodes with no date wait under the board, to be dragged onto a day.
 - **A view switch** beside the settings (a calendar or a list, remembered in the browser) shows the season as a list instead: each week with its span and theme, then a row per episode in release order (its day, its place's picture, its title with the first translation, its id, place and cast, and its state), and last the episodes with no date. A row opens the episode.
-- *Season settings* and *Series settings* open in a modal over the board (`Modal`, a `<dialog>`: Escape or a click outside closes it): titles and summaries in every language, the series' languages, narrator and stand-in, the season's launch day. On a root with no `series.json`, the board starts one.
+- *Season settings* and *Series settings* open in a modal over the board (`Modal`, a `<dialog>`: Escape or a click outside closes it), and the series' also from an episode (its *⋯* menu, and Translate's *+ Add a language*). They hold the titles and summaries in every language, the narrator and stand-in, and the season's launch day. They also hold:
+  - **The series' languages:** the one it is written in, and its translations. A translation is added from the languages Sahne has a story language for (sahne-story `LANGS`), or removed with ×, which keeps its texts in the files but stops asking for them. The main language is changed in `series.json`.
+  - **How its episodes play:** *Interactive* or *Watch only* (`play`, sahne-story *Watch-only episodes*). An episode's Brief can differ. On a root with no `series.json`, the board starts one.
 
 **The episode studio** (`src/ui/studio/`) is built around the stages of the work. It always shows where the episode stands and the one next step.
 - **The top** (`episode.ts`):
@@ -149,6 +151,7 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
   - **The next step:** one sentence and at most two buttons for the stage on the page, such as *Draft it with the assistant*, *Go to the first* line without directions, *Add all 3* suggestions, the next language, *Watch it* or *Approve*.
   - **The task line:** a task writing the episode now, or the one that made it (`MadeByTask`).
 - **The stage on the page** fills the left column. The stage on the right plays the line you're on, with the tools to move people on it while you work in Script.
+- **Translate** (`translate.ts`): the main language beside one translation, a row per line (the learner's options, replies and a plugin's step with words too), each with its *Check*. A check holds until its line changes, then shows amber. There is a tab for each of the series' languages, with how far along it is, and *+ Add a language* (the series settings). *Copy the translator's link* copies `#/episode/<id>/translate/<lang>`. The comments left on the episode are under the lines.
 - **Needs you** (along the bottom): the episode's errors and notes, with *Show* for the list. A note goes to its line, and some have a fix.
 - **Approving** stores the episode's signature (`episodeSig`, kept in the review notes as `sig`), so a later change shows as *Changed since approved*. The release day and the draft mark are not part of it.
 - **The head:** the title and premise in the series' languages, who is in it (the cast and extras as portraits, each with how many lines they speak; *+ someone* adds from a picker; the story check refuses a speaker not in the cast), and what the series' plugins add (the lesson plugin: what it teaches).
@@ -279,6 +282,7 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 - Stories get `checkStory` and `checkSeason`, characters `checkCast`, and places `checkPlaces` and `lintPlace`. A series or season edit gets `checkSeries`.
 - The rules across documents run over every document, not only the edited ones: the season's dates and arcs, and the cast's order. An edit that breaks another document is caught (two episodes on one date).
 - The same checks run on the files as they are, and a problem in both is not new.
+- A series edit that adds a translation does not count the texts missing in that language as new errors (`has no <lang> text`): they are the translation work, shown in Translate. Every other new error still refuses the save.
 
 **Refused with 403 when read-only.** That is the default, and on the samples a save needs `--write`.
 

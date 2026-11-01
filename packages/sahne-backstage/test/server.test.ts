@@ -89,6 +89,24 @@ test("an edit that brings an error is refused and writes nothing; one the file h
   assert.ok(c.body.problems.some((p: { new?: boolean }) => p.new));
 });
 
+test("the series starts a new translation: its missing texts are the work to do, not errors that refuse the save", async () => {
+  const { body: { doc, mtime } } = await call(rw.url, "GET", "doc/series/series");
+  const langs = doc.languages ?? { main: "tr", translations: ["en", "fa"] };
+  const more = { ...doc, languages: { ...langs, translations: [...langs.translations, "de"] } };
+  const r = await call(rw.url, "POST", "save", { edits: [{ kind: "series", id: "series", doc: more, mtime }] });
+  assert.equal(r.status, 200, JSON.stringify(r.body.message));
+  assert.ok(r.body.problems.some((p: { message: string }) => / has no de text$/.test(p.message)), "every text without German shows as work");
+  // a story edit still may not bring a missing text in a language the series already had
+  const { body: s0 } = await call(rw.url, "GET", "doc/story/s1e00");
+  const line = s0.doc.steps.findIndex((x: { who?: string; en?: string }) => x.who && x.en);
+  delete s0.doc.steps[line].en;
+  const bad = await call(rw.url, "POST", "save", { edits: [{ kind: "story", id: "s1e00", doc: s0.doc, mtime: s0.mtime }] });
+  assert.equal(bad.status, 422);
+  // back as it was, for the tests after
+  const { body: now } = await call(rw.url, "GET", "doc/series/series");
+  assert.equal((await call(rw.url, "POST", "save", { edits: [{ kind: "series", id: "series", doc, mtime: now.mtime }] })).status, 200);
+});
+
 test("an edit that breaks another document is refused: two stories on one date", async () => {
   const { skeleton } = await import("../src/model/skeleton.ts");
   const w = (await call(rw.url, "GET", "world")).body;

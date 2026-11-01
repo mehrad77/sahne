@@ -978,6 +978,22 @@ button.link { border: 0; background: none; padding: 0; color: var(--accent, inhe
 .ins-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 2px 0 8px 44px; font-family: system-ui, sans-serif; }
 .ins-row button { border-style: dashed; color: var(--mute); }
 .ins-row button.plug { color: var(--curtain); border-color: color-mix(in srgb, var(--curtain) 50%, transparent); }
+.translate { display: grid; gap: 10px; }
+.tr-tabs { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.from-series { margin: -4px 0 0; }
+.tr-grid { display: grid; gap: 0; }
+.tr-head, .tr-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) minmax(0, 1fr) 92px; gap: 10px; align-items: start; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+.tr-head { font: 650 11px system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); padding-top: 0; }
+.tr-row.on { background: var(--panel); box-shadow: inset 3px 0 var(--accent); }
+.tr-row .gut { font: 11px ui-monospace, monospace; color: var(--faint); text-align: right; padding-top: 4px; }
+.tr-row .src { font-family: var(--script); font-size: 14.5px; padding-top: 2px; }
+.tr-row .src small { display: block; font: 650 10.5px system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
+.tr-row textarea { width: 100%; min-height: 2.6em; resize: vertical; }
+.tr-row .check { font-size: 12.5px; }
+.tr-row .check.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.tr-row .check.stale { color: var(--warn); border-color: var(--warn); }
+.empty-stage { padding: 28px 8px; display: grid; gap: 10px; justify-items: start; }
+@media (max-width: 700px) { .tr-head { display: none; } .tr-row { grid-template-columns: 24px minmax(0, 1fr); } .tr-row textarea, .tr-row .check { grid-column: 2; } }
 </style>
 </head>
 <body>

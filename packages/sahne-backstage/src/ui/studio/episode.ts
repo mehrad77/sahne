@@ -24,7 +24,9 @@ import { ChangesPanel } from "../changes.ts";
 import { AskMenu, send } from "../assistant.ts";
 import { settingsNow } from "../settings.ts";
 import { Popover } from "../kit/index.ts";
-import { Drawer, Icon, MOD } from "../kit/index.ts";
+import { Drawer, Icon, MOD, Modal } from "../kit/index.ts";
+import { SeriesSettings } from "../seasons.ts";
+import { Translate } from "./translate.ts";
 import { SaveButton } from "../readonly.ts";
 import { inLang, langName, useLangs } from "../lang.ts";
 import type { Problem } from "../../api.ts";
@@ -77,6 +79,7 @@ function Studio(p: { id: string }) {
   const [more, setMore] = useState<{ x: number; y: number } | null>(null);
   const [drawer, setDrawer] = useState<"details" | "changes" | null>(null);
   const [needsOpen, setNeedsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [trLang, setTrLang] = useState<string>(langs.translations[0] ?? langs.main);
   // the Script stage's view: only the words, and a translation under each line (remembered in this browser)
   const [onlyWords, setOnlyWords] = useStored("backstage:words-only", false);
@@ -199,7 +202,7 @@ function Studio(p: { id: string }) {
       case "first-untranslated": { const b = blocksOf(story, langs).find(x => !checkedOf(review.value[p.id]?.steps?.[x.key]).includes(trLang)); if (b) select(b.path, true); return; }
       case "next-language": { const l = progress.langs.find(x => x.done < x.total); if (l) setTrLang(l.lang); return; }
       case "draft-language": return void send(`Fill in every missing ${langName(trLang)} translation in this episode, natural and simple. Propose them.`);
-      case "settings": return go("board");
+      case "settings": return setSettingsOpen(true);
       case "watch": return goStage("review");
       case "approve": return void setReview(p.id, r => ({ ...r, status: "approved", sig: episodeSig(story) }));
     }
@@ -212,7 +215,7 @@ function Studio(p: { id: string }) {
         ${langs.translations[0] && html`<label class="row note"><input type="checkbox" style="width:auto" checked=${showTr} onChange=${() => setShowTr(!showTr)} /> Show the ${langName(langs.translations[0])}</label>`}</div>
       <${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} ghosts=${ghosts} suggestions=${suggestions}
         wordsOnly=${onlyWords} showTr=${showTr ? langs.translations[0] : null} watch=${playOf(story, w.series) === "watch"} onMore=${(x: Path) => { select(x); setDrawer("details"); }} />`;
-    if (stage === "translate") return html`<${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} ghosts=${ghosts} suggestions=${{}} />`;
+    if (stage === "translate") return html`<${Translate} id=${p.id} story=${story} selected=${path} lang=${trLang} langs=${progress.langs} setLang=${setTrLang} select=${select} edit=${edit} onSettings=${() => setSettingsOpen(true)} />`;
     if (stage === "review") return html`<${ReviewPanel} id=${p.id} story=${story} path=${path} standing=${standingOf(review.value[p.id], blocksOf(story, langs), { errors, translations: langs.translations })} onReview=${() => {}} />`;
     const ep = plugins.find(x => x.stage?.key === stage);
     return ep?.Sections ? html`<${ep.Sections} story=${story} saved=${saved} edit=${edit} />` : null;
@@ -267,7 +270,8 @@ function Studio(p: { id: string }) {
       <button onClick=${() => { setDrawer("changes"); setMore(null); }}><b>Changes</b><small>what changed since the last save and commit</small></button>
       <button disabled=${!path} onClick=${() => { setDrawer("details"); setMore(null); }}><b>More about this line</b><small>everything on the selected line, and the file's data</small></button>
       <button disabled=${!dirty(d)} onClick=${() => { history("story", p.id, "revert"); setMore(null); }}><b>Revert</b><small>back to the saved file</small></button>
-      <button onClick=${() => { go("board"); setMore(null); }}><b>Series settings</b><small>languages, how episodes play, the narrator</small></button></div></${Popover}>`}
+      <button onClick=${() => { setSettingsOpen(true); setMore(null); }}><b>Series settings</b><small>languages, how episodes play, the narrator</small></button></div></${Popover}>`}
+    ${settingsOpen && html`<${Modal} title="Series settings" onClose=${() => setSettingsOpen(false)}><${SeriesSettings} /></${Modal}>`}
     ${drawer === "details" && html`<${Drawer} float title="More about this line" onClose=${() => setDrawer(null)}><${Details} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} /></${Drawer}>`}
     ${drawer === "changes" && html`<${Drawer} float title="Changes" onClose=${() => setDrawer(null)}><${ChangesPanel} id=${p.id} story=${story} savedAt=${d.mtime} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} select=${(x: Path) => select(x, true)} /></${Drawer}>`}
   </section>`;
