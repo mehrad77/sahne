@@ -138,6 +138,8 @@ export interface SeriesDoc {
   /** The narrator's and the stand-in's character ids (the stage casts `NARRATOR` and `STANDIN`). */
   narrator: string;
   standin: string;
+  /** The story plugins the series turns on, by id (src/plugin.ts): `["lesson"]`. A host passes the plugins it has. */
+  plugins?: string[];
 }
 
 /** One release of an episode: its date, whether it is a weekday episode or a Saturday special, and its week. */

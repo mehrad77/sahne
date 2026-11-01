@@ -69,7 +69,7 @@ The JSON schemas stay in `schema/`. `kit-piece.json` and `kit-variant.json` hold
 
 ## Series, seasons, episodes
 
-A content root holds one **series**: its story world. `series.json` names it (`title`, an optional `summary`), its `languages` ([Languages](#languages)) and its `narrator` and `standin` (the stage casts `NARRATOR` and `STANDIN`, `src/types.ts`; another id is an error for now). A series has **seasons**, one `seasons/s<n>.json` each: `id` (`s<n>`, the file name), `n`, the titles and summaries, an optional `launch` date, the weeks' `arcs` by arc id (`s<n>wNN`) and the release `calendar` by story id (`{ date, kind, week }`, the shape of `days.json`). The **episodes** are the story documents: `s<n>eNN` is episode NN of season n (`seasonOf`), ordered by id; a story's `kind` says whether it is a weekday episode or a Saturday special. A series and its seasons have no level: a story's own `level` and `ref` are its own.
+A content root holds one **series**: its story world. `series.json` names it (`title`, an optional `summary`), its `languages` ([Languages](#languages)), the story `plugins` it turns on ([Plugins](#plugins)) and its `narrator` and `standin` (the stage casts `NARRATOR` and `STANDIN`, `src/types.ts`; another id is an error for now). A series has **seasons**, one `seasons/s<n>.json` each: `id` (`s<n>`, the file name), `n`, the titles and summaries, an optional `launch` date, the weeks' `arcs` by arc id (`s<n>wNN`) and the release `calendar` by story id (`{ date, kind, week }`, the shape of `days.json`). The **episodes** are the story documents: `s<n>eNN` is episode NN of season n (`seasonOf`), ordered by id; a story's `kind` says whether it is a weekday episode or a Saturday special. A series and its seasons have no level: a story's own `level` and `ref` are its own.
 
 `checkSeries` (in `stories.ts --check`): each document against its schema and its file name; the narrator and stand-in have character documents of that kind; every story's season has a document; where a season has a calendar, a row for each of its stories and a story for each row (one not written yet is a warning); each story's `arc` equals its season's `arcs` entry; while `days.json` is still written beside the calendars, a difference is a warning: the seasons are the source, and `days.json` is regenerated from them. A story's own calendar rules read the season's row: its `releaseDate` and `kind`, and its arc id from the week (`arcId`). Types: `SeriesDoc`, `SeasonDoc`, `CalendarRow` (`src/types.ts`); paths: `SERIES`, `SEASONS`, `seasonFile`, `seasonIds` (`paths.ts`).
 
@@ -102,6 +102,23 @@ A missing text is a `schema` error. `textIn(t, lang)` and `textOf(t, …langs)` 
 node packages/sahne-story/convert/languages.ts           # $SAHNE_CONTENT (or the samples), in place
 node packages/sahne-story/convert/languages.ts --check   # exits 1 while a file is in the old shape (in pnpm sahne check)
 ```
+
+## Plugins
+
+A series can turn on **story plugins**: parts of the format not every series needs, such as lessons. `series.json` names them, as in `"plugins": ["lesson"]`. A plugin (`StoryPlugin`, `src/plugin.ts`) may bring any of these:
+- its own step kinds (`steps`): each with the schema of the whole step and the cues it becomes (`adapt`, through the adapter's own helpers in an `AdaptContext`)
+- story, line and choice fields (`schema`), and the story fields a story must then have
+- checks on a story (`check`), run after the core's with its own rule names
+- lints (`lint`), run after `lintStory`'s
+- the texts it needs in the series' languages (`languageGaps`)
+- a few sentences for the assistant's prompt (`prompt`)
+
+**The seam is inverted.** `sahne-story` owns the interface and never imports a plugin. A host holds the plugins it knows and passes them in. The hosts are the gate (`stories.ts`), backstage, the gallery and an app's reader. `pluginsOf(series, plugins)` picks the ones the series turns on, in the series' order, and these take them:
+- `adaptStory` and `lintStory`, as `plugins` in their options
+- `validateDoc("story", doc, plugins)`, which merges the plugins' fragments into the core schema (`storySchema`, `check/schema.ts`)
+- the check, as `CheckOptions.plugins`, from which it picks the series' own
+
+Without its plugin, a plugin's step or field is a schema error, and the adapter skips the step. `checkSeries` reports a plugin the series names but the host does not have (`missingPlugins`). `test/plugin.test.ts` proves the seam with a made-up plugin.
 
 ## Places
 

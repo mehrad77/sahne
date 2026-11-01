@@ -20,6 +20,7 @@
       }
     },
     "narrator": { "type": "string", "pattern": "^[a-z0-9_]+$" },
-    "standin": { "type": "string", "pattern": "^[a-z0-9_]+$" }
+    "standin": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "plugins": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }, "description": "The story plugins the series turns on, by id (sahne-story src/plugin.ts)." }
   }
 }

@@ -12,6 +12,7 @@ import { languagesOf, textOf, type Languages } from "../src/texts.ts";
 import { validateDoc, type SchemaKind } from "./schema.ts";
 import { characterLanguageGaps, languageCodeGaps, seasonLanguageGaps, seriesLanguageGaps, storyLanguageGaps } from "./languages.ts";
 import { langFor, type Resolver, type StoryLang } from "../src/lang.ts";
+import { missingPlugins, pluginsOf, type StoryPlugin } from "../src/plugin.ts";
 import type { Draft, World } from "./world.ts";
 
 export type CheckRule = "schema" | "id" | "series" | "calendar" | "ref" | "cast" | "counts" | "flags" | "quiz" | "mistake" | "text" | "words" | "recycle" | "character" | "lint" | "place";
@@ -21,7 +22,11 @@ export interface CheckProblem { rule: CheckRule | string; level: "error" | "warn
  * skips that. `puppets` names the kit puppets a character's `puppet` may name beyond the kit's own
  * (default: Kerim's, from sahne-kit/kerim, which full.ts leaves out so a page that never casts her never loads her).
  */
-export interface CheckOptions { kit?: KitManifest | Kit; puppets?: string[]; solids?: Record<string, Record<string, Solid[]>>; cards?: CardIndex | null; needs?: Needs; recycleDays?: number }
+export interface CheckOptions {
+  kit?: KitManifest | Kit; puppets?: string[]; solids?: Record<string, Record<string, Solid[]>>; cards?: CardIndex | null; needs?: Needs; recycleDays?: number;
+  /** The story plugins the host has (src/plugin.ts): the ones the series names are turned on for its stories. */
+  plugins?: readonly StoryPlugin[];
+}
 
 /** s1e45 has six speakers in an episode, the owner's choice (Kumru's STORIES_A1.md). */
 export const CAST_ALLOW = new Set(["s1e45"]);
@@ -99,7 +104,8 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   const add = (rule: CheckProblem["rule"], level: CheckProblem["level"], message: string, step?: number) => out.push({ rule, level, story: id, step, message });
 
   const langs = languagesOf(world.series), lang = langOf(world), norm = normIn(lang), { checkWords: words, resolver } = lang;
-  for (const p of [...validateDoc("story", s), ...storyLanguageGaps(s, langs)]) add("schema", "error", `${p.path}: ${p.message}`);
+  const plugins = pluginsOf(world.series, o.plugins ?? []);
+  for (const p of [...validateDoc("story", s, plugins), ...storyLanguageGaps(s, langs), ...plugins.flatMap(pl => pl.languageGaps?.(s, langs) ?? [])]) add("schema", "error", `${p.path}: ${p.message}`);
   for (const [cid, c] of Object.entries(d.characters)) for (const p of [...validateDoc("character", c), ...characterLanguageGaps(c, langs)]) add("schema", "error", `character ${cid} ${p.path}: ${p.message}`);
   if (s.id !== d.id) add("id", "error", `the folder is ${d.id} but the story's id is ${s.id}`);
 
@@ -220,7 +226,7 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   const missing = [s.place, ...s.steps.filter(isScene).map(x => x.scene)].filter(p => !places[p]);
   for (const p of new Set(missing)) add("place", "error", `place ${p} has no document in places/`);
   if (!missing.length) {
-    for (const p of lintStory(s, { places, characters: d.characters, kit: o.kit, solids: o.solids?.[id], lang })) {
+    for (const p of lintStory(s, { places, characters: d.characters, kit: o.kit, solids: o.solids?.[id], lang, plugins })) {
       out.push({ rule: p.rule, level: p.level, story: id, step: p.step, message: p.message });
     }
     if (o.kit) {
@@ -229,6 +235,8 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
       }
     }
   }
+  // the series' plugins check what they add
+  for (const pl of plugins) pl.check?.({ story: s, characters: d.characters, world, languages: langs, lang, texts: all, add });
   return out;
 }
 
@@ -309,11 +317,12 @@ export function checkSeason(world: World, drafts: Draft[] = world.drafts, o: Che
  * season's; the series' languages, and each document's texts in them (check/languages.ts). Without series.json, one
  * warning (the root predates series); files still in the old language shape, one warning (convert/languages.ts).
  */
-export function checkSeries(world: World): CheckProblem[] {
+export function checkSeries(world: World, o: Pick<CheckOptions, "plugins"> = {}): CheckProblem[] {
   const out: CheckProblem[] = [];
   const add = (level: CheckProblem["level"], story: string, message: string, rule: CheckRule = "series") => out.push({ rule, level, story, message });
   const schema = (kind: SchemaKind, doc: unknown, at: string) => { for (const p of validateDoc(kind, doc)) add("error", at, `${p.path}: ${p.message}`, "schema"); };
   const sr = world.series, langs = languagesOf(sr);
+  if (o.plugins) for (const id of missingPlugins(sr, o.plugins)) add("error", "series", `series.json turns on the plugin ${id}, which this host does not have`);
   const gaps = (ps: { path: string; message: string }[], at: string) => { for (const p of ps) add("error", at, `${p.path}: ${p.message}`, "schema"); };
   if (world.oldShape?.length) add("warning", "series", `${world.oldShape.length} files are in the old language shape (titleEn, nameFa, … ; ${world.oldShape.slice(0, 3).join(", ")}${world.oldShape.length > 3 ? ", …" : ""}): run node packages/sahne-story/convert/languages.ts`);
   if (!sr) add("warning", "series", "the content root has no series.json: add one, with a seasons/s<n>.json per season");

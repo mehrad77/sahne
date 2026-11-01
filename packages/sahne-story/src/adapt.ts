@@ -20,6 +20,7 @@ import { storyProps } from "./props.ts";
 import { langFor, type StoryLang } from "./lang.ts";
 import { allLanguages, DEFAULT_LANGUAGES, textOf, type Languages, type LangText } from "./texts.ts";
 import { dressing } from "./looks.ts";
+import { pluginStepOf, type StoryPlugin } from "./plugin.ts";
 
 export interface AdaptOptions {
   places: Record<string, PlaceDoc>;
@@ -39,6 +40,8 @@ export interface AdaptOptions {
   lang?: StoryLang;
   /** Flags set by earlier stories, for `if` / `unless` lines (Kumru's STORIES_SCHEMA.md §4.7). */
   flags?: Iterable<string>;
+  /** The series' story plugins (src/plugin.ts, `pluginsOf`): their steps become cues here. */
+  plugins?: readonly StoryPlugin[];
 }
 
 /** What the learner picked: a choice's option index, or the target an act ended on. */
@@ -112,7 +115,7 @@ export function adaptStory(story: StoryDoc, o: AdaptOptions): StoryStage {
   const p = (s: string) => P(s, main);
   /** A step's main-language text. */
   const said = (t: object) => String((t as Record<string, unknown>)[main] ?? "");
-  const flags = new Set(o.flags ?? []);
+  const flags = new Set(o.flags ?? []), plugins = o.plugins ?? [];
   const lower = (o.lang ?? langFor(main)).lower;
   const word = (k: string) => { const a = lower(p(k)); return a !== k ? a : lower(p(k[0].toUpperCase() + k.slice(1))); };
 
@@ -157,7 +160,9 @@ export function adaptStory(story: StoryDoc, o: AdaptOptions): StoryStage {
 
     story.steps.forEach((s: Step, step) => {
       if (!passes(s, flags)) return;
-      if (isScene(s)) {
+      const own = pluginStepOf(s, plugins);
+      if (own) own.adapt(s, { step, main, p, said, shown: t3, staging: x => staging(x as Staging) as Record<string, unknown>, push });
+      else if (isScene(s)) {
         push({ scene: { place: s.scene, at: { ...(s.at ?? {}) }, ...(s.time ? { time: s.time } : {}), ...(s.weather ? { weather: s.weather } : {}), ...(s.state ? { state: s.state } : {}), ...(s.kerim ? { perch: s.kerim } : {}), ...(s.stop ? { stop: s.stop } : {}), ...worn(step) } }, { step, kind: "scene" });
       } else if (isLine(s)) {
         if (s.who === STANDIN) {

@@ -21,6 +21,7 @@
 
 import { applyLook, inState, placeState, route, detour, WEATHER, CLOTHING_FIELDS, lookFields, normalize, type AvatarDoc, type AvatarNote, type KitManifest, type Look, type PlaceDoc, type PropRef, type Solid, type Staging, type Target, type Vec3 } from "sahne";
 import { langFor, motivated, type LineContext, type StoryLang } from "./lang.ts";
+import type { StoryPlugin } from "./plugin.ts";
 import { DEIXIS_GESTURES } from "./langs/tr.ts";
 import { placesOf, storyProps } from "./props.ts";
 import { canon, dress, forLearner, LEARNER_FIELDS, looksOf } from "./looks.ts";
@@ -29,7 +30,8 @@ import { isAct, isBeat, isChoice, isLine, isScene, isSpot, NARRATOR, STANDIN, ty
 export type Rule = "deixis" | "var_yok" | "number" | "budget" | "via" | "silent" | "time" | "link" | "standin" | "mechanics" | "props" | "look" | "place" | "route";
 
 export interface Problem {
-  rule: Rule;
+  /** A core rule, or a plugin's own (src/plugin.ts). */
+  rule: Rule | (string & {});
   level: "error" | "warning";
   /** The story step; `option` and `reply` point inside a choice. */
   step: number;
@@ -50,6 +52,8 @@ export interface LintOptions {
   solids?: Record<string, Solid[]>;
   /** The story language of the series' main language (src/lang.ts); Turkish without one. */
   lang?: StoryLang;
+  /** The series' story plugins (src/plugin.ts): their lints run after these. */
+  plugins?: readonly StoryPlugin[];
 }
 
 export { NEAR, FAR } from "./langs/tr.ts";
@@ -286,6 +290,7 @@ export function lintStory(story: StoryDoc, o: LintOptions): Problem[] {
   });
   out.push(...lintRefs(story, o));
   out.push(...lintLooks(story, o));
+  for (const pl of o.plugins ?? []) out.push(...(pl.lint?.(story, { lang }) ?? []));
   if (firstTurn < 0 || firstTurn > 4) out.push({ rule: "standin", level: "error", step: 0, message: firstTurn < 0 ? "the learner never has a turn" : `the learner's first turn is line ${firstTurn}: it must come within the first four lines` });
   return out;
 }
@@ -457,7 +462,7 @@ function lintLooks(story: StoryDoc, o: LintOptions): Problem[] {
 }
 
 /** A link a line could have: a word that names a prop on stage but is not in `link`. */
-export interface Suggestion { step: number; option?: number; reply?: number; rule: Rule | "link"; message: string; fix: Staging }
+export interface Suggestion { step: number; option?: number; reply?: number; rule: Problem["rule"]; message: string; fix: Staging }
 
 /**
  * Staging the lints would add (Kumru's STORIES_STAGE.md §4 `--suggest`): every problem's fix, plus `link`
