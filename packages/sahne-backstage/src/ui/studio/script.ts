@@ -16,12 +16,14 @@ import { allLanguages, languagesOf, textOf, type StoryDoc } from "sahne-story";
 import { get, set, type Path } from "../../model/path.ts";
 import { addAfter, blocks, convert, duplicateAt, emptyLine, INSERTS, moveBy, nextSpeaker, remove, stagingIn, template, type Block, type Insert } from "../../model/script.ts";
 import { chipsOf, parseParenthetical } from "../../model/parenthetical.ts";
+import { directionsOf } from "../../model/directions.ts";
+import { isUnstaged } from "../../model/progress.ts";
 import { taken, type Ghost, type Suggest } from "../../model/autostage.ts";
 import { KIT } from "../../stage.ts";
 import { history, review, say, world } from "../../store.ts";
 import { checkedOf, markStep, rowKey } from "../review.ts";
 import { sigAt } from "../../model/review.ts";
-import { Icon, Popover } from "../kit/index.ts";
+import { Popover } from "../kit/index.ts";
 import { Picker } from "../galleries.ts";
 import { inLang, langName, useLangs } from "../lang.ts";
 import { placeAt, targetsAt } from "../staging.ts";
@@ -44,6 +46,14 @@ export interface ScriptProps {
   /** What the director does by itself on each block (never written), and what the rules suggest, by block path. */
   ghosts?: Record<string, Ghost>;
   suggestions?: Record<string, Suggest[]>;
+  /** Only the words: no stage directions under the lines (a line with none still says so). */
+  wordsOnly?: boolean;
+  /** A translation to show under each line, quietly and read-only (Translate is where they are written); none without it. */
+  showTr?: string | null;
+  /** The episode is watch-only: nothing that waits for the viewer is offered (a choice, something to do). */
+  watch?: boolean;
+  /** Open everything on a line (its details). */
+  onMore?(path: Path): void;
 }
 
 const key = (p: Path) => p.join("/");
@@ -108,11 +118,18 @@ export function Script(p: ScriptProps) {
   const extra = editorPluginsOf(w.series).flatMap(ep => ep.blocks ?? []);
 
   const common = { ...p, keys, name, narrator, standin, setMenu, paren, setParen };
+  // what can be added: in a watch-only episode, nothing that waits for the viewer
+  const kinds = INSERTS.filter(k => !p.watch || (k !== "choice" && k !== "act"));
+  const row = (after: Path, end = false) => html`<div class="ins-row"><span class="note">${end ? "Add at the end:" : "Add below:"}</span>
+    ${kinds.map(k => html`<button class="small" onClick=${() => insert(k, after)}>+ ${INSERT_NAMES[k][0].toLowerCase()}</button>`)}
+    ${extra.map(b => html`<button class="small plug" onClick=${() => apply(addAfter(p.story, after, b.template({ story: p.story, langs })))}>+ ${b.name[0].toLowerCase()}</button>`)}
+    <span class="note">or type <kbd>/</kbd> in an empty line</span></div>`;
+  const sel = p.selected ? key(p.selected) : null;
   return html`<div class="script" role="list" aria-label="The script">
-    ${list.map(b => html`<${BlockView} key=${key(b.path)} b=${b} ...${common} />`)}
-    <button class="script-add" onClick=${(e: MouseEvent) => setMenu({ kind: "insert", path: list.at(-1)?.path ?? ["steps", -1], x: e.clientX, y: e.clientY })}><${Icon} name="plus" size=${14} /> Add a block <kbd>/</kbd></button>
+    ${list.map(b => html`<${BlockView} key=${key(b.path)} b=${b} ...${common} />${sel === key(b.path) && b.depth === 0 ? row(b.path) : ""}`)}
+    ${row(list.at(-1)?.path ?? ["steps", -1], true)}
     ${menu?.kind === "insert" && html`<${Popover} x=${menu.x} y=${menu.y} onClose=${() => setMenu(null)} label="Insert a block">
-      <div class="menu">${INSERTS.map(k => html`<button onClick=${() => { insert(k, menu.path); setMenu(null); }}><b>${INSERT_NAMES[k][0]}</b><small>${INSERT_NAMES[k][1]}</small></button>`)}
+      <div class="menu">${kinds.map(k => html`<button onClick=${() => { insert(k, menu.path); setMenu(null); }}><b>${INSERT_NAMES[k][0]}</b><small>${INSERT_NAMES[k][1]}</small></button>`)}
         ${extra.map(b => html`<button onClick=${() => { apply(addAfter(p.story, menu.path, b.template({ story: p.story, langs }))); setMenu(null); }}><b>${b.name[0]}</b><small>${b.name[1]}</small></button>`)}</div></${Popover}>`}
     ${menu?.kind === "speaker" && html`<${Picker} kind="character" x=${menu.x} y=${menu.y} ids=${[...(p.story.cast ?? []), ...(p.story.extras ?? []), narrator]} value=${[(get(p.story, menu.path) as { who?: string })?.who ?? ""]}
       onPick=${(id: string) => { p.edit(s => set(s, [...menu.path, "who"], id)); p.select(menu.path, true); }} onClose=${() => setMenu(null)} />`}
@@ -120,8 +137,8 @@ export function Script(p: ScriptProps) {
 }
 
 const INSERT_NAMES: Record<Insert, [string, string]> = {
-  line: ["Line", "someone says something"], action: ["Action", "someone does something, with no words"], narration: ["Narration", "the narrator, to the viewer"],
-  scene: ["Scene", "a new place or time"], choice: ["Choice", "the learner picks what to say"], act: ["Act", "the learner does something on stage"],
+  line: ["Line", "someone says something"], action: ["Stage action", "someone does something, with no words"], narration: ["Narration", "the narrator, to the viewer"],
+  scene: ["Scene", "a new place or time"], choice: ["Choice", "the viewer picks what to say"], act: ["Something to do", "the viewer does something on stage"],
 };
 
 type Common = ScriptProps & {
@@ -186,7 +203,9 @@ function Translations(p: Common & { at: Path }) {
     : html`<button class=${`tcheck${checked.includes(l) ? (stale ? " stale" : " on") : ""}`} aria-pressed=${checked.includes(l) && !stale} title=${checked.includes(l) ? (stale ? `${langName(l)} checked before the block changed (click to check it again)` : `${langName(l)} checked`) : `Mark the ${langName(l)} checked`} onClick=${() => markStep(p.id, p.story, p.b.path, l, stale || !checked.includes(l))}>✓</button>`}</div>`)}</div>`;
 }
 
-/** The staging written on a block, as chips (× clears one), and the parenthetical field that adds to it. */
+/** A block's stage directions in plain words (model/directions.ts) under its words: quiet text until the block is selected,
+ * then chips (× clears one), the director's own choices (dotted), the rules' suggestions ("Add?", dashed: a click takes
+ * one, ⌥ Enter all), and "+ add a direction", typed as a parenthetical: (waves, happy, to İsmail). */
 function Staged(p: Common & { at: Path; who?: string }) {
   const w = world.value!, { main } = useLangs();
   const [paren, setText] = useState("");
@@ -194,9 +213,11 @@ function Staged(p: Common & { at: Path; who?: string }) {
   const setParen = setText;
   const step = get(p.story, p.at);
   const st = stagingIn(step) as Record<string, unknown>;
-  const chips = chipsOf(st, p.name);
+  const dirs = directionsOf(st, p.name);
   const base = "beat" in ((step ?? {}) as object) ? [...p.at, "beat"] : p.at;
   const ghost = p.ghosts?.[key(p.at)], sugg = p.suggestions?.[key(p.at)] ?? [];
+  const on = !!p.selected && key(p.selected) === key(p.b.path);
+  const bare = p.b.kind !== "action" && isUnstaged(step as Record<string, unknown>);
   const take = (sg: Suggest) => p.edit(s => set(s, base, taken((get(s, base) ?? {}) as Record<string, unknown>, sg.fix)), `${key(p.at)}.take`);
   const commit = () => {
     if (!paren.trim()) { setOpen(false); return; }
@@ -214,16 +235,29 @@ function Staged(p: Common & { at: Path; who?: string }) {
     requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-block="${key(p.b.path)}"] [data-main]`)?.focus());
   };
   const clear = (k: string) => p.edit(s => set(s, [...base, k], undefined));
-  return html`<span class="staged">
-    ${chips.map(c => html`<span class="schip set">${c.label}<button aria-label=${`Clear ${c.key}`} onClick=${() => clear(c.key)}>×</button></span>`)}
-    ${ghost?.to && !st.to && html`<span class="schip ghost" title="The director's choice: who it is said to. Set it to change it.">→ ${ghost.to === "viewer" ? "us" : p.name(ghost.to)}</span>`}
-    ${ghost?.cam && !st.cam && html`<span class="schip ghost" title="The director's shot. The shot bar on the stage changes it.">${ghost.cam} shot</span>`}
-    ${sugg.map(sg => html`<button class="schip suggest" title=${`${sg.why}: click (or ⌥ Enter for all) to take it`} onClick=${() => take(sg)}>+ ${chipsOf(sg.fix as Record<string, unknown>, p.name).map(c => c.label).join(", ")}</button>`)}
-    ${open ? html`<input class="paren" autofocus value=${paren} placeholder="(waves, happy, to …)" aria-label="How it is said" lang=${main === "tr" ? "en" : undefined}
-      onInput=${(e: Event) => setParen((e.target as HTMLInputElement).value)} onBlur=${commit}
-      onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); commit(); } else if (e.key === "Escape") { setParen(""); setOpen(false); } }} />`
-    : html`<button class="schip add" onClick=${() => setOpen(true)} title="How it is said: type (waves, happy, to …)">( )</button>`}
-  </span>`;
+  const suggestions = sugg.map(sg => html`<button class="schip suggest" title=${`${sg.why}: click (or ⌥ Enter for all) to add it`} onClick=${() => take(sg)}>Add? ${directionsOf(sg.fix as Record<string, unknown>, p.name).map(c => c.label).join(", ") || chipsOf(sg.fix as Record<string, unknown>, p.name).map(c => c.label).join(", ")}</button>`);
+  if (p.wordsOnly) return bare ? html`<div class="no-dirs">No stage directions</div>` : null;
+  return html`<div class="dirs">
+    ${on ? html`<span class="staged">
+      ${dirs.map(c => html`<span class="schip set">${c.label}<button aria-label=${`Clear ${c.label}`} onClick=${() => clear(c.key)}>×</button></span>`)}
+      ${ghost?.to && !st.to && html`<span class="schip ghost" title="The director's choice: whom it is said to. Set it to change it.">says it to ${ghost.to === "viewer" ? "us" : p.name(ghost.to)}</span>`}
+      ${ghost?.cam && !st.cam && html`<span class="schip ghost" title="The director's shot. The shot bar on the stage changes it.">${directionsOf({ cam: ghost.cam } as Record<string, unknown>, p.name)[0]?.label}</span>`}
+      ${suggestions}
+      ${open ? html`<input class="paren" autofocus value=${paren} placeholder="(waves, happy, to …)" aria-label="How it is said" lang=${main === "tr" ? "en" : undefined}
+        onInput=${(e: Event) => setParen((e.target as HTMLInputElement).value)} onBlur=${commit}
+        onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); commit(); } else if (e.key === "Escape") { setParen(""); setOpen(false); } }} />`
+      : html`<button class="schip add" onClick=${() => setOpen(true)} title="How it is said: type (waves, happy, to …)">+ add a direction</button>`}
+      ${p.onMore && html`<button class="schip add" onClick=${() => p.onMore!(p.b.path)}>More about this line</button>`}</span>`
+    : html`${dirs.length ? html`<span class="dirs-quiet">${dirs.map(c => c.label).join(" · ")}</span>` : ""} ${suggestions}`}
+    ${bare && html`<div class="no-dirs">No stage directions: the stage holds still on this line.</div>`}
+  </div>`;
+}
+
+/** The line in a translation, quietly under the main language (read-only: Translate is where it is written). */
+function Gloss(p: Common & { at: Path }) {
+  const l = p.showTr, v = (get(p.story, p.at) ?? {}) as Record<string, unknown>;
+  if (!l) return null;
+  return html`<div class="tr-quiet" ...${inLang(l)}>${String(v[l] ?? "") || html`<span class="note">No ${langName(l)} yet</span>`}</div>`;
 }
 
 function LineBlock(p: Common) {
@@ -241,10 +275,10 @@ function LineBlock(p: Common) {
         <select class="tone" value=${String(step.tone ?? "")} aria-label="Tone" onChange=${(e: Event) => p.edit(s => set(s, [...p.b.path, "tone"], (e.target as HTMLSelectElement).value || undefined))}>
           <option value="">tone…</option>${["polite", "warm", "formal", "casual", "blunt", "rude"].map(t => html`<option value=${t}>${t}</option>`)}</select>`}
       ${(step.if || step.unless) && html`<span class="schip gate" title="Shown only when an earlier story set (or did not set) this flag">${step.if ? `if ${step.if}` : `unless ${step.unless}`}</span>`}
-      <${Staged} ...${p} at=${p.b.path} who=${who} />
     </div>
-    <${Grow} main value=${text} lang=${main} label=${`${p.name(who)}'s line`} placeholder=${option ? "What the learner may say…" : "What they say…"} onInput=${(x: string) => p.edit(s => set(s, [...p.b.path, main], x), `${key(p.b.path)}.${main}`)} onKeyDown=${p.keys(p.b, text)} />
-    <${Translations} ...${p} at=${p.b.path} />`;
+    <${Grow} main value=${text} lang=${main} label=${`${p.name(who)}'s line`} placeholder=${option ? "What the viewer may say…" : "What they say…"} onInput=${(x: string) => p.edit(s => set(s, [...p.b.path, main], x), `${key(p.b.path)}.${main}`)} onKeyDown=${p.keys(p.b, text)} />
+    <${Gloss} ...${p} at=${p.b.path} />
+    <${Staged} ...${p} at=${p.b.path} who=${who} />`;
 }
 
 function ActionBlock(p: Common) {
@@ -252,8 +286,9 @@ function ActionBlock(p: Common) {
   const who = beat.who as string | undefined;
   return html`<div class="line-head action-head">
     <button class="speaker" data-main title="Who does it" onKeyDown=${p.keys(p.b, "")} onClick=${(e: MouseEvent) => p.setMenu({ kind: "speaker", path: [...p.b.path, "beat"], x: e.clientX, y: e.clientY })}>${who ? p.name(who) : "everyone"}</button>
-    <span class="note">does</span><${Staged} ...${p} at=${p.b.path} who=${who} />
-    ${beat.wait !== undefined && html`<span class="schip">waits ${beat.wait} ms</span>`}</div>`;
+    <span class="note">does</span>
+    ${beat.wait !== undefined && html`<span class="schip">a pause, ${(Number(beat.wait) / 1000).toFixed(1)} s</span>`}</div>
+    <${Staged} ...${p} at=${p.b.path} who=${who} />`;
 }
 
 function SceneBlock(p: Common) {

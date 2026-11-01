@@ -14,7 +14,7 @@ import { cueOf, cuePath, type Path } from "../../model/path.ts";
 import { flagsIn, wordsOnly } from "../../model/steps.ts";
 import { dirty } from "../../model/history.ts";
 import { KIT, Preview, solidsOf } from "../../stage.ts";
-import { pathOfKey, ReviewGutter, ReviewPanel } from "../review.ts";
+import { pathOfKey, ReviewPanel } from "../review.ts";
 import { blocksOf, checkedOf, standingOf } from "../../model/review.ts";
 import { episodeSig, nextStepOf, progressOf, type StageKey, type StepAction } from "../../model/progress.ts";
 import { blocks } from "../../model/script.ts";
@@ -78,6 +78,9 @@ function Studio(p: { id: string }) {
   const [drawer, setDrawer] = useState<"details" | "changes" | null>(null);
   const [needsOpen, setNeedsOpen] = useState(false);
   const [trLang, setTrLang] = useState<string>(langs.translations[0] ?? langs.main);
+  // the Script stage's view: only the words, and a translation under each line (remembered in this browser)
+  const [onlyWords, setOnlyWords] = useStored("backstage:words-only", false);
+  const [showTr, setShowTr] = useStored("backstage:show-translation", false);
   const cast = useMemo(() => [...new Set([w.series?.narrator ?? "kerim", w.series?.standin ?? "nima", ...(story.cast ?? []), ...(story.extras ?? [])])], [story.cast, story.extras]);
   const lang = langFor(langs.main);
   const plugins = editorPluginsOf(w.series);
@@ -204,8 +207,11 @@ function Studio(p: { id: string }) {
   const title = textOf(story.title, langs.main);
   const view = (() => {
     if (stage === "brief") return html`<${EpisodeHead} story=${story} saved=${saved} edit=${edit} />`;
-    if (stage === "script") return html`<${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} ghosts=${ghosts} suggestions=${suggestions}
-      gutter=${(b: { path: Path }) => html`<${ReviewGutter} id=${p.id} story=${story} path=${b.path} onComments=${() => { select(b.path); goStage("review"); }} />`} />`;
+    if (stage === "script") return html`<div class="lead"><span class="grow">The words, and what each person does under them. Select a line to change its directions; dashed chips are suggestions.</span>
+        <label class="row note"><input type="checkbox" style="width:auto" checked=${onlyWords} onChange=${() => setOnlyWords(!onlyWords)} /> Words only</label>
+        ${langs.translations[0] && html`<label class="row note"><input type="checkbox" style="width:auto" checked=${showTr} onChange=${() => setShowTr(!showTr)} /> Show the ${langName(langs.translations[0])}</label>`}</div>
+      <${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} ghosts=${ghosts} suggestions=${suggestions}
+        wordsOnly=${onlyWords} showTr=${showTr ? langs.translations[0] : null} watch=${playOf(story, w.series) === "watch"} onMore=${(x: Path) => { select(x); setDrawer("details"); }} />`;
     if (stage === "translate") return html`<${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} ghosts=${ghosts} suggestions=${{}} />`;
     if (stage === "review") return html`<${ReviewPanel} id=${p.id} story=${story} path=${path} standing=${standingOf(review.value[p.id], blocksOf(story, langs), { errors, translations: langs.translations })} onReview=${() => {}} />`;
     const ep = plugins.find(x => x.stage?.key === stage);
@@ -299,4 +305,10 @@ function Transport(p: { preview: Preview; redraw(): void }) {
     </div>`}
     ${f.kind === "end" && html`<p class="note">The end of the episode.</p>`}
   </div>`;
+}
+
+/** A view setting kept in this browser (a missing or blocked storage keeps the default). */
+function useStored<T>(name: string, fallback: T): [T, (v: T) => void] {
+  const [v, setV] = useState<T>(() => { try { const x = localStorage.getItem(name); return x === null ? fallback : JSON.parse(x) as T; } catch { return fallback; } });
+  return [v, (x: T) => { setV(x); try { localStorage.setItem(name, JSON.stringify(x)); } catch { /* the setting lasts this visit */ } }];
 }

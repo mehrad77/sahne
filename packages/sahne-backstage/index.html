@@ -973,6 +973,11 @@ button.link { border: 0; background: none; padding: 0; color: var(--accent, inhe
 .dirs-quiet { font: 12.5px/1.5 system-ui, sans-serif; color: var(--faint); }
 .no-dirs { font: 12.5px/1.5 system-ui, sans-serif; color: var(--warn); }
 @media (max-width: 700px) { .needs { margin: 14px -12px 0; padding: 8px 12px; } .stage-tab { min-width: 104px; } }
+.dirs { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; min-height: 0; }
+.tr-quiet { font: 13px/1.45 system-ui, sans-serif; color: var(--mute); }
+.ins-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 2px 0 8px 44px; font-family: system-ui, sans-serif; }
+.ins-row button { border-style: dashed; color: var(--mute); }
+.ins-row button.plug { color: var(--curtain); border-color: color-mix(in srgb, var(--curtain) 50%, transparent); }
 </style>
 </head>
 <body>
