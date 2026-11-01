@@ -278,16 +278,15 @@ function Studio(p: { id: string }) {
     ${asks && html`<${Popover} x=${asks.x} y=${asks.y} onClose=${() => setAsks(null)} label="Ask the assistant"><${AskMenu} onDone=${() => setAsks(null)} /></${Popover}>`}
     ${more && html`<${Popover} x=${more.x} y=${more.y} onClose=${() => setMore(null)} label="More"><div class="menu">
       <button onClick=${() => { setDrawer("changes"); setMore(null); }}><b>Changes</b><small>what changed since the last save and commit</small></button>
-      <button disabled=${!path} onClick=${() => { setDrawer("details"); setMore(null); }}><b>More about this line</b><small>everything on the selected line, and the file's data</small></button>
       <button disabled=${!dirty(d)} onClick=${() => { history("story", p.id, "revert"); setMore(null); }}><b>Revert</b><small>back to the saved file</small></button>
       <button onClick=${() => { setSettingsOpen(true); setMore(null); }}><b>Series settings</b><small>languages, how episodes play, the narrator</small></button></div></${Popover}>`}
     ${settingsOpen && html`<${Modal} title="Series settings" onClose=${() => setSettingsOpen(false)}><${SeriesSettings} /></${Modal}>`}
-    ${drawer === "details" && html`<${Drawer} float title="More about this line" onClose=${() => setDrawer(null)}><${Details} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} /></${Drawer}>`}
+    ${drawer === "details" && html`<${Drawer} float title="More about it" onClose=${() => setDrawer(null)}><${Details} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} /></${Drawer}>`}
     ${drawer === "changes" && html`<${Drawer} float title="Changes" onClose=${() => setDrawer(null)}><${ChangesPanel} id=${p.id} story=${story} savedAt=${d.mtime} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} select=${(x: Path) => select(x, true)} /></${Drawer}>`}
   </section>`;
 }
 
-/** Play controls: from the start, back, play on, a scrubber over every cue and one through the cue playing, the learner's card. */
+/** Play controls: from the start, back, play on, a scrubber over every cue and one through the cue playing, the viewer's card. */
 function Transport(p: { preview: Preview; redraw(): void; watch?: boolean }) {
   // a card shows its line in the main language, and a choice option its first translation under it
   const { main, translations: [gloss] } = useLangs();

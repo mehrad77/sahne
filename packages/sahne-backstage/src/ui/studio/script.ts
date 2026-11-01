@@ -141,6 +141,9 @@ const INSERT_NAMES: Record<Insert, [string, string]> = {
   scene: ["Scene", "a new place or time"], choice: ["Choice", "the viewer picks what to say"], act: ["Something to do", "the viewer does something on stage"],
 };
 
+/** What a block is called in "More about this …". */
+const MORE_NAMES: Record<string, string> = { scene: "scene", line: "line", option: "option", action: "action", choice: "choice", act: "act" };
+
 type Common = ScriptProps & {
   b: Block; keys(b: Block, text: string): (e: KeyboardEvent) => void; name(id: string): string; narrator: string; standin: string;
   setMenu(m: { kind: "insert" | "speaker"; path: Path; x: number; y: number } | null): void;
@@ -165,7 +168,8 @@ function BlockView(p: Common) {
     <div class="gutter"><span class="n">${b.path.slice(1).filter(x => typeof x === "number").join(".")}</span>
       ${m?.errors ? html`<span class="mark bad" title=${`${m.errors} errors`}>●</span>` : m?.warnings ? html`<span class="mark warn" title=${`${m.warnings} warnings`}>●</span>` : ""}
       ${p.gutter?.(b)}</div>
-    <div class="body">${body(p)}</div>
+    <div class="body">${body(p)}
+      ${on && p.onMore && html`<div class="blk-more"><button class="linkish" onClick=${() => p.onMore!(b.path)} title="Everything on it, its staging in full, and its data">More about this ${MORE_NAMES[b.kind] ?? "step"} ›</button></div>`}</div>
   </div>`;
 }
 
@@ -247,8 +251,7 @@ function Staged(p: Common & { at: Path; who?: string }) {
         onInput=${(e: Event) => setParen((e.target as HTMLInputElement).value)} onBlur=${commit}
         onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); commit(); } else if (e.key === "Escape") { setParen(""); setOpen(false); } }} />`
       : html`<button class="schip add" onClick=${() => setOpen(true)} title="How it is said: type (waves, happy, to …)">+ add a direction</button>`}
-
-      ${p.onMore && html`<button class="schip add" onClick=${() => p.onMore!(p.b.path)}>More about this line</button>`}</span>`
+</span>`
     : html`${dirs.length ? html`<span class="dirs-quiet">${dirs.map(c => c.label).join(" · ")}</span>` : ""} ${suggestions}`}
     ${bare && html`<div class="no-dirs">No stage directions: the stage holds still on this line.</div>`}
   </div>`;
