@@ -3,7 +3,7 @@
 //   a task's question about this episode   answered in place (a task waits for it)
 //   an agent's proposals                    accepted or rejected in place (studio/proposals.ts)
 //   problems                                the check's and the lints' notes in plain words (model/notes.ts), each to its
-//                                           line, with a fix where one is obvious; the texts a language lacks are one item
+//                                           line, with a fix where one is obvious; the lines a language lacks are one item
 //                                           per language, to Translate
 //   suggestions                             the rules' staging ideas, to Script, or all added at once
 //   open comments                           to Review
@@ -35,7 +35,8 @@ export function NeedsYou(p: Props) {
   const w = world.value!, { main } = useLangs();
   // the texts a language lacks, counted per language; the other problems as notes
   const gaps = new Map<string, number>(), rest: Problem[] = [];
-  for (const x of p.problems) { const m = GAP.exec(x.message); if (m) gaps.set(m[1], (gaps.get(m[1]) ?? 0) + 1); else rest.push(x); }
+  // only a line's (Translate fills those); a gloss, a quiz question, the cast's texts and a place's name are their own items
+  for (const x of p.problems) { const m = GAP.exec(x.message); if (m && /^\/(steps|followUp)\//.test(x.message)) gaps.set(m[1], (gaps.get(m[1]) ?? 0) + 1); else rest.push(x); }
   const notes: Note[] = notesOf(rest, { name: id => textOf(w.characters[id]?.name, main) ?? id, langName, standin: w.series?.standin ?? "nima" });
   const errors = notes.filter(n => n.level === "error").length;
   const counts: [string, number, string][] = [
@@ -60,7 +61,7 @@ export function NeedsYou(p: Props) {
         <span class="t">${n.isNew ? html`<b>New: </b>` : ""}${n.text}</span>
         ${n.fix && html`<button class="small" onClick=${() => p.edit(n.fix!.apply, `fix.${n.rule}`)}>${n.fix.label}</button>`}
         ${n.path && html`<button class="small primary" onClick=${() => p.select(n.path!, true)}>Show it</button>`}</div>`)}
-      ${[...gaps].map(([l, n]) => html`<div class="need"><span class="kind">translation</span><span class="t">${n} text${n > 1 ? "s have" : " has"} no ${langName(l)} yet.</span>
+      ${[...gaps].map(([l, n]) => html`<div class="need"><span class="kind">translation</span><span class="t">${n} line${n > 1 ? "s have" : " has"} no ${langName(l)} yet.</span>
         <button class="small primary" onClick=${() => { p.setLang(l); p.goStage("translate"); }}>Translate</button></div>`)}
       ${p.suggestions > 0 && html`<div class="need"><span class="kind">suggestion</span><span class="t">${p.suggestions} staging idea${p.suggestions > 1 ? "s" : ""} from the rules, as Add? chips in Script.</span>
         <button class="small" onClick=${p.addAll}>Add all</button><button class="small primary" onClick=${() => p.goStage("script")}>Look at them</button></div>`}

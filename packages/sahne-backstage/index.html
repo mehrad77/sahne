@@ -1018,6 +1018,10 @@ button.link { border: 0; background: none; padding: 0; color: var(--accent, inhe
 .draft-card p { margin: 0; }
 .plugbox { border: 1px dashed color-mix(in srgb, var(--curtain) 55%, transparent); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 8px; }
 .plugbox .tag { font: 650 10.5px/1 system-ui, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--curtain); }
+.mini-stages { display: flex; flex-wrap: wrap; gap: 3px; }
+.mini-stages .ms { font-size: 11.5px; padding: 0 7px; border-radius: 99px; background: var(--chip); color: var(--mute); white-space: nowrap; }
+.mini-stages .ms.done { color: var(--accent); background: var(--accent-soft); }
+.mini-stages .ms.next { color: var(--warn); box-shadow: inset 0 0 0 1px var(--warn); }
 </style>
 </head>
 <body>

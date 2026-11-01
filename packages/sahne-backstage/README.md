@@ -127,7 +127,7 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 | `#/character/<id>` | A character, described below |
 | `#/places` | Every place as its wide shot, with how many episodes it opens; *New place* starts one |
 | `#/place/<id>` | A place, described below |
-| `#/review` | What needs a person's eye, nearest launch first (filters: needs you, has errors, launches this week, changed since review, AI-written): each season's stage bar and its next launch, and each episode's stage, a strip of its blocks (reviewed, changed since, partly, to review, an error, a comment; a click opens the block), each translation's checks, errors, open comments and the known-word ratio (when the root has cards); *Export the notes* downloads them as markdown |
+| `#/review` | What needs a person's eye, nearest launch first (filters: needs you, has errors, launches this week, changed since approved, AI-written): each season's bar (approved, ready to approve, in progress, changed since) and its next launch, and each episode's stages (`src/model/progress.ts`, as its page's stages bar), the one it is at, its errors, and a link straight there (*Go to Translate*, *Approve*). *Export the notes* writes them as markdown |
 
 **The board** (`src/ui/board.ts`, its dates in `src/model/board.ts`):
 - **The seasons are tabs at its top** (*Season 1*, *Season 2*, with each title), and *+ Season* starts the next one. The top bar names only the series.
@@ -162,7 +162,7 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
   - *AI wrote it*
   - the comments on the episode or the selected line, and *✦ Ask a fresh reader* (the assistant as a second reader who did not write it)
 
-  Per-block review marks (the old ✓ in the gutter and review mode) are no longer written. Readiness comes from the stages. The Review page (`#/review`) and the MCP review tools still read the block marks for now.
+  Per-block review marks (the old ✓ in the gutter and review mode) are no longer written: readiness comes from the stages, here and on the Review page (`#/review`). The MCP tools `check_season` and `set_review` still read the block marks, so they disagree with the page until they are moved too.
 - **Play** in the transport runs the episode on by itself (the player's auto, sahne-story `setAuto`), stopping at the viewer's cards. In a watch-only episode it is the main button and nothing stops it. The editor never starts playing by itself.
 - **Needs you** (along the bottom, `needs.ts`): one list for everything that wants a person's eye on this episode, each going where it is dealt with. The bar counts them; it opens by itself while a task asks.
   - a task's question about this episode, answered in place
@@ -216,7 +216,7 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 - **Details** opens the selected block's full staging in a drawer (`details.ts`, the forms in `src/ui/staging.ts`): every field with a picker of what is valid there (the kit's emotions, gestures and sounds; the engine's cameras, moves, prop ops and voices; the place's marks and props; the cast), a scene's time, weather and states, a line's note for the learner, the flags that gate it, and the step as JSON.
 - **Notes, the review marks and changes:** the notes are in *Needs you*, and *Changes* opens from the *⋯* menu.
   - **Notes** (`notes.ts`, `src/model/notes.ts`): every problem as a stage manager's note in plain words ("İsmail speaks but isn't in the cast", "The line has no Persian yet"), the ones the last edit brought first, each with *Go* to its block and, where one is obvious, a fix (*Add İsmail*, *Stage it*, *Gloss them*); for the whole episode or only the selected block. The stage lints (`lintStory`, in the series' story language) run as you type, the full story check a moment later on the server. A block with problems has a dot in its gutter.
-  - **The review notes' block marks** (`src/model/review.ts`): the Review page (`#/review`) and the MCP tools `check_season` and `set_review` still work out an episode's stage from per-block marks (*Draft*, *In review*, *Ready*, *Approved*, *Changed since approved*), each remembering its block as it was (`sig`). The episode page no longer writes them: its Review stage reads readiness from the stages of the work, and a translation's check (written in Translate) is the mark it keeps.
+  - **The review notes' block marks** (`src/model/review.ts`): the MCP tools `check_season` and `set_review` still work out an episode's stage from per-block marks (*Draft*, *In review*, *Ready*, *Approved*, *Changed since approved*), each remembering its block as it was (`sig`). Nothing writes the *reviewed* marks any more, so those tools never see an episode as Ready: they wait to be moved to `progressOf`. A translation's check (written in Translate) is the mark that is kept.
   - **Changes**: the episode's changed fields, and its steps against git's HEAD step by step (the step diff, below), with *Put back as committed* on a changed or removed step. A person commits; backstage never does.
 - **Undo, redo, revert and save.** Typing into one field is one undo step. Save is refused when the edit brings an error; problems the file already had do not block it.
 
@@ -301,6 +301,7 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 - The rules across documents run over every document, not only the edited ones: the season's dates and arcs, and the cast's order. An edit that breaks another document is caught (two episodes on one date).
 - The same checks run on the files as they are, and a problem in both is not new.
 - A series edit that adds a translation does not count the texts missing in that language as new errors (`has no <lang> text`): they are the translation work, shown in Translate. Every other new error still refuses the save.
+- A text missing in a language that is another document's is not counted against the document saved: a character's role or bio, a place's name, or the arc a story copies from its season. A story that names them reports them, but its save, a new episode's too, is not refused for them while that document is not in the edit.
 
 **Refused with 403 when read-only.** That is the default, and on the samples a save needs `--write`.
 
