@@ -42,6 +42,8 @@ export interface Step {
   summary?: string;
   /** The choices it made that the goal left open, in a line each (finish_step), shown to the person beside what it made. */
   decided?: string[];
+  /** What the person told it while it works, not read yet: its next model call reads it (`tell`). */
+  told?: string[];
   /** What it asks the person, while it is `asking`. */
   question?: Question;
   error?: string;
@@ -95,6 +97,9 @@ export interface RunsOptions {
 /** The most rounds of tools one step takes. */
 const STEP_TURNS = 60;
 
+/** Why a task the person paused waits; and what a step meets at its next model call then. */
+const PAUSED = "you paused it";
+class Paused extends Error { constructor() { super("paused"); this.name = "Paused"; } }
 const STEP_ASK: ToolDef = { name: "ask_person", description: "Ask the person a question and wait for the answer: this step waits, the task's other steps go on. Use it only for a real choice the goal leaves open (which of two ideas, a name, a fact only the person knows) or for their reply, never to confirm making or changing something: they can undo it. With options, they answer with a button.", schema: { type: "object", properties: { question: { type: "string" }, options: { type: "array", items: { type: "string" }, maxItems: 6 } }, required: ["question"] } };
 const PLAN_STEPS = { type: "array", items: { type: "object", properties: {
   id: { type: "string", description: "a-z, 0-9, _: cast_derya, place_library, ep_s2e01, review" },
@@ -291,7 +296,7 @@ export class Runs {
   }
 
   /** The person's answer at a gate (go on, or stop), or new gates. */
-  act(id: string, a: { action: "continue" } | { action: "stop" } | { action: "gates"; gates: Partial<Gates> } | { action: "budget"; maxUsd: number } | { action: "plan"; plan: Plan }): Run {
+  act(id: string, a: { action: "continue" } | { action: "pause" } | { action: "stop" } | { action: "gates"; gates: Partial<Gates> } | { action: "budget"; maxUsd: number } | { action: "plan"; plan: Plan }): Run {
     const run = this.need(id);
     if (a.action === "plan") {
       if (run.status !== "gate" || run.gate !== "plan") throw new Error("the plan can change at the plan gate only");
@@ -306,6 +311,13 @@ export class Runs {
       this.changed(run);
       return run;
     }
+    // paused by the person: no step starts, and a working one waits before its next model call (Paused, in go())
+    if (a.action === "pause") {
+      if (run.status !== "running") throw new Error(`the task is ${run.status}: only a working task pauses`);
+      run.status = "paused"; run.why = PAUSED;
+      this.changed(run);
+      return run;
+    }
     if (a.action === "continue" && run.status === "gate" && run.gate) { run.passed.push(run.gate); delete run.gate; run.status = "running"; }
     if (a.action === "gates") run.gates = { ...run.gates, ...a.gates };
     if (a.action === "budget") { run.maxUsd = a.maxUsd; run.maxSet = true; if (run.status === "paused") { run.status = "running"; delete run.why; } }
@@ -317,10 +329,17 @@ export class Runs {
   }
 
   /** The person answers a step's question, stops it, or has it try again. */
-  async step(id: string, stepId: string, a: { action: "answer"; answer: string } | { action: "stop" } | { action: "retry" } | { action: "redo"; note?: string; owns?: Owned[] }): Promise<Run> {
+  async step(id: string, stepId: string, a: { action: "answer"; answer: string } | { action: "tell"; text: string } | { action: "stop" } | { action: "retry" } | { action: "redo"; note?: string; owns?: Owned[] }): Promise<Run> {
     const run = this.need(id), s = run.steps.find(x => x.id === stepId);
     if (!s) throw new Error(`run ${id} has no step ${stepId}`);
     if (a.action === "stop") { this.live.get(`${run.id}:${s.id}`)?.abort(); s.status = "stopped"; delete s.question; }
+    else if (a.action === "tell") {
+      // read at its next model call; a step that asks takes an answer instead
+      const text = String(a.text ?? "").trim().slice(0, 1000);
+      if (!text) throw new Error("say something to tell it");
+      if (s.status !== "running" && s.status !== "waiting") throw new Error(`step ${stepId} is ${s.status}: tell a step while it works`);
+      (s.told ??= []).push(text);
+    }
     else if (a.action === "redo") {
       // from its start again, with what the person said; its proposals still waiting are what it builds on
       if (s.status === "running" || s.status === "asking") throw new Error(`step ${stepId} is ${s.status}: stop it first`);
@@ -441,7 +460,9 @@ export class Runs {
         before: () => {
           guard(st.caps);
           if (run.usd >= run.maxUsd) throw new BudgetError(`the task's budget, $${run.maxUsd.toFixed(2)}, is spent`);
+          if (run.status === "paused" && run.why === PAUSED) throw new Paused();
         },
+        inbox: () => { const t = s.told ?? []; delete s.told; if (t.length) this.keep(); return t; },
         after: (u: Usage) => {
           const e = record(model.id, model.model, u);
           s.usd += e.usd; run.usd += e.usd;
@@ -491,6 +512,8 @@ export class Runs {
       }
     } catch (e) {
       if (stop.signal.aborted || (e as Error).name === "AbortError") { if (s.status === "running") s.status = "stopped"; }
+      // paused: it waits at its checkpoint, from before this model call, and goes on from there with Go on
+      else if (e instanceof Paused || (e as Error).name === "Paused") s.status = "waiting";
       else {
         s.attempts++;
         s.error = (e as Error).message;

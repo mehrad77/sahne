@@ -358,3 +358,29 @@ test("a step says what it decided; the task's history lists its writes in order,
   assert.deepEqual(r.journal.history(run.id).map(d => d.id), ["defne5"]);
   r.undo(run.id);
 });
+
+test("pausing: a working step waits before its next model call and goes on from there; a note told to it is read then", async () => {
+  const seen: Record<string, BaseMessage[][]> = {};
+  let r!: InstanceType<typeof Runs>, run!: ReturnType<InstanceType<typeof Runs>["create"]>, paused = false;
+  const { r: made } = runs(scripted({
+    cast_x: (m: BaseMessage[]) => {
+      const n = m.filter(x => x.getType() === "ai").length;
+      // the person pauses while its first answer comes, and tells it something
+      if (n === 0 && !paused) { paused = true; r.act(run.id, { action: "pause" }); void r.step(run.id, "cast_x", { action: "tell", text: "make her a little older" }); return { calls: [{ name: "kit_search", args: { kind: "characters" } }] }; }
+      return n >= 1 ? finish("made") : { calls: [{ name: "kit_search", args: { kind: "characters" } }] };
+    },
+  }, { seen }));
+  r = made;
+  run = r.create({ goal: "g", plan: { brief: "b", steps: [{ id: "cast_x", kind: "character", title: "X", brief: "make her", owns: [] }] }, gates: false });
+  await r.idle();
+  assert.deepEqual([run.status, run.steps[0].status], ["paused", "waiting"], "it waits, its tool call done");
+  assert.deepEqual(run.steps[0].told, ["make her a little older"], "not read yet");
+  r.act(run.id, { action: "continue" });
+  await r.idle();
+  assert.equal(run.status, "done", JSON.stringify(run.steps.map(s => [s.id, s.status, s.error])));
+  const last = seen.cast_x.at(-1)!.map(m => String(typeof m.content === "string" ? m.content : JSON.stringify(m.content))).join("\n");
+  assert.match(last, /The person says, while you work: make her a little older/);
+  assert.equal(run.steps[0].told, undefined);
+  assert.ok(r.log(run.id, "cast_x").some(e => JSON.stringify(e.event).includes("You said")));
+  await assert.rejects(r.step(run.id, "cast_x", { action: "tell", text: "x" }), /tell a step while it works/);
+});

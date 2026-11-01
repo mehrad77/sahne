@@ -28,6 +28,8 @@ const STEP_TONE: Record<RunStep["status"], "" | "ok" | "warn" | "bad"> = { waiti
 const KIND_WORD: Record<string, string> = { plan: "plan", season: "season", character: "character", place: "place", episode: "episode", review: "review", task: "task" };
 const waitsForYou = (r: Run) => r.status === "gate" || r.steps.some(s => s.status === "asking");
 const auto = (r: Run) => r.mode === "auto";
+/** The person paused it (server/runs/run.ts PAUSED): working steps finish their turn, then wait for Go on. */
+const pausedByYou = (r: Run) => r.status === "paused" && r.why === "you paused it";
 /** It wrote straight in (journaled, to undo) rather than as proposals: every task now, but an older one may have proposed. */
 const direct = (r: Run) => r.agentEdits === "direct";
 
@@ -88,6 +90,8 @@ function RunView(p: { id: string }) {
   if (!run) return html`<p class="note">There is no task ${p.id}. <a href="#/agents/tasks">All tasks</a></p>`;
   const work = run.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done").length, doing = work.filter(s => s.status === "running").length;
   const share = (n: number) => `width:${work.length ? (n / work.length) * 100 : 0}%`;
+  const pause = async () => { const e = await act(run.id, { action: "pause" }); if (e) say(e, true); };
+  const goOn = async () => { const e = await act(run.id, { action: "continue" }); if (e) say(e, true); };
   const stop = async () => { if (!confirm(`Stop this task? Its steps stop where they are${direct(run) ? "; what it made stays, and you can still undo it" : "; what they proposed stays for you to answer"}.`)) return; const e = await act(run.id, { action: "stop" }); if (e) say(e, true); };
   const [work2, setWork] = useState(false);
   return html`<div class="run">
@@ -95,8 +99,12 @@ function RunView(p: { id: string }) {
     <div class="run-head">
       <div class="grow"><h3 class="run-goal" title=${run.goal}>${run.goal}</h3>
         <div class="run-progress"><span class=${`bar${run.status === "running" ? " live" : ""}`}><span style=${share(done)}></span><span class="doing" style=${share(doing)}></span></span>
-          <span class="note">${run.status === "done" ? "Done" : run.status === "stopped" ? "Stopped" : `${done} of ${work.length}`} · ${usd(run.usd)}${run.estimateUsd !== undefined ? ` of about ${usd(run.estimateUsd)}` : ""} · ${auto(run) ? "just doing it" : "checking with you"}</span></div></div>
-      ${run.status !== "done" && run.status !== "stopped" && html`<button class="small" onClick=${() => void stop()}><${Icon} name="stop" size=${14} /> Stop</button>`}
+          <span class="note">${run.status === "done" ? "Done" : run.status === "stopped" ? "Stopped" : `${done} of ${work.length}`} · ${usd(run.usd)}${run.estimateUsd !== undefined ? ` of about ${usd(run.estimateUsd)}` : ""} · ${auto(run) ? "just doing it" : "checking with you"}${pausedByYou(run) ? ` · paused${run.steps.some(s => s.status === "running") ? ": the working steps finish what they are doing, then wait" : ""}` : ""}</span></div></div>
+      <div class="row">
+        ${run.status === "running" && html`<button class="small" onClick=${() => void pause()} title="Steps finish what they are doing, then wait"><${Icon} name="pause" size=${14} /> Pause</button>`}
+        ${pausedByYou(run) && html`<button class="small primary" onClick=${() => void goOn()}><${Icon} name="play" size=${14} /> Go on</button>`}
+        ${run.status !== "done" && run.status !== "stopped" && html`<button class="small" onClick=${() => void stop()}><${Icon} name="stop" size=${14} /> Stop the task</button>`}
+      </div>
     </div>
     <${NowLines} run=${run} />
     <${NeedsYou} run=${run} />
@@ -117,7 +125,7 @@ function NeedsYou(p: { run: Run }) {
   const items = [
     run.status === "gate" && html`<${GateCard} run=${run} />`,
     ...asking.map(s => html`<${StepQuestion} run=${run} step=${s} />`),
-    run.status === "paused" && html`<${PausedCard} run=${run} stuck=${stuck} />`,
+    run.status === "paused" && !pausedByYou(run) && html`<${PausedCard} run=${run} stuck=${stuck} />`,
   ].filter(Boolean);
   if (!items.length) return null;
   return html`<section class="needs-you" aria-label="Needs you"><h4><${Icon} name="hand" size=${15} /> Needs you</h4>${items}</section>`;
@@ -245,7 +253,7 @@ function StepRow(p: { run: Run; step: RunStep }) {
   const just = useJust(s.status, "done");
   return html`<li class=${`run-step ${s.status}${just ? " just" : ""}`}>
     <div class="run-step-head" onClick=${() => setOpen(!open)}>
-      <${Chip} tone=${STEP_TONE[s.status]} live=${live}>${STEP_WORD[s.status]}</${Chip}>
+      <${Chip} tone=${STEP_TONE[s.status]} live=${live}>${s.status === "running" && pausedByYou(run) ? "pausing" : STEP_WORD[s.status]}</${Chip}>
       <b class="grow">${s.title}</b>
       <span class="note">${KIND_WORD[s.kind] ?? s.kind}${s.owns.length ? ` · makes ${s.owns.map(o => o.id).join(", ")}` : ""}${needs.length ? ` · after ${needs.join(", ")}` : ""}${s.usd ? ` · ${usd(s.usd)}` : ""}</span>
       <${Icon} name="down" size=${14} />
@@ -272,8 +280,24 @@ function NowLines(p: { run: Run }) {
   if (!live.length) return null;
   return html`<ul class="run-now" aria-live="polite">${live.map(s => {
     const log = logs.value[`${p.run.id}:${s.id}`];
-    return html`<li><span class="spin" aria-hidden="true"></span><b>${s.title}</b><span class="note">${log ? doingNow(log.parts) : "Starting"}…</span></li>`;
+    return html`<li><span class="spin" aria-hidden="true"></span><b>${s.title}</b><span class="note grow">${log ? doingNow(log.parts) : "Starting"}…</span><${Tell} run=${p.run} step=${s} /></li>`;
   })}</ul>`;
+}
+
+/** Tell a working step something: its agent reads it before its next model call, as the person's message. */
+function Tell(p: { run: Run; step: RunStep }) {
+  const [open, setOpen] = useState(false), [text, setText] = useState(""), [busy, setBusy] = useState(false);
+  const told = p.step.told?.length ?? 0;
+  if (!open) return html`<button class="small linkish" onClick=${() => setOpen(true)} title="It reads it before its next step of thought"><${Icon} name="chat" size=${14} /> Tell it something${told ? ` (${told} waiting)` : ""}</button>`;
+  const send = async (e: Event) => {
+    e.preventDefault();
+    setBusy(true); const err = await actStep(p.run.id, p.step.id, { action: "tell", text }); setBusy(false);
+    if (err) say(err, true); else { setText(""); setOpen(false); say("told: it reads it before its next model call"); }
+  };
+  return html`<form class="tell" onSubmit=${send} onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); }}>
+    <input autoFocus placeholder=${`What ${p.step.title} should know`} value=${text} onInput=${(e: Event) => setText((e.target as HTMLInputElement).value)} />
+    <button class="small primary" disabled=${busy || !text.trim()}><${Icon} name="send" size=${14} /> Tell</button>
+    <button type="button" class="small" onClick=${() => setOpen(false)}>Cancel</button></form>`;
 }
 
 /** What the task wrote, newest first: each document to open, or to undo while it can be; under a step's newest row, the choices it made. */

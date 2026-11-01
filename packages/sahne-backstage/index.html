@@ -880,6 +880,9 @@ button.link { border: 0; background: none; padding: 0; color: var(--accent, inhe
 @keyframes landed { from { box-shadow: 0 0 0 3px var(--accent); background-color: var(--accent-soft); } }
 .run-now { list-style: none; margin: -2px 0 12px; padding: 0; display: grid; gap: 4px; }
 .run-now li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.run-now .linkish { border: 0; background: none; color: var(--accent); padding: 2px 4px; cursor: pointer; white-space: nowrap; } .run-now .linkish:hover { text-decoration: underline; }
+.run-now .tell { display: flex; gap: 6px; flex: 1 1 260px; } .run-now .tell input { flex: 1; min-width: 0; }
+.run-now li { flex-wrap: wrap; }
 .run-now .note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .result-body .why { font-size: 12.5px; }
 .decided { margin: 2px 0 0; padding-left: 16px; font-size: 12.5px; color: var(--mute); }

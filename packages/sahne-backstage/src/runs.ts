@@ -10,7 +10,7 @@ import { marksOf } from "./model/marks.ts";
 export type StepStatus = "waiting" | "running" | "asking" | "done" | "failed" | "stopped" | "stale" | "skipped" | "undone";
 export interface RunStep {
   id: string; kind: string; title: string; brief: string; about?: string; needs: string[]; owns: { kind: Kind; id: string }[]; model?: string;
-  status: StepStatus; summary?: string; decided?: string[]; question?: { question: string; options?: string[] }; error?: string; budget?: boolean; usd: number; attempts: number; proposals: string[];
+  status: StepStatus; summary?: string; decided?: string[]; told?: string[]; question?: { question: string; options?: string[] }; error?: string; budget?: boolean; usd: number; attempts: number; proposals: string[];
 }
 /** A document a run wrote and can still undo (server/runs/journal.ts). */
 export interface Made { kind: Kind; id: string; step: string; created: boolean; steps: string[] }

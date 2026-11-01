@@ -23,8 +23,10 @@ export interface Agent {
   tools: ToolDef[];
   /** The most rounds of tools, after which it stops and says so. */
   maxTurns: number;
-  /** Before each model call: throws at a cap (budget.ts guard). */
+  /** Before each model call: throws at a cap (budget.ts guard), or when the person paused the work. */
   before(): void;
+  /** What the person said while it works, taken before each model call and read as their message (a task's step). */
+  inbox?(): string[];
   /** After each: what it used, to log and price. */
   after(u: Usage): void;
   /** One call of any tool but ask_person. */
@@ -73,11 +75,13 @@ export function agentGraph(a: Agent, checkpointer?: BaseCheckpointSaver) {
       return { stopped: "limit" };
     }
     a.before();
+    const told = (a.inbox?.() ?? []).map(t => new HumanMessage(`The person says, while you work: ${t}`));
+    for (const m of told) emit(config, { type: "text", text: `\n\n> **You said:** ${String(m.content).replace(/^The person says, while you work: /, "")}\n\n` });
     const bound = a.model.chat.bindTools!(a.model.tools(a.tools));
     const say = (text: string) => emit(config, { type: "text", text }), think = (text: string) => emit(config, { type: "thinking", text });
     // a local reasoning model may write its thinking into the text, between <think> tags
     const split = a.model.id === "openai" ? thinkSplitter(say, think) : null;
-    const input = [new SystemMessage(a.system), ...s.messages];
+    const input = [new SystemMessage(a.system), ...s.messages, ...told];
     let full: AIMessageChunk | undefined;
     for await (const ch of await bound.stream(input, { signal: config.signal })) {
       full = full ? full.concat(ch) : ch;
@@ -105,7 +109,7 @@ export function agentGraph(a: Agent, checkpointer?: BaseCheckpointSaver) {
     }
     // kept as a whole message, its content as the model sent it
     const turn = new AIMessage({ content: full.content, tool_calls: full.tool_calls, invalid_tool_calls: full.invalid_tool_calls, additional_kwargs: full.additional_kwargs, response_metadata: full.response_metadata, usage_metadata: full.usage_metadata, ...(full.id ? { id: full.id } : {}) });
-    return { messages: [turn], turns: s.turns + 1 };
+    return { messages: [...told, turn], turns: s.turns + 1 };
   }
 
   async function tools(s: S, config: LangGraphRunnableConfig) {
