@@ -8,9 +8,9 @@ import type { Staging } from "sahne";
 import { allLanguages, type Languages, type StoryDoc } from "sahne-story";
 import { get, insert, set, type Path } from "./path.ts";
 import { kindOf } from "./steps.ts";
-import { lessonOf } from "sahne-lesson";
 
-export type BlockKind = "scene" | "line" | "action" | "choice" | "option" | "spot" | "act";
+/** A core step's block, or a plugin step's, by its key (`spot`: ui/plugins). */
+export type BlockKind = "scene" | "line" | "action" | "choice" | "option" | "act" | (string & {});
 export interface Block { path: Path; kind: BlockKind; depth: 0 | 1 | 2; who?: string }
 
 type Obj = Record<string, unknown>;
@@ -23,7 +23,7 @@ export function blocks(story: Pick<StoryDoc, "steps">): Block[] {
     const k = kindOf(s);
     if (k === "line") out.push({ path, kind: "line", depth, who: s.who as string });
     else if (k === "beat") out.push({ path, kind: "action", depth, who: (s.beat as Obj)?.who as string | undefined });
-    else if (k === "scene" || k === "spot" || k === "act") out.push({ path, kind: k, depth });
+    else if (k === "scene" || k === "act") out.push({ path, kind: k, depth });
     else if (k === "choice") {
       out.push({ path, kind: "choice", depth });
       ((s.choice as Obj)?.options as Obj[] ?? []).forEach((op, i) => {
@@ -31,6 +31,8 @@ export function blocks(story: Pick<StoryDoc, "steps">): Block[] {
         ((op.reply as Obj[]) ?? []).forEach((r, j) => one(r, [...path, "choice", "options", i, "reply", j], 2));
       });
     }
+    // a plugin's step: its block is the plugin's, named by the step's key
+    else if (depth === 0) { const key = Object.keys(s).find(x => x !== "if" && x !== "unless"); if (key) out.push({ path, kind: key, depth }); }
   };
   (story.steps ?? []).forEach((s, i) => one(s as unknown as Obj, ["steps", i], 0));
   return out;
@@ -111,8 +113,8 @@ export function convert(story: StoryDoc, path: Path, to: "line" | "action", lang
   return story;
 }
 
-/** The blocks the `/` menu inserts, each in the series' languages. */
-export const INSERTS = ["line", "action", "narration", "scene", "choice", "spot", "act"] as const;
+/** The core blocks the `/` menu inserts, each in the series' languages (a plugin adds its own: ui/plugins). */
+export const INSERTS = ["line", "action", "narration", "scene", "choice", "act"] as const;
 export type Insert = (typeof INSERTS)[number];
 
 export function template(kind: Insert, o: { story: StoryDoc; langs: Languages; who: string; standin: string; narrator: string; place: string }): unknown {
@@ -128,7 +130,6 @@ export function template(kind: Insert, o: { story: StoryDoc; langs: Languages; w
       let n = 1; while (ids.has(`choice${n}`)) n++;
       return { choice: { id: `choice${n}`, kind: "polite", to: other, options: [{ ...texts(), ok: true }, texts()] } };
     }
-    case "spot": return { spot: { lesson: (lessonOf(o.story).lessons ?? [])[0] ?? "", ex: "", ...Object.fromEntries(o.langs.translations.map(l => [l, ""])) } };
     case "act": {
       const ids = new Set(o.story.steps.flatMap(s => ("act" in s ? [(s as { act: { id: string } }).act.id] : [])));
       let n = 1; while (ids.has(`act${n}`)) n++;

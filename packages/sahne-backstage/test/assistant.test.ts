@@ -122,7 +122,7 @@ test("anthropic: a streamed tool_use loop reads a real step through MCP, keeps i
   const tool = r1.body.tools.find((t: { name: string }) => t.name === "read_step");
   assert.equal(tool.input_schema.type, "object");
   assert.equal(tool.input_schema.$schema, undefined);
-  assert.match(r1.body.system, /learning Turkish \(tr\)/);
+  assert.match(r1.body.system, /written in Turkish \(tr\)[\s\S]*language-learning scenes/);
   assert.match(r1.body.system, /English \(en\), Persian \(fa\)/);
   assert.match(r1.body.system, /fa is written right to left/);
   assert.match(r1.body.system, /The narrator is Kerim \(id kerim\)/);

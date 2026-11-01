@@ -32,6 +32,7 @@ import { tavilyExtract, tavilySearch, urlsIn } from "./ai/web.ts";
 import { forgetNote, readMemory, remember, type Note } from "./memory.ts";
 import { agentGraph, personSays, type Call, type Outcome } from "./agent/graph.ts";
 import { backstage, callTool } from "./agent/tools.ts";
+import { storyPluginsOf } from "../src/model/plugins.ts";
 
 export interface AssistantContext { page: string; kind?: string; id?: string; path?: (string | number)[] }
 export interface AssistantRequest { messages: { role: "user" | "assistant"; content: string }[]; context?: AssistantContext; fresh?: boolean; confirm?: boolean; quick?: boolean; /** Pictures the person attached to their last message. */ pictures?: Picture[] }
@@ -117,10 +118,13 @@ export function systemPrompt(o: { agentEdits: AgentEdits; writable: boolean; sha
   const rtl = allLanguages(l).filter(x => dirOf(x) === "rtl");
   const ab = abilities({ writable: o.writable, agentEdits: o.agentEdits, shareCards: o.shareCards, cards: !!w.cards, page: o.context?.page, web: o.web });
   const parts = [
-    `You are the assistant in Backstage, the editor of ${series ? `the series "${textOf(series.title, l.main, ...l.translations) ?? series.id}"` : "a series"}: short language-learning scenes played on a paper-theatre stage, read by people who are learning ${language(l.main)} (${l.main}).`,
-    `Every line is written in ${language(l.main)}, at the episode's level: short, natural, everyday. Each line also carries its translations, in ${l.translations.map(x => `${language(x)} (${x})`).join(", ") || "no other language"}, which say the same thing as naturally as a person would${rtl.length ? `; ${rtl.join(", ")} ${rtl.length > 1 ? "are" : "is"} written right to left` : ""}.`,
+    `You are the assistant in Backstage, the editor of ${series ? `the series "${textOf(series.title, l.main, ...l.translations) ?? series.id}"` : "a series"}: short scenes played on a paper-theatre stage, written in ${language(l.main)} (${l.main}).`,
+    `Every line is written in ${language(l.main)}: short, natural, everyday. Each line also carries its translations, in ${l.translations.map(x => `${language(x)} (${x})`).join(", ") || "no other language"}, which say the same thing as naturally as a person would${rtl.length ? `; ${rtl.join(", ")} ${rtl.length > 1 ? "are" : "is"} written right to left` : ""}.`,
     `The narrator is ${name(series?.narrator)} (id ${series?.narrator ?? "?"}). The stand-in, ${name(series?.standin)} (id ${series?.standin ?? "?"}), is the learner's own character on stage: give them no nationality, language or story the series does not.`,
-    `The format: an episode is a story document. Its steps are scenes ({ scene: place, at: { who: mark }, time }), lines ({ who, the texts by language code, and staging: to, emo, do, at, move, obj, cam, sfx … }), choices (the stand-in's options, each a line, with replies), spots (a grammar note on one line), acts (the learner taps or drags something) and beats. An episode's words are word-card ids, its lessons grammar lesson ids. A path names a place in it: steps/3, steps/12/choice/options/0/reply/1, quiz/0, title.`,
+    `The format: an episode is a story document. Its steps are scenes ({ scene: place, at: { who: mark }, time }), lines ({ who, the texts by language code, and staging: to, emo, do, at, move, obj, cam, sfx … }), choices (the stand-in's options, each a line, with replies), acts (the learner taps or drags something) and beats. A path names a place in it: steps/3, steps/12/choice/options/0/reply/1, title.`,
+    // how its episodes play, and what the series' plugins add to the format (sahne-story src/play.ts, src/plugin.ts)
+    ...(series?.play === "watch" ? ["The series' episodes are watch-only unless one says otherwise (play): they play on time alone, so write no choices and no acts, and give the stand-in plain lines. An episode with play: \"interactive\" has them."] : []),
+    ...storyPluginsOf(series).flatMap(pl => (pl.prompt ? [pl.prompt] : [])),
     `Work with the tools: read with read_episode and read_step, look names up with kit_search before you stage anything, and check with check_episode. To draw a missing set piece or prop, read the sahne://kit-guide resource, kit_read a neighbour, draft it with draft_kit_item and look at its sheet before you save_kit_item. Keep every id, character id and mark as it is; ids are permanent.`,
     !o.writable ? "Backstage is read-only now: you can read, check and advise, not edit."
       : o.agentEdits === "proposals" ? "Your edits are proposals: each is checked and shown to the person in the editor, who accepts or rejects it, and nothing is saved until they do. Say briefly what you proposed and why."
@@ -134,7 +138,7 @@ export function systemPrompt(o: { agentEdits: AgentEdits; writable: boolean; sha
   ];
   if (o.notes?.length) parts.push(`What you remember from earlier conversations (notes kept in the series, shared by everyone who works on it; forget one that is wrong):\n${o.notes.map(n => `- ${n.id}: ${n.text}`).join("\n")}`);
   if (o.writable) parts.push("When the person settles something that will hold beyond this conversation (a house style, how a name is written, a preference), keep it with remember, in a sentence. Never keep a secret or what the documents already say.");
-  if (o.fresh) parts.push("You are a second reader. You did not write this episode and have not seen how it was drafted. Read it fresh, as a careful reviewer would, and report what must be fixed: wrong or unnatural words, words above the level, translations that do not say what the line says, lines that do not fit the scene, quiz answers that do not hold, staging that contradicts the words. Leave a comment on each step that needs one; change nothing unless you are asked to.");
+  if (o.fresh) parts.push("You are a second reader. You did not write this episode and have not seen how it was drafted. Read it fresh, as a careful reviewer would, and report what must be fixed: wrong or unnatural words, translations that do not say what the line says, lines that do not fit the scene, staging that contradicts the words, and anything the series' plugins ask that does not hold. Leave a comment on each step that needs one; change nothing unless you are asked to.");
   const c = o.context;
   if (c) parts.push(`The editor shows the page "${c.page}"${c.kind && c.id ? `, ${c.kind} ${c.id}` : ""}${c.path?.length ? `, at ${c.path.join("/")}` : ""}. "This" in the person's words means what is shown.`);
   return parts.join("\n\n");

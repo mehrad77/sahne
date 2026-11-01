@@ -142,13 +142,13 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 - *Season settings* and *Series settings* open in a modal over the board (`Modal`, a `<dialog>`: Escape or a click outside closes it): titles and summaries in every language, the series' languages, narrator and stand-in, the season's launch day. On a root with no `series.json`, the board starts one.
 
 **The episode studio** (`src/ui/studio/`): the script on the left, the stage on the right.
-- **The head:** the title and premise in the series' languages, who is in it (the cast and extras as portraits, each with how many lines they speak; *+ someone* adds from a picker; the story check refuses a speaker not in the cast), and what it teaches.
+- **The head:** the title and premise in the series' languages, who is in it (the cast and extras as portraits, each with how many lines they speak; *+ someone* adds from a picker; the story check refuses a speaker not in the cast), and what the series' plugins add (the lesson plugin: what it teaches).
 - **The script** (`script.ts`, its operations in `src/model/script.ts`): one block per step, typed into like a screenplay.
   - A **scene** heading: the place (a click picks another from its picture), the time of day, and where each of the cast starts.
   - A **line**: the speaker in capitals (a click, or `@` in an empty line, picks another), the words in the main language, the translations as smaller rows under it (a dot where one is missing), and the staging as chips; × on a chip clears it. The narrator's lines to the viewer say so.
   - An **action**: who does what, with no words (a beat).
   - The learner's **choice**: what it is about and whom it is said to, its options indented under it (each with ✓ for the fitting answer and a tone) and their replies under them.
-  - A **grammar spot** (its lesson and the line it points at, the narrator's words in the translations) and an **act** (how the learner acts, on what, and the prompt).
+  - An **act** (how the learner acts, on what, and the prompt), and a plugin's own step in its block: the lesson plugin's **grammar spot** (its lesson and the line it points at, the narrator's words in the translations).
   - **The keys:**
 
     | Key | What |
@@ -167,7 +167,15 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 
   - **A parenthetical** (`src/model/parenthetical.ts`) is read phrase by phrase: a gesture of the kit (`waves`, `points at the apple`), a feeling (`happy`, `angry`), whom it is said to (`to İsmail`), where it points (`at the door`), a walk (`walks to counter`), a voice (`whispers`) or a shot (`close`). What it does not understand is named, never written.
   - Focusing a block selects it and the stage plays that moment; an option not picked is picked. The block playing is marked, and so are a changed block and one with problems.
-- **After the script:** the quiz (each question in every language, three options in the main language, the right one, the line its answer quotes) and the glosses (a word the cards do not have, its meaning in each translation).
+- **After the script:** what the series' plugins add. The lesson plugin adds the quiz (each question in every language, three options in the main language, the right one, the line its answer quotes) and the glosses (a word the cards do not have, its meaning in each translation).
+- **The plugins' parts** (`src/ui/plugins/`): a series turns a story plugin on in `series.json` (sahne-story, *Plugins*), and backstage holds each plugin's two halves. The story half (`src/model/plugins.ts`, `STORY_PLUGINS`) adapts and checks. The editor half (`EditorPlugin`, `EDITOR_PLUGINS`) can add:
+  - a row in the head (`Head`)
+  - sections after the script (`Sections`)
+  - its step kinds' blocks and their entries in the insert menu (`blocks`)
+  - a line's own fields in its details (`LineFields`)
+  - a step of the new-episode page (`newEpisode`)
+
+  Without the plugin, none of these show, and its step kinds are not offered. The lesson plugin's editor half is `src/ui/plugins/lesson.ts`. The assistant's system prompt adds each plugin's `prompt`.
 - **The storyboard strip** over the stage (`strip.ts`): a picture of each beat of the episode as it plays now (each scene, line, reply, action and act, at its end), drawn once and kept, keyed by everything up to it so an edit late in the episode keeps the pictures before it. A click goes there in the script and on the stage; the one playing is marked, and a choice shows as a fork.
 - **The stage:** the whole kit, the narrator's round window, the transport (the opening, back, *Next*, a scrubber over every cue and one through the cue playing: held props and gestures go wrong mid-cue, so look there), the learner's card (say, a choice's options, an act), and one switch for each flag the episode's callbacks read.
 - **Staging fills itself in, and can be overridden** (`src/model/autostage.ts`). A block's chips are of three kinds:
@@ -223,10 +231,10 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 - *New place* starts from an empty room or a copy of another place.
 
 **A new episode** (`src/ui/new.ts`, `src/model/skeleton.ts`), from an empty day on the board or *New episode*:
-- **Three picks:** where (a place from its picture, and the time of day), who (the cast from their portraits; the stand-in is always in, the narrator narrates), and what it teaches (the target words, searched live through `GET /api/cards?q=`, their text never stored; on a root without cards, ids typed in; and one to three lessons, `GET /api/lessons`). Then a title (the main language's at least) and a line of premise in the translations, which the narrator opens with.
+- **The picks:** where (a place from its picture, and the time of day), who (the cast from their portraits; the stand-in is always in, the narrator narrates), and each plugin's step. The lesson plugin's is what it teaches: the target words, searched live through `GET /api/cards?q=`, their text never stored (on a root without cards, ids typed in), and one to three lessons (`GET /api/lessons`). Then a title (the main language's at least) and a line of premise in the translations, which the narrator opens with.
 - **The rest comes from the day:** the id (the season's next free one), the kind (a Saturday is a special), the week and its theme (a week with none gets one to write). The day can be changed at the top.
 - **Or from an episode:** another episode's place, cast, structure and staging, with every text cleared to `…` (`duplicate`), and the flags it sets renamed for the new story.
-- `skeleton` writes a draft the check can read (a scene with the cast on floor marks, the narrator's opening, a few lines, a choice, a spot, three quiz items), every text a placeholder in each of the series' languages (a Turkish series gets a few real words to start from), marked `draft: true`. It opens in the script, and is saved with its calendar row (and a new week's theme) once the check finds no error: it will want the target words by then.
+- `skeleton` writes a draft the check can read, in any kind of series (`test/skeleton.test.ts`): a scene with the cast on floor marks, the narrator's opening and a few lines; a choice in an interactive episode (a plain line in a watch-only one); and with the lesson plugin, a spot and three quiz items. Every text is a placeholder in each of the series' languages (a Turkish series gets a few real words to start from), marked `draft: true`. It opens in the script, and is saved with its calendar row (and a new week's theme) once the check finds no error (with the lesson plugin, it will want the target words by then).
 
 **Live preview.**
 - An edit that changes only words (`src/model/steps.ts` `wordsOnly`) re-directs the cues: `storyPlayer.replace`, with no reload.

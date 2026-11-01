@@ -1,14 +1,13 @@
-// A new episode (#/new/<season>[/<date>]) in three picks: where (a place, from its picture, and the time of day), who
-// (the cast, from their portraits; the stand-in is always in), and what it teaches (the target words, read live from
-// the cards, whose text is never stored; and its lessons); then a title and a line of premise. Everything else comes
+// A new episode (#/new/<season>[/<date>]) in two picks: where (a place, from its picture, and the time of day) and who
+// (the cast, from their portraits; the stand-in is always in); then the series' plugins' steps (ui/plugins: what the
+// lesson plugin's episode teaches), a title and a line of premise. Everything else comes
 // from the day it is on: its id (the season's next free one), kind (a Saturday is a special), week and theme. Or it
 // starts from another episode: that one's place, cast, structure and staging, every text cleared (model/skeleton.ts).
 // It opens in the script as a draft; it is saved, with its row in the season's calendar, once the check finds no error.
 
 import { html } from "htm/preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { allLanguages, textOf, type SeasonDoc, type StoryDoc, type StoryPlace } from "sahne-story";
-import { api } from "../api.ts";
+import { allLanguages, playOf, textOf, type SeasonDoc, type StoryDoc, type StoryPlace } from "sahne-story";
 import { set } from "../model/path.ts";
 import { addDays, arcOfWeek, boardOf, datesOf, isSunday, rowOn, weekOfArc } from "../model/board.ts";
 import { duplicate, skeleton } from "../model/skeleton.ts";
@@ -19,6 +18,8 @@ import { Empty, Icon } from "./kit/index.ts";
 import { characterItems, placeItems } from "./galleries.ts";
 import { inLang, langName, Texts, useLangs } from "./lang.ts";
 import { lessonOf } from "sahne-lesson";
+import { storyPluginsOf } from "../model/plugins.ts";
+import { editorPluginsOf } from "./plugins/index.ts";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const long = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
@@ -43,18 +44,20 @@ export function NewEpisode(p: { season?: string; date?: string }) {
   const [from, setFrom] = useState<string | null>(null);
   const [place, setPlace] = useState<string | null>(null), [time, setTime] = useState<string | null>(null);
   const [cast, setCast] = useState<string[]>([]);
-  const [words, setWords] = useState<string[]>([]), [lessons, setLessons] = useState<string[]>([]);
+  // each plugin's part of the brief, by plugin id
+  const [extra, setExtra] = useState<Record<string, Record<string, unknown>>>({});
+  const plugins = editorPluginsOf(w.series), lesson = storyPluginsOf(w.series).some(pl => pl.id === "lesson");
   const [title, setTitle] = useState<Record<string, string>>({}), [premise, setPremise] = useState<Record<string, string>>({});
   const narrator = w.series?.narrator ?? "kerim", standin = w.series?.standin ?? "nima";
 
   // starting from an episode: its place and cast
-  useEffect(() => { if (from) void openDoc("story", from).then(d => { const s = d?.doc as StoryDoc | undefined; if (s) { setPlace(s.place); setCast(s.cast.filter(c => c !== standin)); setLessons(lessonOf(s).lessons ?? []); } }); }, [from]);
+  useEffect(() => { if (from) void openDoc("story", from).then(d => { const s = d?.doc as StoryDoc | undefined; if (s) { setPlace(s.place); setCast(s.cast.filter(c => c !== standin)); } }); }, [from]);
 
   const week = row?.week ?? null;
   const arcId = week === null ? null : arcOfWeek(se.n, week);
   const arc = arcId ? se.arcs?.[arcId] : undefined;
   const kind = row?.kind ?? "episode";
-  const nWords = kind === "special" ? [10, 12] : [5, 8];
+  const wants = plugins.map(ep => ep.newEpisode?.wants?.(extra[ep.id] ?? {}, kind) ?? null).filter(Boolean) as string[];
   const on = Object.entries(dates).find(([, d]) => d === date)?.[0];
   const missing = [
     taken.has(id) && `${id} exists already`,
@@ -70,12 +73,12 @@ export function NewEpisode(p: { season?: string; date?: string }) {
   const create = async () => {
     if (!row || !arcId || !place) return;
     // a story still names its level (Kumru's): the one the season's other episodes name most
-    const levels = eps.map(e => (draftOf("story", e.id)?.doc as StoryDoc | undefined)?.level).filter(Boolean) as string[];
+    const levels = eps.map(e => lessonOf((draftOf("story", e.id)?.doc ?? {}) as StoryDoc).level).filter(Boolean) as string[];
     const level = levels.sort((a, b) => levels.filter(x => x === b).length - levels.filter(x => x === a).length)[0];
     const a = arc ?? { ...Object.fromEntries(all.map(l => [l, "…"])), mechanics: ["say"] } as unknown as NonNullable<SeasonDoc["arcs"]>[string];
-    const brief = { id, season: se.n, releaseDate: date, kind, week: row.week, arc: { ...a, id: arcId }, place, cast: [standin, ...cast], words, lessons, title, summary: premise, level };
+    const brief = { id, season: se.n, releaseDate: date, kind, week: row.week, arc: { ...a, id: arcId }, place, cast: [standin, ...cast], ...Object.assign({}, ...Object.values(extra)), title, summary: premise, ...(lesson ? { level } : {}) };
     const src = from ? draftOf("story", from)?.doc as StoryDoc | undefined : undefined;
-    const doc = mode === "copy" && src ? duplicate(src, brief, langs) : skeleton(brief, { narrator, standin, places: w.places, languages: langs });
+    const doc = mode === "copy" && src ? duplicate(src, brief, langs) : skeleton(brief, { narrator, standin, places: w.places, languages: langs, lesson, play: playOf(null, w.series) });
     if (time) { const scene = doc.steps.find(s => "scene" in s) as { time?: string } | undefined; if (scene) scene.time = time; }
     createDoc("story", id, doc);
     // its row in the season's calendar and, for a new week, the week's theme: saved with it
@@ -109,44 +112,15 @@ export function NewEpisode(p: { season?: string; date?: string }) {
       <p class="note">${textOf(w.characters[standin]?.name, langs.main) ?? standin}, the learner, is always in it, and ${textOf(w.characters[narrator]?.name, langs.main) ?? narrator} narrates. Pick one to five more.</p>
       <${Gallery} items=${items} value=${cast} multi onPick=${(x: string) => setCast(c => (c.includes(x) ? c.filter(y => y !== x) : [...c, x].slice(0, 5)))} label="Cast" size="s" /></div>
 
-    <div class="step-card"><h3><span class="step-n">3</span> What it teaches</h3>
-      <${Words} value=${words} onChange=${setWords} want=${nWords} special=${kind === "special"} />
-      <${Lessons} value=${lessons} onChange=${setLessons} /></div>
+    ${plugins.filter(ep => ep.newEpisode).map((ep, k) => html`<div class="step-card"><h3><span class="step-n">${3 + k}</span> ${ep.newEpisode!.title}</h3>
+      <${ep.newEpisode!.View} value=${extra[ep.id] ?? {}} onChange=${(v: Record<string, unknown>) => setExtra(x => ({ ...x, [ep.id]: v }))} kind=${kind} /></div>`)}
 
-    <div class="step-card"><h3><span class="step-n">4</span> Its name</h3>
+    <div class="step-card"><h3><span class="step-n">${3 + plugins.filter(ep => ep.newEpisode).length}</span> Its name</h3>
       <${Texts} label="Title" value=${title} onInput=${(l: string, v?: string) => setTitle(t => ({ ...t, [l]: v ?? "" }))} />
       <${Texts} label="Premise (what happens, in a line: the narrator opens with it)" need="translations" multi value=${premise} onInput=${(l: string, v?: string) => setPremise(t => ({ ...t, [l]: v ?? "" }))} /></div>
 
     <div class="savebar">
-      <span class="grow">${missing.length ? html`Still needed: ${missing.join(" · ")}` : words.length < nWords[0] ? `Ready. The check will want ${nWords[0]}–${nWords[1]} target words before it saves.` : "Ready: it opens in the script as a draft."}</span>
+      <span class="grow">${missing.length ? html`Still needed: ${missing.join(" · ")}` : wants.length ? `Ready. The check will want ${wants.join(" and ")} before it saves.` : "Ready: it opens in the script as a draft."}</span>
       <button class="primary" disabled=${missing.length > 0 || !!draftOf("story", id)} onClick=${() => void create()}><${Icon} name="film" size=${16} /> Create and open the script</button></div>
   </section>`;
-}
-
-/** The target words: cards searched live (their text shown, never stored); on a root without cards, ids typed in. */
-function Words(p: { value: string[]; onChange(v: string[]): void; want: number[]; special: boolean }) {
-  const w = world.value!;
-  const [q, setQ] = useState(""), [cards, setCards] = useState<{ id: string; tr: string; en: string }[]>([]);
-  const [known, setKnown] = useState<Record<string, { tr: string; en: string }>>({});
-  useEffect(() => { if (!w.cards) return; const t = setTimeout(() => void api.get<{ cards: { id: string; tr: string; en: string }[] }>(`cards?q=${encodeURIComponent(q)}`).then(r => setCards(r.cards ?? [])), 250); return () => clearTimeout(t); }, [q]);
-  const add = (c: { id: string; tr: string; en: string }) => { setKnown(k => ({ ...k, [c.id]: c })); p.onChange([...p.value, c.id]); };
-  return html`<div class="fields">
-    <div class="row"><b>Target words</b><span class="note">${p.value.length} of ${p.want[0]}–${p.want[1]} for ${p.special ? "a special" : "an episode"}</span></div>
-    <div class="row">${p.value.map(id => html`<span class="chip">${known[id]?.tr ?? id} <button class="small" style="border:0;padding:0 2px" aria-label=${`Remove ${id}`} onClick=${() => p.onChange(p.value.filter(x => x !== id))}>×</button></span>`)}</div>
-    ${w.cards ? html`<input type="search" placeholder="search the cards (any language)" value=${q} aria-label="Search the cards" onInput=${(e: Event) => setQ((e.target as HTMLInputElement).value)} />
-      <div class="word-list">${cards.filter(c => !p.value.includes(c.id)).map(c => html`<button class="word" onClick=${() => add(c)}><b>${c.tr}</b><small>${c.en}</small></button>`)}</div>`
-    : html`<input placeholder="this root has no cards: type card ids, comma between" value=${p.value.join(", ")} aria-label="Card ids" onInput=${(e: Event) => p.onChange([...new Set((e.target as HTMLInputElement).value.split(",").map(s => s.trim()).filter(Boolean))])} />`}
-  </div>`;
-}
-
-/** One to three lessons: the root's grammar, or ids typed in. */
-function Lessons(p: { value: string[]; onChange(v: string[]): void }) {
-  const [lessons, setLessons] = useState<{ id: string; ref?: string }[]>([]);
-  useEffect(() => { void api.get<{ lessons: { id: string; ref?: string }[] }>("lessons").then(r => setLessons(r.lessons ?? [])); }, []);
-  const toggle = (id: string) => p.onChange(p.value.includes(id) ? p.value.filter(x => x !== id) : [...p.value, id].slice(0, 3));
-  return html`<div class="fields" style="margin-top:10px">
-    <div class="row"><b>Lessons</b><span class="note">1 to 3</span></div>
-    ${lessons.length ? html`<div class="row">${lessons.map(l => html`<button class=${`chip${p.value.includes(l.id) ? " on" : ""}`} aria-pressed=${p.value.includes(l.id)} onClick=${() => toggle(l.id)}>${l.id}${l.ref ? ` · ${l.ref}` : ""}</button>`)}</div>`
-    : html`<input placeholder="lesson ids (g_a1_<n>_<slug>), comma between" value=${p.value.join(", ")} aria-label="Lesson ids" onInput=${(e: Event) => p.onChange((e.target as HTMLInputElement).value.split(",").map(s => s.trim()).filter(Boolean).slice(0, 3))} />`}
-  </div>`;
 }

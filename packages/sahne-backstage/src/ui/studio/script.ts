@@ -1,10 +1,11 @@
 // The episode as a screenplay (model/script.ts): one block per step, typed into. A scene heading (the place, its time,
 // who starts where); a line (the speaker, the words in the main language, the translations as smaller rows under it,
 // the staging as chips); an action (who does what, with no words); the learner's choice with its options and their
-// replies indented under it; a grammar spot; an act on stage. The keys of a screenplay:
+// replies indented under it; an act on stage; a plugin's step in its own block (ui/plugins: the lesson plugin's grammar spot).
+// The keys of a screenplay:
 //   Enter              a new line after this one, said by the one before last (a conversation alternates)
 //   Tab, Shift Tab     an empty line becomes an action, an action a line
-//   @ in an empty line  pick the speaker          / in an empty line  insert a block (scene, line, choice, spot …)
+//   @ in an empty line  pick the speaker          / in an empty line  insert a block (scene, line, choice …)
 //   (                  type how it is said: (waves, happy, to İsmail) becomes the staging (model/parenthetical.ts)
 //   Backspace in an empty line  delete it        ⌘↑ ⌘↓  move it        ⌘D  duplicate it        ⌘Z ⇧⌘Z  undo, redo
 // Focusing a block selects it, and the stage plays that moment.
@@ -24,7 +25,7 @@ import { Icon, Popover } from "../kit/index.ts";
 import { Picker } from "../galleries.ts";
 import { inLang, langName, useLangs } from "../lang.ts";
 import { placeAt, targetsAt } from "../staging.ts";
-import { lessonOf } from "sahne-lesson";
+import { editorPluginsOf, pluginBlockOf } from "../plugins/index.ts";
 
 export interface ScriptProps {
   id: string;
@@ -103,13 +104,16 @@ export function Script(p: ScriptProps) {
     const step = template(kind, { story: p.story, langs, who, standin, narrator, place: placeAt(p.story, Number(after[1])) });
     apply(addAfter(p.story, after, step));
   };
+  // the series' plugins' blocks join the menu (a grammar spot with the lesson plugin)
+  const extra = editorPluginsOf(w.series).flatMap(ep => ep.blocks ?? []);
 
   const common = { ...p, keys, name, narrator, standin, setMenu, paren, setParen };
   return html`<div class="script" role="list" aria-label="The script">
     ${list.map(b => html`<${BlockView} key=${key(b.path)} b=${b} ...${common} />`)}
     <button class="script-add" onClick=${(e: MouseEvent) => setMenu({ kind: "insert", path: list.at(-1)?.path ?? ["steps", -1], x: e.clientX, y: e.clientY })}><${Icon} name="plus" size=${14} /> Add a block <kbd>/</kbd></button>
     ${menu?.kind === "insert" && html`<${Popover} x=${menu.x} y=${menu.y} onClose=${() => setMenu(null)} label="Insert a block">
-      <div class="menu">${INSERTS.map(k => html`<button onClick=${() => { insert(k, menu.path); setMenu(null); }}><b>${INSERT_NAMES[k][0]}</b><small>${INSERT_NAMES[k][1]}</small></button>`)}</div></${Popover}>`}
+      <div class="menu">${INSERTS.map(k => html`<button onClick=${() => { insert(k, menu.path); setMenu(null); }}><b>${INSERT_NAMES[k][0]}</b><small>${INSERT_NAMES[k][1]}</small></button>`)}
+        ${extra.map(b => html`<button onClick=${() => { apply(addAfter(p.story, menu.path, b.template({ story: p.story, langs }))); setMenu(null); }}><b>${b.name[0]}</b><small>${b.name[1]}</small></button>`)}</div></${Popover}>`}
     ${menu?.kind === "speaker" && html`<${Picker} kind="character" x=${menu.x} y=${menu.y} ids=${[...(p.story.cast ?? []), ...(p.story.extras ?? []), narrator]} value=${[(get(p.story, menu.path) as { who?: string })?.who ?? ""]}
       onPick=${(id: string) => { p.edit(s => set(s, [...menu.path, "who"], id)); p.select(menu.path, true); }} onClose=${() => setMenu(null)} />`}
   </div>`;
@@ -117,7 +121,7 @@ export function Script(p: ScriptProps) {
 
 const INSERT_NAMES: Record<Insert, [string, string]> = {
   line: ["Line", "someone says something"], action: ["Action", "someone does something, with no words"], narration: ["Narration", "the narrator, to the viewer"],
-  scene: ["Scene", "a new place or time"], choice: ["Choice", "the learner picks what to say"], spot: ["Grammar spot", "the narrator points out a line"], act: ["Act", "the learner does something on stage"],
+  scene: ["Scene", "a new place or time"], choice: ["Choice", "the learner picks what to say"], act: ["Act", "the learner does something on stage"],
 };
 
 type Common = ScriptProps & {
@@ -155,9 +159,12 @@ function body(p: Common) {
     case "option": return html`<${LineBlock} ...${p} />`;
     case "action": return html`<${ActionBlock} ...${p} />`;
     case "choice": return html`<${ChoiceBlock} ...${p} />`;
-    case "spot": return html`<${SpotBlock} ...${p} />`;
     case "act": return html`<${ActBlock} ...${p} />`;
   }
+  // a plugin's step: its own block
+  const pb = pluginBlockOf(world.value?.series, p.b.kind);
+  return pb ? html`<${pb.View} story=${p.story} saved=${p.saved} edit=${p.edit} path=${p.b.path} keys=${p.keys(p.b, "")} translations=${(at: Path) => html`<${Translations} ...${p} at=${at} />`} />`
+    : html`<span class="note">A ${p.b.kind} step: a plugin this series does not turn on.</span>`;
 }
 
 /** A textarea that grows with its text. */
@@ -278,19 +285,6 @@ function ChoiceBlock(p: Common) {
 }
 /** The open series' languages, outside a component. */
 const languagesNow = () => languagesOf(world.value?.series);
-
-function SpotBlock(p: Common) {
-  const { main } = useLangs();
-  const sp = (get(p.story, [...p.b.path, "spot"]) ?? {}) as Record<string, unknown>;
-  const lines = blocks(p.story).filter(b => b.kind === "line").map(b => String((get(p.story, b.path) as Record<string, unknown>)[main] ?? "")).filter(Boolean);
-  return html`<div class="spot-head"><b data-main tabindex="0" onKeyDown=${p.keys(p.b, "")}>Grammar spot</b>
-    <select value=${String(sp.lesson ?? "")} aria-label="Lesson" onChange=${(e: Event) => p.edit(s => set(s, [...p.b.path, "spot", "lesson"], (e.target as HTMLSelectElement).value))}>
-      ${(lessonOf(p.story).lessons ?? []).map(l => html`<option value=${l}>${l}</option>`)}</select>
-    <span class="note">on the line</span>
-    <select value=${String(sp.ex ?? "")} ...${inLang(main)} aria-label="The line it points at" onChange=${(e: Event) => p.edit(s => set(s, [...p.b.path, "spot", "ex"], (e.target as HTMLSelectElement).value))}>
-      <option value="">pick a line…</option>${lines.map(t => html`<option value=${t}>${t}</option>`)}</select></div>
-    <${Translations} ...${p} at=${[...p.b.path, "spot"]} />`;
-}
 
 function ActBlock(p: Common) {
   const { main } = useLangs();

@@ -28,7 +28,8 @@ import { SuggestionsReview } from "./suggestions.ts";
 import { inLang, useLangs } from "../lang.ts";
 import type { Problem } from "../../api.ts";
 import { Script } from "./script.ts";
-import { EpisodeHead, Glosses, Quiz } from "./sections.ts";
+import { EpisodeHead } from "./sections.ts";
+import { editorPluginsOf } from "../plugins/index.ts";
 import { Details } from "./details.ts";
 import { Direct } from "./direct.ts";
 import { Strip } from "./strip.ts";
@@ -199,8 +200,7 @@ function Studio(p: { id: string }) {
         <${EpisodeHead} story=${story} saved=${saved} edit=${edit} />
         <${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} ghosts=${ghosts} suggestions=${suggestions}
           gutter=${(b: { path: Path }) => html`<${ReviewGutter} id=${p.id} story=${story} path=${b.path} onComments=${() => { select(b.path); setTab("review"); }} />`} />
-        <${Quiz} story=${story} saved=${saved} edit=${edit} />
-        <${Glosses} story=${story} saved=${saved} edit=${edit} />
+        ${editorPluginsOf(w.series).map(ep => ep.Sections && html`<${ep.Sections} story=${story} saved=${saved} edit=${edit} />`)}
       </div>
       <div class="stage-col">
         ${pv && player && html`<${Strip} preview=${pv} story=${shown.current} at=${Math.max(0, player.next - 1)} select=${select} jump=${(i: number) => { player.jump(i); redraw(); }} />`}

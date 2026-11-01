@@ -62,5 +62,5 @@ export const lesson: StoryPlugin = {
     const n = (line as { note?: Record<string, string> }).note;
     return n ? { note: Object.fromEntries(Object.entries(n).map(([l, v]) => [l, personalise(v, l)])) } : {};
   },
-  prompt: "These are language-learning scenes. An episode teaches a few target words (card ids in `words`) and a grammar lesson (`lessons`), with one grammar spot ({ \"spot\": { \"lesson\", \"ex\" } }, Kerim explaining it on a line of the story) and a three-item quiz after it (`quiz/0` …, each answered by a line). Keep the words at the episode's level; gloss a word the learner cannot know in `gl`.",
+  prompt: "These are language-learning scenes. An episode teaches a few target words (card ids in `words`) and a grammar lesson (`lessons`), with one grammar spot ({ \"spot\": { \"lesson\", \"ex\" } }, Kerim explaining it on a line of the story) and a three-item quiz after it (`quiz/0` …, each answered by a line). Keep every line at the episode's level; gloss a word the learner cannot know in `gl`. A second reader also reports words above the level and quiz answers that do not hold.",
 };
