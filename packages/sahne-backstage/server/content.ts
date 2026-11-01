@@ -274,6 +274,27 @@ export function refuse(e: Edit): string | null {
   return null;
 }
 
+/**
+ * A text missing in a language that is another document's, not the one saved: a character's role or bio, a place's name, or
+ * the arc a story copies from its season. A story that names them reports them, but its save is not refused for them while
+ * that document is not in the edit (it is fixed on its own page).
+ */
+function theirs(p: Problem, edits: Edit[]): boolean {
+  const edited = (kind: Kind, id: string) => edits.some(e => e.kind === kind && e.id === id);
+  let m = /^character (\S+) \/[^:]*: .* has no (\S+) text$/.exec(p.message);
+  if (m) return !edited("character", m[1]);
+  m = /^(\S+): no name in (\S+)$/.exec(p.message);
+  if (m && p.rule === "place") return !edited("place", m[1]);
+  m = /^\/arc: the arc has no (\S+) text$/.exec(p.message);
+  if (m && p.doc?.startsWith("story:")) {
+    const story = edits.find(e => e.kind === "story" && e.id === p.doc!.slice(6))?.doc as StoryDoc | undefined, n = story?.season;
+    if (!story?.arc || n === undefined || edited("season", `s${n}`) || !existsSync(seasonFile(`s${n}`))) return false;
+    const arc = ((JSON.parse(readFile(seasonFile(`s${n}`)).text) as SeasonDoc).arcs ?? {})[story.arc.id] as Record<string, unknown> | undefined;
+    return !!arc && typeof arc[m[1]] !== "string";
+  }
+  return false;
+}
+
 /** The translations a series edit adds to the series' languages (none when the edits leave the series alone). */
 function addedLanguages(edits: Edit[]): string[] {
   const e = edits.find(x => x.kind === "series");
@@ -298,7 +319,7 @@ export function save(edits: Edit[], o: { write: boolean; before?: (b: Before[]) 
   const problems = check(edits);
   // a language the series starts translating into is missing everywhere: that is the translation work, not a broken file
   const added = addedLanguages(edits);
-  const gap = (p: Problem) => added.some(l => p.message.endsWith(` has no ${l} text`));
+  const gap = (p: Problem) => added.some(l => p.message.endsWith(` has no ${l} text`)) || theirs(p, edits);
   if (problems.some(p => p.new && p.level === "error" && !gap(p))) return { status: 422, problems, message: "the edit brings errors" };
   const saved: Record<string, number> = {};
   o.before?.(edits.map(e => { const u = fileOf(e.kind, e.id); return { kind: e.kind, id: e.id, text: existsSync(u) ? readFile(u).text : null }; }));

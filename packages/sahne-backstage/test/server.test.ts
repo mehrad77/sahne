@@ -96,6 +96,14 @@ test("the series starts a new translation: its missing texts are the work to do,
   const r = await call(rw.url, "POST", "save", { edits: [{ kind: "series", id: "series", doc: more, mtime }] });
   assert.equal(r.status, 200, JSON.stringify(r.body.message));
   assert.ok(r.body.problems.some((p: { message: string }) => / has no de text$/.test(p.message)), "every text without German shows as work");
+  // a new episode can still be created: the cast's and the places' missing German is theirs, not the new story's
+  const { skeleton } = await import("../src/model/skeleton.ts");
+  const w = (await call(rw.url, "GET", "world")).body, se = w.seasons.s1, arcId = Object.keys(se.arcs)[0];
+  const ep = skeleton({ id: "s1e05", season: 1, releaseDate: "2026-09-18", kind: "episode", week: 0, arc: { ...se.arcs[arcId], id: arcId }, place: "bakkal", cast: ["ismail"],
+    words: ["a1-w-ekmek", "a1-w-su", "a1-w-cay", "a1-w-peynir", "a1-w-zeytin"], lessons: ["g_a1_2_var_yok"], title: { tr: "Yeni" }, level: "A1" }, { narrator: "kerim", standin: "nima", places: w.places, languages: more.languages });
+  const made = await call(rw.url, "POST", "save", { edits: [{ kind: "story", id: "s1e05", doc: ep, create: true }] });
+  assert.equal(made.status, 200, JSON.stringify(made.body.problems?.filter((p: { new?: boolean; level: string }) => p.new && p.level === "error").map((p: { message: string }) => p.message)));
+  rmSync(join(root, "stories", "s1e05.json"));
   // a story edit still may not bring a missing text in a language the series already had
   const { body: s0 } = await call(rw.url, "GET", "doc/story/s1e00");
   const line = s0.doc.steps.findIndex((x: { who?: string; en?: string }) => x.who && x.en);
