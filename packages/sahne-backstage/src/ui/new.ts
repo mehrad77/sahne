@@ -18,6 +18,7 @@ import { Gallery, type Item } from "./kit/gallery.ts";
 import { Empty, Icon } from "./kit/index.ts";
 import { characterItems, placeItems } from "./galleries.ts";
 import { inLang, langName, Texts, useLangs } from "./lang.ts";
+import { lessonOf } from "sahne-lesson";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const long = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
@@ -47,7 +48,7 @@ export function NewEpisode(p: { season?: string; date?: string }) {
   const narrator = w.series?.narrator ?? "kerim", standin = w.series?.standin ?? "nima";
 
   // starting from an episode: its place and cast
-  useEffect(() => { if (from) void openDoc("story", from).then(d => { const s = d?.doc as StoryDoc | undefined; if (s) { setPlace(s.place); setCast(s.cast.filter(c => c !== standin)); setLessons(s.lessons ?? []); } }); }, [from]);
+  useEffect(() => { if (from) void openDoc("story", from).then(d => { const s = d?.doc as StoryDoc | undefined; if (s) { setPlace(s.place); setCast(s.cast.filter(c => c !== standin)); setLessons(lessonOf(s).lessons ?? []); } }); }, [from]);
 
   const week = row?.week ?? null;
   const arcId = week === null ? null : arcOfWeek(se.n, week);

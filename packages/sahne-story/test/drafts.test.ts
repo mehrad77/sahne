@@ -9,6 +9,8 @@ import kit from "../../sahne-kit/src/full.ts";
 import { loadCards, loadNeeds } from "../load.ts";
 import { checkAll } from "../check/rules.ts";
 import { loadWorld } from "../check/world.ts";
+// the bakkal scene and the samples use the lesson plugin (a grammar spot, the quiz): a test is a host, so it passes it in
+import { lesson } from "../../sahne-lesson/src/index.ts";
 
 const world = loadWorld();
 const needs = loadNeeds();
@@ -19,7 +21,7 @@ test("there are drafts", () => {
 });
 
 test("every draft, character and place passes the story check with no errors", () => {
-  const errors = checkAll(world, { kit, cards: loadCards(), needs, solids }).filter(p => p.level === "error");
+  const errors = checkAll(world, { kit, cards: loadCards(), needs, solids, plugins: [lesson] }).filter(p => p.level === "error");
   assert.deepEqual(errors.map(p => `${p.story}${p.step !== undefined ? ` step ${p.step}` : ""} [${p.rule}] ${p.message}`), []);
 });
 

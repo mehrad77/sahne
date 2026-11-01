@@ -16,6 +16,7 @@ import { draftOf, world } from "../store.ts";
 import { cueThumb } from "../thumbs.ts";
 import { Picture } from "./kit/gallery.ts";
 import { inLang, langName, useLangs } from "./lang.ts";
+import { storyPluginsOf } from "../model/plugins.ts";
 
 export type At = { was?: number; now?: number };
 
@@ -33,7 +34,7 @@ const parts = (ps: Part[]) => ps.map(d => (d.op === "=" ? d.text : d.op === "-" 
 const pictureOf = (doc: StoryDoc, i: number) => async (): Promise<string | null> => {
   try {
     const w = world.value!;
-    const a = adaptStory(doc, { places: w.places, characters: w.characters, languages: languagesOf(w.series) });
+    const a = adaptStory(doc, { places: w.places, characters: w.characters, languages: languagesOf(w.series), plugins: storyPluginsOf(w.series) });
     const perf = a.perform();
     const k = perf.info.map(c => c.step).lastIndexOf(i);
     return k < 0 ? null : await cueThumb(perf.script.cues, k, a.load);

@@ -7,19 +7,13 @@
     "id",
     "releaseDate",
     "kind",
-    "level",
     "season",
     "arc",
-    "ref",
     "title",
     "summary",
     "place",
     "cast",
-    "lessons",
-    "words",
-    "gl",
-    "steps",
-    "quiz"
+    "steps"
   ],
   "properties": {
     "id": {
@@ -34,13 +28,6 @@
       "enum": [
         "episode",
         "special"
-      ]
-    },
-    "level": {
-      "enum": [
-        "A1",
-        "A2",
-        "B1"
       ]
     },
     "season": {
@@ -81,10 +68,6 @@
         }
       }
     },
-    "ref": {
-      "type": "string",
-      "pattern": "^(A1|A2|B1)_[1-6]$"
-    },
     "title": {
       "$ref": "#/$defs/text"
     },
@@ -109,35 +92,6 @@
       "type": "array",
       "items": {
         "type": "string"
-      }
-    },
-    "lessons": {
-      "type": "array",
-      "minItems": 1,
-      "maxItems": 3,
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "pattern": "^g_(a1|a2|b1)_[0-9]+_[a-z0-9_]+$"
-      }
-    },
-    "words": {
-      "type": "array",
-      "minItems": 5,
-      "maxItems": 12,
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "gl": {
-      "type": "object",
-      "propertyNames": {
-        "pattern": "^[^A-ZİÇĞÖŞÜ]+$"
-      },
-      "additionalProperties": {
-        "$ref": "#/$defs/text"
       }
     },
     "props": {
@@ -176,53 +130,6 @@
       "minItems": 1,
       "items": {
         "$ref": "#/$defs/step"
-      }
-    },
-    "quiz": {
-      "type": "array",
-      "minItems": 3,
-      "maxItems": 3,
-      "items": {
-        "type": "object",
-        "required": [
-          "q",
-          "options",
-          "a",
-          "why",
-          "kind"
-        ],
-        "properties": {
-          "q": {
-            "$ref": "#/$defs/text"
-          },
-          "options": {
-            "type": "array",
-            "minItems": 3,
-            "maxItems": 3,
-            "items": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "a": {
-            "enum": [
-              0,
-              1,
-              2
-            ]
-          },
-          "why": {
-            "type": "string",
-            "minLength": 1
-          },
-          "kind": {
-            "enum": [
-              "comp",
-              "word"
-            ]
-          }
-        },
-        "additionalProperties": false
       }
     },
     "draft": {
@@ -296,21 +203,6 @@
             "past",
             "past_inset"
           ]
-        },
-        "mistake": {
-          "type": "object",
-          "required": [
-            "fix"
-          ],
-          "properties": {
-            "fix": {
-              "type": "string",
-              "minLength": 1
-            }
-          }
-        },
-        "note": {
-          "type": "object"
         },
         "looks": {
           "$ref": "#/$defs/looks"
@@ -441,47 +333,6 @@
         },
         {
           "required": [
-            "spot"
-          ],
-          "properties": {
-            "spot": {
-              "type": "object",
-              "required": [
-                "lesson",
-                "ex"
-              ],
-              "properties": {
-                "lesson": {
-                  "type": "string"
-                },
-                "ex": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "show": {
-                  "enum": [
-                    "deixis",
-                    "var_yok",
-                    "case_path",
-                    "owner",
-                    "compare",
-                    "aspect",
-                    "clock"
-                  ]
-                }
-              }
-            },
-            "if": {
-              "type": "string"
-            },
-            "unless": {
-              "type": "string"
-            }
-          },
-          "additionalProperties": false
-        },
-        {
-          "required": [
             "choice"
           ],
           "properties": {
@@ -499,7 +350,6 @@
                 "kind": {
                   "enum": [
                     "polite",
-                    "meaning",
                     "action"
                   ]
                 },

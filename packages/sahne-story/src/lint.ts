@@ -25,7 +25,8 @@ import type { StoryPlugin } from "./plugin.ts";
 import { DEIXIS_GESTURES } from "./langs/tr.ts";
 import { placesOf, storyProps } from "./props.ts";
 import { canon, dress, forLearner, LEARNER_FIELDS, looksOf } from "./looks.ts";
-import { isAct, isBeat, isChoice, isLine, isScene, isSpot, NARRATOR, STANDIN, type BeatStep, type CharacterDoc, type ChoiceOption, type LineStep, type LookRef, type StoryDoc } from "./types.ts";
+import { pluginStepOf } from "./plugin.ts";
+import { isAct, isBeat, isChoice, isLine, isScene, NARRATOR, STANDIN, type BeatStep, type CharacterDoc, type ChoiceOption, type LineStep, type LookRef, type StoryDoc } from "./types.ts";
 
 export type Rule = "deixis" | "var_yok" | "number" | "budget" | "via" | "silent" | "time" | "link" | "standin" | "mechanics" | "props" | "look" | "place" | "route";
 
@@ -113,7 +114,11 @@ function sceneState(story: StoryDoc, s: State, id: string, place: PlaceDoc | nul
 
 const dist = (a: Vec, b: Vec) => Math.hypot(a.x - b.x, a.z - b.z);
 
+/** Who acts in a plugin's step and how (src/plugin.ts `staging`), so the staging lints read it as a beat. */
+const stagedIn = (o: LintOptions) => (s: object) => pluginStepOf(s, o.plugins ?? [])?.staging?.(s);
+
 export function lintStory(story: StoryDoc, o: LintOptions): Problem[] {
+  const staged = stagedIn(o);
   const out: Problem[] = [], lang = o.lang ?? langFor("tr");
   /** A step's text in the story language. */
   const said = (t: object) => String((t as Record<string, unknown>)[lang.id] ?? "");
@@ -266,7 +271,7 @@ export function lintStory(story: StoryDoc, o: LintOptions): Problem[] {
       turn(l.who === STANDIN, step, !l.narr);
       unit({ who: l.who, text: said(l), st: l, at: { step }, standin: l.who === STANDIN });
     } else if (isBeat(s)) unit({ who: s.beat.who, st: s.beat, at: { step }, standin: false });
-    else if (isSpot(s)) unit({ who: "kerim", st: s.spot, at: { step }, standin: false });
+    else if (staged(s)) { const x = staged(s)!; unit({ who: x.who, st: x.staging, at: { step }, standin: false }); }
     else if (isChoice(s)) {
       turn(true, step, true);
       const start = clone(state);
@@ -297,6 +302,7 @@ export function lintStory(story: StoryDoc, o: LintOptions): Problem[] {
 
 /** `place`: what the story names in its places exists there (marks, times), so nothing is dropped on the stage without a word. */
 function lintRefs(story: StoryDoc, o: LintOptions): Problem[] {
+  const staged = stagedIn(o);
   const out: Problem[] = [];
   const err = (step: number, message: string, at: Partial<Problem> = {}) => out.push({ rule: "place", level: "error", step, ...at, message });
   let here = story.place, on: string[] = o.places[here] ? placeState(o.places[here], undefined) : [];
@@ -355,7 +361,7 @@ function lintRefs(story: StoryDoc, o: LintOptions): Problem[] {
       if (s.stop) station(pl, s.stop, step);
     } else if (isLine(s)) moves(s as LineStep, step);
     else if (isBeat(s)) moves(s.beat, step);
-    else if (isSpot(s)) moves(s.spot, step);
+    else if (staged(s)) moves(staged(s)!.staging, step);
     else if (isChoice(s)) s.choice.options.forEach((op: ChoiceOption, option) => {
       moves(op, step, { option });
       (op.reply ?? []).forEach((r: LineStep | BeatStep, reply) => moves(isBeat(r) ? r.beat : r, step, { option, reply }));
@@ -456,7 +462,8 @@ function lintLooks(story: StoryDoc, o: LintOptions): Problem[] {
       });
     }
     if (isAct(s) && ("looks" in s || "looks" in s.act)) misplaced({ step }, "an act");
-    if (isSpot(s) && ("looks" in s || "looks" in s.spot)) misplaced({ step }, "a spot");
+    const own = pluginStepOf(s, o.plugins ?? []);
+    if (own && ("looks" in s || "looks" in (own.staging?.(s).staging ?? {}))) misplaced({ step }, `a ${own.key}`);
   });
   return out;
 }

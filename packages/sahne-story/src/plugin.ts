@@ -45,6 +45,8 @@ export interface PluginStep {
   is(step: Step | object): boolean;
   /** The cues the step becomes. */
   adapt(step: object, ctx: AdaptContext): void;
+  /** Who acts on stage in the step and how, for the staging lints (budget, moves, clothes), as a beat's. */
+  staging?(step: object): { who: string; staging: StoryStaging };
 }
 
 /** Where a plugin check adds a problem: `rule` is the plugin's own, `step` the story step it is on. */
@@ -59,7 +61,20 @@ export interface PluginCheckContext {
   lang: StoryLang;
   /** Every main-language text of the story with its step (check/rules.ts `texts`). */
   texts: { tr: string; step: number; kind: string; who?: string; narr?: boolean }[];
+  /** The names the story may use as words: the characters', the places', the language's own (a hometown token). */
+  names: string[];
+  /** A text as the check compares it: lower case in the story language, punctuation gone. */
+  norm(text: string): string;
   add: PluginAdd;
+}
+
+/** What a plugin's season check reads: every story of the season, the world, and the texts of any story. */
+export interface PluginSeasonContext {
+  world: unknown;
+  stories: StoryDoc[];
+  lang: StoryLang;
+  texts(story: StoryDoc): { tr: string; step: number; kind: string }[];
+  add(rule: string, level: "error" | "warning" | "info", story: string, message: string): void;
 }
 
 /** Schema fragments merged into the core schemas while the plugin is on. */
@@ -79,6 +94,10 @@ export interface StoryPlugin {
   schema?: PluginSchema;
   /** Checks on one story, run after the core's. */
   check?(ctx: PluginCheckContext): void;
+  /** Checks across the stories of a season (`checkSeason`). */
+  season?(ctx: PluginSeasonContext): void;
+  /** What a line adds to its cue's info for the host (a note for the learner), from the line's own fields. */
+  lineInfo?(line: object, personalise: (text: string, lang: string) => string): Partial<CueInfo>;
   /** Lints on one story (staging against the text, as `lintStory`'s). */
   lint?(story: StoryDoc, o: { lang: StoryLang }): Problem[];
   /** The plugin's texts a story must have in the series' languages (`/gl/akşam` …), as the core's `storyLanguageGaps`. */

@@ -11,6 +11,7 @@ import { world } from "../../store.ts";
 import { portraitOf, Picker } from "../galleries.ts";
 import { Icon } from "../kit/index.ts";
 import { inLang, langName, Texts, useLangs } from "../lang.ts";
+import { lessonOf } from "sahne-lesson";
 
 interface Props { story: StoryDoc; saved: StoryDoc; edit(fn: (s: StoryDoc) => StoryDoc, field?: string): void }
 
@@ -38,8 +39,8 @@ export function EpisodeHead(p: Props) {
     <div class="field"><label>Who is in it (the cast, 2 to 6; ${textOf(w.characters[narrator]?.name, langs.main) ?? narrator} narrates every episode)</label>
       <div class="people">${cast.map(person)}${extras.map(person)}
         <button class="schip add" onClick=${(e: MouseEvent) => setPick({ x: e.clientX, y: e.clientY })}><${Icon} name="plus" size=${12} /> someone</button></div></div>
-    <div class="row teaches"><span class="note">Teaches</span>${(p.story.words ?? []).map(id => html`<span class="chip">${id}</span>`)}
-      ${(p.story.lessons ?? []).map(id => html`<span class="chip ok">${id}</span>`)}</div>
+    <div class="row teaches"><span class="note">Teaches</span>${(lessonOf(p.story).words ?? []).map(id => html`<span class="chip">${id}</span>`)}
+      ${(lessonOf(p.story).lessons ?? []).map(id => html`<span class="chip ok">${id}</span>`)}</div>
     ${pick && html`<${Picker} kind="character" multi x=${pick.x} y=${pick.y} value=${[...cast, ...extras]} ids=${Object.keys(w.characters).filter(id => id !== narrator && id !== standin)} onPick=${toggle} onClose=${() => setPick(null)} />`}
   </div>`;
 }
@@ -47,7 +48,7 @@ export function EpisodeHead(p: Props) {
 /** The quiz after the episode. */
 export function Quiz(p: Props) {
   const langs = useLangs(), all = allLanguages(langs);
-  const quiz = (p.story.quiz ?? []) as Record<string, any>[];
+  const quiz = (lessonOf(p.story).quiz ?? []) as Record<string, any>[];
   const put = (i: number, path: (string | number)[], v: unknown, field?: string) => p.edit(s => set(s, ["quiz", i, ...path], v), field ?? `quiz.${i}.${path.join(".")}`);
   return html`<div class="section-block"><h3><${Icon} name="review" size=${16} /> The quiz after it</h3>
     ${quiz.map((q, i) => html`<div class="quiz-item">
@@ -67,7 +68,7 @@ export function Quiz(p: Props) {
 export function Glosses(p: Props) {
   const langs = useLangs();
   const [word, setWord] = useState("");
-  const gl = Object.entries(p.story.gl ?? {});
+  const gl = Object.entries(lessonOf(p.story).gl ?? {});
   return html`<div class="section-block"><h3><${Icon} name="note" size=${16} /> Glosses: words the cards do not have</h3>
     ${gl.length ? html`<table class="grid"><thead><tr><th ...${inLang(langs.main)}>${langName(langs.main)}</th>${langs.translations.map(l => html`<th>${langName(l)}</th>`)}<th></th></tr></thead><tbody>
       ${gl.map(([w, g]) => html`<tr><td ...${inLang(langs.main)}>${w}</td>

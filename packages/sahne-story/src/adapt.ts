@@ -6,16 +6,16 @@
 //   a stand-in line    → the reply card (a turn), then the line for nima; "…" with voice silent is the "…" card
 //   beat               → beat
 //   act                → act, whose result goes back like a choice; its reaction is a beat
-//   spot               → overlay, with Kerim's staging
+//   a plugin's step    → the cues its own adapt makes (src/plugin.ts): the lesson plugin's spot is an overlay
 //   choice             → the reply card with its options; the picked line, its reactions and the reply become cues
 //   looks              → the cast's starting clothes, the wardrobe, and `costume` on the scene, line or beat that changes them
 //
 // Translations (en, fa) never reach the stage: they stay in `info`, for the log and the card. The
 // host's personalising runs on every text that reaches the stage: lines, link keys, sound words,
-// prop labels and phone screens, an act's prompt, a spot's example and the display names.
+// prop labels and phone screens, an act's prompt and the display names (a plugin's step personalises its own).
 
 import type { ActCue, AvatarDoc, Cue, LoadOptions, PlaceDoc, PuppetRef, Script, Staging, VoiceSpec } from "sahne";
-import { isAct, isBeat, isChoice, isLine, isScene, isSpot, NARRATOR, STANDIN, type CharacterDoc, type ChoiceOption, type Gate, type LineStep, type BeatStep, type Step, type StoryDoc, type Text3 } from "./types.ts";
+import { isAct, isBeat, isChoice, isLine, isScene, NARRATOR, STANDIN, type CharacterDoc, type ChoiceOption, type Gate, type LineStep, type BeatStep, type Step, type StoryDoc, type Text3 } from "./types.ts";
 import { storyProps } from "./props.ts";
 import { langFor, type StoryLang } from "./lang.ts";
 import { allLanguages, DEFAULT_LANGUAGES, textOf, type Languages, type LangText } from "./texts.ts";
@@ -65,7 +65,8 @@ export type Turn =
 /** What the host needs to know about a cue: the story step it came from, the line with its translations, and the card before it. */
 export interface CueInfo {
   step: number;
-  kind: "scene" | "line" | "say" | "beat" | "act" | "react" | "spot" | "reply";
+  /** `spot` is the lesson plugin's grammar spot; another plugin's step names its own kind. */
+  kind: "scene" | "line" | "say" | "beat" | "act" | "react" | "spot" | "reply" | (string & {});
   who?: string;
   /** The line in every language of the series, by code. */
   text?: LangText;
@@ -74,7 +75,7 @@ export interface CueInfo {
   en?: string;
   fa?: string;
   narr?: boolean;
-  /** A note for the learner, in the translations. */
+  /** A note for the learner, in the translations (from a plugin's `lineInfo`: the lesson plugin's). */
   note?: LangText;
   turn?: Turn;
   /** The choice option a `say` or `reply` cue belongs to. */
@@ -134,8 +135,6 @@ export function adaptStory(story: StoryDoc, o: AdaptOptions): StoryStage {
     for (const l of every) if (typeof r[l] === "string") text[l] = P(r[l] as string, l);
     return { tr: text[main] ?? "", ...(text.en !== undefined ? { en: text.en } : {}), ...(text.fa !== undefined ? { fa: text.fa } : {}), text };
   };
-  /** A note's texts, each personalised in its language. */
-  const noted = (n: Record<string, string>): LangText => Object.fromEntries(Object.entries(n).map(([l, v]) => [l, P(v, l)]));
   const card = (op: ChoiceOption): CardOption => ({ ...t3(op), ...(op.ok ? { ok: true } : {}), ...(op.tone ? { tone: op.tone } : {}) });
 
   const defaults: Picks = {};
@@ -153,7 +152,7 @@ export function adaptStory(story: StoryDoc, o: AdaptOptions): StoryStage {
       const st: Staging = { ...staging(l), ...(top ? worn(step) : {}) };
       const narr = "narr" in l && l.narr === true;
       if (narr && !st.to) st.to = "viewer";
-      push({ line: { who: l.who, text: p(said(l)), ...st } }, { step, kind, who: l.who, ...t3(l), ...(narr ? { narr } : {}), ...("note" in l && l.note ? { note: noted(l.note) } : {}), ...extra });
+      push({ line: { who: l.who, text: p(said(l)), ...st } }, { step, kind, who: l.who, ...t3(l), ...(narr ? { narr } : {}), ...Object.assign({}, ...plugins.map(pl => pl.lineInfo?.(l, P) ?? {})), ...extra });
     };
     const beat = (b: BeatStep, step: number, kind: CueInfo["kind"], extra: Partial<CueInfo> = {}, top = false) =>
       push({ beat: { ...staging(b.beat), ...(top ? worn(step) : {}), ...(b.beat.who ? { who: b.beat.who } : {}), ...(b.beat.wait !== undefined ? { wait: b.beat.wait } : {}) } }, { step, kind, ...(b.beat.who ? { who: b.beat.who } : {}), ...extra });
@@ -170,12 +169,7 @@ export function adaptStory(story: StoryDoc, o: AdaptOptions): StoryStage {
           line(s, step, "say", { turn: { kind: "say", step, silent, options: [t3(s)] } }, true);
         } else line(s, step, "line", {}, true);
       } else if (isBeat(s)) beat(s, step, "beat", {}, true);
-      else if (isSpot(s)) {
-        const { lesson, ex, show } = s.spot, own = said(s.spot);
-        const shown = t3({ ...s.spot, [main]: own || ex });
-        push({ overlay: { kind: show ?? "spot", lesson, ex: p(ex), ...(own ? { tr: p(own) } : {}), who: NARRATOR, ...staging(s.spot) } },
-          { step, kind: "spot", who: NARRATOR, ...shown });
-      } else if (isChoice(s)) {
+      else if (isChoice(s)) {
         const c = s.choice, k = Math.min(Math.max(0, Number(picks[c.id] ?? 0) | 0), c.options.length - 1), op = c.options[k];
         const turn: Turn = { kind: "choice", step, id: c.id, ...(c.to ? { to: c.to } : {}), options: c.options.map(card) };
         line({ ...op, who: STANDIN }, step, "say", { turn, option: k });

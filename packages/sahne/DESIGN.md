@@ -73,7 +73,8 @@ app (Kumru)                            sahne (engine)                           
 | `packages/sahne` | The engine: formats (typed in TypeScript), world state, director, timeline, rig, backends, audio, interaction, the avatar model and a default builder UI | nothing |
 | `packages/sahne-kit` | The art: the body kit, parts, palettes, faces, poses and gestures, props, set pieces, sound patches, motifs, CC0 samples. A different app can ship a different kit in another style | `sahne` (types only) |
 | `packages/sahne-tr` | The Turkish plugin: mouth timing from spelling, token matching for word ↔ object links, normalising and matching speech for *say it aloud* (`normalise`, `matchLine`), and what the teaching lints read (*bu/şu/o*, numbers, clock times) | `sahne` (types only) |
-| `packages/sahne-story` | The story format's adapter (`adaptStory`: a story document becomes a script and its reply cards, the Kumru repo's `docs/stories/STORIES_STAGE.md` §3) and the story lints (`lintStory`, `suggest`, §4). Story-specific, so it lives beside the engine, not in it | `sahne` (types), `sahne-tr` |
+| `packages/sahne-story` | The story format's adapter (`adaptStory`: a story document becomes a script and its reply cards, the Kumru repo's `docs/stories/STORIES_STAGE.md` §3) and the story lints (`lintStory`, `suggest`, §4). Story-specific, so it lives beside the engine, not in it. A series turns on story plugins for parts not every story needs | `sahne` (types), `sahne-tr` |
+| `packages/sahne-lesson` | The lesson plugin of the story format: grammar spots, target words, glosses, the quiz, learner notes and the syllabus checks, for a series that teaches a language | `sahne-story` |
 | `packages/sahne-backstage` | The editor an app runs on its content root: series, seasons and episodes played, fixed and staged in the browser, saved with the story check; a Node server beside a Preact page. Never ships | all but the gallery |
 | `packages/sahne-gallery` | The dev site: every part, view, emotion, gesture, set, light and sound; the builder; a script player; a story played through the adapter; a performance readout | all of them |
 
@@ -570,6 +571,7 @@ Mid-range means a Galaxy A15/A25-class phone; low-end means Android Go with 2–
 | Kerim's puppet (`sahne-kit/kerim`: her art, moods and gestures), loaded only by pages that cast her | ≤ 8 KB gzip |
 | The animal puppets (`sahne-kit/puppets`: Pisi and the gulls), loaded only by pages that cast them | ≤ 8 KB gzip (4.6 KB) |
 | The drawing interpreter (`sahne-kit/drawing`: pieces drawn as data), loaded by an app with content items, and by any family that takes drawn items | ≤ 8 KB gzip (3.1 KB) |
+| The lesson plugin (`sahne-lesson`), loaded by an app whose series teaches | ≤ 8 KB gzip (3.4 KB) |
 | What an app loads for its lists: `normalize` and `portrait` | ≤ 20 KB gzip (15 KB) |
 | What an app loads for its builder: `mountBuilder` with its stage | ≤ 100 KB gzip (80.3 KB; raised from 80 on 2026-10-13) |
 | All A1 places (28) | ≤ 100 KB gzip |

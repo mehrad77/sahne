@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { CHARACTERS, PLACES, storyFile } from "../../sahne-story/paths.ts";
 import { adaptStory, type CharacterDoc, type StoryDoc } from "../../sahne-story/src/index.ts";
+import { STORY_PLUGINS } from "../src/model/plugins.ts";
 import { cueOf, cuePath, get, insert, move, same, set, within } from "../src/model/path.ts";
 import * as H from "../src/model/history.ts";
 import { marksOf } from "../src/model/marks.ts";
@@ -39,7 +40,7 @@ test("insert and move in an array", () => {
 });
 
 test("every cue maps back to its place in the story, and every row's path to a cue", () => {
-  const perf = adaptStory(STORY, { places, characters }).perform();
+  const perf = adaptStory(STORY, { places, characters, plugins: STORY_PLUGINS }).perform();
   for (const i of perf.info) {
     const v = get(STORY, cuePath(i));
     assert.ok(v && typeof v === "object", `cue of step ${i.step} (${i.kind}) has a place in the story`);

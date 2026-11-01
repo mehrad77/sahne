@@ -10,6 +10,8 @@ import { adaptStory, lintStory, missingPlugins, pluginsOf, type CharacterDoc, ty
 import { validateDoc } from "../check/schema.ts";
 import { checkSeries, checkStory } from "../check/rules.ts";
 import { loadWorld, type World } from "../check/world.ts";
+// the bakkal scene and the samples use the lesson plugin (a grammar spot, the quiz): a test is a host, so it passes it in
+import { lesson } from "../../sahne-lesson/src/index.ts";
 
 const json = <T>(f: string): T => JSON.parse(readFileSync(new URL(`./fixtures/${f}`, import.meta.url), "utf8"));
 const places: Record<string, PlaceDoc> = { bakkal: JSON.parse(readFileSync(new URL("bakkal.json", PLACES), "utf8")) };
@@ -68,19 +70,21 @@ test("plugins: a plugin's lints run with the core's", () => {
 test("plugins: the story check runs a plugin's checks for a series that turns it on", () => {
   const world: World = loadWorld();
   const d = world.drafts.find(x => x.id === "s1e00")!;
-  const signed = { ...world, series: { ...world.series!, plugins: ["sign"] } };
-  const base = checkStory(d, world).filter(p => p.level === "error").map(p => p.message);
+  // the samples' series turns on the lesson plugin; this one turns on the made-up one too
+  const signed = { ...world, series: { ...world.series!, plugins: ["lesson", "sign"] } };
+  const both = [lesson, SIGN];
+  const base = checkStory(d, world, { plugins: [lesson] }).filter(p => p.level === "error").map(p => p.message.replace(/\/steps\/\d+/, "/steps/n"));
   // the plugin is on: its check reports the story with no sign, and its required field
-  const bare = checkStory(d, signed, { plugins: [SIGN] }).filter(p => p.level === "error");
+  const bare = checkStory(d, signed, { plugins: both }).filter(p => p.level === "error");
   assert.ok(bare.some(p => p.rule === "sign"));
   assert.ok(bare.some(p => /mood/.test(p.message)));
   // with a sign and a mood, the story has the errors it has without the plugin, no more
   const draft = { ...d, story: withSign(d.story) };
-  const errs = checkStory(draft, signed, { plugins: [SIGN] }).filter(p => p.level === "error").map(p => p.message);
+  const errs = checkStory(draft, signed, { plugins: both }).filter(p => p.level === "error").map(p => p.message.replace(/\/steps\/\d+/, "/steps/n"));
   assert.deepEqual(errs.filter(m => !base.includes(m)), []);
   // a series that does not name it never runs it, even when the host has it
-  assert.ok(!checkStory(d, world, { plugins: [SIGN] }).some(p => p.rule === "sign"));
+  assert.ok(!checkStory(d, world, { plugins: both }).some(p => p.rule === "sign"));
   // a series that names a plugin the host lacks is an error of the series
-  assert.ok(checkSeries(signed, { plugins: [] }).some(p => /plugin sign/.test(p.message)));
-  assert.ok(!checkSeries(signed, { plugins: [SIGN] }).some(p => /plugin/.test(p.message)));
+  assert.ok(checkSeries(signed, { plugins: [lesson] }).some(p => /plugin sign/.test(p.message)));
+  assert.ok(!checkSeries(signed, { plugins: both }).some(p => /plugin/.test(p.message)));
 });

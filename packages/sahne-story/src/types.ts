@@ -28,9 +28,6 @@ export interface LineStep extends StoryStaging, Text3, Gate {
   /** Changes of clothes as the line starts (a coat coming off). */
   looks?: Looks;
   narr?: true;
-  /** A note for the learner, in the translations (`{ en, fa }`). */
-  note?: Record<string, string>;
-  mistake?: { fix: string };
   /** `frame: "past_inset"`: the scene it pictures. */
   of?: { story: string; step: number };
 }
@@ -52,10 +49,6 @@ export interface SceneStep extends Gate {
   looks?: Looks;
 }
 
-export interface SpotStep extends Gate {
-  spot: StoryStaging & { lesson: string; ex: string; en?: string; fa?: string; tr?: string; show?: string };
-}
-
 export interface ChoiceOption extends StoryStaging, Text3 {
   ok?: boolean;
   tone?: "polite" | "warm" | "formal" | "casual" | "blunt" | "rude";
@@ -66,7 +59,8 @@ export interface ChoiceOption extends StoryStaging, Text3 {
 }
 
 export interface ChoiceStep extends Gate {
-  choice: { id: string; kind?: "polite" | "meaning" | "action"; to?: string; options: ChoiceOption[] };
+  /** `kind`: polite or action in the core; a plugin may add its own (the lesson plugin's "meaning"). */
+  choice: { id: string; kind?: "polite" | "action" | (string & {}); to?: string; options: ChoiceOption[] };
 }
 
 export interface ActStep extends Gate {
@@ -94,28 +88,24 @@ export interface StoryProp { kit: string; at: PropAt | Record<string, PropAt>; n
 
 export type ReactValue =NonNullable<Staging["react"]>[string];
 
-export type Step = LineStep | BeatStep | SceneStep | SpotStep | ChoiceStep | ActStep;
+/** A step of the core format. A story plugin adds its own kinds (src/plugin.ts), read as plain objects. */
+export type Step = LineStep | BeatStep | SceneStep | ChoiceStep | ActStep;
 
 export interface Arc { id: string; tr: string; en?: string; fa?: string; mechanics: ("say" | "explore" | "act" | "aloud" | "unlocks")[] }
 
+/** A story document of the core format. A plugin's fields (the lesson plugin's `level`, `words`, `quiz` …) are read loosely, through the index signature. */
 export interface StoryDoc {
   id: string;
   releaseDate?: string;
   kind?: "episode" | "special";
-  level?: string;
   season?: number;
   arc?: Arc;
-  ref?: string;
   /** The title in every language of the series. */
   title: LangText;
   summary?: LangText;
   place: string;
   cast: string[];
   extras?: string[];
-  lessons?: string[];
-  words?: string[];
-  /** Glosses: a word of the main language → its meaning in each translation. */
-  gl?: Record<string, LangText>;
   /** Story-only props, added to the places their `at` names (src/props.ts). */
   props?: Record<string, StoryProp>;
   /** What the cast wears from the start (§5.2). */
@@ -187,7 +177,6 @@ export interface CharacterDoc {
 export const isLine = (s: Step): s is LineStep => "who" in s;
 export const isBeat = (s: Step): s is BeatStep => "beat" in s;
 export const isScene = (s: Step): s is SceneStep => "scene" in s;
-export const isSpot = (s: Step): s is SpotStep => "spot" in s;
 export const isChoice = (s: Step): s is ChoiceStep => "choice" in s;
 export const isAct = (s: Step): s is ActStep => "act" in s;
 

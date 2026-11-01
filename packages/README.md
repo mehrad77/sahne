@@ -10,7 +10,8 @@ The packages of this repo's pnpm workspace: the Sahne stage engine and the packa
 | [`sahne-en`](sahne-en/) | The English plugin: the same for English (British spelling), and the words and lints of an English series (`sahne-story/src/langs/en.ts`) | [README](sahne-en/README.md) | `sahne-en/test/` |
 | [`sahne-de`](sahne-de/) | The German plugin: the same for German, and the words and lints of a German series (`sahne-story/src/langs/de.ts`) | [README](sahne-de/README.md) | `sahne-de/test/` |
 | [`sahne-fa`](sahne-fa/) | The Persian plugin: the same for Persian (right to left), and the words and lints of a Persian series (`sahne-story/src/langs/fa.ts`) | [README](sahne-fa/README.md) | `sahne-fa/test/` |
-| [`sahne-story`](sahne-story/) | The story format: the adapter, the player, the story check and lints, and `paths.ts`, where the story data lives (the content root: `$SAHNE_CONTENT`, or `sahne-story/samples/`) | [README](sahne-story/README.md) | `sahne-story/test/` |
+| [`sahne-story`](sahne-story/) | The story format: the adapter, the player, the story check and lints, the story plugins' seam, and `paths.ts`, where the story data lives (the content root: `$SAHNE_CONTENT`, or `sahne-story/samples/`) | [README](sahne-story/README.md) | `sahne-story/test/` |
+| [`sahne-lesson`](sahne-lesson/) | The lesson plugin of the story format: grammar spots, target words, glosses, the quiz, learner notes and the syllabus checks, for a series that teaches a language | [README](sahne-lesson/README.md) | `sahne-lesson/test/` |
 | [`sahne-backstage`](sahne-backstage/) | The studio an app runs on its content root (`startBackstage`, its own port): a season board, episodes written as scripts beside a live stage, the kit as galleries, review, an assistant (Claude or a local model, within a budget), and an MCP server for agents; saved with the story check. Never ships to learners | [README](sahne-backstage/README.md) | `sahne-backstage/test/` |
 | [`sahne-gallery`](sahne-gallery/) | The dev gallery (one page on :5180: systems, kit, places, stories), the size check and the `pnpm sahne` scripts | [README](sahne-gallery/README.md) | none of its own |
 
@@ -35,6 +36,7 @@ node packages/sahne-gallery/size.mjs  # the size check alone (--json for an app'
 | Kerim's puppet (`sahne-kit/kerim`) | 8 KB |
 | The animal puppets (`sahne-kit/puppets`) | 8 KB |
 | Pieces drawn as data (`sahne-kit/drawing`) | 8 KB |
+| The lesson plugin (`sahne-lesson`) | 8 KB |
 | Portraits (`normalize`, `portrait`, `silhouette`) | 20 KB |
 | The builder with its stage | 100 KB (raised from 80 on 2026-10-13: it carries the whole stage) |
 | The whole set, every family together | 250 KB, a warning only (365 KB today) |

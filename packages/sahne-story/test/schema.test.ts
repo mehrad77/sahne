@@ -6,6 +6,8 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { validateDoc } from "../check/schema.ts";
 import { CHARACTERS, PLACES, storyFile, storyIds } from "../paths.ts";
+// the bakkal scene and the samples use the lesson plugin (a grammar spot, the quiz): a test is a host, so it passes it in
+import { lesson } from "../../sahne-lesson/src/index.ts";
 
 const json = (u: URL) => JSON.parse(readFileSync(u, "utf8"));
 /** The first story of the content root (s1e00, the sample, or Kumru's s1e01). */
@@ -13,7 +15,7 @@ const S1 = () => json(storyFile(storyIds()[0]));
 const C = (id: string) => json(new URL(`${id}.json`, CHARACTERS));
 
 test("every story and character is valid", () => {
-  for (const id of storyIds()) assert.deepEqual(validateDoc("story", json(storyFile(id))), [], id);
+  for (const id of storyIds()) assert.deepEqual(validateDoc("story", json(storyFile(id)), [lesson]), [], id);
   for (const f of readdirSync(CHARACTERS).filter(f => f.endsWith(".json"))) assert.deepEqual(validateDoc("character", json(new URL(f, CHARACTERS))), [], f);
 });
 
@@ -25,17 +27,17 @@ test("every place document is valid", () => {
 
 test("a story with a break is refused, naming the path", () => {
   const miss = S1(); delete miss.quiz;
-  assert.match(validateDoc("story", miss)[0].message, /quiz/);
+  assert.match(validateDoc("story", miss, [lesson])[0].message, /quiz/);
   const kind = S1(); kind.kind = "movie";
-  assert.ok(validateDoc("story", kind).some(p => p.path === "/kind"));
+  assert.ok(validateDoc("story", kind, [lesson]).some(p => p.path === "/kind"));
   const id = S1(); id.id = "x1";
-  assert.ok(validateDoc("story", id).some(p => p.path === "/id"));
+  assert.ok(validateDoc("story", id, [lesson]).some(p => p.path === "/id"));
   const quiz = S1(); quiz.quiz[0].a = 3;
-  assert.ok(validateDoc("story", quiz).some(p => p.path === "/quiz/0/a"));
+  assert.ok(validateDoc("story", quiz, [lesson]).some(p => p.path === "/quiz/0/a"));
   const step = S1(); step.steps.push({ nonsense: 1 });
-  assert.ok(validateDoc("story", step).length > 0);
+  assert.ok(validateDoc("story", step, [lesson]).length > 0);
   const extra = S1(); extra.mood = "x";
-  assert.match(validateDoc("story", extra)[0].message, /mood/);
+  assert.match(validateDoc("story", extra, [lesson])[0].message, /mood/);
 });
 
 test("a character with a break is refused", () => {

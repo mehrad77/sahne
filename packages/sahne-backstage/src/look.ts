@@ -7,6 +7,7 @@ import type { AvatarDoc, PlaceDoc, PuppetRef } from "sahne";
 import { cueOf, type Path } from "./model/path.ts";
 import { drawNow, type Scene } from "./thumbs.ts";
 import { world } from "./store.ts";
+import { storyPluginsOf } from "./model/plugins.ts";
 
 export interface LookAsk { rid: string; kind: "story" | "place"; id: string; doc: unknown; step?: Path; at?: number }
 
@@ -18,7 +19,7 @@ function sceneOf(a: LookAsk): Scene | null {
     const doc = a.doc as PlaceDoc & { times?: string[] };
     return { place: doc, cues: [{ scene: { place: doc.id, time: doc.times?.[0] ?? "day", at: {}, cam: "wide" } }], cast: {} };
   }
-  const adapted = adaptStory(a.doc as StoryDoc, { places: w.places as Record<string, StoryPlace>, characters: w.characters, languages: languagesOf(w.series) });
+  const adapted = adaptStory(a.doc as StoryDoc, { places: w.places as Record<string, StoryPlace>, characters: w.characters, languages: languagesOf(w.series), plugins: storyPluginsOf(w.series) });
   const perf = adapted.perform();
   if (!perf.script.cues.length) return null;
   const i = a.step ? Math.max(0, cueOf(perf.info, a.step)) : 0;

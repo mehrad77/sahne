@@ -24,6 +24,7 @@ import { Icon, Popover } from "../kit/index.ts";
 import { Picker } from "../galleries.ts";
 import { inLang, langName, useLangs } from "../lang.ts";
 import { placeAt, targetsAt } from "../staging.ts";
+import { lessonOf } from "sahne-lesson";
 
 export interface ScriptProps {
   id: string;
@@ -284,7 +285,7 @@ function SpotBlock(p: Common) {
   const lines = blocks(p.story).filter(b => b.kind === "line").map(b => String((get(p.story, b.path) as Record<string, unknown>)[main] ?? "")).filter(Boolean);
   return html`<div class="spot-head"><b data-main tabindex="0" onKeyDown=${p.keys(p.b, "")}>Grammar spot</b>
     <select value=${String(sp.lesson ?? "")} aria-label="Lesson" onChange=${(e: Event) => p.edit(s => set(s, [...p.b.path, "spot", "lesson"], (e.target as HTMLSelectElement).value))}>
-      ${(p.story.lessons ?? []).map(l => html`<option value=${l}>${l}</option>`)}</select>
+      ${(lessonOf(p.story).lessons ?? []).map(l => html`<option value=${l}>${l}</option>`)}</select>
     <span class="note">on the line</span>
     <select value=${String(sp.ex ?? "")} ...${inLang(main)} aria-label="The line it points at" onChange=${(e: Event) => p.edit(s => set(s, [...p.b.path, "spot", "ex"], (e.target as HTMLSelectElement).value))}>
       <option value="">pick a line…</option>${lines.map(t => html`<option value=${t}>${t}</option>`)}</select></div>

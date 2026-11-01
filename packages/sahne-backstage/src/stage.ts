@@ -16,6 +16,7 @@ import fa from "sahne-fa";
 import tr from "sahne-tr";
 import { world } from "./store.ts";
 import { adaptStory, languagesOf, storyPlayer, type CharacterDoc, type Languages, type StoryDoc, type StoryPlace, type StoryPlayer, type StoryStage } from "sahne-story";
+import type { StoryPlugin } from "sahne-story";
 
 export const KIT: Kit = { ...full, puppets: { ...full.puppets, ...kerimPuppets, ...animals } };
 /** The language plugins, by the code of a series' main language. */
@@ -44,6 +45,8 @@ export interface PreviewOptions {
   flags?: string[];
   /** The series' languages: the main one is what the stage plays. */
   languages?: Languages;
+  /** The series' story plugins (model/plugins.ts): their steps play too. */
+  plugins?: readonly StoryPlugin[];
   onChange?(): void;
 }
 
@@ -65,7 +68,7 @@ export class Preview {
     this.load(story);
   }
 
-  private adapt(story: StoryDoc) { return adaptStory(story, { places: this.o.places, characters: this.o.characters, flags: this.o.flags, languages: this.o.languages }); }
+  private adapt(story: StoryDoc) { return adaptStory(story, { places: this.o.places, characters: this.o.characters, flags: this.o.flags, languages: this.o.languages, plugins: this.o.plugins }); }
 
   /** Adapt and load the story, at its opening scene. */
   load(story: StoryDoc) {

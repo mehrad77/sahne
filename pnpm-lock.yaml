@@ -63,6 +63,9 @@ importers:
       sahne-kit:
         specifier: workspace:*
         version: link:../sahne-kit
+      sahne-lesson:
+        specifier: workspace:*
+        version: link:../sahne-lesson
       sahne-story:
         specifier: workspace:*
         version: link:../sahne-story
@@ -108,6 +111,9 @@ importers:
       sahne-kit:
         specifier: workspace:*
         version: link:../sahne-kit
+      sahne-lesson:
+        specifier: workspace:*
+        version: link:../sahne-lesson
       sahne-story:
         specifier: workspace:*
         version: link:../sahne-story
@@ -145,6 +151,15 @@ importers:
       sahne:
         specifier: workspace:*
         version: link:../sahne
+
+  packages/sahne-lesson:
+    dependencies:
+      sahne:
+        specifier: workspace:*
+        version: link:../sahne
+      sahne-story:
+        specifier: workspace:*
+        version: link:../sahne-story
 
   packages/sahne-story:
     dependencies:

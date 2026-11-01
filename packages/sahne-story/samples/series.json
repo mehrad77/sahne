@@ -15,5 +15,6 @@
     "translations": ["en", "fa"]
   },
   "narrator": "kerim",
-  "standin": "nima"
+  "standin": "nima",
+  "plugins": ["lesson"]
 }

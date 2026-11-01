@@ -6,9 +6,9 @@
 import { applyLook, AVATAR_MAX_BYTES, compose, GARMENT_FIELDS, normalize, serialize, type AvatarDoc, type AvatarNote, type Kit, type KitManifest, type Solid } from "sahne";
 import { puppets as KERIM_PUPPETS } from "../../sahne-kit/src/kerim/index.ts";
 import { puppets as ANIMAL_PUPPETS } from "../../sahne-kit/src/puppets/index.ts";
-import { isAct, isChoice, isLine, isSpot, isScene, lintPlace, lintStory, NARRATOR, seasonOf, STANDIN, type CharacterDoc, type LineStep, type Needs, type StoryDoc, type Step } from "../src/index.ts";
+import { isAct, isChoice, isLine, isScene, lintPlace, lintStory, NARRATOR, seasonOf, STANDIN, type CharacterDoc, type LineStep, type Needs, type StoryDoc, type Step } from "../src/index.ts";
 import type { CardIndex } from "../src/index.ts";
-import { languagesOf, textOf, type Languages } from "../src/texts.ts";
+import { languagesOf, textOf, type Languages, type LangText } from "../src/texts.ts";
 import { validateDoc, type SchemaKind } from "./schema.ts";
 import { characterLanguageGaps, languageCodeGaps, seasonLanguageGaps, seriesLanguageGaps, storyLanguageGaps } from "./languages.ts";
 import { langFor, type Resolver, type StoryLang } from "../src/lang.ts";
@@ -33,17 +33,9 @@ export const CAST_ALLOW = new Set(["s1e45"]);
 /** Character ids of the series Kumru replaced: never used again (ids are permanent). */
 export const RETIRED_CHARACTERS = new Set("ada can dede deniz ela marti mert selin simit zeynep".split(" "));
 const BREAKS: [string, string][] = [["2026-11-02", "2026-11-07"], ["2027-01-04", "2027-01-09"]];
-const LEVELS = ["A1", "A2", "B1"];
-/** Lines per story (Kumru's STORIES_DESIGN.md §1, proposed): [min, max] by level and kind. */
-const LINES: Record<string, Record<string, [number, number]>> = { A1: { episode: [10, 14], special: [20, 28] }, A2: { episode: [14, 18], special: [26, 34] }, B1: { episode: [16, 22], special: [30, 40] } };
 
 /** A week's arc id: season 1, week 3 → `s1w03`. */
 export const arcId = (season: number, week: number) => `s${season}w${String(week).padStart(2, "0")}`;
-
-/** The unit a week teaches: weeks 1-6 their own, weeks 7-8 all of A1 (Kumru's STORIES_A1.md *Weeks*). */
-export const unitOfWeek = (week: number) => Math.min(week, 6);
-/** Where a ref sits in the course: A1_1–A1_6 are units 1–6, A2 7–12, B1 13–18; 0 for none. An A2 or B1 card is never an A1 week's. */
-export const unitOfRef = (ref?: string) => { const m = /^(A1|A2|B1)_(\d)$/.exec(ref ?? ""); return m ? LEVELS.indexOf(m[1]) * 6 + Number(m[2]) : 0; };
 
 /**
  * Every main-language text of a story with where it is: steps, choice options and their replies, follow-ups. The text is
@@ -103,7 +95,7 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   const out: CheckProblem[] = [];
   const add = (rule: CheckProblem["rule"], level: CheckProblem["level"], message: string, step?: number) => out.push({ rule, level, story: id, step, message });
 
-  const langs = languagesOf(world.series), lang = langOf(world), norm = normIn(lang), { checkWords: words, resolver } = lang;
+  const langs = languagesOf(world.series), lang = langOf(world), norm = normIn(lang);
   const plugins = pluginsOf(world.series, o.plugins ?? []);
   for (const p of [...validateDoc("story", s, plugins), ...storyLanguageGaps(s, langs), ...plugins.flatMap(pl => pl.languageGaps?.(s, langs) ?? [])]) add("schema", "error", `${p.path}: ${p.message}`);
   for (const [cid, c] of Object.entries(d.characters)) for (const p of [...validateDoc("character", c), ...characterLanguageGaps(c, langs)]) add("schema", "error", `character ${cid} ${p.path}: ${p.message}`);
@@ -111,7 +103,6 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
 
   // the calendar rules run when the content root has one (days.json)
   const day = world.days?.[d.id];
-  const unit = day ? unitOfWeek(day.week) : 0;
   if (world.days && !day) add("calendar", "error", `${d.id} has no row in days.json`);
   else if (day) {
     if (s.releaseDate !== day.date) add("calendar", "error", `releaseDate ${s.releaseDate} but Days has ${day.date}`);
@@ -123,23 +114,6 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   if (s.releaseDate && s.kind === "special" && dayOfWeek(s.releaseDate) !== 6) add("calendar", "error", "a special comes out on a Saturday");
   if (s.releaseDate && s.kind === "episode" && dayOfWeek(s.releaseDate) === 6) add("calendar", "error", "an episode comes out Monday to Friday");
   if (s.id && s.season && seasonOf(s.id) !== s.season) add("id", "error", `season ${s.season} does not match the id ${s.id}`);
-
-  // ref is a constraint (DESIGN §2): the week's unit
-  const level = s.level ?? "A1";
-  if (day && s.ref !== `${level}_${unit}`) add("ref", "error", `ref ${s.ref} but week ${day.week} teaches ${level}_${unit}`);
-  if (world.lessons) for (const l of s.lessons ?? []) {
-    const g = world.lessons[l];
-    if (!g) add("ref", "error", `lesson ${l} is not in grammar/`);
-    else if (unit && unitOfRef(g.ref) > unit) add("ref", "error", `lesson ${l} is from ${g.ref}, after week ${day?.week}'s A1_${unit}`);
-  }
-  s.steps.forEach((st, i) => { if (isSpot(st) && !(s.lessons ?? []).includes(st.spot.lesson)) add("ref", "error", `spot lesson ${st.spot.lesson} is not in the story's lessons`, i); });
-  if (world.cards) for (const w of s.words ?? []) {
-    const c = world.cards[w];
-    if (!c) add("ref", "error", `word ${w} is not a card`);
-    else if (!unitOfRef(c.ref)) add("ref", "error", `word ${w} (${c.tr}) has no unit: its card has no ref`);
-    else if (c.level && LEVELS.indexOf(c.level) > LEVELS.indexOf(s.level ?? "A1")) add("ref", "error", `word ${w} (${c.tr}) is ${c.level.startsWith("A") ? "an" : "a"} ${c.level} card, above the story's ${s.level ?? "A1"}`);
-    else if (unit && unitOfRef(c.ref) > unit) add("ref", "error", `word ${w} (${c.tr}) is from ${c.ref}, after week ${day?.week}'s A1_${unit}`);
-  }
 
   // cast
   const all = texts(s, langs.main);
@@ -153,22 +127,15 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
     if (RETIRED_CHARACTERS.has(c)) add("cast", "error", `${c} is a retired character id`);
     const doc = d.characters[c];
     if (!doc) add("character", "error", `no character document for ${c}`);
-    else if (LEVELS.indexOf(doc.level as string) > LEVELS.indexOf(s.level ?? "A1")) add("character", "error", `${c} is level ${doc.level}, after the story's ${s.level}`);
   }
   const kinds = Object.values(d.characters).map(c => c.kind);
   if (kinds.filter(k => k === "narrator").length !== 1) add("character", "error", "the draft needs exactly one narrator character");
   if (kinds.filter(k => k === "standin").length !== 1) add("character", "error", "the draft needs exactly one stand-in character");
 
-  // counts
+  // counts: the choices and acts (the lesson plugin counts the target words, the spots and the lines)
   const special = s.kind === "special";
-  const nWords = (s.words ?? []).length, [wMin, wMax] = special ? [10, 12] : [5, 8];
-  if (nWords < wMin || nWords > wMax) add("counts", "error", `${nWords} target words; a${special ? " special" : "n episode"} has ${wMin}-${wMax}`);
   const choices = s.steps.filter(isChoice).length;
   if (special ? choices !== 2 : choices < 1 || choices > 2) add("counts", "error", `${choices} choices; ${special ? "a special has 2" : "an episode has 1-2"}`);
-  const spots = s.steps.filter(isSpot).length;
-  if (special ? spots < 1 || spots > 2 : spots !== 1) add("counts", "error", `${spots} grammar spots; ${special ? "a special has 1-2" : "an episode has 1"}`);
-  const lines = s.steps.filter(isLine).length, size = LINES[s.level ?? "A1"]?.[s.kind ?? "episode"];
-  if (size && (lines < size[0] || lines > size[1])) add("counts", "warning", `${lines} lines; ${s.level} ${s.kind}s have ${size[0]}-${size[1]} (proposed)`);
   const acts = s.steps.filter(isAct).length;
   if (acts > 2 && day && day.week >= 2) add("counts", "warning", `${acts} acts; at most 2 from week 2 (Kumru's STORIES_STAGE.md §5, proposed)`);
   const ids = s.steps.filter(isChoice).map(c => c.choice.id);
@@ -177,50 +144,8 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   // flags set by this story
   for (const op of flagOptions(s)) if (!op.sets!.startsWith(`${id}_`)) add("flags", "error", `flag ${op.sets} must be named ${id}_<slug>`, op.step);
 
-  // quiz
-  const quiz = s.quiz ?? [];
-  if (!quiz.some((q: { kind?: string }) => q.kind === "comp") || !quiz.some((q: { kind?: string }) => q.kind === "word")) add("quiz", "error", "the quiz needs at least one comp and one word item");
-  const haystack = all.map(t => norm(t.tr)).join(" | ");
-  (quiz as { why?: string }[]).forEach((q, k) => {
-    const quoted = [...(q.why ?? "").matchAll(/[“"]([^”"]+)[”"]/g)].map(m => m[1]);
-    if (!quoted.length) add("quiz", "warning", `quiz item ${k + 1}: why quotes no line`);
-    for (const t of quoted) if (!haystack.includes(norm(t))) add("quiz", "error", `quiz item ${k + 1}: “${t}” is not a line of the story`);
-  });
-
-  // spot examples are lines of the story
-  s.steps.forEach((st, i) => { if (isSpot(st) && !haystack.includes(norm(st.spot.ex))) add("ref", "error", `spot example “${st.spot.ex}” is not a line of the story`, i); });
-
-  // mistake.fix is used within 3 lines
-  const ls = s.steps.map((st, i) => [st, i] as const).filter(([st]) => isLine(st)) as [LineStep, number][];
-  ls.forEach(([l, i], k) => {
-    if (!l.mistake) return;
-    const next = ls.slice(k + 1, k + 4).map(([x]) => norm(x.tr));
-    if (!next.some(t => t.includes(norm(l.mistake!.fix)))) add("mistake", "error", `the fix “${l.mistake.fix}” is not used in the next 3 lines`, i);
-  });
-
-  // text: the language-neutral stand-in, glossed names, unknown tokens
-  for (const t of all) for (const m of lang.hints?.({ text: t.tr, standin: t.who === STANDIN }, s.gl ?? {}) ?? []) add("text", "warning", m, t.step);
-  const glKeys = Object.keys(s.gl ?? {});
-  // unknown tokens and the known-word ratio need a dictionary: the cards (or the syllabus)
-  const dictionary = !!world.cards || !!world.syllabus;
-  const resolves: Resolver = resolver([...Object.values(world.cards ?? {}).map(c => c.tr), ...glKeys, ...nameWords(d, world, s), ...Object.values(d.characters).map(c => textOf(c.name, langs.main) ?? ""), ...(world.syllabus ? Object.values(world.syllabus.words).map(w => w.tr) : [])]);
-  const unknown = new Map<string, number>();
-  for (const t of [...all, ...(quiz as { q: unknown; options: string[] }[]).flatMap(q => [{ tr: textOf(q.q, langs.main) ?? "", step: -1 }, ...q.options.map(tr => ({ tr, step: -1 }))])]) {
-    for (const w of words(t.tr)) if (!resolves(w)) unknown.set(w, (unknown.get(w) ?? 0) + 1);
-  }
-  if (dictionary && unknown.size) add("text", "error", `${unknown.size} words resolve to no card, gloss or name: ${[...unknown].map(([w, n]) => (n > 1 ? `${w}×${n}` : w)).join(", ")}`);
-
-  // known-word ratio (a warning for now): names, numbers and particles count; glosses do not
-  if (day && dictionary) {
-    const known = resolver([...Object.values(world.cards ?? {}).filter(c => c.level === "A1" && unitOfRef(c.ref) > 0 && unitOfRef(c.ref) <= unit).map(c => c.tr), ...nameWords(d, world, s), ...(world.syllabus ? Object.values(world.syllabus.words).filter(w => w.unit <= unit).map(w => w.tr) : [])]);
-    const toks = all.flatMap(t => words(t.tr));
-    const miss = new Map<string, number>();
-    for (const w of toks) if (!known(w)) miss.set(w, (miss.get(w) ?? 0) + 1);
-    const total = toks.length, missed = [...miss.values()].reduce((a, b) => a + b, 0), ratio = total ? 1 - missed / total : 1;
-    const msg = `known words ${(ratio * 100).toFixed(1)}% of ${total} (95% wanted); not known: ${[...miss].map(([w, n]) => (n > 1 ? `${w}×${n}` : w)).join(", ")}`;
-    add("words", ratio < 0.95 ? "warning" : "info", msg);
-  }
-
+  // text: the language's series hints (the language-neutral stand-in, glossed names; the glosses are the lesson plugin's)
+  for (const t of all) for (const m of lang.hints?.({ text: t.tr, standin: t.who === STANDIN }, (s.gl as Record<string, LangText> | undefined) ?? {}) ?? []) add("text", "warning", m, t.step);
   // the stage lints
   const places = Object.fromEntries(Object.entries(world.places).filter(([k]) => true));
   const missing = [s.place, ...s.steps.filter(isScene).map(x => x.scene)].filter(p => !places[p]);
@@ -236,7 +161,8 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
     }
   }
   // the series' plugins check what they add
-  for (const pl of plugins) pl.check?.({ story: s, characters: d.characters, world, languages: langs, lang, texts: all, add });
+  const names = [...nameWords(d, world, s), ...Object.values(d.characters).map(c => textOf(c.name, langs.main) ?? "")];
+  for (const pl of plugins) pl.check?.({ story: s, characters: d.characters, world, languages: langs, lang, texts: all, names, norm, add });
   return out;
 }
 
@@ -280,33 +206,13 @@ export function checkSeason(world: World, drafts: Draft[] = world.drafts, o: Che
   const NO_ALBUM = new Set(["extra", "standin", "narrator"]);
   for (const [c, n] of seen) if (n >= 3 && !docs.get(c)?.album && !world.extras?.[c] && !NO_ALBUM.has(docs.get(c)?.kind as string)) add("character", "warning", "season", `${c} is in ${n} stories but has no album entry`);
 
-  // recycling: forward (a warning once the next stories exist) and backward (a report)
-  const days = o.recycleDays ?? 14;
-  const uses = (d: Draft, card: string): boolean => {
-    const c = world.cards?.[card];
-    if (!c) return false;
-    const lang = langOf(world), r = lang.resolver([c.tr], { particles: false });
-    return texts(d.story, lang.id).some(t => lang.checkWords(t.tr).some(r));
-  };
-  for (const d of drafts) {
-    const date = d.story.releaseDate;
-    if (!date) continue;
-    const later = Object.values(world.days ?? {}).filter(x => x.date > date && x.date <= addDays(date, days));
-    const have = later.map(x => drafts.find(e => e.story.id === x.id)).filter((e): e is Draft => !!e);
-    if (later.length && have.length === later.length) {
-      const lacking = (d.story.words ?? []).filter(w => have.filter(e => uses(e, w)).length < 2);
-      if (lacking.length) add("recycle", "warning", d.story.id, `target words used in fewer than 2 of the next ${later.length} stories (${days} days): ${lacking.map(w => world.cards?.[w]?.tr ?? w).join(", ")}`);
-    }
-    const before = drafts.filter(e => e.story.releaseDate && e.story.releaseDate < date && e.story.releaseDate >= addDays(date, -days));
-    if (before.length) {
-      const reused = before.flatMap(e => (e.story.words ?? []).filter(w => uses(d, w)));
-      add("recycle", "info", d.story.id, `reuses ${new Set(reused).size} target words of the previous ${days} days (${before.map(e => e.story.id).join(", ")})`);
-    }
-  }
   // season-wide choice kinds
   const kinds: Record<string, number> = {};
   for (const d of drafts) for (const st of d.story.steps) if (isChoice(st)) kinds[st.choice.kind ?? "polite"] = (kinds[st.choice.kind ?? "polite"] ?? 0) + 1;
   if (Object.keys(kinds).length) add("counts", "info", "season", `choice kinds: ${Object.entries(kinds).map(([k, n]) => `${k} ${n}`).join(", ")} (a third each wanted over the season)`);
+  // the series' plugins check across the season (the lesson plugin: recycling)
+  const lang = langOf(world);
+  for (const pl of pluginsOf(world.series, o.plugins ?? [])) pl.season?.({ world, stories: drafts.map(d => d.story), lang, texts: st => texts(st, lang.id), add });
   return out;
 }
 

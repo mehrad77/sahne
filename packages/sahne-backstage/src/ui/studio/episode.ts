@@ -38,6 +38,7 @@ import { conflicts, postSelection, proposals, proposalsRead, shown as agentShown
 import { ghostsOf, suggestionsOf, taken, type Suggest } from "../../model/autostage.ts";
 import { get, set } from "../../model/path.ts";
 import { MadeByTask } from "../madeby.ts";
+import { storyPluginsOf } from "../../model/plugins.ts";
 
 declare global { interface Window { backstage?: { preview: Preview; select(path: Path | null): void } } }
 
@@ -80,7 +81,7 @@ function Studio(p: { id: string }) {
 
   // the stage, once
   useEffect(() => {
-    const pv = new Preview(box.current!, story, { places: w.places, characters: w.characters, onChange: redraw, languages: langs });
+    const pv = new Preview(box.current!, story, { places: w.places, characters: w.characters, onChange: redraw, languages: langs, plugins: storyPluginsOf(w.series) });
     preview.current = pv;
     shown.current = story;
     window.backstage = { preview: pv, select: x => select(x, true) };
@@ -110,7 +111,7 @@ function Studio(p: { id: string }) {
   }, [story]);
 
   const { lints, suggestions } = useMemo(() => {
-    const o = { places: w.places, characters: w.characters, kit: KIT, lang };
+    const o = { places: w.places, characters: w.characters, kit: KIT, lang, plugins: storyPluginsOf(w.series) };
     try {
       const ps = lintStory(story, { ...o, solids: solidsOf(w.places) }).map(x => ({ ...x, doc: key, story: p.id } as Problem));
       const raw = suggest(story, o);

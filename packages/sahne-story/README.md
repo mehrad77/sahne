@@ -17,7 +17,8 @@ A story format for the [Sahne](../sahne/README.md) stage: story documents (the f
 | `lintStory(story, options)` | Staging that contradicts the Turkish it stages (`STORIES_STAGE.md` §4): deixis, *var*/*yok*, numbers, the staging budget, phone lines, silent lines, clock times, links and `obj:` targets on stage, stand-in turns, mechanics, where story props stand, changes of clothes (`look`), and that every scene's place, marks, Kerim's perch, moves and time exist (`place`). With the characters, Kerim on stage stands on her perch, so `ch:kerim` has a place. A problem may carry a `fix` |
 | `suggest(story, options)` | The fixes, plus the links a line could have |
 | `lintPlace(place, {kit, cards, needs})` | A place document against the place standard (`src/lint-place.ts`): `valid`, `needs`, `depth`, `density`, `explore`, `crowd`, `reach`, `light`, `sound`, `budget` (5 KB of JSON, and every flat fits a layer of the atlas). A `placeholder` document only warns |
-| The story check (`check/`, `stories.ts`; node only, not exported from `src/index.ts`) | Every story, character and place against the story docs: JSON schemas (`schema/*.json`, ajv), ids, calendar (`days.json`), `ref` and lesson units, cast, counts, flags, quiz, mistakes, unknown words, the known-word ratio and recycling (warnings for now), `lintStory` and `lintPlace`. See *The story check* below |
+| The story check (`check/`, `stories.ts`; node only, not exported from `src/index.ts`) | Every story, character and place against the story docs: JSON schemas (`schema/*.json`, ajv, with the series' plugins' fragments), ids, calendar (`days.json`), cast, counts, flags, `lintStory` and `lintPlace`, and the series' plugins' checks (the lesson plugin's units, words, quiz and recycling). See *The story check* below |
+| `pluginsOf`, `StoryPlugin` | The story plugins' seam (`src/plugin.ts`): see *Plugins* below |
 | `isCard`, `isA1`, `cardProblem` | The app's card index (`src/cards.ts`): which ids a `terms` entry may name (any live card) and which count as A1. `load.ts` builds the index in node from the content root's `cards/` and `cards-extra/` (read only) |
 | `needsOf(needs, place)` | A place's entry in the content root's `needs.json`: what the stories' briefs ask of it, keyed by site (`src/needs.ts`) |
 
@@ -86,8 +87,8 @@ A series names its languages in `series.json`: `"languages": { "main": "tr", "tr
 | an act's prompt | flat: `{ "tr": "…" }` | the main one |
 | a story's, series' or season's `title` | a map: `{ "tr": "…", "en": "…", "fa": "…" }` | every one (a series' summary is optional) |
 | a story's `summary` | a map | the translations |
-| a quiz item's `q` | a map (its `options` and `why` are the main language's) | every one |
-| a gloss, `gl` | the main language's word → a map of its meaning: `"elma": { "fa": "سیب", "en": "apple" }` | the translations |
+| a quiz item's `q` (the lesson plugin's) | a map (its `options` and `why` are the main language's) | every one (the plugin's `languageGaps`) |
+| a gloss, `gl` (the lesson plugin's) | the main language's word → a map of its meaning: `"elma": { "fa": "سیب", "en": "apple" }` | the translations (the plugin's `languageGaps`) |
 | a character's `name` | a map | the main one (others optional) |
 | a character's `role`, `bio` | maps | the translations |
 | a place's `name` | a map | every one (`lintPlace`) |
@@ -120,6 +121,16 @@ A series can turn on **story plugins**: parts of the format not every series nee
 
 Without its plugin, a plugin's step or field is a schema error, and the adapter skips the step. `checkSeries` reports a plugin the series names but the host does not have (`missingPlugins`). `test/plugin.test.ts` proves the seam with a made-up plugin.
 
+**The lesson plugin** ([sahne-lesson](../sahne-lesson/README.md)) holds what a language-teaching series adds: the grammar spot step, a story's `level`, `ref`, `lessons`, `words`, `gl` and `quiz`, a line's `note` and `mistake`, the `meaning` choice, and their checks. The samples' series turns it on. The gate (`stories.ts`), backstage (`src/model/plugins.ts`) and the gallery pass it in. The place-level word rules (a prop's `terms`, `decor` and the `explore` lint) are still in `lintPlace` for now.
+
+**Migrating a host (Kumru's reader).** `sahne-story` no longer has the lesson parts, and re-exports none of them. A host that plays a lesson series must make these changes:
+1. Add `"plugins": ["lesson"]` to its `series.json`.
+2. Depend on `sahne-lesson`.
+3. Pass the plugins to `adaptStory` (`plugins: pluginsOf(series, [lesson])`), `lintStory` and the check (`CheckOptions.plugins`).
+4. Import `SpotStep`, `isSpot`, `QuizItem` and the lesson fields (`lessonOf(story)`) from `sahne-lesson`.
+
+Without the plugin, a spot plays nothing and a lesson field is a schema error. Kumru's `kumru/app/features/stories/reader.ts` and `state.ts` are the files to change.
+
 ## Places
 
 The place documents are read by the gallery, the stories and the tests from `places/` of the content root. The checker prints every place against the standard:
@@ -148,7 +159,18 @@ node packages/sahne-story/stories.ts s1e00      # one story
 node packages/sahne-story/stories.ts --check    # exits 1 on any error (warnings and info pass)
 ```
 
-Errors: the characters (above), schema, ids, calendar (with `days.json`: release date, kind and arc against it; always: no Sunday, no break week, specials on Saturdays), `ref` and lessons and target words against the week's unit (a card above the story's level, or with no ref, never counts), cast limits (`CAST_ALLOW` holds s1e45's six), counts (target words, choices, spots), flags (each read flag set by the earlier story it names, once that story is written), quiz, `mistake.fix`, words that resolve to no card, gloss or name, missing places and characters, and every `lintStory` error. Warnings and info: line counts, the 95% known-word ratio (known = cards and syllabus words up to the week's unit, names, numbers and particles; glosses do not count), recycling forwards (the target words reappear in two of the next stories within 14 days, once those stories exist) and backwards, albums, the season's choice kinds. The rules that need the cards, the grammar, the syllabus or the calendar run only when the content root has them (see the table above). `pnpm sahne check` and Kumru's `pnpm check` run the check, and `test/drafts.test.ts` finds every story in `stories/` of the content root on its own.
+Errors:
+- the characters (above), schema, ids
+- calendar: with `days.json`, release date, kind and arc against it; always, no Sunday, no break week, specials on Saturdays
+- cast limits (`CAST_ALLOW` holds s1e45's six)
+- counts: the choices, and each choice id once
+- flags: each read flag set by the earlier story it names, once that story is written
+- missing places and characters
+- every `lintStory` error
+
+Warnings and info: the acts from week 2, albums, the season's choice kinds.
+
+The series' plugins add their own. The lesson plugin adds the units, the target words, the spots, the quiz, mistakes, unknown words, line counts, the known-word ratio and recycling ([its README](../sahne-lesson/README.md#the-checks)). The rules that need the cards, the grammar, the syllabus or the calendar run only when the content root has them (see the table above). `pnpm sahne check` and Kumru's `pnpm check` run the check, and `test/drafts.test.ts` finds every story in `stories/` of the content root on its own.
 
 ## The sample story
 

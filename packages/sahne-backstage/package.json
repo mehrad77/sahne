@@ -33,6 +33,7 @@
     "sahne-en": "workspace:*",
     "sahne-fa": "workspace:*",
     "sahne-kit": "workspace:*",
+    "sahne-lesson": "workspace:*",
     "sahne-story": "workspace:*",
     "sahne-tr": "workspace:*",
     "zod": "4.6.7"

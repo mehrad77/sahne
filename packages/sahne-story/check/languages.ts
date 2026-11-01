@@ -35,8 +35,6 @@ export function storyLanguageGaps(s: StoryDoc, l: Languages): LanguageGap[] {
   need(out, s.title, all, "/title", "the title");
   if (s.summary !== undefined) need(out, s.summary, l.translations, "/summary", "the summary");
   if (s.arc) need(out, s.arc, all, "/arc", "the arc");
-  for (const [w, g] of Object.entries(s.gl ?? {})) need(out, g, l.translations, `/gl/${w}`, `the gloss of ${w}`);
-  ((s.quiz as { q?: unknown }[] | undefined) ?? []).forEach((q, i) => need(out, q.q, all, `/quiz/${i}/q`, `quiz ${i + 1}'s question`));
   const steps = (list: unknown[], at: string) => list.forEach((st, i) => {
     const step = st as Parameters<typeof isLine>[0];
     if (isLine(step)) need(out, step, all, `${at}/${i}`, "the line");

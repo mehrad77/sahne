@@ -8,6 +8,7 @@ import type { Staging } from "sahne";
 import { allLanguages, type Languages, type StoryDoc } from "sahne-story";
 import { get, insert, set, type Path } from "./path.ts";
 import { kindOf } from "./steps.ts";
+import { lessonOf } from "sahne-lesson";
 
 export type BlockKind = "scene" | "line" | "action" | "choice" | "option" | "spot" | "act";
 export interface Block { path: Path; kind: BlockKind; depth: 0 | 1 | 2; who?: string }
@@ -127,7 +128,7 @@ export function template(kind: Insert, o: { story: StoryDoc; langs: Languages; w
       let n = 1; while (ids.has(`choice${n}`)) n++;
       return { choice: { id: `choice${n}`, kind: "polite", to: other, options: [{ ...texts(), ok: true }, texts()] } };
     }
-    case "spot": return { spot: { lesson: (o.story.lessons ?? [])[0] ?? "", ex: "", ...Object.fromEntries(o.langs.translations.map(l => [l, ""])) } };
+    case "spot": return { spot: { lesson: (lessonOf(o.story).lessons ?? [])[0] ?? "", ex: "", ...Object.fromEntries(o.langs.translations.map(l => [l, ""])) } };
     case "act": {
       const ids = new Set(o.story.steps.flatMap(s => ("act" in s ? [(s as { act: { id: string } }).act.id] : [])));
       let n = 1; while (ids.has(`act${n}`)) n++;

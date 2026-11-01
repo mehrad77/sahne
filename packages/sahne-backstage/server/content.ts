@@ -18,6 +18,7 @@ import { checkCast, checkPlaces, checkSeason, checkSeries, checkStory, RETIRED_C
 import { calendarOf, charactersOf, loadWorld, type World } from "../../sahne-story/check/world.ts";
 import { languagesOf, lintPlace, seasonOf, upgrade, type CharacterDoc, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../../sahne-story/src/index.ts";
 import { plain, readFile, textFor, writeAtomic } from "../../sahne-story/json.ts";
+import { STORY_PLUGINS } from "../src/model/plugins.ts";
 
 export type Kind = "series" | "season" | "story" | "character" | "place" | "kit_piece" | "kit_variant";
 export const KINDS: Kind[] = ["series", "season", "story", "character", "place", "kit_piece", "kit_variant"];
@@ -132,7 +133,7 @@ const solidsOf = (places: Record<string, StoryPlace>): Record<string, Solid[]> =
   }));
 
 let gate: Omit<CheckOptions, "solids"> | null = null;
-const options = (k?: Kit): Omit<CheckOptions, "solids"> => { gate ??= { kit: kit(), cards: loadCards(), needs: loadNeeds() }; return k ? { ...gate, kit: k } : gate; };
+const options = (k?: Kit): Omit<CheckOptions, "solids"> => { gate ??= { kit: kit(), cards: loadCards(), needs: loadNeeds(), plugins: STORY_PLUGINS }; return k ? { ...gate, kit: k } : gate; };
 
 /** The world with the edits in it: a story's characters read again from the edited cast, the calendar from the edited seasons. */
 function withEdits(w0: World, edits: Edit[]): World {
@@ -216,7 +217,7 @@ function problemsIn(w: World, edits: Edit[], k?: Kit): Problem[] {
     for (const p of lintPlace(doc, { kit: o.kit, cards: o.cards, needs: o.needs, languages: languagesOf(w.series) })) out.push({ rule: p.rule, level: p.level, story: `place:${e.id}`, message: p.message, doc: `place:${e.id}` });
   }
   if (edits.some(e => e.kind === "series" || e.kind === "season")) {
-    for (const p of checkSeries(w)) {
+    for (const p of checkSeries(w, { plugins: STORY_PLUGINS })) {
       const doc = p.story === "series" ? "series:series" : p.story.startsWith("season:") ? `season:${p.story.slice(7)}` : `story:${p.story}`;
       out.push({ ...p, doc });
     }
