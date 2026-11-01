@@ -3,6 +3,7 @@
 
 import type { Languages, StoryDoc } from "sahne-story";
 import type { Path } from "../../model/path.ts";
+import type { Problem } from "../../api.ts";
 
 /** What a plugin's part of the episode page gets: the story, how it was saved, and the page's edit. */
 export interface EpisodeProps { story: StoryDoc; saved: StoryDoc; edit(fn: (s: StoryDoc) => StoryDoc, field?: string): void }
@@ -35,8 +36,11 @@ export interface EditorPlugin {
   id: string;
   /** A row in the episode's head: what the episode teaches. */
   Head?(p: EpisodeProps): unknown;
-  /** Its own part of the episode, after the script (the Lesson stage of the new page). */
+  /** Its own part of the episode: the view of its stage. */
   Sections?(p: EpisodeProps): unknown;
+  /** Its own stage of the work, between Translate and Review: its name, and where the episode stands in it (its own
+   * problems carry its id: `Problem.plugin`). The stage shows `Sections`. */
+  stage?: { key: string; name: string; state(p: { story: StoryDoc; problems: Problem[] }): { done: boolean; state: string } };
   /** Its step kinds in the script. */
   blocks?: EditorBlock[];
   /** A line's own fields in its details: the learner's note. */

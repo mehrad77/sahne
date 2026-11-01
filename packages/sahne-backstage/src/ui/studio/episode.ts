@@ -7,25 +7,26 @@
 
 import { html } from "htm/preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { allLanguages, langFor, lintStory, seasonOf, suggest, textOf, type StoryDoc } from "sahne-story";
+import { allLanguages, langFor, lintStory, playOf, seasonOf, suggest, textOf, type StoryDoc } from "sahne-story";
 import type { Run } from "sahne";
-import { checkDocs, checked, change, draftOf, history, keyOf, openDoc, review, route, saveDocs, world } from "../../store.ts";
+import { checkDocs, checked, change, draftOf, go, history, keyOf, openDoc, review, route, saveDocs, setReview, world } from "../../store.ts";
 import { cueOf, cuePath, type Path } from "../../model/path.ts";
 import { flagsIn, wordsOnly } from "../../model/steps.ts";
 import { dirty } from "../../model/history.ts";
 import { KIT, Preview, solidsOf } from "../../stage.ts";
 import { pathOfKey, ReviewGutter, ReviewPanel } from "../review.ts";
-import { ReviewMode } from "./reviewmode.ts";
-import { blocksOf, standingOf, STAGE_NAME } from "../../model/review.ts";
+import { blocksOf, checkedOf, standingOf } from "../../model/review.ts";
+import { episodeSig, nextStepOf, progressOf, type StageKey, type StepAction } from "../../model/progress.ts";
+import { blocks } from "../../model/script.ts";
+import { marks as marksNow } from "../../runs.ts";
 import { NotesPanel } from "./notes.ts";
 import { ChangesPanel } from "../changes.ts";
-import { AskMenu } from "../assistant.ts";
+import { AskMenu, send } from "../assistant.ts";
 import { settingsNow } from "../settings.ts";
 import { Popover } from "../kit/index.ts";
 import { Drawer, Icon, MOD } from "../kit/index.ts";
 import { SaveButton } from "../readonly.ts";
-import { SuggestionsReview } from "./suggestions.ts";
-import { inLang, useLangs } from "../lang.ts";
+import { inLang, langName, useLangs } from "../lang.ts";
 import type { Problem } from "../../api.ts";
 import { Script } from "./script.ts";
 import { EpisodeHead } from "./sections.ts";
@@ -55,7 +56,7 @@ export function Episode(p: { id?: string }) {
   // a proposal's link to read it as a whole (studio/proposals.ts)
   const [, , sub, pid] = route.value, whole = sub === "proposal" ? proposals.value.find(x => x.id === pid && x.kind === "story" && x.doc === id) : undefined;
   if (whole) return html`<${ProposedEpisode} x=${whole} />`;
-  if (d) return html`<${MadeByTask} kind="story" id=${id} /><${Studio} key=${id} id=${id} />`;
+  if (d) return html`<${Studio} key=${id} id=${id} />`;
   if (proposed) return html`<${ProposedEpisode} x=${proposed} />`;
   return html`<p class="note">${missing ? html`There is no episode ${id}. <a href="#/board">Back to the board</a>` : `Opening ${id}…`}</p>`;
 }
@@ -72,13 +73,14 @@ function Studio(p: { id: string }) {
   const redraw = () => tick(n => n + 1);
   const [path, setPath] = useState<Path | null>(null), [focusTick, setFocusTick] = useState(0);
   const [flags, setFlags] = useState<string[]>([]);
-  const [tab, setTab] = useState<"problems" | "review" | "changes">("problems");
-  const [inReview, setReviewMode] = useState(false);
   const [asks, setAsks] = useState<{ x: number; y: number } | null>(null);
-  const [here, setHere] = useState(false);
-  const [details, setDetails] = useState(false);
+  const [more, setMore] = useState<{ x: number; y: number } | null>(null);
+  const [drawer, setDrawer] = useState<"details" | "changes" | null>(null);
+  const [needsOpen, setNeedsOpen] = useState(false);
+  const [trLang, setTrLang] = useState<string>(langs.translations[0] ?? langs.main);
   const cast = useMemo(() => [...new Set([w.series?.narrator ?? "kerim", w.series?.standin ?? "nima", ...(story.cast ?? []), ...(story.extras ?? [])])], [story.cast, story.extras]);
   const lang = langFor(langs.main);
+  const plugins = editorPluginsOf(w.series);
 
   // the stage, once
   useEffect(() => {
@@ -120,16 +122,13 @@ function Studio(p: { id: string }) {
       return { lints: ps, suggestions: sugg };
     } catch (e) { return { lints: [{ rule: "lint", level: "error", story: p.id, message: String(e), doc: key } as Problem], suggestions: {} }; }
   }, [story]);
-  const nSuggest = Object.values(suggestions).reduce((n, x) => n + x.length, 0);
-  const [reviewing, setReviewing] = useState(false);
-  const nameOf = (id: string) => textOf(w.characters[id]?.name, langs.main) ?? id;
   /** One block's suggestions, taken. */
   const takeAt = (at: Path) => {
     const ss = suggestions[at.join("/")];
     if (!ss?.length) return;
     edit(s => { const base = "beat" in ((get(s, at) ?? {}) as object) ? [...at, "beat"] : at; return set(s, base, ss.reduce((st, sg) => taken(st, sg.fix), (get(s, base) ?? {}) as Record<string, unknown>)); }, "take-auto");
   };
-  /** The picked suggestions (by block), taken as one edit: what the review dialog adds. */
+  /** The picked suggestions (by block), taken as one edit. */
   const takeSome = (picked: Record<string, Suggest[]>) => edit(s => Object.entries(picked).reduce((x, [k, ss]) => {
     const path = k.split("/").map(v => (/^\d+$/.test(v) ? Number(v) : v));
     const base = "beat" in ((get(x, path) ?? {}) as object) ? [...path, "beat"] : path;
@@ -167,64 +166,104 @@ function Studio(p: { id: string }) {
   const edit = (fn: (s: StoryDoc) => StoryDoc, field?: string) => change<StoryDoc>("story", p.id, fn, field);
   // an agent pointed here
   useEffect(() => { const s = agentShown.value; if (s && s.id === p.id && s.step) select(s.step, true); }, [agentShown.value?.n]);
-  // from the review page: a block (#/episode/<id>/at/<key>), or the episode's review (#/episode/<id>/review)
-  useEffect(() => { const [, , sub, k] = route.value; if (sub === "at" && k) select(pathOfKey(k), true); if (sub === "review") { setTab("review"); setReviewMode(true); } }, [route.value.join("/")]);
   const mine = proposals.value.filter(x => (x.kind === "story" && x.doc === p.id) || x.also?.some(a => a.kind === "story" && a.doc === p.id));
   const conflict = conflicts.value.has(key);
   const problems = [...(checked.value[key] ?? []), ...lints];
   const marks: Record<number, { errors: number; warnings: number }> = {};
   for (const x of problems) if (x.step !== undefined && (x.level === "error" || x.level === "warning")) { const m = (marks[x.step] ??= { errors: 0, warnings: 0 }); if (x.level === "error") m.errors++; else m.warnings++; }
-  const comments = review.value[p.id]?.comments?.length ?? 0;
   const allFlags = flagsIn(story);
   const errors = problems.filter(x => x.level === "error").length;
-  const blocks = blocksOf(story, langs), standing = standingOf(review.value[p.id], blocks, { errors, translations: langs.translations });
   const save = () => void saveDocs([key, keyOf("season", `s${seasonOf(p.id)}`)]);
 
+  // where the episode stands in the work, and the stage on the page (#/episode/<id>/<stage>)
+  const live = marksNow.value.get(`story:${p.id}`)?.live;
+  const pluginStages = plugins.flatMap(ep => (ep.stage ? [{ key: ep.stage.key, name: ep.stage.name, ...ep.stage.state({ story, problems }) }] : []));
+  const progress = progressOf({ story, langs, review: review.value[p.id], errors, suggestions, drafting: live ? { step: Math.max(1, blocks(story).length), total: Math.max(1, blocks(story).length) } : null, stages: pluginStages });
+  const keys = progress.stages.map(x => x.key);
+  const [, , sub, k] = route.value;
+  const stage: StageKey = keys.includes(sub) ? sub : sub === "at" ? "script" : sub === "review" ? "review" : live ? "script" : progress.next ?? "review";
+  const goStage = (s: StageKey) => go("episode", p.id, s);
+  // from the review page: a block (#/episode/<id>/at/<key>); from a translator's link: the language (#/episode/<id>/translate/<lang>)
+  useEffect(() => { if (sub === "at" && k) select(pathOfKey(k), true); if (sub === "translate" && k && langs.translations.includes(k)) setTrLang(k); }, [route.value.join("/")]);
+  const next = nextStepOf(progress, stage, { lang: trLang, drafting: !!live });
+  /** Do what a next-step button says. */
+  const act = (a: StepAction) => {
+    if (a.startsWith("go:")) return goStage(a.slice(3));
+    switch (a) {
+      case "draft": return void send("This episode is a draft. Write its steps from its title, premise, cast and place, and what the series' plugins ask of it, in the series' languages, using the place's marks. Propose the result.");
+      case "first-unstaged": if (progress.unstaged[0]) select(progress.unstaged[0], true); return;
+      case "add-all": return takeSome(suggestions);
+      case "first-untranslated": { const b = blocksOf(story, langs).find(x => !checkedOf(review.value[p.id]?.steps?.[x.key]).includes(trLang)); if (b) select(b.path, true); return; }
+      case "next-language": { const l = progress.langs.find(x => x.done < x.total); if (l) setTrLang(l.lang); return; }
+      case "draft-language": return void send(`Fill in every missing ${langName(trLang)} translation in this episode, natural and simple. Propose them.`);
+      case "settings": return go("board");
+      case "watch": return goStage("review");
+      case "approve": return void setReview(p.id, r => ({ ...r, status: "approved", sig: episodeSig(story) }));
+    }
+  };
+  const title = textOf(story.title, langs.main);
+  const view = (() => {
+    if (stage === "brief") return html`<${EpisodeHead} story=${story} saved=${saved} edit=${edit} />`;
+    if (stage === "script") return html`<${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} ghosts=${ghosts} suggestions=${suggestions}
+      gutter=${(b: { path: Path }) => html`<${ReviewGutter} id=${p.id} story=${story} path=${b.path} onComments=${() => { select(b.path); goStage("review"); }} />`} />`;
+    if (stage === "translate") return html`<${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} ghosts=${ghosts} suggestions=${{}} />`;
+    if (stage === "review") return html`<${ReviewPanel} id=${p.id} story=${story} path=${path} standing=${standingOf(review.value[p.id], blocksOf(story, langs), { errors, translations: langs.translations })} onReview=${() => {}} />`;
+    const ep = plugins.find(x => x.stage?.key === stage);
+    return ep?.Sections ? html`<${ep.Sections} story=${story} saved=${saved} edit=${edit} />` : null;
+  })();
+
   return html`<section class="studio-episode" onKeyDown=${(e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") { e.preventDefault(); save(); } }}>
-    <div class="toolbar row">
-      <div class="grow" style="min-width:0"><h2 style="margin:0"><span class="note">${p.id}</span> <span ...${inLang(langs.main)}>${textOf(story.title, langs.main)}</span></h2>
-        <span class="note">${[langs.translations[0] && html`<span ...${inLang(langs.translations[0])}>${textOf(story.title, langs.translations[0]) ?? ""}</span>`, story.kind === "special" && "special", story.releaseDate, story.draft && "draft"].filter(Boolean).map((x, k) => html`${k ? " · " : ""}${x}`)}</span></div>
-      <button class=${`stage-btn ${standing.stage}`} onClick=${() => setTab("review")} title=${`Its review: ${standing.done} of ${standing.total} blocks reviewed${standing.missing.length ? `; not ready: ${standing.missing.join(", ")}` : ""}`}>${STAGE_NAME[standing.stage]}${comments ? ` · ${comments} 💬` : ""}</button>
-      <button class="iconbtn" onClick=${() => history("story", p.id, "undo")} disabled=${!d.past.length} title=${`Undo (${MOD} Z)`} aria-label="Undo"><${Icon} name="undo" /></button>
-      <button class="iconbtn" onClick=${() => history("story", p.id, "redo")} disabled=${!d.future.length} title=${`Redo (⇧${MOD} Z)`} aria-label="Redo"><${Icon} name="redo" /></button>
-      <button onClick=${() => history("story", p.id, "revert")} disabled=${!dirty(d)}>Revert</button>
-      ${nSuggest > 0 && html`<button onClick=${() => setReviewing(true)} title="The rules suggest staging the script lacks: a gesture the words call for, a feeling the punctuation shows, a fix for a check (the dashed chips in the script). Review them before any is added."><${Icon} name="spark" size=${16} /> ${nSuggest} suggested staging${nSuggest > 1 ? "s" : ""}…</button>`}
-      ${w.ai && html`<button onClick=${(e: MouseEvent) => setAsks({ x: e.clientX, y: e.clientY + 12 })} title="Ask the assistant about this episode or the selected block"><${Icon} name="spark" size=${16} /> Ask</button>`}
-      <button aria-pressed=${details} onClick=${() => setDetails(!details)} title="All the staging of the selected block">Details</button>
-      <${SaveButton} onSave=${save} disabled=${!dirty(d)} title=${`Save (${MOD} S)`} />
+    <div class="ep-top">
+      <div class="ep-title">
+        <div class="grow" style="min-width:0"><h2 ...${inLang(langs.main)}>${title || "Untitled episode"}</h2>
+          <span class="sub">${[langs.translations[0] && textOf(story.title, langs.translations[0]) && html`<span ...${inLang(langs.translations[0])}>${textOf(story.title, langs.translations[0])}</span>`, story.kind === "special" && "special", story.releaseDate, playOf(story, w.series) === "watch" && "watch only", progress.approved ? "approved" : story.draft ? "draft" : ""].filter(Boolean).map((x, k) => html`${k ? " · " : ""}${x}`)}</span></div>
+        <span class=${`saved-state${dirty(d) ? " dirty" : ""}`}>${dirty(d) ? "Unsaved" : "Saved"}</span>
+        <span class="tool-group">
+          <button class="iconbtn" onClick=${() => history("story", p.id, "undo")} disabled=${!d.past.length} title=${`Undo (${MOD} Z)`} aria-label="Undo"><${Icon} name="undo" /></button>
+          <button class="iconbtn" onClick=${() => history("story", p.id, "redo")} disabled=${!d.future.length} title=${`Redo (⇧${MOD} Z)`} aria-label="Redo"><${Icon} name="redo" /></button></span>
+        ${dirty(d) && html`<${SaveButton} onSave=${save} title=${`Save (${MOD} S)`} />`}
+        ${w.ai && html`<button onClick=${(e: MouseEvent) => setAsks({ x: e.clientX, y: e.clientY + 12 })} title="Ask the assistant about this episode or the selected line"><${Icon} name="spark" size=${16} /> Ask</button>`}
+        <button class="iconbtn" aria-label="More" title="More" onClick=${(e: MouseEvent) => setMore({ x: e.clientX - 200, y: e.clientY + 12 })}>⋯</button>
+      </div>
+      <nav class="stages" aria-label="Stages of the work">${progress.stages.map(x => html`<button class=${`stage-tab${x.done ? " done" : ""}${progress.next === x.key ? " next" : ""}`} aria-current=${stage === x.key} onClick=${() => goStage(x.key)}>
+        <span class="name"><span class="mark" aria-hidden="true">${x.done ? "✓" : ""}</span>${x.name}${x.plugin ? html`<span class="plug">plugin</span>` : ""}</span>
+        <span class="state">${progress.next === x.key && !x.done ? "Next · " : ""}${x.state}</span></button>`)}</nav>
+      <div class="next-step"><span class="label">Next</span><span class="what">${next.what}</span>
+        ${next.alt && html`<button onClick=${() => act(next.alt!.action)}>${next.alt.label}</button>`}
+        ${next.act && html`<button class="primary" onClick=${() => act(next.act!.action)}>${next.act.label} ▸</button>`}</div>
+      <${MadeByTask} kind="story" id=${p.id} />
     </div>
     ${conflict && html`<div class="banner">An agent wrote this episode while you had unsaved edits: <button class="small" onClick=${() => { void openDoc("story", p.id, true); conflicts.value = new Set([...conflicts.value].filter(k => k !== key)); }}>Take theirs</button> or save yours over it (the server will say it changed on disk; reload first to merge by hand).</div>`}
     <${ProposalsBar} list=${mine} story=${story} select=${select} />
     <div class="studio-split">
-      <div class="script-col">
-        <${EpisodeHead} story=${story} saved=${saved} edit=${edit} />
-        <${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} ghosts=${ghosts} suggestions=${suggestions}
-          gutter=${(b: { path: Path }) => html`<${ReviewGutter} id=${p.id} story=${story} path=${b.path} onComments=${() => { select(b.path); setTab("review"); }} />`} />
-        ${editorPluginsOf(w.series).map(ep => ep.Sections && html`<${ep.Sections} story=${story} saved=${saved} edit=${edit} />`)}
-      </div>
+      <div class="script-col">${view}</div>
       <div class="stage-col">
         ${pv && player && html`<${Strip} preview=${pv} story=${shown.current} at=${Math.max(0, player.next - 1)} select=${select} jump=${(i: number) => { player.jump(i); redraw(); }} />`}
         <div class="stagebox"><div ref=${box}></div></div>
         ${player && html`<${Transport} preview=${pv!} redraw=${redraw} />`}
-        ${pv && html`<${Direct} preview=${pv} story=${story} path=${path} host=${box.current?.parentElement ?? null} edit=${edit} cast=${cast} />`}
+        ${pv && stage === "script" && html`<${Direct} preview=${pv} story=${story} path=${path} host=${box.current?.parentElement ?? null} edit=${edit} cast=${cast} />`}
         ${allFlags.length > 0 && html`<div class="flags"><span class="note">Flags from earlier stories:</span>${allFlags.map(f => html`<button class=${`chip${flags.includes(f) ? " on" : ""}`} aria-pressed=${flags.includes(f)} onClick=${() => {
           const next = flags.includes(f) ? flags.filter(x => x !== f) : [...flags, f];
           setFlags(next); pv!.setFlags(next, Math.max(0, player!.next - 1)); redraw();
         }}>${f}</button>`)}</div>`}
-        ${inReview ? html`<${ReviewMode} id=${p.id} story=${story} blocks=${blocks} standing=${standing} path=${path} main=${langs.main} select=${select} onExit=${() => setReviewMode(false)} />` : html`
-        <div class="tabs" role="tablist">
-          ${(["problems", "review", "changes"] as const).map(t => html`<button role="tab" aria-selected=${tab === t} onClick=${() => setTab(t)}>${t === "problems" ? `Notes${errors ? ` (${errors})` : ""}` : t === "review" ? "Review" : "Changes"}</button>`)}
-        </div>
-        ${tab === "problems" && html`<label class="row note"><input type="checkbox" style="width:auto" checked=${here} onChange=${(e: Event) => setHere((e.target as HTMLInputElement).checked)} /> only the selected block</label>
-          <${NotesPanel} problems=${problems} path=${path} select=${select} edit=${edit} onlyHere=${here} />`}
-        ${tab === "review" && html`<${ReviewPanel} id=${p.id} story=${story} path=${path} standing=${standing} onReview=${() => setReviewMode(true)} />`}
-        ${tab === "changes" && html`<${ChangesPanel} id=${p.id} story=${story} savedAt=${d.mtime} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} select=${(x: Path) => select(x, true)} />`}`}
       </div>
     </div>
+    <div class="needs" role="region" aria-label="Needs you">
+      <div class="needs-bar"><b>Needs you</b>
+        ${errors ? html`<span class="needs-count bad">${errors} error${errors > 1 ? "s" : ""}</span>` : ""}
+        ${problems.length - errors ? html`<span class="needs-count warn">${problems.length - errors} note${problems.length - errors > 1 ? "s" : ""}</span>` : ""}
+        ${!problems.length && html`<span class="note">Nothing waiting.</span>`}
+        <span class="grow"></span>${problems.length > 0 && html`<button class="small" aria-expanded=${needsOpen} onClick=${() => setNeedsOpen(!needsOpen)}>${needsOpen ? "Hide" : "Show"}</button>`}</div>
+      ${needsOpen && html`<div class="needs-list"><${NotesPanel} problems=${problems} path=${path} select=${select} edit=${edit} onlyHere=${false} /></div>`}
+    </div>
     ${asks && html`<${Popover} x=${asks.x} y=${asks.y} onClose=${() => setAsks(null)} label="Ask the assistant"><${AskMenu} onDone=${() => setAsks(null)} /></${Popover}>`}
-    ${reviewing && nSuggest > 0 && html`<${SuggestionsReview} story=${story} suggestions=${suggestions} name=${nameOf} onClose=${() => setReviewing(false)}
-      onAdd=${(picked: Record<string, Suggest[]>) => { takeSome(picked); setReviewing(false); }} onGo=${(at: Path) => { setReviewing(false); select(at, true); }} />`}
-    ${details && html`<${Drawer} float title="Details" onClose=${() => setDetails(false)}><${Details} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} /></${Drawer}>`}
+    ${more && html`<${Popover} x=${more.x} y=${more.y} onClose=${() => setMore(null)} label="More"><div class="menu">
+      <button onClick=${() => { setDrawer("changes"); setMore(null); }}><b>Changes</b><small>what changed since the last save and commit</small></button>
+      <button disabled=${!path} onClick=${() => { setDrawer("details"); setMore(null); }}><b>More about this line</b><small>everything on the selected line, and the file's data</small></button>
+      <button disabled=${!dirty(d)} onClick=${() => { history("story", p.id, "revert"); setMore(null); }}><b>Revert</b><small>back to the saved file</small></button>
+      <button onClick=${() => { go("board"); setMore(null); }}><b>Series settings</b><small>languages, how episodes play, the narrator</small></button></div></${Popover}>`}
+    ${drawer === "details" && html`<${Drawer} float title="More about this line" onClose=${() => setDrawer(null)}><${Details} story=${story} saved=${saved} path=${path} cast=${cast} edit=${edit} /></${Drawer}>`}
+    ${drawer === "changes" && html`<${Drawer} float title="Changes" onClose=${() => setDrawer(null)}><${ChangesPanel} id=${p.id} story=${story} savedAt=${d.mtime} edit=${(fn: (s: StoryDoc) => StoryDoc) => edit(fn)} select=${(x: Path) => select(x, true)} /></${Drawer}>`}
   </section>`;
 }
 

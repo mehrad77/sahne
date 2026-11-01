@@ -32,6 +32,8 @@ function clean(e: unknown): EpisodeReview {
   if (isStatus(x.status)) out.status = x.status;
   if (typeof x.ai === "boolean") out.ai = x.ai;
   if (typeof x.reviewer === "string" && x.reviewer.trim()) out.reviewer = x.reviewer.trim().slice(0, 80);
+  // the episode as it was approved (model/progress.ts episodeSig): a later change shows as changed since
+  if (typeof x.sig === "string" && /^[0-9a-f]{8}$/.test(x.sig)) out.sig = x.sig;
   if (x.steps && typeof x.steps === "object") {
     const steps: Record<string, StepNote> = {};
     for (const [k, v] of Object.entries(x.steps as Record<string, unknown>)) {

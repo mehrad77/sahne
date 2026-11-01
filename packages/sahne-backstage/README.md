@@ -119,7 +119,8 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 | `#/` | The home: the series' name, the scene last worked on framed as a paper theatre's stage, *Continue* back into it, the board, and the cast, places, kit and guides. The episode page keeps the episode, the cue on its stage and a picture of that stage in this browser (`src/recent.ts`). Before any, the home shows the next episode's place. *Continue* opens the curtains and grows the scene to fill the page. The episode then opens under it at that cue. With reduced motion, it simply opens. A root with no series or no episode asks for the first |
 | `#/board`, `#/season/<id>` | The board of a season (the first, or the one named), described below |
 | `#/new/<season>[/<date>]` | A new episode (on that day), described below |
-| `#/episode/<id>` | An episode, described below |
+| `#/episode/<id>` | An episode, at the stage of the work it is at, described below |
+| `#/episode/<id>/<stage>` | An episode at one stage: `brief`, `script`, `translate` (`/translate/<lang>` opens that language: a translator's link), a plugin's own (`lesson`) or `review` |
 | `#/episode/<id>/proposal/<n>` | An agent's proposal of that episode read as a whole, as a new episode's preview is (*Reject*, *Accept*); its step diff links here when most of the episode changes |
 | `#/kit/<section>/<shelf>` | The kit as a library: props, set pieces, gestures, emotions, sounds, by shelf |
 | `#/cast` | Everyone of the series as a portrait, the extras on their own tab. *New character* (the first card, or the button) asks who they are: a name in the main language (the id is made from it, `Kırlangıç Ana` → `kirlangic_ana`, and can be edited; ids are permanent, and a taken or retired one is refused), a role, and a look to start from (the stand-in, four random ones, or a copy of someone), then opens their page. With a few words about them and the assistant on, they are saved at once and the assistant drafts their role, bio and names there, as a proposal to accept. A right click on a card opens or deletes them; deleting asks first, and is refused for an extra, the stand-in or the narrator, or one an episode names (their page has the same *Delete*) |
@@ -141,7 +142,15 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 - **A view switch** beside the settings (a calendar or a list, remembered in the browser) shows the season as a list instead: each week with its span and theme, then a row per episode in release order (its day, its place's picture, its title with the first translation, its id, place and cast, and its state), and last the episodes with no date. A row opens the episode.
 - *Season settings* and *Series settings* open in a modal over the board (`Modal`, a `<dialog>`: Escape or a click outside closes it): titles and summaries in every language, the series' languages, narrator and stand-in, the season's launch day. On a root with no `series.json`, the board starts one.
 
-**The episode studio** (`src/ui/studio/`): the script on the left, the stage on the right.
+**The episode studio** (`src/ui/studio/`) is built around the stages of the work. It always shows where the episode stands and the one next step.
+- **The top** (`episode.ts`):
+  - **The title row:** the title, its first translation, the kind, the release day and whether it is watch-only, draft or approved. Beside it, the save state, undo and redo, *Save* while there are unsaved edits, *Ask* and a *⋯* menu: *Changes*, *More about this line*, *Revert* and *Series settings*.
+  - **The stages bar:** Brief, Script, Translate, a plugin's own stage (the lesson plugin's Lesson) and Review. Each says whether it is done and what it is at, and the next one is marked. Nothing about it is stored: `src/model/progress.ts` works it out from the episode, its review notes, its problems, the suggestions and a task writing it (`test/progress.test.ts`).
+  - **The next step:** one sentence and at most two buttons for the stage on the page, such as *Draft it with the assistant*, *Go to the first* line without directions, *Add all 3* suggestions, the next language, *Watch it* or *Approve*.
+  - **The task line:** a task writing the episode now, or the one that made it (`MadeByTask`).
+- **The stage on the page** fills the left column. The stage on the right plays the line you're on, with the tools to move people on it while you work in Script.
+- **Needs you** (along the bottom): the episode's errors and notes, with *Show* for the list. A note goes to its line, and some have a fix.
+- **Approving** stores the episode's signature (`episodeSig`, kept in the review notes as `sig`), so a later change shows as *Changed since approved*. The release day and the draft mark are not part of it.
 - **The head:** the title and premise in the series' languages, who is in it (the cast and extras as portraits, each with how many lines they speak; *+ someone* adds from a picker; the story check refuses a speaker not in the cast), and what the series' plugins add (the lesson plugin: what it teaches).
 - **The script** (`script.ts`, its operations in `src/model/script.ts`): one block per step, typed into like a screenplay.
   - A **scene** heading: the place (a click picks another from its picture), the time of day, and where each of the cast starts.

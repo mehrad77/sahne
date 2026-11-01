@@ -116,6 +116,14 @@ export const lessonEditor: EditorPlugin = {
   id: "lesson",
   Head,
   Sections: p => html`<${Quiz} ...${p} /><${Glosses} ...${p} />`,
+  stage: {
+    key: "lesson", name: "Lesson",
+    state: ({ story, problems }) => {
+      const mine = problems.filter(x => x.plugin === "lesson" && x.level === "error");
+      if (!story.steps.length) return { done: false, state: "Nothing yet" };
+      return mine.length ? { done: false, state: `${mine.length} problem${mine.length > 1 ? "s" : ""}` } : { done: true, state: "All checks pass" };
+    },
+  },
   blocks: [{
     kind: "spot",
     name: ["Grammar spot", "the narrator points out a line"],

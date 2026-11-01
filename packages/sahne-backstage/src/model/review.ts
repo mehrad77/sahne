@@ -14,7 +14,8 @@ export type Status = "draft" | "reviewed" | "approved";
 export interface Comment { id: string; at?: string; by: string; text: string; date: string; done?: boolean }
 /** A block's review: reviewed, the translations checked, and the block as it was then (`sig`). `persian`: notes from before `checked`. */
 export interface StepNote { reviewed?: boolean; checked?: string[]; persian?: boolean; sig?: string }
-export interface EpisodeReview { status?: Status; ai?: boolean; reviewer?: string; steps?: Record<string, StepNote>; comments?: Comment[] }
+/** `sig`: the episode as it was approved (model/progress.ts `episodeSig`), so a later change shows as changed since. */
+export interface EpisodeReview { status?: Status; ai?: boolean; reviewer?: string; steps?: Record<string, StepNote>; comments?: Comment[]; sig?: string }
 
 /** One block of an episode, as review sees it. */
 export interface Block { key: string; path: Path; step: number; kind: string; who?: string; text: string; sig: string; /** The translations it holds words in, which each need a check. */ langs: string[] }

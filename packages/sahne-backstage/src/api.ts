@@ -27,7 +27,8 @@ export interface World {
   /** Whether agents may see a card's main-language word. */
   shareCards?: boolean;
 }
-export interface Problem { rule: string; level: "error" | "warning" | "info"; story: string; step?: number; option?: number; message: string; doc: string; new?: boolean }
+/** A problem of a document; `plugin` names the story plugin whose check found it. */
+export interface Problem { rule: string; level: "error" | "warning" | "info"; story: string; step?: number; option?: number; message: string; doc: string; new?: boolean; plugin?: string }
 export interface Edit { kind: Kind; id: string; doc: unknown; mtime?: number; create?: boolean }
 export interface SaveResult { status: number; saved?: Record<string, number>; problems?: Problem[]; message?: string }
 

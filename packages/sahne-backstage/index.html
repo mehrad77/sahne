@@ -934,6 +934,45 @@ button.link { border: 0; background: none; padding: 0; color: var(--accent, inhe
 .step-proposals ul { margin: 0; padding-left: 18px; }
 .note.bad { color: var(--bad); }
 .redo input { flex: 1; }
+
+/* the episode page (ui/studio/episode.ts): the stages of the work, the one next step, the task line and what needs you */
+.ep-top { position: sticky; top: 0; z-index: 6; background: var(--bg); padding: 8px 0 10px; border-bottom: 1px solid var(--line); margin-bottom: 12px; display: grid; gap: 8px; }
+.ep-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ep-title h2 { margin: 0; font-family: var(--script); font-size: 21px; }
+.ep-title .sub { color: var(--mute); font-size: 13px; }
+.ep-title .tool-group { display: inline-flex; gap: 2px; }
+.saved-state { font-size: 12.5px; color: var(--mute); display: inline-flex; align-items: center; gap: 5px; }
+.saved-state::before { content: ""; width: 7px; height: 7px; border-radius: 99px; background: var(--ok); }
+.saved-state.dirty::before { background: var(--warn); }
+.stages { display: flex; gap: 0; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); overflow-x: auto; }
+.stage-tab { flex: 1 1 0; min-width: 118px; border: 0; border-right: 1px solid var(--line); border-radius: 0; background: none; text-align: left; padding: 7px 12px 8px; display: grid; gap: 1px; color: var(--ink); }
+.stage-tab:last-child { border-right: 0; }
+.stage-tab .name { font-weight: 650; font-size: 14.5px; display: inline-flex; align-items: center; gap: 6px; }
+.stage-tab .mark { width: 15px; height: 15px; border-radius: 99px; border: 1.6px solid var(--faint); display: inline-grid; place-items: center; font-size: 10px; line-height: 1; flex: none; }
+.stage-tab.done .mark { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.stage-tab.next:not(.done) .mark { border-color: var(--warn); }
+.stage-tab .state { font-size: 12px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage-tab.next:not(.done) .state { color: var(--warn); }
+.stage-tab[aria-current="true"] { background: var(--accent-soft); box-shadow: inset 0 -2px 0 var(--accent); }
+.stage-tab .plug { font: 600 9.5px/1.4 system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--curtain); border: 1px solid var(--curtain); border-radius: 4px; padding: 0 4px; }
+.next-step { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px; }
+.next-step .label { font: 650 11px/1 system-ui, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); }
+.next-step .what { flex: 1 1 16rem; min-width: 0; }
+.ep-top .made-by { margin: 0; background: none; padding: 0 2px; font-size: 13px; }
+.lead { color: var(--mute); font-size: 13px; margin: 0 0 8px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.lead .grow { flex: 1 1 14rem; }
+.needs { position: sticky; bottom: 0; z-index: 6; background: var(--panel); border-top: 1px solid var(--line); margin: 14px -22px 0; padding: 8px 22px; }
+.needs-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.needs-count { font-size: 12.5px; padding: 1px 9px; border-radius: 99px; background: var(--chip); }
+.needs-count.warn { color: var(--warn); } .needs-count.bad { color: var(--bad); }
+.needs-list { display: grid; gap: 6px; margin-top: 8px; max-height: 42vh; overflow: auto; }
+.need { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--raised); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13.5px; }
+.need .kind { font: 650 10.5px/1.6 system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; padding: 0 6px; border-radius: 4px; background: var(--chip); color: var(--mute); }
+.need .kind.problem { color: var(--warn); } .need .kind.error { color: var(--bad); } .need .kind.proposal, .need .kind.task { color: var(--accent); }
+.need .t { flex: 1 1 18rem; min-width: 0; }
+.dirs-quiet { font: 12.5px/1.5 system-ui, sans-serif; color: var(--faint); }
+.no-dirs { font: 12.5px/1.5 system-ui, sans-serif; color: var(--warn); }
+@media (max-width: 700px) { .needs { margin: 14px -12px 0; padding: 8px 12px; } .stage-tab { min-width: 104px; } }
 </style>
 </head>
 <body>

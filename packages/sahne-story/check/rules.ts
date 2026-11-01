@@ -17,7 +17,8 @@ import { INTERACTIVE_MECHANICS, playOf } from "../src/play.ts";
 import type { Draft, World } from "./world.ts";
 
 export type CheckRule = "schema" | "id" | "series" | "calendar" | "ref" | "cast" | "counts" | "play" | "flags" | "quiz" | "mistake" | "text" | "words" | "recycle" | "character" | "lint" | "place";
-export interface CheckProblem { rule: CheckRule | string; level: "error" | "warning" | "info"; story: string; step?: number; message: string }
+/** A problem the check finds; `plugin` names the story plugin whose check found it (src/plugin.ts). */
+export interface CheckProblem { rule: CheckRule | string; level: "error" | "warning" | "info"; story: string; step?: number; message: string; plugin?: string }
 /**
  * `kit` is a whole `Kit` (sahne-kit's full.ts) when the cast's avatars are to be composed; a bare manifest
  * skips that. `puppets` names the kit puppets a character's `puppet` may name beyond the kit's own
@@ -98,7 +99,8 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
 
   const langs = languagesOf(world.series), lang = langOf(world), norm = normIn(lang);
   const plugins = pluginsOf(world.series, o.plugins ?? []), play = playOf(s, world.series);
-  for (const p of [...validateDoc("story", s, plugins), ...storyLanguageGaps(s, langs), ...plugins.flatMap(pl => pl.languageGaps?.(s, langs) ?? [])]) add("schema", "error", `${p.path}: ${p.message}`);
+  for (const p of [...validateDoc("story", s, plugins), ...storyLanguageGaps(s, langs)]) add("schema", "error", `${p.path}: ${p.message}`);
+  for (const pl of plugins) for (const p of pl.languageGaps?.(s, langs) ?? []) out.push({ rule: "schema", level: "error", story: id, message: `${p.path}: ${p.message}`, plugin: pl.id });
   for (const [cid, c] of Object.entries(d.characters)) for (const p of [...validateDoc("character", c), ...characterLanguageGaps(c, langs)]) add("schema", "error", `character ${cid} ${p.path}: ${p.message}`);
   if (s.id !== d.id) add("id", "error", `the folder is ${d.id} but the story's id is ${s.id}`);
 
@@ -173,7 +175,7 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   }
   // the series' plugins check what they add
   const names = [...nameWords(d, world, s), ...Object.values(d.characters).map(c => textOf(c.name, langs.main) ?? "")];
-  for (const pl of plugins) pl.check?.({ story: s, characters: d.characters, world, languages: langs, lang, play, texts: all, names, norm, add });
+  for (const pl of plugins) pl.check?.({ story: s, characters: d.characters, world, languages: langs, lang, play, texts: all, names, norm, add: (rule, level, message, step) => out.push({ rule, level, story: id, step, message, plugin: pl.id }) });
   return out;
 }
 
