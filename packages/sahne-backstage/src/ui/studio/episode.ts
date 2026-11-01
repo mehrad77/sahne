@@ -14,8 +14,9 @@ import { cueOf, cuePath, type Path } from "../../model/path.ts";
 import { flagsIn, wordsOnly } from "../../model/steps.ts";
 import { dirty } from "../../model/history.ts";
 import { KIT, Preview, solidsOf } from "../../stage.ts";
-import { pathOfKey, ReviewPanel } from "../review.ts";
-import { blocksOf, checkedOf, standingOf } from "../../model/review.ts";
+import { pathOfKey } from "../review.ts";
+import { ReadThrough, ReviewSide } from "./reviewstage.ts";
+import { blocksOf, checkedOf } from "../../model/review.ts";
 import { episodeSig, nextStepOf, progressOf, type StageKey, type StepAction } from "../../model/progress.ts";
 import { blocks } from "../../model/script.ts";
 import { marks as marksNow } from "../../runs.ts";
@@ -80,6 +81,7 @@ function Studio(p: { id: string }) {
   const [drawer, setDrawer] = useState<"details" | "changes" | null>(null);
   const [needsOpen, setNeedsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [watching, setWatching] = useState(false);
   const [trLang, setTrLang] = useState<string>(langs.translations[0] ?? langs.main);
   // the Script stage's view: only the words, and a translation under each line (remembered in this browser)
   const [onlyWords, setOnlyWords] = useStored("backstage:words-only", false);
@@ -203,10 +205,18 @@ function Studio(p: { id: string }) {
       case "next-language": { const l = progress.langs.find(x => x.done < x.total); if (l) setTrLang(l.lang); return; }
       case "draft-language": return void send(`Fill in every missing ${langName(trLang)} translation in this episode, natural and simple. Propose them.`);
       case "settings": return setSettingsOpen(true);
-      case "watch": return goStage("review");
+      case "watch": return watch();
       case "approve": return void setReview(p.id, r => ({ ...r, status: "approved", sig: episodeSig(story) }));
     }
   };
+  /** Watch it through: the stage full width from the opening scene, running on by itself. */
+  const watch = () => {
+    if (stage !== "review") goStage("review");
+    setWatching(true);
+    const pl = preview.current?.player;
+    if (pl) { pl.jump(0); pl.setAuto(true); redraw(); }
+  };
+  const unwatch = () => { setWatching(false); preview.current?.player.setAuto(false); redraw(); };
   const title = textOf(story.title, langs.main);
   const view = (() => {
     if (stage === "brief") return html`<${EpisodeHead} story=${story} saved=${saved} edit=${edit} />`;
@@ -216,7 +226,8 @@ function Studio(p: { id: string }) {
       <${Script} id=${p.id} story=${story} saved=${saved} selected=${path} focusTick=${focusTick} playing=${playing} select=${select} edit=${edit} marks=${marks} ghosts=${ghosts} suggestions=${suggestions}
         wordsOnly=${onlyWords} showTr=${showTr ? langs.translations[0] : null} watch=${playOf(story, w.series) === "watch"} onMore=${(x: Path) => { select(x); setDrawer("details"); }} />`;
     if (stage === "translate") return html`<${Translate} id=${p.id} story=${story} selected=${path} lang=${trLang} langs=${progress.langs} setLang=${setTrLang} select=${select} edit=${edit} onSettings=${() => setSettingsOpen(true)} />`;
-    if (stage === "review") return html`<${ReviewPanel} id=${p.id} story=${story} path=${path} standing=${standingOf(review.value[p.id], blocksOf(story, langs), { errors, translations: langs.translations })} onReview=${() => {}} />`;
+    if (stage === "review") return html`<div class="lead"><span class="grow">Read it as the audience will, with the ${langName(langs.translations[0] ?? langs.main)} under each line. Click a line to play it and comment on it.</span></div>
+      <${ReadThrough} id=${p.id} story=${story} selected=${path} select=${(x: Path) => select(x)} />`;
     const ep = plugins.find(x => x.stage?.key === stage);
     return ep?.Sections ? html`<${ep.Sections} story=${story} saved=${saved} edit=${edit} />` : null;
   })();
@@ -244,12 +255,15 @@ function Studio(p: { id: string }) {
     </div>
     ${conflict && html`<div class="banner">An agent wrote this episode while you had unsaved edits: <button class="small" onClick=${() => { void openDoc("story", p.id, true); conflicts.value = new Set([...conflicts.value].filter(k => k !== key)); }}>Take theirs</button> or save yours over it (the server will say it changed on disk; reload first to merge by hand).</div>`}
     <${ProposalsBar} list=${mine} story=${story} select=${select} />
-    <div class="studio-split">
-      <div class="script-col">${view}</div>
+    <div class=${`studio-split${watching ? " watching" : ""}`}>
+      ${!watching && html`<div class="script-col">${view}</div>`}
       <div class="stage-col">
         ${pv && player && html`<${Strip} preview=${pv} story=${shown.current} at=${Math.max(0, player.next - 1)} select=${select} jump=${(i: number) => { player.jump(i); redraw(); }} />`}
         <div class="stagebox"><div ref=${box}></div></div>
-        ${player && html`<${Transport} preview=${pv!} redraw=${redraw} />`}
+        ${watching && player && html`<${Subtitle} info=${info[Math.max(0, player.next - 1)]} />`}
+        ${player && html`<${Transport} preview=${pv!} redraw=${redraw} watch=${playOf(story, w.series) === "watch"} />`}
+        ${watching && html`<div class="row" style="justify-content:center"><button onClick=${unwatch}>Back to reading</button></div>`}
+        ${stage === "review" && !watching && html`<${ReviewSide} id=${p.id} story=${story} progress=${progress} selected=${path} goStage=${goStage} onWatch=${watch} />`}
         ${pv && stage === "script" && html`<${Direct} preview=${pv} story=${story} path=${path} host=${box.current?.parentElement ?? null} edit=${edit} cast=${cast} />`}
         ${allFlags.length > 0 && html`<div class="flags"><span class="note">Flags from earlier stories:</span>${allFlags.map(f => html`<button class=${`chip${flags.includes(f) ? " on" : ""}`} aria-pressed=${flags.includes(f)} onClick=${() => {
           const next = flags.includes(f) ? flags.filter(x => x !== f) : [...flags, f];
@@ -278,7 +292,7 @@ function Studio(p: { id: string }) {
 }
 
 /** Play controls: from the start, back, play on, a scrubber over every cue and one through the cue playing, the learner's card. */
-function Transport(p: { preview: Preview; redraw(): void }) {
+function Transport(p: { preview: Preview; redraw(): void; watch?: boolean }) {
   // a card shows its line in the main language, and a choice option its first translation under it
   const { main, translations: [gloss] } = useLangs();
   const pl = p.preview.player, info = pl.info, f = pl.footer();
@@ -297,7 +311,8 @@ function Transport(p: { preview: Preview; redraw(): void }) {
     <div class="row">
       <button class="iconbtn" onClick=${() => jump(0)} title="The opening scene" aria-label="The opening scene"><${Icon} name="prev" /></button>
       <button class="iconbtn" onClick=${() => jump(Math.max(0, at - 1))} title="The cue before" aria-label="The cue before"><${Icon} name="undo" /></button>
-      <button class="primary" onClick=${() => { pl.devam(); p.redraw(); }} disabled=${f.kind === "turn" || f.kind === "end"}><${Icon} name="play" size=${14} /> ${f.kind === "busy" ? "Finish" : "Next"}</button>
+      <button class=${p.watch ? "" : "primary"} onClick=${() => { pl.devam(); p.redraw(); }} disabled=${f.kind === "turn" || f.kind === "end"}><${Icon} name="play" size=${14} /> ${f.kind === "busy" ? "Finish" : "Next"}</button>
+      <button class=${p.watch ? "primary" : ""} onClick=${() => { if (!pl.auto && f.kind === "end") pl.jump(0); pl.setAuto(!pl.auto); p.redraw(); }} title=${p.watch ? "A watch-only episode plays on time alone" : "Play on by itself, stopping at the viewer's cards"}>${pl.auto ? "Pause" : "Play"}</button>
       <input type="range" class="grow" min="0" max=${Math.max(0, info.length - 1)} value=${at} aria-label="Scrub through the cues" onInput=${(e: Event) => jump(Number((e.target as HTMLInputElement).value))} />
       <span class="note">${at}/${info.length - 1}</span>
     </div>
@@ -315,4 +330,11 @@ function Transport(p: { preview: Preview; redraw(): void }) {
 function useStored<T>(name: string, fallback: T): [T, (v: T) => void] {
   const [v, setV] = useState<T>(() => { try { const x = localStorage.getItem(name); return x === null ? fallback : JSON.parse(x) as T; } catch { return fallback; } });
   return [v, (x: T) => { setV(x); try { localStorage.setItem(name, JSON.stringify(x)); } catch { /* the setting lasts this visit */ } }];
+}
+
+/** What the cue playing says, in the main language and the first translation: the watch view's subtitle. */
+function Subtitle(p: { info?: { tr?: string; text?: Record<string, string> } }) {
+  const { main, translations: [gloss] } = useLangs();
+  const said = p.info?.text?.[main] ?? p.info?.tr;
+  return html`<div class="subtitle">${said ? html`<span ...${inLang(main)}>${said}</span>${gloss && p.info?.text?.[gloss] && html`<small ...${inLang(gloss)}>${p.info.text[gloss]}</small>`}` : html`&nbsp;`}</div>`;
 }

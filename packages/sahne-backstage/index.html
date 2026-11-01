@@ -994,6 +994,24 @@ button.link { border: 0; background: none; padding: 0; color: var(--accent, inhe
 .tr-row .check.stale { color: var(--warn); border-color: var(--warn); }
 .empty-stage { padding: 28px 8px; display: grid; gap: 10px; justify-items: start; }
 @media (max-width: 700px) { .tr-head { display: none; } .tr-row { grid-template-columns: 24px minmax(0, 1fr); } .tr-row textarea, .tr-row .check { grid-column: 2; } }
+.read { display: grid; gap: 2px; }
+.read-row { padding: 6px 10px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; }
+.read-row:hover { background: var(--panel); }
+.read-row.on { background: var(--panel); border-color: var(--line); box-shadow: inset 3px 0 var(--accent); }
+.read-row.d1 { margin-left: 28px; } .read-row.d2 { margin-left: 56px; }
+.read-row .who { font: 700 12px var(--script); letter-spacing: .06em; text-transform: uppercase; }
+.read-row .say { font-family: var(--script); font-size: 15px; }
+.read-row .scene-h { font: 700 13px var(--script); letter-spacing: .06em; color: var(--curtain); }
+.read-row .direction { font-family: var(--script); color: var(--mute); font-style: italic; }
+.cmark { font: 12px system-ui, sans-serif; color: var(--warn); }
+.review-side { display: grid; gap: 10px; }
+.ready-list { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; }
+.ready-list li { display: flex; gap: 8px; align-items: center; font-size: 13.5px; }
+.ready-list .mark { width: 16px; text-align: center; } .ready-list .ok .mark { color: var(--accent); } .ready-list .no .mark { color: var(--warn); }
+.studio-split.watching { grid-template-columns: 1fr; max-width: 1100px; margin: 0 auto; }
+.studio-split.watching .stage-col { position: static; max-height: none; width: min(100%, 860px); margin: 0 auto; }
+.subtitle { text-align: center; font-family: var(--script); font-size: 18px; min-height: 2.6em; display: grid; gap: 2px; padding: 4px 0; }
+.subtitle small { font: 14px system-ui, sans-serif; color: var(--mute); }
 </style>
 </head>
 <body>
