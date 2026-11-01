@@ -893,6 +893,9 @@ button.link { border: 0; background: none; padding: 0; color: var(--accent, inhe
 .run-did ol > li > svg { color: var(--mute); flex: none; }
 .run-did > summary svg { vertical-align: -2px; }
 .run-finished svg { color: var(--accent); flex: none; }
+.run-did .checkpoint { color: var(--mute); border-bottom: 0; } .run-did .checkpoint svg { color: var(--mute); }
+.fail-note p { margin: 2px 0; } .fail-note details { font-size: 12.5px; } .fail-note summary { cursor: pointer; color: var(--mute); } .fail-note pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 2px 0; font-size: 11.5px; }
+.fields-diff { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; margin: 0; } .fields-diff dt { color: var(--mute); font-weight: 600; } .fields-diff dd { margin: 0; overflow-wrap: anywhere; font-size: 13px; } .fields-diff del { color: var(--bad); } .fields-diff ins { color: var(--ok); text-decoration: none; }
 .run-did time { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 12.5px; min-width: 42px; }
 .run-did .decided { flex-basis: 100%; margin-left: 50px; }
 .topbar .chip { display: inline-flex; align-items: center; gap: 5px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }

@@ -42,6 +42,8 @@ export interface Step {
   summary?: string;
   /** The choices it made that the goal left open, in a line each (finish_step), shown to the person beside what it made. */
   decided?: string[];
+  /** When it first started working, and when it was done: how long steps take, for the time left. */
+  startedAt?: number; endedAt?: number;
   /** What the person told it while it works, not read yet: its next model call reads it (`tell`). */
   told?: string[];
   /** What it asks the person, while it is `asking`. */
@@ -447,7 +449,7 @@ export class Runs {
     if (this.live.has(key)) return;
     const stop = new AbortController();
     this.live.set(key, stop);
-    s.status = "running";
+    s.status = "running"; s.startedAt ??= Date.now(); delete s.endedAt;
     this.changed(run);
     let bs: Awaited<ReturnType<typeof backstage>> | null = null, failed: string | undefined;
     try {
@@ -507,7 +509,7 @@ export class Runs {
       else {
         const last = [...(state.values.messages ?? [])].reverse().find(m => m.getType() === "ai");
         s.summary ??= (last ? String(typeof last.content === "string" ? last.content : (last.content as { type: string; text?: string }[]).filter(b => b.type === "text").map(b => b.text).join("")).slice(0, 2000) : undefined);
-        s.status = "done";
+        s.status = "done"; s.endedAt = Date.now();
         await this.saver.deleteThread(thread.configurable.thread_id);
       }
     } catch (e) {

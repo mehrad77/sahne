@@ -10,6 +10,7 @@ import { adaptStory, type CharacterDoc, type StoryDoc } from "../../sahne-story/
 import { cueOf, cuePath, get, insert, move, same, set, within } from "../src/model/path.ts";
 import * as H from "../src/model/history.ts";
 import { marksOf } from "../src/model/marks.ts";
+import { leftWords, timeLeft } from "../src/model/eta.ts";
 import { flagsIn, kindOf, rows, wordsOnly } from "../src/model/steps.ts";
 
 const json = (u: URL) => JSON.parse(readFileSync(u, "utf8"));
@@ -356,4 +357,14 @@ test("marks: what tasks make now and made, by document; newer wins, working wins
   assert.deepEqual(marks.get("season:s1"), { task: "r2", step: "ep", title: "ep", created: false, live: true }, "a working step over what an older task made");
   assert.equal(marks.has("place:firin"), false, "an undone step's");
   assert.equal(marks.has("place:park"), false, "a stopped task makes nothing now");
+});
+
+test("time left: the done steps' average, over the steps left, as many at once as the task runs", () => {
+  const m = 60_000, done = (min: number) => ({ kind: "place", status: "done", startedAt: 0, endedAt: min * m });
+  assert.equal(timeLeft([{ kind: "plan", status: "done", startedAt: 0, endedAt: m }, { kind: "place", status: "waiting" }], 3, 0), null, "nothing done to go by (the plan does not count)");
+  assert.equal(timeLeft([done(2), done(4)], 3, 0), null, "nothing left");
+  assert.equal(timeLeft([done(2), done(4), { kind: "episode", status: "waiting" }, { kind: "episode", status: "waiting" }], 1, 0), 6 * m, "two of 3 min, one at a time");
+  assert.equal(timeLeft([done(2), done(4), { kind: "episode", status: "waiting" }, { kind: "episode", status: "waiting" }], 3, 0), 3 * m, "two at once");
+  assert.equal(timeLeft([done(4), { kind: "episode", status: "running", startedAt: 0 }], 1, m), 3 * m, "a working step owes what is left of its share");
+  assert.deepEqual([leftWords(30_000), leftWords(70_000), leftWords(4 * m)], ["under a minute left", "about a minute left", "about 4 min left"]);
 });

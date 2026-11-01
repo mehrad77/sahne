@@ -384,3 +384,19 @@ test("pausing: a working step waits before its next model call and goes on from 
   assert.ok(r.log(run.id, "cast_x").some(e => JSON.stringify(e.event).includes("You said")));
   await assert.rejects(r.step(run.id, "cast_x", { action: "tell", text: "x" }), /tell a step while it works/);
 });
+
+test("a document's text before the task first wrote it, and now; steps keep when they worked", async () => {
+  const { r } = runs(scripted({
+    plan: [{ calls: [{ name: "propose_plan", args: { brief: "b", steps: [{ id: "cast_x", kind: "character", title: "Defne", brief: "make her", owns: [{ kind: "character", id: "defne6" }] }] } }] }],
+    cast_x: [{ calls: [{ name: "create_character", args: { ...derya, id: "defne6" } }] }, finish("made")],
+  }));
+  const run = r.create({ goal: "a person", mode: "auto" });
+  await r.idle();
+  const b = r.journal.before(run.id, "character", "defne6")!;
+  assert.equal(b.before, null, "it created her");
+  assert.match(b.now!, /defne6/);
+  assert.equal(r.journal.before(run.id, "character", "nima"), null, "it never wrote nima");
+  const s = run.steps.find(x => x.id === "cast_x")!;
+  assert.ok(s.startedAt! <= s.endedAt!, JSON.stringify(s));
+  r.undo(run.id);
+});

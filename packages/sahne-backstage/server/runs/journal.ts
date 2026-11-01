@@ -38,6 +38,12 @@ export class Journal {
     }
   }
 
+  /** A document's text before a run first wrote it (null: the run created it), and now (null: gone): what it changed. */
+  before(run: string, kind: Kind, id: string): { before: string | null; now: string | null } | null {
+    const first = this.of(run).find(w => w.kind === kind && w.id === id);
+    return first ? { before: first.before, now: textAt(fileOf(kind, id)) } : null;
+  }
+
   /** Every write of a run still in effect, oldest first. */
   of(run: string): Written[] {
     return this.store.db.prepare("SELECT seq, run, step, kind, id, before, after, hash, at FROM journal WHERE run = ? ORDER BY seq").all(run) as unknown as Written[];

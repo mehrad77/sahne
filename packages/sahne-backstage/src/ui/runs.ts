@@ -13,6 +13,8 @@ import { acceptAndSave, neededFirst, proposals, reject, turnedDown, type Proposa
 import { hrefOf, openProposal } from "./proposed.ts";
 import { Answer } from "./assistant.ts";
 import { doingNow } from "./chat/parts.ts";
+import { WhatChanged } from "./whatchanged.ts";
+import { leftWords, timeLeft } from "../model/eta.ts";
 import { ago } from "./agents.ts";
 import { Chip, Icon } from "./kit/index.ts";
 import { Picture } from "./kit/gallery.ts";
@@ -99,7 +101,7 @@ function RunView(p: { id: string }) {
     <div class="run-head">
       <div class="grow"><h3 class="run-goal" title=${run.goal}>${run.goal}</h3>
         <div class="run-progress"><span class=${`bar${run.status === "running" ? " live" : ""}`}><span style=${share(done)}></span><span class="doing" style=${share(doing)}></span></span>
-          <span class="note">${run.status === "done" ? "Done" : run.status === "stopped" ? "Stopped" : `${done} of ${work.length}`} · ${usd(run.usd)}${run.estimateUsd !== undefined ? ` of about ${usd(run.estimateUsd)}` : ""} · ${auto(run) ? "just doing it" : "checking with you"}${pausedByYou(run) ? ` · paused${run.steps.some(s => s.status === "running") ? ": the working steps finish what they are doing, then wait" : ""}` : ""}</span></div></div>
+          <span class="note">${run.status === "done" ? "Done" : run.status === "stopped" ? "Stopped" : `${done} of ${work.length}`} · ${usd(run.usd)}${run.estimateUsd !== undefined ? ` of about ${usd(run.estimateUsd)}` : ""}${(left => (left === null ? "" : ` · ${leftWords(left)}`))(run.status === "running" ? timeLeft(run.steps, run.concurrency, Date.now()) : null)} · ${auto(run) ? "just doing it" : "checking with you"}${pausedByYou(run) ? ` · paused${run.steps.some(s => s.status === "running") ? ": the working steps finish what they are doing, then wait" : ""}` : ""}</span></div></div>
       <div class="row">
         ${run.status === "running" && html`<button class="small" onClick=${() => void pause()} title="Steps finish what they are doing, then wait"><${Icon} name="pause" size=${14} /> Pause</button>`}
         ${pausedByYou(run) && html`<button class="small primary" onClick=${() => void goOn()}><${Icon} name="play" size=${14} /> Go on</button>`}
@@ -172,20 +174,33 @@ function PausedCard(p: { run: Run; stuck: RunStep[] }) {
   return html`<div class="ask-card gate-card bad" role="group" aria-label="The task is paused">
     ${budget ? html`<b>Paused at its budget.</b><div class="row"><label class="row">Raise it to $ <input type="number" min=${Math.ceil(run.usd)} step="1" style="max-width:90px" value=${more} onInput=${(e: Event) => setMore(Number((e.target as HTMLInputElement).value))} /></label><button class="primary" onClick=${() => void raise()}>Go on</button></div>
       <p class="note">If the day's cap in Settings stopped it, raise that there; the stopped parts go on by themselves once there is room.</p>`
-      : p.stuck.length ? html`<b>${p.stuck.length === 1 ? `${p.stuck[0].title} stopped` : `${p.stuck.length} parts stopped`}.</b><div class="row"><button class="primary" onClick=${() => void retryAll()}>Try ${p.stuck.length === 1 ? "it" : "them"} again</button></div>`
+      : p.stuck.length ? html`<b>${p.stuck.length === 1 ? `${p.stuck[0].title} stopped` : `${p.stuck.length} parts stopped`}.</b>${p.stuck.map(s => html`<${FailNote} step=${s} />`)}<div class="row"><button class="primary" onClick=${() => void retryAll()}>Try ${p.stuck.length === 1 ? "it" : "them"} again</button></div>`
       : html`<b>Paused: ${run.why}</b>`}</div>`;
 }
 
 /** When an Auto run is done: what it made, to keep or undo. */
+/** Why a step could not go on, in plain words, and what to do; its own error stays folded under it. */
+function failWords(s: RunStep): string {
+  if (s.budget) return `Couldn't finish ${s.title}: the budget or the day's cap was reached. Raise it, or try again later.`;
+  if (s.status === "stopped") return `${s.title} was stopped before it was done. Try it again when you want it.`;
+  const why = (s.error ?? "").split("\n")[0].replace(/^Error: /, "").slice(0, 160);
+  return `Couldn't finish ${s.title}${why ? `: ${why}` : ""}. Try it again, or do it again with a note.`;
+}
+const FailNote = (p: { step: RunStep }) => html`<div class="fail-note"><p class="note bad">${failWords(p.step)}</p>${p.step.error && html`<details><summary>What it said</summary><pre>${p.step.error}</pre></details>`}</div>`;
+
+/** Everything back to how it was before the task: the checkpoint its journal holds. */
+async function backToBefore(run: Run): Promise<void> {
+  const n = (run.made ?? []).length;
+  if (!confirm(`Put everything back to how it was before this task (${n} document${n === 1 ? "" : "s"})? Anything changed since it wrote it is kept.`)) return;
+  const r = await undo(run.id);
+  if (typeof r === "string") say(r, true); else say(`back to before the task: ${r.undone.length} undone${r.kept.length ? `; kept, as it changed after the task: ${r.kept.map(k => k.id).join(", ")}` : ""}`);
+}
+
 function Finished(p: { run: Run }) {
   const run = p.run, made = run.made ?? [];
-  const all = async () => {
-    if (!confirm(`Undo everything this task made (${made.length} document${made.length === 1 ? "" : "s"})? Anything changed since it wrote it is kept.`)) return;
-    const r = await undo(run.id);
-    if (typeof r === "string") say(r, true); else say(`undone: ${r.undone.length}${r.kept.length ? `; kept, as it changed after the task: ${r.kept.map(k => k.id).join(", ")}` : ""}`);
-  };
+  const all = () => backToBefore(run);
   const said = run.status === "done" ? "Done. Here is what it made." : run.status === "stopped" ? "Stopped. Here is what it made so far." : "Paused. Here is what it made so far.";
-  return html`<div class="run-finished"><${Icon} name="check" size=${16} /><b class="grow">${said}</b>${made.length > 0 && html`<button class="small" onClick=${() => void all()}><${Icon} name="undo" size=${14} /> Undo all of it</button>`}</div>`;
+  return html`<div class="run-finished"><${Icon} name="check" size=${16} /><b class="grow">${said}</b>${made.length > 0 && html`<button class="small" onClick=${() => void all()}><${Icon} name="history" size=${14} /> Back to before this task</button>`}</div>`;
 }
 
 export type Kind2 = "character" | "place" | "season" | "story";
@@ -227,6 +242,7 @@ function ResultCard(p: { run: Run; kind: Kind2; id: string; step: RunStep }) {
     ${kind !== "season" && html`<${Picture} art=${art} label=${name} />`}
     <div class="result-body">
       <b>${name}</b><span class="note">${state === "being made" ? html`<${Chip} tone="ok" live>being made</${Chip}>` : state}</span>
+      ${state === "stopped" && html`<${FailNote} step=${step} />`}
       ${step.about && html`<span class="note why">${step.about}</span>`}
       ${step.decided && html`<ul class="decided" aria-label="What it decided">${step.decided.map(d => html`<li>${d}</li>`)}</ul>`}
       ${first.length > 0 && heads.length > 0 && html`<span class="note">Accepting also saves ${first.map(q => q.doc).join(", ")}.</span>`}
@@ -261,7 +277,7 @@ function StepRow(p: { run: Run; step: RunStep }) {
     ${s.status === "asking" && s.question && html`<${StepQuestion} run=${run} step=${s} />`}
     ${open && html`<div class="run-step-body">
       ${s.brief && s.kind !== "plan" && html`<p class="note">${s.brief}</p>`}
-      ${s.error && html`<div class="chat-error"><span class="grow">${s.error}</span></div>`}
+      ${(s.status === "failed" || s.status === "stopped") ? html`<${FailNote} step=${s} />` : s.error && html`<div class="chat-error"><span class="grow">${s.error}</span></div>`}
       ${log ? html`<div class="step-log"><${Answer} turn=${log} live=${s.status === "running"} /></div>` : html`<p class="note">Reading its work…</p>`}
       ${s.summary && s.status === "done" && html`<div class="step-summary"><b>Its report</b><${Markdown} text=${s.summary} /></div>`}
       <${StepProposals} run=${run} step=${s} />
@@ -302,7 +318,7 @@ function Tell(p: { run: Run; step: RunStep }) {
 
 /** What the task wrote, newest first: each document to open, or to undo while it can be; under a step's newest row, the choices it made. */
 function History(p: { run: Run }) {
-  const run = p.run, { main } = useLangs();
+  const run = p.run, { main } = useLangs(), [diff, setDiff] = useState<{ kind: string; id: string; name: string } | null>(null);
   // a document a step wrote several times is one row, at its last write: made, if the first of them created it
   const by = new Map<string, Did>();
   for (const d of run.did ?? []) { const k = `${d.step}:${d.kind}:${d.id}`, was = by.get(k); by.delete(k); by.set(k, { ...d, created: d.created || !!was?.created }); }
@@ -314,10 +330,13 @@ function History(p: { run: Run }) {
     told.add(d.step);
     const made = (run.made ?? []).some(m => m.kind === d.kind && m.id === d.id);
     return html`<li><time>${clock(d.at)}</time><${Icon} name=${KIND_ICON[d.kind] ?? "note"} size=${15} /><span class="grow">${d.created ? "Made" : "Changed"} ${KIND_NAME[d.kind] ?? d.kind} <b>${name}</b>${step && html` <span class="note">· ${step.title}</span>`}</span>
+      ${made && !d.created && html`<button class="small" onClick=${() => setDiff({ kind: d.kind, id: d.id, name })}><${Icon} name="list" size=${14} /> What changed</button>`}
       ${made && html`<a class="button small" href=${hrefOf(d.kind, d.id)}>Open</a>`}
       ${made && step && direct(run) && step.status !== "running" && (d.kind === "character" || d.kind === "place" || d.kind === "season" || d.kind === "story") && html`<button class="small" onClick=${() => void undoDoc(run, d.kind as Kind2, d.id, name, step)}><${Icon} name="undo" size=${14} /> Undo</button>`}
       ${first && step?.decided && html`<ul class="decided" aria-label="What it decided">${step.decided.map(x => html`<li>${x}</li>`)}</ul>`}</li>`;
-  })}</ol></details>`;
+  })}
+    <li class="checkpoint"><${Icon} name="history" size=${15} /><span class="grow">Before this task</span>${direct(run) && (run.made ?? []).length > 0 && run.status !== "running" && html`<button class="small" onClick=${() => void backToBefore(run)}><${Icon} name="undo" size=${14} /> Restore</button>`}</li></ol>
+    ${diff && html`<${WhatChanged} task=${run.id} kind=${diff.kind} id=${diff.id} name=${diff.name} onClose=${() => setDiff(null)} />`}</details>`;
 }
 
 /** A step's question: its buttons, or the person's own words. */

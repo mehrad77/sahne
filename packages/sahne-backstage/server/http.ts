@@ -194,6 +194,13 @@ export async function serve(o: Options): Promise<Running> {
           if (v?.action === "undo") { const r = runs.undo(id, Array.isArray(v.items) ? v.items : undefined); return json(res, 200, { run: withMade(r.run), undone: r.undone, kept: r.kept.map(({ before: _b, ...w }) => w) }); }
           return json(res, 200, { run: withMade(runs.act(id, v as Parameters<Runs["act"]>[1])) });
         }
+        if (sub === "before" && !step && m === "GET") {
+          const q = new URL(req.url ?? "", "http://x").searchParams, kind = q.get("kind") ?? "";
+          if (!isKind(kind)) throw new Fail(400, `no kind ${kind}`);
+          const b = runs.journal.before(id, kind, q.get("id") ?? "");
+          if (!b) throw new Fail(404, `the task wrote no ${q.get("kind")} ${q.get("id")}`);
+          return json(res, 200, b);
+        }
         if (sub === "steps" && step && what === "log" && m === "GET") return json(res, 200, { events: runs.log(id, step, Number(new URL(req.url ?? "", "http://x").searchParams.get("after") ?? 0)) });
         if (sub === "steps" && step && !what && m === "POST") return json(res, 200, { run: await runs.step(id, step, await body(req) as Parameters<Runs["step"]>[2]) });
       } catch (e) { if (e instanceof Fail) throw e; throw new Fail(400, (e as Error).message); }
