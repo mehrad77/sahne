@@ -6,8 +6,8 @@ import { useEffect } from "preact/hooks";
 import { loadLog, logs, marks, runs } from "../runs.ts";
 import { dirtyKeys, keyOf } from "../store.ts";
 import { doingNow } from "./chat/parts.ts";
-import { Chip, Icon } from "./kit/index.ts";
-import { undoDoc, type Kind2 } from "./runs.ts";
+import { Chip, Confirm, Icon } from "./kit/index.ts";
+import { undoAsk, undoDoc, type Kind2 } from "./runs.ts";
 
 export function MadeByTask(p: { kind: Kind2; id: string; name?: string }) {
   const m = marks.value.get(`${p.kind}:${p.id}`);
@@ -22,6 +22,6 @@ export function MadeByTask(p: { kind: Kind2; id: string; name?: string }) {
       ${dirty && html`<p class="note warn">You have unsaved edits here: what the task writes will need merging with them.</p>`}</div>`;
   }
   return html`<div class="made-by"><${Icon} name="spark" size=${15} /><span class="grow">${m.created ? "Made" : "Changed"} by a task${m.about ? html`<span class="note"> · ${m.about}</span>` : ""}</span>
-    ${run.agentEdits === "direct" && html`<button class="small" onClick=${() => void undoDoc(run, p.kind, p.id, p.name ?? p.id, step)}><${Icon} name="undo" size=${14} /> Undo</button>`}${see}
+    ${run.agentEdits === "direct" && html`<${Confirm} label=${html`<${Icon} name="undo" size=${14} /> Undo`} ask=${undoAsk(run, p.id, p.name ?? p.id, step)} yes="Yes, undo" run=${() => undoDoc(run, p.kind, p.id)} />`}${see}
     ${m.decided && html`<details class="made-by-decided"><summary>What it decided</summary><ul>${m.decided.map(d => html`<li>${d}</li>`)}</ul></details>`}</div>`;
 }

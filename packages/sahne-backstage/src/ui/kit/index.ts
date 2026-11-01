@@ -3,10 +3,21 @@
 
 import { html } from "htm/preact";
 import type { ComponentChildren } from "preact";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { Icon } from "./icons.ts";
 
 export { Icon } from "./icons.ts";
+
+/** A button that asks before it acts, in place (the browser's own confirm may not show): its question, a Yes and a
+ * Cancel take its spot, so a mis-click costs nothing. Escape cancels. */
+export function Confirm(p: { label: ComponentChildren; ask: string; yes: string; run(): unknown; class?: string; disabled?: boolean; title?: string }) {
+  const [asking, setAsking] = useState(false);
+  if (!asking) return html`<button class=${p.class ?? "small"} disabled=${p.disabled} title=${p.title} onClick=${() => setAsking(true)}>${p.label}</button>`;
+  return html`<span class="confirm" role="group" aria-label=${p.ask} onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Escape") setAsking(false); }}>
+    <span class="confirm-ask">${p.ask}</span>
+    <button class="small danger" autoFocus onClick=${() => { setAsking(false); void p.run(); }}>${p.yes}</button>
+    <button class="small" onClick=${() => setAsking(false)}>Cancel</button></span>`;
+}
 
 /** A small word in a pill; `live` gives it a breathing dot, for an agent at work (or, with "warn", waiting for you). */
 export const Chip = (p: { tone?: "bad" | "warn" | "ok" | ""; title?: string; live?: boolean; children?: ComponentChildren }) =>

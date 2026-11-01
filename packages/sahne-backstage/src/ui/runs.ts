@@ -16,7 +16,7 @@ import { doingNow } from "./chat/parts.ts";
 import { WhatChanged } from "./whatchanged.ts";
 import { leftWords, timeLeft } from "../model/eta.ts";
 import { ago } from "./agents.ts";
-import { Chip, Icon } from "./kit/index.ts";
+import { Chip, Confirm, Icon } from "./kit/index.ts";
 import { Picture } from "./kit/gallery.ts";
 import { portraitOf } from "./galleries.ts";
 import { placeThumb } from "../thumbs.ts";
@@ -57,10 +57,13 @@ function docOf(kind: string, id: string): unknown {
 const nameOf = (doc: unknown, id: string, main: string) => { const d = doc as { name?: unknown; title?: unknown } | undefined; return textOf((d?.name ?? d?.title) as never, main) ?? id; };
 const KIND_NAME: Record<string, string> = { character: "person", place: "place", season: "season", story: "episode", kit_piece: "set piece", kit_variant: "look" };
 
-/** Undo one document a task made, with what was built on it, after saying so. */
-export async function undoDoc(run: Run, kind: Kind2, id: string, name: string, step: RunStep): Promise<void> {
+/** What undoing a document asks first: it, and what was built on it. */
+export function undoAsk(run: Run, id: string, name: string, step: RunStep): string {
   const after = stepsAfter(run, step.id).flatMap(s => s.owns.map(o => o.id)).filter(x => x !== id);
-  if (!confirm(`Undo ${name}?${after.length ? ` This also undoes what was built on it: ${after.join(", ")}.` : ""}`)) return;
+  return `Undo ${name}?${after.length ? ` This also undoes ${after.join(", ")}, built on it.` : ""}`;
+}
+/** Undo one document a task made, with what was built on it (asked first, by a Confirm). */
+export async function undoDoc(run: Run, kind: Kind2, id: string): Promise<void> {
   const r = await undo(run.id, [{ kind, id }]);
   if (typeof r === "string") say(r, true); else say(`undone: ${r.undone.map(u => u.id).join(", ") || "nothing"}${r.kept.length ? `; kept, as it changed after the task: ${r.kept.map(k => k.id).join(", ")}` : ""}`);
 }
@@ -90,11 +93,12 @@ export function RunsTab() {
 function RunView(p: { id: string }) {
   const run = runs.value.find(r => r.id === p.id);
   if (!run) return html`<p class="note">There is no task ${p.id}. <a href="#/agents/tasks">All tasks</a></p>`;
-  const work = run.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done").length, doing = work.filter(s => s.status === "running").length;
+  // undone or skipped steps are over too: a done task's bar is full
+  const work = run.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done" || s.status === "undone" || s.status === "skipped").length, doing = work.filter(s => s.status === "running").length;
   const share = (n: number) => `width:${work.length ? (n / work.length) * 100 : 0}%`;
   const pause = async () => { const e = await act(run.id, { action: "pause" }); if (e) say(e, true); };
   const goOn = async () => { const e = await act(run.id, { action: "continue" }); if (e) say(e, true); };
-  const stop = async () => { if (!confirm(`Stop this task? Its steps stop where they are${direct(run) ? "; what it made stays, and you can still undo it" : "; what they proposed stays for you to answer"}.`)) return; const e = await act(run.id, { action: "stop" }); if (e) say(e, true); };
+  const stop = async () => { const e = await act(run.id, { action: "stop" }); if (e) say(e, true); };
   const [work2, setWork] = useState(false);
   return html`<div class="run">
     <p class="note"><a href="#/agents/tasks">All tasks</a></p>
@@ -105,7 +109,7 @@ function RunView(p: { id: string }) {
       <div class="row">
         ${run.status === "running" && html`<button class="small" onClick=${() => void pause()} title="Steps finish what they are doing, then wait"><${Icon} name="pause" size=${14} /> Pause</button>`}
         ${pausedByYou(run) && html`<button class="small primary" onClick=${() => void goOn()}><${Icon} name="play" size=${14} /> Go on</button>`}
-        ${run.status !== "done" && run.status !== "stopped" && html`<button class="small" onClick=${() => void stop()}><${Icon} name="stop" size=${14} /> Stop the task</button>`}
+        ${run.status !== "done" && run.status !== "stopped" && html`<${Confirm} label=${html`<${Icon} name="stop" size=${14} /> Stop the task`} ask=${`Stop this task? Its steps stop where they are${direct(run) ? "; what it made stays, and you can still undo it" : "; what they proposed stays for you to answer"}.`} yes="Yes, stop it" run=${stop} />`}
       </div>
     </div>
     <${NowLines} run=${run} />
@@ -189,18 +193,17 @@ function failWords(s: RunStep): string {
 const FailNote = (p: { step: RunStep }) => html`<div class="fail-note"><p class="note bad">${failWords(p.step)}</p>${p.step.error && html`<details><summary>What it said</summary><pre>${p.step.error}</pre></details>`}</div>`;
 
 /** Everything back to how it was before the task: the checkpoint its journal holds. */
+const beforeAsk = (run: Run) => { const n = (run.made ?? []).length; return `Put ${n} document${n === 1 ? "" : "s"} back as before this task? What changed since is kept.`; };
 async function backToBefore(run: Run): Promise<void> {
-  const n = (run.made ?? []).length;
-  if (!confirm(`Put everything back to how it was before this task (${n} document${n === 1 ? "" : "s"})? Anything changed since it wrote it is kept.`)) return;
   const r = await undo(run.id);
   if (typeof r === "string") say(r, true); else say(`back to before the task: ${r.undone.length} undone${r.kept.length ? `; kept, as it changed after the task: ${r.kept.map(k => k.id).join(", ")}` : ""}`);
 }
 
 function Finished(p: { run: Run }) {
   const run = p.run, made = run.made ?? [];
-  const all = () => backToBefore(run);
+
   const said = run.status === "done" ? "Done. Here is what it made." : run.status === "stopped" ? "Stopped. Here is what it made so far." : "Paused. Here is what it made so far.";
-  return html`<div class="run-finished"><${Icon} name="check" size=${16} /><b class="grow">${said}</b>${made.length > 0 && html`<button class="small" onClick=${() => void all()}><${Icon} name="history" size=${14} /> Back to before this task</button>`}</div>`;
+  return html`<div class="run-finished"><${Icon} name="check" size=${16} /><b class="grow">${said}</b>${made.length > 0 && html`<${Confirm} label=${html`<${Icon} name="history" size=${14} /> Back to before this task`} ask=${beforeAsk(run)} yes="Yes, put it back" run=${() => backToBefore(run)} />`}</div>`;
 }
 
 export type Kind2 = "character" | "place" | "season" | "story";
@@ -233,17 +236,17 @@ function ResultCard(p: { run: Run; kind: Kind2; id: string; step: RunStep }) {
     : null;
   const state = step.status === "running" ? "being made" : step.status === "asking" ? "asks you" : step.status === "undone" ? "undone"
     : heads.length ? "waits for you" : doc && (made || !direct(run)) ? "made" : step.status === "failed" || step.status === "stopped" ? "stopped" : "to come";
-  const undoIt = async () => { setBusy(true); try { await undoDoc(run, kind, id, name, step); } finally { setBusy(false); } };
+  const undoIt = async () => { setBusy(true); try { await undoDoc(run, kind, id); } finally { setBusy(false); } };
   const just = useJust(state, "made");
   const redo = async () => { const e = await actStep(run.id, step.id, { action: "redo" }); if (e) say(e, true); };
   const answer = async (fn: (x: Proposal) => Promise<unknown>) => { setBusy(true); try { for (const x of heads) if (proposals.value.some(q => q.id === x.id)) await fn(x); } finally { setBusy(false); } };
   const blocked = heads.flatMap(turnedDown), first = [...new Map(heads.flatMap(neededFirst).map(q => [q.id, q])).values()];
   return html`<div class=${`result-card ${state.replace(/ /g, "-")}${just ? " just" : ""}`}>
-    ${kind !== "season" && html`<${Picture} art=${art} label=${name} />`}
+    ${kind !== "season" && (art ? html`<${Picture} art=${art} label=${name} />` : html`<div class="art placeholder" aria-hidden="true"><${Icon} name=${KIND_ICON[kind]} size=${30} /></div>`)}
     <div class="result-body">
       <b>${name}</b><span class="note">${state === "being made" ? html`<${Chip} tone="ok" live>being made</${Chip}>` : state}</span>
       ${state === "stopped" && html`<${FailNote} step=${step} />`}
-      ${step.about && html`<span class="note why">${step.about}</span>`}
+      ${step.about && run.status !== "gate" && html`<span class="note why">${step.about}</span>`}
       ${step.decided && html`<ul class="decided" aria-label="What it decided">${step.decided.map(d => html`<li>${d}</li>`)}</ul>`}
       ${first.length > 0 && heads.length > 0 && html`<span class="note">Accepting also saves ${first.map(q => q.doc).join(", ")}.</span>`}
       <div class="row wrap">
@@ -251,7 +254,7 @@ function ResultCard(p: { run: Run; kind: Kind2; id: string; step: RunStep }) {
         ${heads.length > 0 && html`<button class="small" disabled=${busy} onClick=${() => openProposal(heads[0])}>Look</button>
           <button class="small primary" disabled=${busy || blocked.length > 0} onClick=${() => void answer(x => acceptAndSave(x))}>Accept and save</button>
           <button class="small" disabled=${busy} onClick=${() => void answer(x => reject(x))}>Reject</button>`}
-        ${direct(run) && made && step.status !== "running" && html`<button class="small" disabled=${busy} onClick=${() => void undoIt()}><${Icon} name="undo" size=${14} /> Undo</button>`}
+        ${direct(run) && made && step.status !== "running" && html`<${Confirm} disabled=${busy} label=${html`<${Icon} name="undo" size=${14} /> Undo`} ask=${undoAsk(run, id, name, step)} yes="Yes, undo" run=${undoIt} />`}
         ${step.status === "undone" && html`<button class="small" onClick=${() => void redo()}><${Icon} name="redo" size=${14} /> Make it again</button>`}
       </div></div></div>`;
 }
@@ -296,7 +299,8 @@ function NowLines(p: { run: Run }) {
   if (!live.length) return null;
   return html`<ul class="run-now" aria-live="polite">${live.map(s => {
     const log = logs.value[`${p.run.id}:${s.id}`];
-    return html`<li><span class="spin" aria-hidden="true"></span><b>${s.title}</b><span class="note grow">${log ? doingNow(log.parts) : "Starting"}…</span><${Tell} run=${p.run} step=${s} /></li>`;
+    // keyed by step: a note being written stays with its step when another one ends
+    return html`<li key=${s.id}><span class="spin" aria-hidden="true"></span><b>${s.title}</b><span class="note grow">${log ? doingNow(log.parts) : "Starting"}…</span><${Tell} run=${p.run} step=${s} /></li>`;
   })}</ul>`;
 }
 
@@ -332,10 +336,10 @@ function History(p: { run: Run }) {
     return html`<li><time>${clock(d.at)}</time><${Icon} name=${KIND_ICON[d.kind] ?? "note"} size=${15} /><span class="grow">${d.created ? "Made" : "Changed"} ${KIND_NAME[d.kind] ?? d.kind} <b>${name}</b>${step && html` <span class="note">· ${step.title}</span>`}</span>
       ${made && !d.created && html`<button class="small" onClick=${() => setDiff({ kind: d.kind, id: d.id, name })}><${Icon} name="list" size=${14} /> What changed</button>`}
       ${made && html`<a class="button small" href=${hrefOf(d.kind, d.id)}>Open</a>`}
-      ${made && step && direct(run) && step.status !== "running" && (d.kind === "character" || d.kind === "place" || d.kind === "season" || d.kind === "story") && html`<button class="small" onClick=${() => void undoDoc(run, d.kind as Kind2, d.id, name, step)}><${Icon} name="undo" size=${14} /> Undo</button>`}
+      ${made && step && direct(run) && step.status !== "running" && (d.kind === "character" || d.kind === "place" || d.kind === "season" || d.kind === "story") && html`<${Confirm} label=${html`<${Icon} name="undo" size=${14} /> Undo`} ask=${undoAsk(run, d.id, name, step)} yes="Yes, undo" run=${() => undoDoc(run, d.kind as Kind2, d.id)} />`}
       ${first && step?.decided && html`<ul class="decided" aria-label="What it decided">${step.decided.map(x => html`<li>${x}</li>`)}</ul>`}</li>`;
   })}
-    <li class="checkpoint"><${Icon} name="history" size=${15} /><span class="grow">Before this task</span>${direct(run) && (run.made ?? []).length > 0 && run.status !== "running" && html`<button class="small" onClick=${() => void backToBefore(run)}><${Icon} name="undo" size=${14} /> Restore</button>`}</li></ol>
+    <li class="checkpoint"><${Icon} name="history" size=${15} /><span class="grow">Before this task</span>${direct(run) && (run.made ?? []).length > 0 && run.status !== "running" && html`<${Confirm} label=${html`<${Icon} name="undo" size=${14} /> Restore`} ask=${beforeAsk(run)} yes="Yes, put it back" run=${() => backToBefore(run)} />`}</li></ol>
     ${diff && html`<${WhatChanged} task=${run.id} kind=${diff.kind} id=${diff.id} name=${diff.name} onClose=${() => setDiff(null)} />`}</details>`;
 }
 

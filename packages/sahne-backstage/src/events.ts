@@ -9,10 +9,11 @@ import { signal } from "@preact/signals";
 import { api, type Kind } from "./api.ts";
 import { get, set, type Path } from "./model/path.ts";
 import * as H from "./model/history.ts";
-import { change, createDoc, drafts, go, keyOf, loadWorld, openDoc, saveDocs, say } from "./store.ts";
+import { change, createDoc, drafts, go, keyOf, loadWorld, openDoc, route, saveDocs, say } from "./store.ts";
 import { loadKitDocs } from "./kitdocs.ts";
 import { answerLook, type LookAsk } from "./look.ts";
 import { heardRun, loadRuns, runs } from "./runs.ts";
+import { who } from "./model/who.ts";
 
 export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean; paths?: Path[] }
 export interface Proposal extends ProposalEdit {
@@ -54,10 +55,22 @@ export function connectEvents() {
   void refresh();
   source.addEventListener("proposal", () => void refresh());
   source.addEventListener("doc", e => {
-    const d = JSON.parse((e as MessageEvent).data) as { kind: Kind; id: string; by?: string };
+    const d = JSON.parse((e as MessageEvent).data) as { kind: Kind; id: string; by?: string; removed?: boolean };
     const k = keyOf(d.kind, d.id), draft = drafts.value[k];
-    if (draft && H.dirty(draft)) { conflicts.value = new Set([...conflicts.value, k]); say(`${d.by ?? "An agent"} wrote ${d.kind} ${d.id} while you have unsaved edits of it`, true); }
-    else { if (draft) void openDoc(d.kind, d.id, true); say(`${d.by ?? "An agent"} wrote ${d.kind} ${d.id}`); }
+    // undone, and gone: a clean draft goes, and its page gives way to the list it was on
+    if (d.removed) {
+      if (draft && H.dirty(draft)) { conflicts.value = new Set([...conflicts.value, k]); say(`${d.by ? who(d.by) : "An agent"} took back ${d.kind} ${d.id}, which you have unsaved edits of`, true); }
+      else {
+        if (draft) { const { [k]: _gone, ...rest } = drafts.value; drafts.value = rest; }
+        const [page, id] = route.value, LIST: Record<string, [string, string]> = { character: ["character", "cast"], place: ["place", "places"], story: ["episode", "board"] };
+        if (id === d.id && LIST[d.kind]?.[0] === page) go(LIST[d.kind][1]);
+        say(`${d.by ? who(d.by) : "An agent"}: ${d.kind === "story" ? "episode" : d.kind} ${d.id} undone`);
+      }
+      void loadWorld();
+      return;
+    }
+    if (draft && H.dirty(draft)) { conflicts.value = new Set([...conflicts.value, k]); say(`${d.by ? who(d.by) : "An agent"} wrote ${d.kind} ${d.id} while you have unsaved edits of it`, true); }
+    else { if (draft) void openDoc(d.kind, d.id, true); say(`${d.by ? who(d.by) : "An agent"} wrote ${d.kind} ${d.id}`); }
     void loadWorld();
     if (d.kind === "kit_piece" || d.kind === "kit_variant") void loadKitDocs();
   });

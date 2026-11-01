@@ -114,7 +114,10 @@ pre.json { font: 12px/1.4 ui-monospace, monospace; white-space: pre-wrap; margin
 .season-tabs a small { color: var(--faint); font-weight: 400; margin-left: 4px; }
 .season-tabs button { margin: 0 0 4px 6px; font-size: 13px; padding: 3px 10px; }
 .topbar .search { flex: 1; max-width: 460px; margin: 0 auto; display: flex; align-items: center; gap: 8px; color: var(--mute); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; cursor: text; text-align: left; }
-.topbar .search kbd { margin-left: auto; }
+.topbar .search kbd { margin-left: auto; white-space: nowrap; flex: none; }
+/* the search keeps one line: its words are cut before the box grows, and a task's chip gives way first */
+.topbar .search { min-width: 44px; white-space: nowrap; overflow: hidden; }
+.topbar .search .words { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .topbar .state { font-size: 13px; color: var(--mute); white-space: nowrap; }
 .topbar .state.dirty { color: var(--warn); }
 .topbar .state.ro { color: var(--curtain); }
@@ -898,7 +901,13 @@ button.link { border: 0; background: none; padding: 0; color: var(--accent, inhe
 .fields-diff { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; margin: 0; } .fields-diff dt { color: var(--mute); font-weight: 600; } .fields-diff dd { margin: 0; overflow-wrap: anywhere; font-size: 13px; } .fields-diff del { color: var(--bad); } .fields-diff ins { color: var(--ok); text-decoration: none; }
 .run-did time { color: var(--faint); font-variant-numeric: tabular-nums; font-size: 12.5px; min-width: 42px; }
 .run-did .decided { flex-basis: 100%; margin-left: 50px; }
-.topbar .chip { display: inline-flex; align-items: center; gap: 5px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+.topbar .chip { display: inline-block; max-width: 240px; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+.topbar .chip svg { vertical-align: -2px; }
+.topbar .chip.live::before { display: inline-block; margin-right: 6px; vertical-align: 1px; }
+.result-card .art.placeholder { aspect-ratio: 16 / 10; display: grid; place-items: center; background: var(--chip); color: var(--faint); }
+.confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border-radius: 8px; background: var(--curtain-soft); }
+.confirm-ask { font-size: 13px; }
+.confirm button.danger { border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
 .chip.agent { display: inline-flex; align-items: center; gap: 3px; }
 .tilebadge.ok { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
 .tilebadge.live { display: inline-flex; align-items: center; gap: 5px; }

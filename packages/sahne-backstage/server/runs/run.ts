@@ -220,7 +220,7 @@ export class Runs {
 
   /** Start a run: of a plan, or from its goal alone, a planning step first. */
   create(v: { goal: string; plan?: Plan; gates?: Partial<Gates> | false; maxUsd?: number; concurrency?: number; agentEdits?: AgentEdits; mode?: "check" | "auto"; asks?: "choices" | "never" }): Run {
-    const plan: Plan = v.plan ?? { brief: "", steps: [{ id: "plan", kind: "plan", title: "Plan the run", brief: PLANNING }] };
+    const plan: Plan = v.plan ?? { brief: "", steps: [{ id: "plan", kind: "plan", title: "Plan the task", brief: PLANNING }] };
     const bad = planProblems(plan);
     if (bad.length) throw new Error(`the plan: ${bad.join("; ")}`);
     const s = this.settings(), id = `r${++this.n}`, mode = v.mode ?? s.runMode ?? "check";

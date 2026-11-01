@@ -63,7 +63,7 @@ export function App() {
     <header class="topbar">
       <a class="brand" href="#/" aria-label="sahne backstage"><span class="lockup"></span></a>
       <span class="series" title=${w.series ? tx(w.series.title, "en") : ""}>${w.series ? tx(w.series.title, "en") : "No series yet"}</span>
-      <button class="search" onClick=${() => setPalette(true)} aria-label="Search and commands"><${Icon} name="search" size=${16} /> Search or run a command <kbd>${MOD} K</kbd></button>
+      <button class="search" onClick=${() => setPalette(true)} aria-label="Search and commands"><${Icon} name="search" size=${16} /> <span class="words">Search or run a command</span> <kbd>${MOD} K</kbd></button>
       ${w.writable ? html`<span class=${`state${dirty ? " dirty" : ""}`} title=${dirty ? dirtyKeys.value.map(k => k.replace(":", " ")).join(", ") : ""}>${dirty ? `${dirty} unsaved` : "All saved"}</span>`
         : html`<button class="state ro" onClick=${() => { readOnlyHelp.value = true; }} title="Nothing is saved here. Click for why, and how to save.">${w.oldShape ? "Read-only: convert the root" : w.samples ? "Samples · read-only" : "Read-only"} <span aria-hidden="true">ⓘ</span></button>`}
       ${proposals.value.length > 0 && html`<a class="chip warn" href=${hrefOf(proposals.value[0].kind, proposals.value[0].doc)} title=${proposals.value.map(x => `${x.doc}: ${x.summary}`).join("\n")}>${proposals.value.length} proposed edit${proposals.value.length > 1 ? "s" : ""}</a>`}
