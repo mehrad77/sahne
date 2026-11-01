@@ -1,8 +1,9 @@
-// The series' and a season's own settings, in a drawer beside the board: the series' title and summary in its
-// languages, its languages (shown: they are set in series.json), its narrator and stand-in; a season's title, summary
-// and launch day. A root without series.json starts one here (with a season document for each season its stories use,
-// saved together: the check needs both); a new season takes the next number. The weeks' themes and the calendar are
-// edited on the board itself (ui/board.ts).
+// The series' and a season's own settings, in a dialog: the series' title and summary in its languages, its languages
+// (the translations added or removed here; the one it is written in is set in series.json), how its episodes play with
+// (when they are interactive) the stand-in the viewer speaks as, and its narrator; a season's title, summary and launch
+// day. A foot kept in view says whether there is anything to save, with Discard and Save. A root without series.json
+// starts one here (with a season document for each season its stories use, saved together: the check needs both); a new
+// season takes the next number. The weeks' themes and the calendar are edited on the board itself (ui/board.ts).
 
 import { html } from "htm/preact";
 import { useEffect, useState } from "preact/hooks";
@@ -14,8 +15,22 @@ import { Problems, Select } from "./fields.ts";
 import { startSeries } from "../model/series.ts";
 import { langName, Texts, useLangs } from "./lang.ts";
 import { SaveButton } from "./readonly.ts";
+import { editorPluginsOf } from "./plugins/index.ts";
 
 const filled = (codes: string[], text: (l: string) => string) => Object.fromEntries(codes.map(l => [l, text(l)]));
+
+/** The foot of a settings dialog, kept in view while the fields scroll: whether there is anything to save, Discard and
+ * Save (or, read-only, why nothing is saved). */
+function SettingsFoot(p: { dirty: boolean; onSave(): void; onDiscard(): void; label: string }) {
+  const writable = !!world.value?.writable;
+  return html`<div class="settings-foot">
+    <span class=${`grow note${p.dirty ? " unsaved" : ""}`}>${!writable ? "Changes stay in this tab." : p.dirty ? "Unsaved changes" : "Nothing to save"}</span>
+    ${p.dirty && html`<button onClick=${p.onDiscard}>Discard</button>`}
+    <${SaveButton} disabled=${!p.dirty} onSave=${p.onSave} label=${p.label} /></div>`;
+}
+
+/** One part of a settings dialog, under a heading. */
+const Part = (p: { title: string; children?: unknown }) => html`<section class="settings-part"><h3>${p.title}</h3>${p.children}</section>`;
 
 /** The series' own fields. */
 export function SeriesSettings() {
@@ -29,21 +44,32 @@ export function SeriesSettings() {
   const s = d.doc as SeriesDoc, was = d.saved as SeriesDoc, key = keyOf("series", "series");
   const put = (k: string, v: unknown) => change<SeriesDoc>("series", "series", x => set(x, [k], v), k);
   const people = Object.values(w.characters).filter(c => c.kind !== "extra").map(c => [c.id, `${textOf(c.name, langs.main) ?? c.id} (${c.kind})`] as [string, string]);
-  return html`<div class="fields">
-    <${Texts} label="Title" value=${s.title} saved=${was.title} onInput=${(l: string, v?: string) => put("title", { ...s.title, [l]: v ?? "" })} />
-    <${Texts} label="Summary" multi value=${s.summary} saved=${was.summary} onInput=${(l: string, v?: string) => put("summary", { ...s.summary, [l]: v ?? "" })} />
-    <${SeriesLanguages} s=${s} put=${put} />
-    <div class="field"><label>How its episodes play</label>
-      <div class="segmented" role="group" aria-label="How its episodes play">
-        <button aria-pressed=${(s.play ?? "interactive") === "interactive"} onClick=${() => put("play", undefined)}>Interactive</button>
-        <button aria-pressed=${s.play === "watch"} onClick=${() => put("play", "watch")}>Watch only</button></div>
-      <p class="note">${s.play === "watch" ? "Its episodes play on time alone: no choices, nothing to do, no cards. An episode can still be interactive (its Brief)." : "The viewer says the stand-in's lines, chooses and acts. An episode can be watch-only instead (its Brief)."}</p></div>
-    <div class="row">
-      <div class="grow"><${Select} label="Narrator" value=${s.narrator} options=${people} onInput=${(v?: string) => v && put("narrator", v)} /></div>
-      <div class="grow"><${Select} label="Stand-in (the learner)" value=${s.standin} options=${people} onInput=${(v?: string) => v && put("standin", v)} /></div>
-    </div>
-    <div class="row"><span class="grow"></span><${SaveButton} disabled=${!dirty(d)} onSave=${() => void saveDocs([key])} label="Save the series" /></div>
+  const play = s.play ?? "interactive";
+  // the stand-in is core (the viewer speaks as them in an interactive episode); a plugin may name them ("the learner")
+  const standinName = editorPluginsOf(s).map(ep => ep.standin).find(Boolean);
+  const ways: [string, string, string][] = [
+    ["interactive", "Interactive", "The viewer says the stand-in's lines, chooses and acts. The story waits for them."],
+    ["watch", "Watch only", "It plays on time alone: no choices, nothing to do, no cards."],
+  ];
+  return html`<div class="fields settings">
+    <${Part} title="Name">
+      <${Texts} label="Title" value=${s.title} saved=${was.title} onInput=${(l: string, v?: string) => put("title", { ...s.title, [l]: v ?? "" })} />
+      <${Texts} label="Summary" multi value=${s.summary} saved=${was.summary} onInput=${(l: string, v?: string) => put("summary", { ...s.summary, [l]: v ?? "" })} />
+    </${Part}>
+    <${Part} title="Languages"><${SeriesLanguages} s=${s} put=${put} /></${Part}>
+    <${Part} title="How its episodes play">
+      <div class="way-cards" role="radiogroup" aria-label="How its episodes play">${ways.map(([v, name, about]) => html`
+        <button role="radio" aria-checked=${play === v} class=${`way-card${play === v ? " on" : ""}`} onClick=${() => put("play", v === "interactive" ? undefined : v)}>
+          <b>${name}</b><span>${about}</span></button>`)}</div>
+      <p class="note">An episode can play the other way: its Brief says so.</p>
+      ${play === "interactive" && html`<div class="pair">
+        <${Select} label=${`Who the viewer speaks as${standinName ? ` (${standinName})` : ""}`} value=${s.standin} options=${people} onInput=${(v?: string) => v && put("standin", v)} /></div>`}
+    </${Part}>
+    <${Part} title="Narrator">
+      <div class="pair"><${Select} label="Who tells the story" value=${s.narrator} options=${people} onInput=${(v?: string) => v && put("narrator", v)} /></div>
+    </${Part}>
     <${Problems} problems=${checked.value[key] ?? []} empty="" />
+    <${SettingsFoot} dirty=${dirty(d)} onSave=${() => void saveDocs([key])} onDiscard=${() => void openDoc("series", "series", true)} label="Save the series" />
   </div>`;
 }
 
@@ -51,18 +77,19 @@ export function SeriesSettings() {
  * character and place is translated into. A translation is added from the languages Sahne has a story language for
  * (sahne-story `LANGS`); a removed one keeps its texts in the files, but nothing asks for them any more. */
 function SeriesLanguages(p: { s: SeriesDoc; put(k: string, v: unknown): void }) {
-  const langs = languagesOf(p.s), [pick, setPick] = useState("");
+  const langs = languagesOf(p.s);
   const free = Object.keys(LANGS).filter(l => l !== langs.main && !langs.translations.includes(l));
   const setTr = (translations: string[]) => p.put("languages", { main: langs.main, translations });
-  return html`<div class="field"><label>Languages</label>
-    <div class="row">
-      <span class="chip ok" title=${langs.main}>${langName(langs.main)} · written in, the stage plays it</span>
-      ${langs.translations.map(l => html`<span class="schip set" title=${l}>${langName(l)}<button aria-label=${`Stop translating into ${langName(l)}`} onClick=${() => setTr(langs.translations.filter(x => x !== l))}>×</button></span>`)}
-    </div>
-    ${free.length > 0 && html`<div class="row" style="margin-top:6px">
-      <select value=${pick || free[0]} aria-label="A language to translate into" onChange=${(e: Event) => setPick((e.target as HTMLSelectElement).value)}>${free.map(l => html`<option value=${l}>${langName(l)}</option>`)}</select>
-      <button onClick=${() => { setTr([...langs.translations, pick || free[0]]); setPick(""); }}>+ Translate into it</button></div>`}
-    <p class="note">Every episode, character and place is translated into these. A new one starts empty: each text gets a row for it, and Translate shows how far along it is. Removing one keeps its texts in the files but stops asking for them. The language it is written in is changed in series.json.</p></div>`;
+  return html`<ul class="lang-list" aria-label="The series' languages">
+      <li><span class="code">${langs.main}</span><span class="name">${langName(langs.main)}</span><span class="role main">Written in · the stage plays it</span></li>
+      ${langs.translations.map(l => html`<li><span class="code">${l}</span><span class="name">${langName(l)}</span><span class="role">Translation</span>
+        <button class="small quiet" aria-label=${`Stop translating into ${langName(l)}`} onClick=${() => setTr(langs.translations.filter(x => x !== l))}>Remove</button></li>`)}
+      <li class="add">${free.length > 0
+        ? html`<select value="" aria-label="Add a language to translate into" onChange=${(e: Event) => { const v = (e.target as HTMLSelectElement).value; if (v) setTr([...langs.translations, v]); (e.target as HTMLSelectElement).value = ""; }}>
+            <option value="">+ Add a language…</option>${free.map(l => html`<option value=${l}>${langName(l)}</option>`)}</select>`
+        : html`<span class="note">Every language Sahne has a story language for is here.</span>`}</li>
+    </ul>
+    <p class="note">Every episode, character and place is translated into these; a new one starts empty, and Translate shows how far along it is. Removing one keeps its texts in the files. The language it is written in is set in <code>series.json</code>.</p>`;
 }
 
 /** A content root with no series.json yet: start one. */
@@ -97,12 +124,12 @@ export function SeasonSettings(p: { id: string }) {
   if (!ready || !d) return html`<p class="note">Opening the season…</p>`;
   const se = d.doc as SeasonDoc, was = d.saved as SeasonDoc, key = keyOf("season", p.id);
   const put = (k: string, v: unknown) => change<SeasonDoc>("season", p.id, x => set(x, [k], v), k);
-  return html`<div class="fields">
+  return html`<div class="fields settings">
     <${Texts} label="Title" value=${se.title} saved=${was.title} onInput=${(l: string, v?: string) => put("title", { ...se.title, [l]: v ?? "" })} />
     <${Texts} label="Summary" multi value=${se.summary} saved=${was.summary} onInput=${(l: string, v?: string) => put("summary", { ...se.summary, [l]: v ?? "" })} />
     <div class="field"><label>Launch day (the board starts its week)</label><input type="date" value=${se.launch ?? ""} onInput=${(e: Event) => put("launch", (e.target as HTMLInputElement).value || undefined)} /></div>
-    <div class="row"><span class="grow"></span><${SaveButton} disabled=${!dirty(d)} onSave=${() => void saveDocs([key])} label="Save the season" /></div>
     <${Problems} problems=${checked.value[key] ?? []} empty="" />
+    <${SettingsFoot} dirty=${dirty(d)} onSave=${() => void saveDocs([key])} onDiscard=${() => void openDoc("season", p.id, true)} label="Save the season" />
   </div>`;
 }
 

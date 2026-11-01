@@ -49,4 +49,6 @@ export interface EditorPlugin {
   LineFields?(p: EpisodeProps & { path: Path }): unknown;
   /** Its step on the new-episode page. */
   newEpisode?: NewEpisodeStep;
+  /** What it calls the stand-in, the character the viewer speaks as in an interactive episode: "the learner". */
+  standin?: string;
 }
