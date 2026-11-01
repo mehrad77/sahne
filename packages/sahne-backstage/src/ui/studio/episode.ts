@@ -1,9 +1,10 @@
-// An episode in the studio (#/episode/<id>): its script on the left (ui/studio/script.ts), between its head (title,
-// premise, cast, what it teaches) and its quiz and glosses; the stage on the right, playing the block the cursor is in,
-// with its transport (the opening, back, play, a scrubber over every cue and one through the cue playing), the learner's
-// card, the flags its callbacks read, clicks on the stage, and its problems, review and changes. The stage lints run in
-// the browser as you type, the story check on the server a moment later (what the edit brought is marked new). The
-// selected block's full staging opens in a drawer. Save writes the file when the edit brings no error.
+// An episode in the studio (#/episode/<id>[/<stage>]), built around the stages of the work (model/progress.ts): the top says
+// where it stands (the stages bar: Brief, Script, Translate, a plugin's own, Review), the one next step, and a task writing
+// it; the stage on the page fills the left column (brief.ts, script.ts, translate.ts, a plugin's Sections, reviewstage.ts);
+// the stage on the right plays the line you are on, with its transport (the opening, back, next, play, a scrubber over every
+// cue and one through the cue playing), the viewer's card, the flags its callbacks read and, in Script, directing on it;
+// and Needs you (needs.ts) gathers what wants a person. The stage lints run in the browser as you type, the story check on
+// the server a moment later (what the edit brought is marked new). Save writes the file when the edit brings no error.
 
 import { html } from "htm/preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";

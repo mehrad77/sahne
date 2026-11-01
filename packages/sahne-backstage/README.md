@@ -326,12 +326,12 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 Review state is editors' notes, so it is not part of a story: a story's root takes no extra keys. It lives in a sidecar beside the content, `<root>/.backstage/review.json`, at sahne-story's `paths.ts` `REVIEW`. The assistant's memory is in the same sidecar, `<root>/.backstage/memory.json` (`MEMORY`): shared by everyone who works on the series and committed with it, so it holds lasting decisions, never what one person spends or a secret.
 
 ```json
-{ "v": 1, "episodes": { "s1e01": { "status": "reviewed", "ai": true, "reviewer": "…",
+{ "v": 1, "episodes": { "s1e01": { "status": "approved", "sig": "9f8e7d6c", "ai": true, "reviewer": "…",
   "steps": { "4": { "reviewed": true, "checked": ["en", "fa"], "sig": "1a2b3c4d" }, "12.0.1": { "reviewed": true } },
   "comments": [{ "id": "…", "at": "4", "by": "…", "text": "…", "date": "2026-10-29 10:00", "done": true }] } } }
 ```
 
-- **Status** is `draft`, `reviewed` or `approved`.
+- **Status** is `draft`, `reviewed` or `approved`. **`sig`** is the episode as it was approved (`episodeSig`): a later change shows as changed since approved.
 - **A step key** is the step's number, then the option's, then the reply's (`12.0.1`).
 - **`checked`** lists the translations checked, by language code. Notes written before it say `persian: true`, read as `fa` checked.
 - **The notes are saved at once.** They are written apart from the story's Save, and only when backstage runs with `--write`.
