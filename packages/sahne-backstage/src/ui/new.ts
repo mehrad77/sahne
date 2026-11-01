@@ -85,7 +85,7 @@ export function NewEpisode(p: { season?: string; date?: string }) {
     await openDoc("season", se.id);
     if (se.calendar) change<SeasonDoc>("season", se.id, s => set(s, ["calendar", id], row));
     if (!arc) change<SeasonDoc>("season", se.id, s => set(s, ["arcs", arcId], a));
-    go("episode", id);
+    go("episode", id, "brief");
   };
 
   const pl = place ? w.places[place] as StoryPlace : undefined;

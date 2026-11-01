@@ -131,6 +131,9 @@ export const lessonEditor: EditorPlugin = {
     View: SpotBlock,
   }],
   LineFields,
+  // the brief's fields are the new-episode page's, on the story itself
+  Brief: p => { const l = lessonOf(p.story); return html`<${Words} value=${l.words ?? []} onChange=${(v: string[]) => p.edit(s => set(s, ["words"], v), "words")} want=${wordsFor(p.story.kind === "special" ? "special" : "episode")} special=${p.story.kind === "special"} />
+    <${Lessons} value=${l.lessons ?? []} onChange=${(v: string[]) => p.edit(s => set(s, ["lessons"], v), "lessons")} />`; },
   newEpisode: {
     title: "What it teaches",
     View: p => html`<${Words} value=${(p.value.words as string[]) ?? []} onChange=${(v: string[]) => p.onChange({ ...p.value, words: v })} want=${wordsFor(p.kind)} special=${p.kind === "special"} />

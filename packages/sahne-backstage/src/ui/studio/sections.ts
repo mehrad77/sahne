@@ -37,7 +37,7 @@ export function EpisodeHead(p: Props) {
     <div class="field"><label>Who is in it (the cast, 2 to 6; ${textOf(w.characters[narrator]?.name, langs.main) ?? narrator} narrates every episode)</label>
       <div class="people">${cast.map(person)}${extras.map(person)}
         <button class="schip add" onClick=${(e: MouseEvent) => setPick({ x: e.clientX, y: e.clientY })}><${Icon} name="plus" size=${12} /> someone</button></div></div>
-    ${editorPluginsOf(w.series).map(ep => ep.Head && html`<${ep.Head} story=${p.story} saved=${p.saved} edit=${p.edit} />`)}
+    ${editorPluginsOf(w.series).map(ep => ep.Head && !ep.Brief && html`<${ep.Head} story=${p.story} saved=${p.saved} edit=${p.edit} />`)}
     ${pick && html`<${Picker} kind="character" multi x=${pick.x} y=${pick.y} value=${[...cast, ...extras]} ids=${Object.keys(w.characters).filter(id => id !== narrator && id !== standin)} onPick=${toggle} onClose=${() => setPick(null)} />`}
   </div>`;
 }

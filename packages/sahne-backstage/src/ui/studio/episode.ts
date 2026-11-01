@@ -32,7 +32,7 @@ import { SaveButton } from "../readonly.ts";
 import { inLang, langName, useLangs } from "../lang.ts";
 import type { Problem } from "../../api.ts";
 import { Script } from "./script.ts";
-import { EpisodeHead } from "./sections.ts";
+import { Brief } from "./brief.ts";
 import { editorPluginsOf } from "../plugins/index.ts";
 import { Details } from "./details.ts";
 import { Direct } from "./direct.ts";
@@ -219,7 +219,7 @@ function Studio(p: { id: string }) {
   const unwatch = () => { setWatching(false); preview.current?.player.setAuto(false); redraw(); };
   const title = textOf(story.title, langs.main);
   const view = (() => {
-    if (stage === "brief") return html`<${EpisodeHead} story=${story} saved=${saved} edit=${edit} />`;
+    if (stage === "brief") return html`<${Brief} story=${story} saved=${saved} edit=${edit} onWrite=${() => goStage("script")} />`;
     if (stage === "script") return html`<div class="lead"><span class="grow">The words, and what each person does under them. Select a line to change its directions; dashed chips are suggestions.</span>
         <label class="row note"><input type="checkbox" style="width:auto" checked=${onlyWords} onChange=${() => setOnlyWords(!onlyWords)} /> Words only</label>
         ${langs.translations[0] && html`<label class="row note"><input type="checkbox" style="width:auto" checked=${showTr} onChange=${() => setShowTr(!showTr)} /> Show the ${langName(langs.translations[0])}</label>`}</div>

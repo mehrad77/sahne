@@ -34,8 +34,10 @@ export interface NewEpisodeStep {
 export interface EditorPlugin {
   /** The story plugin's id. */
   id: string;
-  /** A row in the episode's head: what the episode teaches. */
+  /** A row in the episode's head: what the episode teaches, at a glance. */
   Head?(p: EpisodeProps): unknown;
+  /** Its fields in the episode's Brief: what the series asks of an episode beyond the core's (the target words, the lessons). */
+  Brief?(p: EpisodeProps): unknown;
   /** Its own part of the episode: the view of its stage. */
   Sections?(p: EpisodeProps): unknown;
   /** Its own stage of the work, between Translate and Review: its name, and where the episode stands in it (its own
