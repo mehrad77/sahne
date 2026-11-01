@@ -19,8 +19,8 @@ import { ReadThrough, ReviewSide } from "./reviewstage.ts";
 import { blocksOf, checkedOf } from "../../model/review.ts";
 import { episodeSig, nextStepOf, progressOf, type StageKey, type StepAction } from "../../model/progress.ts";
 import { blocks } from "../../model/script.ts";
-import { marks as marksNow } from "../../runs.ts";
-import { NotesPanel } from "./notes.ts";
+import { marks as marksNow, runs as runsNow } from "../../runs.ts";
+import { NeedsYou } from "./needs.ts";
 import { ChangesPanel } from "../changes.ts";
 import { AskMenu, send } from "../assistant.ts";
 import { settingsNow } from "../settings.ts";
@@ -38,7 +38,7 @@ import { Details } from "./details.ts";
 import { Direct } from "./direct.ts";
 import { Strip } from "./strip.ts";
 import { rememberScene, takeResume } from "../../recent.ts";
-import { ProposalsBar, ProposedEpisode } from "./proposals.ts";
+import { ProposedEpisode } from "./proposals.ts";
 import { conflicts, postSelection, proposals, proposalsRead, shown as agentShown } from "../../events.ts";
 import { ghostsOf, suggestionsOf, taken, type Suggest } from "../../model/autostage.ts";
 import { get, set } from "../../model/path.ts";
@@ -174,6 +174,8 @@ function Studio(p: { id: string }) {
   const edit = (fn: (s: StoryDoc) => StoryDoc, field?: string) => change<StoryDoc>("story", p.id, fn, field);
   // an agent pointed here
   useEffect(() => { const s = agentShown.value; if (s && s.id === p.id && s.step) select(s.step, true); }, [agentShown.value?.n]);
+  // a task's question about this episode: answered in Needs you
+  const asks2 = runsNow.value.flatMap(r => r.steps.filter(st => st.status === "asking" && st.question && st.owns.some(o => o.kind === "story" && o.id === p.id)).map(st => ({ run: r, step: st })));
   const mine = proposals.value.filter(x => (x.kind === "story" && x.doc === p.id) || x.also?.some(a => a.kind === "story" && a.doc === p.id));
   const conflict = conflicts.value.has(key);
   const problems = [...(checked.value[key] ?? []), ...lints];
@@ -254,7 +256,6 @@ function Studio(p: { id: string }) {
       <${MadeByTask} kind="story" id=${p.id} />
     </div>
     ${conflict && html`<div class="banner">An agent wrote this episode while you had unsaved edits: <button class="small" onClick=${() => { void openDoc("story", p.id, true); conflicts.value = new Set([...conflicts.value].filter(k => k !== key)); }}>Take theirs</button> or save yours over it (the server will say it changed on disk; reload first to merge by hand).</div>`}
-    <${ProposalsBar} list=${mine} story=${story} select=${select} />
     <div class=${`studio-split${watching ? " watching" : ""}`}>
       ${!watching && html`<div class="script-col">${view}</div>`}
       <div class="stage-col">
@@ -271,14 +272,8 @@ function Studio(p: { id: string }) {
         }}>${f}</button>`)}</div>`}
       </div>
     </div>
-    <div class="needs" role="region" aria-label="Needs you">
-      <div class="needs-bar"><b>Needs you</b>
-        ${errors ? html`<span class="needs-count bad">${errors} error${errors > 1 ? "s" : ""}</span>` : ""}
-        ${problems.length - errors ? html`<span class="needs-count warn">${problems.length - errors} note${problems.length - errors > 1 ? "s" : ""}</span>` : ""}
-        ${!problems.length && html`<span class="note">Nothing waiting.</span>`}
-        <span class="grow"></span>${problems.length > 0 && html`<button class="small" aria-expanded=${needsOpen} onClick=${() => setNeedsOpen(!needsOpen)}>${needsOpen ? "Hide" : "Show"}</button>`}</div>
-      ${needsOpen && html`<div class="needs-list"><${NotesPanel} problems=${problems} path=${path} select=${select} edit=${edit} onlyHere=${false} /></div>`}
-    </div>
+    <${NeedsYou} story=${story} problems=${problems} suggestions=${progress.suggestions} comments=${progress.openComments} proposals=${mine} asks=${asks2}
+      open=${needsOpen} setOpen=${setNeedsOpen} select=${select} edit=${edit} goStage=${goStage} addAll=${() => takeSome(suggestions)} setLang=${setTrLang} />
     ${asks && html`<${Popover} x=${asks.x} y=${asks.y} onClose=${() => setAsks(null)} label="Ask the assistant"><${AskMenu} onDone=${() => setAsks(null)} /></${Popover}>`}
     ${more && html`<${Popover} x=${more.x} y=${more.y} onClose=${() => setMore(null)} label="More"><div class="menu">
       <button onClick=${() => { setDrawer("changes"); setMore(null); }}><b>Changes</b><small>what changed since the last save and commit</small></button>

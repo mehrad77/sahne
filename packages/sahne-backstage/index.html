@@ -964,12 +964,13 @@ button.link { border: 0; background: none; padding: 0; color: var(--accent, inhe
 .needs { position: sticky; bottom: 0; z-index: 6; background: var(--panel); border-top: 1px solid var(--line); margin: 14px -22px 0; padding: 8px 22px; }
 .needs-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .needs-count { font-size: 12.5px; padding: 1px 9px; border-radius: 99px; background: var(--chip); }
-.needs-count.warn { color: var(--warn); } .needs-count.bad { color: var(--bad); }
+.needs-count.warn { color: var(--warn); } .needs-count.bad { color: var(--bad); } .needs-count.accent { color: var(--accent); background: var(--accent-soft); }
 .needs-list { display: grid; gap: 6px; margin-top: 8px; max-height: 42vh; overflow: auto; }
 .need { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--raised); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13.5px; }
 .need .kind { font: 650 10.5px/1.6 system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; padding: 0 6px; border-radius: 4px; background: var(--chip); color: var(--mute); }
 .need .kind.problem { color: var(--warn); } .need .kind.error { color: var(--bad); } .need .kind.proposal, .need .kind.task { color: var(--accent); }
 .need .t { flex: 1 1 18rem; min-width: 0; }
+.need .t .proposals, .need .t .ask-card { margin: 0; }
 .dirs-quiet { font: 12.5px/1.5 system-ui, sans-serif; color: var(--faint); }
 .no-dirs { font: 12.5px/1.5 system-ui, sans-serif; color: var(--warn); }
 @media (max-width: 700px) { .needs { margin: 14px -12px 0; padding: 8px 12px; } .stage-tab { min-width: 104px; } }

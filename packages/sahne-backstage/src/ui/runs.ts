@@ -344,7 +344,7 @@ function History(p: { run: Run }) {
 }
 
 /** A step's question: its buttons, or the person's own words. */
-function StepQuestion(p: { run: Run; step: RunStep }) {
+export function StepQuestion(p: { run: Run; step: RunStep }) {
   const [text, setText] = useState(""), [busy, setBusy] = useState(false);
   const q = p.step.question!;
   const answer = async (a: string) => {

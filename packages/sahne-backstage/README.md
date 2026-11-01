@@ -164,7 +164,12 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 
   Per-block review marks (the old ✓ in the gutter and review mode) are no longer written. Readiness comes from the stages. The Review page (`#/review`) and the MCP review tools still read the block marks for now.
 - **Play** in the transport runs the episode on by itself (the player's auto, sahne-story `setAuto`), stopping at the viewer's cards. In a watch-only episode it is the main button and nothing stops it. The editor never starts playing by itself.
-- **Needs you** (along the bottom): the episode's errors and notes, with *Show* for the list. A note goes to its line, and some have a fix.
+- **Needs you** (along the bottom, `needs.ts`): one list for everything that wants a person's eye on this episode, each going where it is dealt with. The bar counts them; it opens by itself while a task asks.
+  - a task's question about this episode, answered in place
+  - an agent's proposals, accepted or rejected in place (`proposals.ts`)
+  - the problems and notes in plain words (`src/model/notes.ts`), each to its line, with a fix where one is obvious. The texts a language lacks are one item per language, to Translate.
+  - the rules' staging ideas, to Script or *Add all*
+  - the open comments, to Review
 - **Approving** stores the episode's signature (`episodeSig`, kept in the review notes as `sig`), so a later change shows as *Changed since approved*. The release day and the draft mark are not part of it.
 - **The head:** the title and premise in the series' languages, who is in it (the cast and extras as portraits, each with how many lines they speak; *+ someone* adds from a picker; the story check refuses a speaker not in the cast), and what the series' plugins add (the lesson plugin: what it teaches).
 - **The script** (`script.ts`, its operations in `src/model/script.ts`): one block per step, typed into like a screenplay.
