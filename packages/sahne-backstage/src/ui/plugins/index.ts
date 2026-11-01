@@ -14,6 +14,10 @@ export const EDITOR_PLUGINS: readonly EditorPlugin[] = [lessonEditor];
 export const editorPluginsOf = (series: SeriesDoc | null | undefined): EditorPlugin[] =>
   storyPluginsOf(series).flatMap(sp => EDITOR_PLUGINS.filter(ep => ep.id === sp.id));
 
+/** What the series calls the viewer, who speaks as the stand-in: a plugin's word ("the learner"), else "the viewer". */
+export const viewerOf = (series: SeriesDoc | null | undefined): string =>
+  editorPluginsOf(series).map(ep => ep.viewer).find(Boolean) ?? "the viewer";
+
 /** The plugin block of a step kind, if a plugin the series turns on has one. */
 export const pluginBlockOf = (series: SeriesDoc | null | undefined, kind: string): EditorBlock | undefined =>
   editorPluginsOf(series).flatMap(ep => ep.blocks ?? []).find(b => b.kind === kind);

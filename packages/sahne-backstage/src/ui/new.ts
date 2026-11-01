@@ -19,7 +19,7 @@ import { characterItems, placeItems } from "./galleries.ts";
 import { inLang, langName, Texts, useLangs } from "./lang.ts";
 import { lessonOf } from "sahne-lesson";
 import { storyPluginsOf } from "../model/plugins.ts";
-import { editorPluginsOf } from "./plugins/index.ts";
+import { editorPluginsOf, viewerOf } from "./plugins/index.ts";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const long = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
@@ -109,7 +109,7 @@ export function NewEpisode(p: { season?: string; date?: string }) {
       ${pl?.times && pl.times.length > 1 && html`<div class="row" style="margin-top:8px"><span class="note">Time of day:</span>${pl.times.map(t => html`<button class=${`chip${(time ?? pl.times![0]) === t ? " on" : ""}`} aria-pressed=${(time ?? pl.times![0]) === t} onClick=${() => setTime(t)}>${t}</button>`)}</div>`}</div>
 
     <div class="step-card"><h3><span class="step-n">2</span> Who</h3>
-      <p class="note">${textOf(w.characters[standin]?.name, langs.main) ?? standin}, the learner, is always in it, and ${textOf(w.characters[narrator]?.name, langs.main) ?? narrator} narrates. Pick one to five more.</p>
+      <p class="note">${textOf(w.characters[standin]?.name, langs.main) ?? standin}, who ${viewerOf(w.series)} speaks as, is always in it, and ${textOf(w.characters[narrator]?.name, langs.main) ?? narrator} narrates. Pick one to five more.</p>
       <${Gallery} items=${items} value=${cast} multi onPick=${(x: string) => setCast(c => (c.includes(x) ? c.filter(y => y !== x) : [...c, x].slice(0, 5)))} label="Cast" size="s" /></div>
 
     ${plugins.filter(ep => ep.newEpisode).map((ep, k) => html`<div class="step-card"><h3><span class="step-n">${3 + k}</span> ${ep.newEpisode!.title}</h3>

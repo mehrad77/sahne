@@ -114,7 +114,7 @@ function Lessons(p: { value: string[]; onChange(v: string[]): void }) {
 
 export const lessonEditor: EditorPlugin = {
   id: "lesson",
-  standin: "the learner",
+  viewer: "the learner",
   Head,
   Sections: p => html`<${Quiz} ...${p} /><${Glosses} ...${p} />`,
   stage: {

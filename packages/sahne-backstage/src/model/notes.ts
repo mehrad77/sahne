@@ -26,7 +26,7 @@ export function noteOf(p: ProblemLike, c: NoteContext): Note {
     const path = where[0] === "steps" ? where : undefined;
     return { ...base, ...(path ? { path } : {}), text: `${cap(r[2])} has no ${c.langName(r[3])} yet.` };
   }
-  if (/^\/cast: must NOT have (fewer|more) than (\d+) items$/.test(m)) return { ...base, text: "The cast needs 2 to 6 people, the learner among them." };
+  if (/^\/cast: must NOT have (fewer|more) than (\d+) items$/.test(m)) return { ...base, text: `The cast needs 2 to 6 people, ${c.name(c.standin)} among them.` };
   if (p.rule === "cast" && (r = /^(\S+) speaks but is not in cast$/.exec(m))) {
     const who = r[1];
     return { ...base, text: `${c.name(who)} speaks but isn't in the cast.`, fix: { label: `Add ${c.name(who)}`, apply: s => set(s, ["cast"], [...(s.cast ?? []), who]) } };
@@ -44,6 +44,7 @@ export function noteOf(p: ProblemLike, c: NoteContext): Note {
     return { ...base, text: `${r[1]} words are on no card, gloss or name: ${r[2]}.`, fix: { label: "Gloss them", apply: s => words.reduce((x, w) => (get(x, ["gl", w]) ? x : set(x, ["gl", w], {})), s) } };
   }
   if (p.rule === "standin" && /two stand-in lines in a row/.test(m)) return { ...base, text: `${c.name(c.standin)} has two lines in a row: each turn is one card.` };
+  if (p.rule === "standin" && /never has a turn/.test(m)) return { ...base, text: `${c.name(c.standin)} never has a turn: an interactive episode gives them one within the first four lines.` };
   if (p.rule === "standin" && /first turn is line/.test(m)) return { ...base, text: `${cap(m.replace(/^the learner's/, `${c.name(c.standin)}'s`))}.` };
   // a lint with the staging that settles it
   if (p.fix && base.path) {

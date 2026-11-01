@@ -15,7 +15,7 @@ import { Problems, Select } from "./fields.ts";
 import { startSeries } from "../model/series.ts";
 import { langName, Texts, useLangs } from "./lang.ts";
 import { SaveButton } from "./readonly.ts";
-import { editorPluginsOf } from "./plugins/index.ts";
+import { viewerOf } from "./plugins/index.ts";
 
 const filled = (codes: string[], text: (l: string) => string) => Object.fromEntries(codes.map(l => [l, text(l)]));
 
@@ -45,8 +45,8 @@ export function SeriesSettings() {
   const put = (k: string, v: unknown) => change<SeriesDoc>("series", "series", x => set(x, [k], v), k);
   const people = Object.values(w.characters).filter(c => c.kind !== "extra").map(c => [c.id, `${textOf(c.name, langs.main) ?? c.id} (${c.kind})`] as [string, string]);
   const play = s.play ?? "interactive";
-  // the stand-in is core (the viewer speaks as them in an interactive episode); a plugin may name them ("the learner")
-  const standinName = editorPluginsOf(s).map(ep => ep.standin).find(Boolean);
+  // the stand-in is core (the viewer speaks as them in an interactive episode); a plugin may name the viewer ("the learner")
+  const viewer = viewerOf(s);
   const ways: [string, string, string][] = [
     ["interactive", "Interactive", "The viewer says the stand-in's lines, chooses and acts. The story waits for them."],
     ["watch", "Watch only", "It plays on time alone: no choices, nothing to do, no cards."],
@@ -63,7 +63,7 @@ export function SeriesSettings() {
           <b>${name}</b><span>${about}</span></button>`)}</div>
       <p class="note">An episode can play the other way: its Brief says so.</p>
       ${play === "interactive" && html`<div class="pair">
-        <${Select} label=${`Who the viewer speaks as${standinName ? ` (${standinName})` : ""}`} value=${s.standin} options=${people} onInput=${(v?: string) => v && put("standin", v)} /></div>`}
+        <${Select} label=${`Who ${viewer} speaks as`} value=${s.standin} options=${people} onInput=${(v?: string) => v && put("standin", v)} /></div>`}
     </${Part}>
     <${Part} title="Narrator">
       <div class="pair"><${Select} label="Who tells the story" value=${s.narrator} options=${people} onInput=${(v?: string) => v && put("narrator", v)} /></div>

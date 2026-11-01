@@ -62,7 +62,7 @@ export function isUnstaged(step: Record<string, unknown> | undefined): boolean {
   return !DIRECTING.some(k => step[k] !== undefined);
 }
 
-/** The blocks a translator translates: lines, the learner's options, replies, and a plugin's step with words (a spot). */
+/** The blocks a translator translates: lines, the stand-in's options, replies, and a plugin's step with words (a spot). */
 function translatable(story: StoryDoc, main: string): { path: Path; node: Record<string, unknown> }[] {
   const out: { path: Path; node: Record<string, unknown> }[] = [];
   for (const b of blocks(story)) {

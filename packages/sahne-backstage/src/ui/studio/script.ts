@@ -1,6 +1,6 @@
 // The episode as a screenplay (model/script.ts): one block per step, typed into. A scene heading (the place, its time,
 // who starts where); a line (the speaker, the words in the main language, the translations as smaller rows under it,
-// the staging as chips); an action (who does what, with no words); the learner's choice with its options and their
+// the staging as chips); an action (who does what, with no words); the stand-in's choice with its options and their
 // replies indented under it; an act on stage; a plugin's step in its own block (ui/plugins: the lesson plugin's grammar spot).
 // The keys of a screenplay:
 //   Enter              a new line after this one, said by the one before last (a conversation alternates)
@@ -27,7 +27,7 @@ import { Popover } from "../kit/index.ts";
 import { Picker } from "../galleries.ts";
 import { inLang, langName, useLangs } from "../lang.ts";
 import { placeAt, targetsAt } from "../staging.ts";
-import { editorPluginsOf, pluginBlockOf } from "../plugins/index.ts";
+import { editorPluginsOf, pluginBlockOf, viewerOf } from "../plugins/index.ts";
 
 export interface ScriptProps {
   id: string;
@@ -247,6 +247,7 @@ function Staged(p: Common & { at: Path; who?: string }) {
         onInput=${(e: Event) => setParen((e.target as HTMLInputElement).value)} onBlur=${commit}
         onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); commit(); } else if (e.key === "Escape") { setParen(""); setOpen(false); } }} />`
       : html`<button class="schip add" onClick=${() => setOpen(true)} title="How it is said: type (waves, happy, to …)">+ add a direction</button>`}
+
       ${p.onMore && html`<button class="schip add" onClick=${() => p.onMore!(p.b.path)}>More about this line</button>`}</span>`
     : html`${dirs.length ? html`<span class="dirs-quiet">${dirs.map(c => c.label).join(" · ")}</span>` : ""} ${suggestions}`}
     ${bare && html`<div class="no-dirs">No stage directions: the stage holds still on this line.</div>`}
@@ -331,7 +332,7 @@ function ActBlock(p: Common) {
       <option value="tap">taps</option><option value="drag">drags</option><option value="go">goes to</option><option value="choose">chooses</option></select>
     ${a.targets.map(t => html`<span class="schip set">${t.replace(/^obj:/, "")}<button aria-label=${`Remove ${t}`} onClick=${() => p.edit(s => set(s, [...p.b.path, "act", "targets"], a.targets.filter(x => x !== t)))}>×</button></span>`)}
     <button class="schip add" onClick=${(e: MouseEvent) => setPick({ x: e.clientX, y: e.clientY })}>+ what</button></div>
-    <${Grow} main value=${a.prompt?.[main] ?? ""} lang=${main} label="The prompt" placeholder="What the learner is asked to do…" onInput=${(x: string) => p.edit(s => set(s, [...p.b.path, "act", "prompt", main], x), `${key(p.b.path)}.prompt`)} onKeyDown=${p.keys(p.b, a.prompt?.[main] ?? "")} />
+    <${Grow} main value=${a.prompt?.[main] ?? ""} lang=${main} label="The prompt" placeholder=${`What ${viewerOf(world.value?.series)} is asked to do…`} onInput=${(x: string) => p.edit(s => set(s, [...p.b.path, "act", "prompt", main], x), `${key(p.b.path)}.prompt`)} onKeyDown=${p.keys(p.b, a.prompt?.[main] ?? "")} />
     ${pick && html`<${Popover} x=${pick.x} y=${pick.y} onClose=${() => setPick(null)} label="A prop on stage"><div class="menu">
       ${props.map(id => html`<button onClick=${() => { p.edit(s => set(s, [...p.b.path, "act", "targets"], [...a.targets, `obj:${id}`])); setPick(null); }}>${id.replace(/_/g, " ")}</button>`)}
       ${!props.length && html`<p class="note">The place has no props.</p>`}</div></${Popover}>`}`;

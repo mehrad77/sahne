@@ -15,6 +15,7 @@ import { arcOfWeek, boardOf, datesOf, rowOn, themed, weekOfArc, type Day, type W
 import { set } from "../model/path.ts";
 import { dirty } from "../model/history.ts";
 import { allProblems, change, checked, draftOf, drafts, keyOf, loadAllProblems, openDoc, review, route, saveDocs, say, world } from "../store.ts";
+import { viewerOf } from "./plugins/index.ts";
 import { proposals } from "../events.ts";
 import type { Episode } from "../api.ts";
 import { placeThumb } from "../thumbs.ts";
@@ -138,7 +139,7 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
           <div class="week" role="rowheader">
             ${wk.week === null ? html`<b>Break</b><small>${span(wk.monday, wk.days[5].date)}</small>` : html`
               <div class="row" style="gap:4px;flex-wrap:nowrap"><b>Week ${wk.week}</b><span class="grow"></span>
-                <button class="iconbtn" style="width:24px;height:24px" title="The theme in every language, and what the learner does" aria-label=${`Week ${wk.week}'s theme`} onClick=${(e: MouseEvent) => setMenu({ week: wk.week!, x: e.clientX, y: e.clientY })}><${Icon} name="settings" size=${14} /></button></div>
+                <button class="iconbtn" style="width:24px;height:24px" title=${`The theme in every language, and what ${viewerOf(w.series)} does`} aria-label=${`Week ${wk.week}'s theme`} onClick=${(e: MouseEvent) => setMenu({ week: wk.week!, x: e.clientX, y: e.clientY })}><${Icon} name="settings" size=${14} /></button></div>
               <small>${span(wk.monday, wk.days[5].date)}</small>
               <input class="theme" ...${inLang(langs.main)} value=${arc ? textOf(arc, langs.main) ?? "" : ""} placeholder="This week's theme…" aria-label=${`Week ${wk.week}'s theme`}
                 onInput=${(e: Event) => theme(wk.week!, { ...(arc ?? blankArc()), [langs.main]: (e.target as HTMLInputElement).value })} />
@@ -168,7 +169,7 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
     ${menu && html`<${Popover} x=${menu.x} y=${menu.y} onClose=${() => setMenu(null)} label=${`Week ${menu.week}`}>
       <div class="fields" style="width:min(360px,80vw)"><b>Week ${menu.week}: ${arcOfWeek(se.n, menu.week)}</b>
         <${Texts} label="The theme" value=${arcOf(menu.week) as unknown as Record<string, unknown>} onInput=${(l: string, v?: string) => theme(menu.week, { ...(arcOf(menu.week) ?? blankArc()), [l]: v ?? "" })} />
-        <div class="field"><label>What the learner does this week</label><div class="row">${MECHANICS.map(m => {
+        <div class="field"><label>What ${viewerOf(w.series)} does this week</label><div class="row">${MECHANICS.map(m => {
           const a = arcOf(menu.week) ?? blankArc(), on = a.mechanics.includes(m);
           return html`<label class="row" style="gap:4px"><input type="checkbox" style="width:auto" checked=${on} onChange=${() => theme(menu.week, { ...a, mechanics: on ? a.mechanics.filter(x => x !== m) : [...a.mechanics, m] })} />${m}</label>`;
         })}</div></div></div></${Popover}>`}
