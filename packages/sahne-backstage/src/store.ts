@@ -27,9 +27,13 @@ export function say(text: string, bad = false) {
   setTimeout(() => { if (notice.value?.text === text) notice.value = null; }, bad ? 9000 : 3500);
 }
 
-export async function loadWorld() {
+/** Read the world again. A refusal (a content file that does not read) keeps the world there was and says why; it is returned. */
+export async function loadWorld(): Promise<string | null> {
   const w = await api.world();
-  world.value = w;
+  if (w.status === 200) { world.value = w; return null; }
+  const why = `the content root could not be read: ${(w as { message?: string }).message ?? w.status}`;
+  if (world.value) say(why, true);
+  return why;
 }
 
 /** Delete a character: a new one never saved is only dropped; one on disk is deleted by the server (refused while used). */

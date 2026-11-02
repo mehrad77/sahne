@@ -7,7 +7,11 @@ import { connectEvents } from "./events.ts";
 import { loadSettings } from "./ui/settings.ts";
 import { loadKitDocs } from "./kitdocs.ts";
 
-await Promise.all([loadWorld(), loadReview(), loadKitDocs()]);
-connectEvents();
-void loadSettings();
-render(h(App, {}), document.getElementById("app")!);
+const [why] = await Promise.all([loadWorld(), loadReview(), loadKitDocs()]);
+// a content root that does not read (a file that is not JSON): say so, and what to do, rather than a blank page
+if (why) render(h("p", { style: "padding:20px" }, `${why}. Fix it, then reload this page.`), document.getElementById("app")!);
+else {
+  connectEvents();
+  void loadSettings();
+  render(h(App, {}), document.getElementById("app")!);
+}
