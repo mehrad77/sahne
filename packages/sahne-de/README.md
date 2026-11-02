@@ -43,7 +43,7 @@ Sounds, in the order the rules apply: `sch` and `tsch` are one sound, `ch` one, 
 
 Mouth shapes: a → A, e and ä and the schwa → E, i → I, o and ö → O, u and ü → U, y as ü (i at the end). Other consonants have no shape of their own and blend into the vowels.
 
-Words keep their character index in the original text. Apostrophes belong to the word (Nima's). Numbers are timed as their German words (21 is *einundzwanzig*, 1990 is *eintausendneunhundertneunzig*, 10:30 is *zehn Uhr dreißig*, 50% is *fünfzig Prozent*, "am 2. Mai" is *zweite*) while the span covers the digits as written. A year is read as a plain number, not "neunzehnhundert…". A word with no vowel is spelled out (TV is *te fau*), except hums (hmm, closed lips) and shushes (pst, rounded lips).
+Words keep their character index in the original text. Apostrophes belong to the word (Nima's). Numbers are timed as their German words (21 is *einundzwanzig*, 1990 is *eintausendneunhundertneunzig*, 10:30 is *zehn Uhr dreißig*, and so is 10:30 Uhr, whose written Uhr is not said again, as the Euro after a price is not; 50% is *fünfzig Prozent*, "am 2. Mai" is *zweite*) while the span covers the digits as written. A year is read as a plain number, not "neunzehnhundert…". A word with no vowel is spelled out (TV is *te fau*), except hums (hmm, closed lips) and shushes (pst, rounded lips).
 
 Keys are sorted, start at 0, never repeat a shape twice in a row, and end on `rest`: at `dur` when the line ends on a word, or where the closing pause begins when it ends on punctuation (the mouth holds rest to `dur`).
 

@@ -161,6 +161,12 @@ test("numbers are timed as their German words, and the span covers the digits", 
   const y = speech("21");
   assert.deepEqual(y.words.map(w => w.text), ["21"]);
   assert.equal(y.dur, speech("einundzwanzig").dur);
+  // "10:30 Uhr": the numeral says the Uhr, the written one is not said twice
+  const said = (t: string) => tokens(t).map(x => x.kind === "word" ? x.said : x.mark);
+  assert.deepEqual(said("Es ist 10:30 Uhr."), ["es", "ist", "zehn uhr dreißig", "stop"]);
+  assert.deepEqual(said("Um 10.30 Uhr"), ["um", "zehn uhr dreißig"]);
+  assert.deepEqual(said("Um 10 Uhr"), ["um", "zehn", "uhr"]);
+  assert.deepEqual(speech("Um 10:00 Uhr.").words.map(w => w.text), ["Um", "10:00"], "the written Uhr has no span of its own");
   // "am 2. Mai": an ordinal, read "zweiten" (-n after am), with no full stop after it
   assert.deepEqual(tokens("am 2. mai").map(t => t.kind === "word" ? t.said : t.mark), ["am", "zweiten", "mai"]);
   assert.equal(sayNumeral("3", true), "dritte");

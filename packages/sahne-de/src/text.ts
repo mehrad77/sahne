@@ -48,7 +48,7 @@ export function tokens(text: string): Token[] {
   for (const m of text.matchAll(TOKEN)) {
     const i = m.index ?? 0;
     if (m[1]) {
-      if (i === skipWord) continue; // the "Euro" a price has already said
+      if (i === skipWord) continue; // the "Euro" a price, or the "Uhr" a clock time, has already said
       const end = i + m[1].length, after = text.slice(end, end + 12);
       // "am 2. Mai", "der 3. Stock": a number and a dot is an ordinal before a lower-case word, or after an article or
       // preposition before a word of any case; "am", "im", "den"… (dative, accusative) take -n: "am dritten Mai"
@@ -57,6 +57,9 @@ export function tokens(text: string): Token[] {
       if (ord) skip = end;
       const price = /^(\d+),(\d{2})$/.exec(m[1]);
       const euro = price ? /^\s*(?:€|(Euro|EUR)(?![\p{L}\p{N}]))/u.exec(text.slice(end)) : null;
+      // "10:30 Uhr", "10.30 Uhr": the numeral already says "zehn Uhr dreißig", so the written Uhr is not said again
+      const clock = /^(\d{1,2})[:.](\d{2})$/.exec(m[1]), uhr = clock && +clock[1] <= 24 && +clock[2] < 60 ? /^\s*(Uhr)(?![\p{L}\p{N}])/iu.exec(text.slice(end)) : null;
+      if (uhr) skipWord = end + uhr[0].length - uhr[1].length;
       if (euro && price) {
         if (euro[1]) skipWord = end + euro[0].length - euro[1].length;
         out.push({ kind: "word", i, text: m[1], said: sayEuro(price[1], price[2]) });

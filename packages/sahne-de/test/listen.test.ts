@@ -151,3 +151,9 @@ test("ordinals: 'N.' after an article or preposition, in -n after am, im, zum, d
   assert.equal(normalise("Es sind 5. Dann"), "es sind fünf dann", "a sentence end, not an ordinal");
   assert.ok(matchLine("am dritten Mai", ["Am 3. Mai"]).matched);
 });
+
+test("a written time with Uhr is said once: 10:30 Uhr is zehn Uhr dreißig", () => {
+  assert.equal(normalise("Um 10:00 Uhr."), "um zehn uhr");
+  assert.equal(matchLine("zehn Uhr dreißig", ["10:30 Uhr."]).matched, true);
+  assert.equal(matchLine("um zehn Uhr", ["Um 10:00 Uhr."]).matched, true);
+});
