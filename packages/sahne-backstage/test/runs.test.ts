@@ -466,3 +466,27 @@ test("a note told to a step stays until a model turn reads it: a call that fails
   assert.deepEqual(seen.map(has), [false, true, true], "the retry reads the note too");
   assert.equal(run.steps[0].told, undefined, "read, it goes");
 });
+
+test("a proposal turned down while its step still works: the step is stale when it ends, and a redo waits for it to end", async () => {
+  let events!: InstanceType<typeof Events>, r!: InstanceType<typeof Runs>, run!: ReturnType<InstanceType<typeof Runs>["create"]>, refused = "";
+  const made = runs(scripted({
+    cast_derya: (m: BaseMessage[]): Turn => {
+      const n = m.filter(x => x.getType() === "ai").length;
+      if (n === 0) return { calls: [{ name: "create_character", args: { ...derya, id: "defne8" } }] };
+      if (n === 1) {
+        // the person turns it down while the step still works, and asks for a redo at once
+        const q = proposalsOf(events), p = q.all().find(x => x.doc === "defne8")!;
+        q.resolve(p.id, false);
+        void r.step(run.id, "cast_derya", { action: "redo" }).catch(e => { refused = (e as Error).message; });
+        return { calls: [{ name: "kit_search", args: { kind: "characters" } }] };
+      }
+      return finish("defne8");
+    },
+  }));
+  ({ r, events } = made);
+  run = r.create({ goal: "g", plan: { brief: "b", steps: [{ ...PLAN.steps[0], owns: [{ kind: "character" as const, id: "defne8" }] }] }, gates: false, agentEdits: "proposals" });
+  await r.idle();
+  assert.match(refused, /still working: stop it first/);
+  assert.deepEqual([run.steps[0].status, run.status], ["stale", "paused"]);
+  assert.match(run.why!, /Derya needs you/);
+});

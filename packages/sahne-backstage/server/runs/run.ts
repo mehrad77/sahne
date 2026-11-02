@@ -55,6 +55,8 @@ export interface Step {
   attempts: number;
   /** The proposals it made. */
   proposals: string[];
+  /** One of its proposals was turned down while it still worked: it needs a redo once it ends. */
+  turnedDown?: boolean;
 }
 export interface Gates { plan: boolean; castAndPlaces: boolean }
 export type Gate = keyof Gates;
@@ -205,7 +207,9 @@ export class Runs {
   private rejected(run: Run, stepId: string): void {
     const s = run.steps.find(x => x.id === stepId);
     if (!s || s.status === "stale") return;
-    s.status = "stale";
+    // a step still at work ends first (go() marks it then), so its redo never meets a graph that runs
+    if (this.live.has(`${run.id}:${s.id}`)) s.turnedDown = true;
+    else s.status = "stale";
     for (const x of this.after(run, stepId)) if (x.status === "done") x.status = "stale";
     if (run.status === "done") run.status = "running";
     this.changed(run);
@@ -344,9 +348,9 @@ export class Runs {
     }
     else if (a.action === "redo") {
       // from its start again, with what the person said; its proposals still waiting are what it builds on
-      if (s.status === "running" || s.status === "asking") throw new Error(`step ${stepId} is ${s.status}: stop it first`);
+      if (s.status === "running" || s.status === "asking" || this.live.has(`${run.id}:${s.id}`)) throw new Error(`step ${stepId} is ${s.status === "asking" ? "asking" : "still working"}: stop it first`);
       await this.saver.deleteThread(`${run.by}:${s.id}`);
-      s.status = "waiting"; s.attempts = 0; delete s.error; delete s.summary; delete s.question;
+      s.status = "waiting"; s.attempts = 0; delete s.error; delete s.summary; delete s.question; delete s.turnedDown;
       if (a.note?.trim()) s.brief = `${s.brief}\n\nDone again, because: ${a.note.trim()}`;
       // what it makes, changed by the person (an id that cannot be made): no other step may make the same
       if (a.owns) {
@@ -517,7 +521,7 @@ export class Runs {
         // a planner that ends without a plan (it asked in words, or gave up) has not planned: the task is not done, it waits
         if (s.kind === "plan" && s.summary === undefined) throw new Error(`the planner ended without a plan (propose_plan)${words?.trim() ? `; it said: ${words.trim()}` : ""}`);
         s.summary ??= words;
-        s.status = "done"; s.endedAt = Date.now(); delete s.error;
+        s.status = s.turnedDown ? "stale" : "done"; s.endedAt = Date.now(); delete s.error; delete s.turnedDown;
         await this.saver.deleteThread(thread.configurable.thread_id);
       }
     } catch (e) {
