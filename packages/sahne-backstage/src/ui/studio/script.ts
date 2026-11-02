@@ -215,6 +215,9 @@ function Staged(p: Common & { at: Path; who?: string }) {
   const [paren, setText] = useState("");
   const open = p.paren === key(p.at), setOpen = (on: boolean) => p.setParen(on ? key(p.at) : null);
   const setParen = setText;
+  // the input's last word: Enter or Escape closes it, and the blur that its removal fires (in Chromium) must not commit again
+  const closed = useRef(false);
+  useEffect(() => { if (open) closed.current = false; }, [open]);
   const step = get(p.story, p.at);
   const st = stagingIn(step) as Record<string, unknown>;
   const dirs = directionsOf(st, p.name);
@@ -224,6 +227,8 @@ function Staged(p: Common & { at: Path; who?: string }) {
   const bare = p.b.kind !== "action" && isUnstaged(step as Record<string, unknown>);
   const take = (sg: Suggest) => p.edit(s => set(s, base, taken((get(s, base) ?? {}) as Record<string, unknown>, sg.fix)), `${key(p.at)}.take`);
   const commit = () => {
+    if (closed.current) return;
+    closed.current = true;
     if (!paren.trim()) { setOpen(false); return; }
     const pl = w.places[placeAt(p.story, Number(p.at[1]))];
     const cast = [...(p.story.cast ?? []), ...(p.story.extras ?? []), p.narrator];
@@ -249,7 +254,7 @@ function Staged(p: Common & { at: Path; who?: string }) {
       ${suggestions}
       ${open ? html`<input class="paren" autofocus value=${paren} placeholder="(waves, happy, to …)" aria-label="How it is said" lang=${main === "tr" ? "en" : undefined}
         onInput=${(e: Event) => setParen((e.target as HTMLInputElement).value)} onBlur=${commit}
-        onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); commit(); } else if (e.key === "Escape") { setParen(""); setOpen(false); } }} />`
+        onKeyDown=${(e: KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); commit(); } else if (e.key === "Escape") { closed.current = true; setParen(""); setOpen(false); } }} />`
       : html`<button class="schip add" onClick=${() => setOpen(true)} title="How it is said: type (waves, happy, to …)">+ add a direction</button>`}
 </span>`
     : html`${dirs.length ? html`<span class="dirs-quiet">${dirs.map(c => c.label).join(" · ")}</span>` : ""} ${suggestions}`}
