@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { storyFile } from "../../sahne-story/paths.ts";
 import type { StoryDoc } from "../../sahne-story/src/index.ts";
-import { approvedReview, episodeSig, nextStepOf, progressOf, stageOnPage, type ProgressInput } from "../src/model/progress.ts";
+import { approvedReview, episodeSig, nextStepOf, problemsOf, progressOf, stageOnPage, type ProgressInput } from "../src/model/progress.ts";
 import { rowKey } from "../src/model/review.ts";
 import { blocks } from "../src/model/script.ts";
 import { get, set } from "../src/model/path.ts";
@@ -131,4 +131,13 @@ test("progress: approving anyway asks for the reason, keeps it as a comment, and
   const ready = approvedReview({}, { story: s, reviewer: "Bob", notDone: [], id: "c2", date: "" });
   assert.equal(ready.reviewer, "Bob");
   assert.equal(ready.comments, undefined);
+});
+
+test("progress: a lint the server's check found too is listed once, as the server's (which says it is new)", () => {
+  const lint = { rule: "link", level: "error", step: 1, message: 'link "x" is not a word of the line' };
+  const server = [{ ...lint, new: true }, { rule: "schema", level: "error", message: "/title: the title has no en text" }];
+  const all = problemsOf(server, [lint, { rule: "silent", level: "error", step: 2, message: "m" }]);
+  assert.equal(all.length, 3);
+  assert.equal(all.filter(x => x.rule === "link").length, 1);
+  assert.equal((all[0] as { new?: boolean }).new, true);
 });

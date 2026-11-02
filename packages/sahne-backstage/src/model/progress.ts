@@ -66,6 +66,16 @@ export function approvedReview(r: EpisodeReview, o: { story: StoryDoc; reviewer:
   return { ...rest, status: "approved", sig: episodeSig(o.story), ...(o.reviewer ? { reviewer: o.reviewer } : {}), ...(c ? { comments: [...(r.comments ?? []), c] } : {}) };
 }
 
+/**
+ * An episode's problems, each once: the server's check (which runs the stage lints too, and marks what an edit brought) and
+ * the lints run in the browser as the person types. A lint the server found as well is the server's copy.
+ */
+export function problemsOf<P extends { rule: string; step?: number; message: string }>(server: readonly P[], lints: readonly P[]): P[] {
+  const key = (x: P) => `${x.rule}|${x.step ?? ""}|${x.message}`;
+  const seen = new Set(server.map(key));
+  return [...server, ...lints.filter(x => !seen.has(key(x)))];
+}
+
 /** Whether a line has no stage direction written. The narrator speaking to the viewer needs none. */
 export function isUnstaged(step: Record<string, unknown> | undefined): boolean {
   if (!step || step.narr === true) return false;

@@ -18,7 +18,7 @@ import { KIT, Preview, solidsOf } from "../../stage.ts";
 import { pathOfKey } from "../review.ts";
 import { approve, ReadThrough, ReviewSide } from "./reviewstage.ts";
 import { blocksOf, checkedOf } from "../../model/review.ts";
-import { nextStepOf, progressOf, stageOnPage, type StageKey, type StepAction } from "../../model/progress.ts";
+import { nextStepOf, problemsOf, progressOf, stageOnPage, type StageKey, type StepAction } from "../../model/progress.ts";
 import { blocks } from "../../model/script.ts";
 import { marks as marksNow, runs as runsNow } from "../../runs.ts";
 import { NeedsYou } from "./needs.ts";
@@ -180,7 +180,7 @@ function Studio(p: { id: string }) {
   const asks2 = runsNow.value.flatMap(r => r.steps.filter(st => st.status === "asking" && st.question && st.owns.some(o => o.kind === "story" && o.id === p.id)).map(st => ({ run: r, step: st })));
   const mine = proposals.value.filter(x => (x.kind === "story" && x.doc === p.id) || x.also?.some(a => a.kind === "story" && a.doc === p.id));
   const conflict = conflicts.value.has(key);
-  const problems = [...(checked.value[key] ?? []), ...lints];
+  const problems = problemsOf(checked.value[key] ?? [], lints);
   const marks: Record<number, { errors: number; warnings: number }> = {};
   for (const x of problems) if (x.step !== undefined && (x.level === "error" || x.level === "warning")) { const m = (marks[x.step] ??= { errors: 0, warnings: 0 }); if (x.level === "error") m.errors++; else m.warnings++; }
   const allFlags = flagsIn(story);
