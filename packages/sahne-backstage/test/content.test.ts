@@ -68,3 +68,10 @@ test("a season or series edit is checked with the stories it governs", () => {
     assert.equal(r.status, 200, r.message);
   } finally { writeFileSync(seasonFile, was.season); writeFileSync(seriesFile, was.series); forget(); }
 });
+
+test("a kit item is checked as the root's loader reads it: a variant whose params its generator refuses is an error", () => {
+  const bad = check([{ kind: "kit_variant", id: "flag.x_club", doc: { of: "flag", name: "x_club", params: { kind: "bunting", w: "wide" } }, create: true }]);
+  assert.ok(bad.some(p => p.new && p.level === "error" && p.doc === "kit_variant:flag.x_club"), JSON.stringify(bad));
+  const good = check([{ kind: "kit_variant", id: "flag.x_club", doc: { of: "flag", name: "x_club", params: { kind: "bunting", w: 420 } }, create: true }]);
+  assert.deepEqual(good.filter(p => p.new && p.level === "error"), []);
+});

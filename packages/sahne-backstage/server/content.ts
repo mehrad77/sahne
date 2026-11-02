@@ -10,7 +10,9 @@
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import { placeSolids, type Kit, type Solid } from "sahne";
 import full from "../../sahne-kit/src/full.ts";
-import { withDrawings, type DrawingDoc, type VariantDoc } from "../../sahne-kit/src/drawing.ts";
+import { compileDrawing, withDrawings, type DrawingDoc, type VariantDoc } from "../../sahne-kit/src/drawing.ts";
+import { checkPiece } from "../../sahne-kit/src/check.ts";
+import { paramProblems } from "../../sahne-story/src/lint-place.ts";
 import { CHARACTERS, IS_SAMPLES, PLACES, SERIES, kitPieceFile, kitPieceIds, kitVariantFile, kitVariantIds, seasonFile, seasonIds, storyFile, storyIds } from "../../sahne-story/paths.ts";
 import { loadCards, loadContentKit, loadNeeds } from "../../sahne-story/load.ts";
 import { validateDoc } from "../../sahne-story/check/schema.ts";
@@ -102,6 +104,20 @@ export const kit = (): Kit => own().kit;
 export const kitDocs = (): { docs: (DrawingDoc | VariantDoc)[]; problems: string[] } => ({ docs: own().docs, problems: own().problems });
 const docKey = (d: DrawingDoc | VariantDoc) => ("of" in d ? `kit_variant:${d.of}.${d.name}` : `kit_piece:${d.id}`);
 
+/** What the root's loader refuses in a kit item it adds (load.ts): a drawing that does not compile, a piece the kit's checks
+ * fail, a variant's params its generator does not take. */
+function loaderProblems(doc: DrawingDoc | VariantDoc, next: Kit): string[] {
+  const out: string[] = [];
+  if ("of" in doc) {
+    for (const m of [next.set, next.props]) if (Object.hasOwn(m, doc.of)) for (const p of paramProblems(m[doc.of], doc.params ?? {}, [])) if (p.level === "error") out.push(p.message);
+  } else {
+    out.push(...compileDrawing(doc).problems);
+    const def = (doc.as === "prop" ? next.props : next.set)[doc.id];
+    if (def) for (const p of checkPiece(def, { ids: [doc.id], set: doc.as !== "prop", prop: doc.as !== "set" }, next)) if (p.level === "error") out.push(`[${p.rule}] ${p.msg}`);
+  }
+  return [...new Set(out)];
+}
+
 /**
  * The kit with these edited kit items in place of their files, and what is wrong with each edit: its schema, then its place in
  * the kit (a taken id, a generator or param the kit does not have). Pieces go in before variants, one at a time, so one
@@ -118,7 +134,13 @@ export function kitWithEdits(edits: Edit[]): { kit: Kit; problems: Problem[] } {
   }
   let k = full;
   for (const { doc, edit } of [...docs.filter(d => !("of" in d.doc)), ...docs.filter(d => "of" in d.doc)]) {
-    try { k = withDrawings(k, [doc]); } catch (err) { if (edit) bad(edit, (err as Error).message); }
+    try {
+      const next = withDrawings(k, [doc]);
+      // an edit passes what the root's loader asks of a file (sahne-story/load.ts loadContentKit), or the loader would drop it
+      const no = edit ? loaderProblems(doc, next) : [];
+      if (no.length) { for (const m of no.slice(0, 5)) bad(edit!, m); continue; }
+      k = next;
+    } catch (err) { if (edit) bad(edit, (err as Error).message); }
   }
   return { kit: k, problems };
 }
