@@ -50,3 +50,11 @@ test("a step both rewrote, or one removed and the other rewrote, is a conflict, 
   assert.deepEqual(steps(merge3(disk, rewrite(disk, "same"), rewrite(disk, "same")).doc)[0], "same");
   assert.deepEqual(steps(merge3(disk, set(disk, ["steps", 0], undefined), set(disk, ["steps", 0], undefined)).doc)[0], "s1");
 });
+
+test("a carried new document (events.ts planOf): from what carried it, whether it is saved now or not here yet", () => {
+  const carried = { id: "s1", calendar: { s1e08: { date: "2026-01-05" } } }, next = set(carried, ["calendar", "s1e09"], { date: "2026-01-06" });
+  assert.equal(merge3(undefined, undefined, next).conflict, undefined, "nothing here and nothing before: the proposal");
+  assert.deepEqual(merge3(carried, carried, next).doc, next, "not here yet: what carried it stands for it");
+  const saved = set(carried, ["title"], "S1");
+  assert.deepEqual(merge3(carried, saved, next).doc, set(next, ["title"], "S1"), "saved since: merged into it");
+});

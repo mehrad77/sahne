@@ -11,7 +11,7 @@ import { api, type Kind } from "./api.ts";
 import { merge3, type Path } from "./model/path.ts";
 import { pathWords } from "./model/tools.ts";
 import * as H from "./model/history.ts";
-import { change, createDoc, drafts, go, keyOf, loadReview, loadWorld, openDoc, route, saveDocs, say } from "./store.ts";
+import { change, createDoc, drafts, go, keyOf, loadReview, loadWorld, openDoc, route, saveDocs, say, world } from "./store.ts";
 import { loadKitDocs } from "./kitdocs.ts";
 import { answerLook, type LookAsk } from "./look.ts";
 import { heardRun, loadRuns, runs } from "./runs.ts";
@@ -108,7 +108,8 @@ const baseOf = (e: ProposalEdit, d: H.Draft | undefined): { doc: unknown } | nul
 export function mergedOnto(e: ProposalEdit, doc: unknown, d: H.Draft | undefined = drafts.value[keyOf(e.kind, e.doc)]): { doc: unknown } | { why: string } {
   const base = baseOf(e, d);
   if (!base) return { why: `${e.kind} ${e.doc} changed since it was proposed: ask for it again` };
-  const m = merge3(base.doc, doc, e.next);
+  // a new document not here at all: what it was built on stands for it (nothing, or the earlier proposal that carried it)
+  const m = merge3(base.doc, doc === undefined && !d && e.create ? base.doc : doc, e.next);
   return m.conflict ? { why: `your edits and the proposal both change ${e.kind} ${e.doc} at ${pathWords(m.conflict)}: save or undo yours first` } : { doc: m.doc };
 }
 
@@ -120,13 +121,28 @@ async function planOf(edits: ProposalEdit[]): Promise<Map<string, { e: ProposalE
   const out = new Map<string, { e: ProposalEdit; doc: unknown }>();
   for (const e of edits) {
     const k = keyOf(e.kind, e.doc);
-    const d = e.create && !drafts.value[k] ? undefined : drafts.value[k] ?? await openDoc(e.kind, e.doc) ?? undefined;
+    // a new document an earlier accept already saved is on disk now: merged into it like any other
+    const d = drafts.value[k] ?? (!e.create || onDisk(e.kind, e.doc) ? await openDoc(e.kind, e.doc) ?? undefined : undefined);
     if (!d && !e.create) return `${e.kind} ${e.doc} could not be opened`;
     const r = mergedOnto(e, out.get(k)?.doc ?? d?.doc, d);
     if ("why" in r) return r.why;
     out.set(k, { e, doc: r.doc });
   }
   return out;
+}
+
+/** Whether a document is in the world as the server listed it (on disk). */
+function onDisk(kind: Kind, id: string): boolean {
+  const w = world.value;
+  if (!w) return false;
+  switch (kind) {
+    case "series": return !!w.series;
+    case "season": return !!w.seasons[id];
+    case "story": return w.episodes.some(x => x.id === id);
+    case "character": return !!w.characters[id];
+    case "place": return !!w.places[id];
+    default: return false;
+  }
 }
 
 /** Put planned documents into the editor, each as one edit (Undo takes it back). */
