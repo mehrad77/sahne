@@ -68,9 +68,17 @@ jobs:
       - name: project consent is the owner's
         # consent "project" is the owner's own kit agents' art: a pull request from anyone else may not add or change it
         if: steps.changed.outputs.ids != '' && github.event.pull_request.user.login != github.repository_owner
+        # the files are parsed, not grepped: JSON spells one value many ways ("consent" : "project", a tab, a line break,
+        # "\u0070roject"); a file that does not parse fails too
         run: |
-          bad=$(git diff --name-only --diff-filter=AMR "origin/${{ github.base_ref }}...HEAD" -- 'packages/sahne-kit/src/set/drawn/*/*.json' | while read -r f; do grep -l '"consent": *"project"' "$f" || true; done)
-          if [ -n "$bad" ]; then echo "consent \"project\" is the owner's, not this pull request author's:"; echo "$bad"; exit 1; fi
+          git diff --name-only -z --diff-filter=AMR "origin/${{ github.base_ref }}...HEAD" -- 'packages/sahne-kit/src/set/drawn/*/*.json' | node -e '
+            const fs = require("node:fs"), bad = [];
+            for (const f of fs.readFileSync(0, "utf8").split("\0").filter(Boolean)) {
+              let consent;
+              try { consent = JSON.parse(fs.readFileSync(f, "utf8"))?.credit?.consent; } catch (e) { bad.push(`${f} (does not parse: ${e.message})`); continue; }
+              if (consent === "project") bad.push(f);
+            }
+            if (bad.length) { console.log(`consent "project" is the owner'"'"'s, not this pull request author'"'"'s:\n${bad.join("\n")}`); process.exit(1); }'
       - uses: pnpm/action-setup@v4
         if: steps.changed.outputs.ids != ''
       - uses: actions/setup-node@v4
