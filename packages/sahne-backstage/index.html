@@ -499,7 +499,7 @@ button.chip { border: 1px solid transparent; cursor: pointer; }
 .inline-date { width: auto; display: inline-block; padding: 1px 6px; font-size: 13px; }
 /* the episode studio: the script beside the stage */
 .studio-split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(340px, 1fr); gap: 18px; align-items: start; }
-.stage-col { position: sticky; top: 64px; display: grid; gap: 8px; max-height: calc(100vh - 130px); overflow: auto; padding-bottom: 8px; }
+.stage-col { position: sticky; top: 64px; display: grid; grid-auto-rows: max-content; gap: 8px; max-height: calc(100vh - 130px); overflow: auto; padding-bottom: 8px; }
 .script-col { min-width: 0; }
 .ep-head { display: grid; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 14px; }
 .people { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
