@@ -36,3 +36,9 @@ test("a proposal built on another takes that one's changes too, applied first (e
   assert.equal(steps(alone)[2], "s2", "merged from its own base only, the held change is missing");
   assert.deepEqual(steps(chained), ["s0", "s1 mine", "s2 p1", "s3", "s4", "p2", "s5", "s6"]);
 });
+
+test("the same step added twice by the proposal lands twice; once when the person added it too", () => {
+  const wait = { beat: { who: "a", wait: 600 } }, twice = insert(insert(disk, ["steps"], 3, wait), ["steps"], 3, wait);
+  assert.equal((merge3(disk, mine, twice).doc as { steps: unknown[] }).steps.filter(s => "beat" in (s as object)).length, 2);
+  assert.equal((merge3(disk, insert(mine, ["steps"], 3, wait), twice).doc as { steps: unknown[] }).steps.filter(s => "beat" in (s as object)).length, 2);
+});

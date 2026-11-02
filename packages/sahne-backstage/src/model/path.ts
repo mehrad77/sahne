@@ -94,9 +94,11 @@ function alike(a: unknown, b: unknown): number {
  * How a list became another: for each item of `base`, its index in `side` (undefined: removed), and the items `side`
  * added before each index of `base` (`base.length`: at the end). Items kept as they were are matched first (the longest
  * common run); between two of those, a base item and the side's at the same place, when as many were there and they are
- * alike, are the same item changed. Anything else is a removal and an addition (a move is both).
+ * alike, are the same item changed. Anything else is a removal and an addition (a move is both); `end` says, for an item
+ * removed, before which base index the additions of its stretch went (an item rewritten past `alike` is removed there and
+ * added again).
  */
-function align(base: readonly unknown[], side: readonly unknown[]): { to: (number | undefined)[]; added: number[][] } {
+function align(base: readonly unknown[], side: readonly unknown[]): { to: (number | undefined)[]; added: number[][]; end: number[] } {
   const n = base.length, m = side.length, L = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
   for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = equal(base[i], side[j]) ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
   const anchors: [number, number][] = [];
@@ -105,17 +107,17 @@ function align(base: readonly unknown[], side: readonly unknown[]): { to: (numbe
     else if (L[i + 1][j] >= L[i][j + 1]) i++;
     else j++;
   }
-  const to: (number | undefined)[] = new Array(n).fill(undefined), added: number[][] = Array.from({ length: n + 1 }, () => []);
+  const to: (number | undefined)[] = new Array(n).fill(undefined), added: number[][] = Array.from({ length: n + 1 }, () => []), end: number[] = new Array(n).fill(n);
   const bounds: [number, number][] = [[-1, -1], ...anchors, [n, m]];
   for (let g = 0; g + 1 < bounds.length; g++) {
     const [i0, j0] = bounds[g], [i1, j1] = bounds[g + 1];
     const bs = Array.from({ length: i1 - i0 - 1 }, (_, k) => i0 + 1 + k), ss = Array.from({ length: j1 - j0 - 1 }, (_, k) => j0 + 1 + k);
     const paired = bs.length === ss.length && bs.every((i, k) => alike(base[i], side[ss[k]]) >= 0.5);
     if (paired) bs.forEach((i, k) => { to[i] = ss[k]; });
-    else added[i1].push(...ss);
+    else { added[i1].push(...ss); for (const i of bs) end[i] = i1; }
     if (i1 < n) to[i1] = j1;
   }
-  return { to, added };
+  return { to, added, end };
 }
 
 /**
@@ -141,11 +143,12 @@ export function merge3(base: unknown, mine: unknown, theirs: unknown, prefer?: "
   if (!Array.isArray(mine) || !Array.isArray(theirs)) return lose();
   const b = Array.isArray(base) ? base : [], A = align(b, mine), B = align(b, theirs), out: unknown[] = [];
   for (let i = 0; i <= b.length; i++) {
-    const adds = A.added[i].map(j => mine[j]);
-    for (const j of B.added[i]) if (!adds.some(x => equal(x, theirs[j]))) adds.push(theirs[j]);
-    out.push(...adds);
-    if (i === b.length) break;
+    // both sides' additions here, one each of what both added (a side may add the same thing twice)
+    const adds = A.added[i].map(j => mine[j]), pool = [...adds];
+    for (const j of B.added[i]) { const k = pool.findIndex(x => equal(x, theirs[j])); if (k >= 0) pool.splice(k, 1); else adds.push(theirs[j]); }
+    if (i === b.length) { out.push(...adds); break; }
     const a = A.to[i], t = B.to[i];
+    out.push(...adds);
     if (a !== undefined && t !== undefined) {
       const r = merge3(b[i], mine[a], theirs[t], prefer, [...at, i]);
       if (r.conflict) return r;
