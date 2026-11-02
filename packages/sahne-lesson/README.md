@@ -52,7 +52,7 @@ The place-level word rules (a prop's `terms`, `decor` and the `explore` lint of 
 
 ## Tests
 
-`test/lesson.test.ts`: the samples with the plugin on and off, a story with no lesson parts passing the core check, the schema's fields and step, a seeded break for each rule, the spot's cue and a note on its cue, and the season's recycling report.
+`test/lesson.test.ts`: the samples with the plugin on and off, a story with no lesson parts passing the core check, the schema's fields and step, a seeded break for each rule, the spot's cue and a note on its cue, and the season's recycling report. `test/languages.test.ts`: the checks in a series whose main language is not Turkish (a mistake's fix is looked for in the main language's lines).
 
 ```bash
 node --test packages/sahne-lesson/test/*.test.ts

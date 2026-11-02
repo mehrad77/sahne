@@ -67,11 +67,12 @@ export function checkLesson({ story, characters, world: w, lang, texts: all, nam
   // spot examples are lines of the story
   story.steps.forEach((st, i) => { if (isSpot(st) && !haystack.includes(norm((st as SpotStep).spot.ex))) add("ref", "error", `spot example “${(st as SpotStep).spot.ex}” is not a line of the story`, i); });
 
-  // mistake.fix is used within 3 lines
+  // mistake.fix is used within 3 lines (of the main language, whatever its code)
   const ls = story.steps.map((st, i) => [st, i] as const).filter(([st]) => isLine(st)) as [LineStep & LessonLine, number][];
+  const said = (x: object) => String((x as Record<string, unknown>)[lang.id] ?? "");
   ls.forEach(([l, i], k) => {
     if (!l.mistake) return;
-    const next = ls.slice(k + 1, k + 4).map(([x]) => norm(x.tr));
+    const next = ls.slice(k + 1, k + 4).map(([x]) => norm(said(x)));
     if (!next.some(t => t.includes(norm(l.mistake!.fix)))) add("mistake", "error", `the fix “${l.mistake.fix}” is not used in the next 3 lines`, i);
   });
 
