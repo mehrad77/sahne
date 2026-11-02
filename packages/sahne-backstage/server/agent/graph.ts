@@ -119,10 +119,15 @@ export function agentGraph(a: Agent, checkpointer?: BaseCheckpointSaver) {
   }
 
   async function tools(s: S, config: LangGraphRunnableConfig) {
-    const t = lastTurn(s)!, out: ToolMessage[] = [];
+    const t = lastTurn(s)!, out: ToolMessage[] = [], first = asked(t);
     let end = false;
     for (const c of t.tool_calls ?? []) {
-      if (c.name === "ask_person") continue;
+      // one question a turn: the first is put to the person (the ask node); every tool call needs its answer, so the others
+      // are told to wait
+      if (c.name === "ask_person") {
+        if (c !== first) out.push(answer(a.model, c.id!, { text: "Not asked: one question at a time. Ask it again after the person answers the first.", isError: true }));
+        continue;
+      }
       // stopped: no further tool runs (in direct mode one would save)
       if (config.signal?.aborted) throw Object.assign(new Error("stopped"), { name: "AbortError" });
       const call = { id: c.id!, name: c.name, input: c.args as Record<string, unknown> };
@@ -162,7 +167,7 @@ export function agentGraph(a: Agent, checkpointer?: BaseCheckpointSaver) {
     .addNode("tools", tools)
     .addNode("ask", ask)
     .addEdge(START, "model")
-    .addConditionalEdges("model", s => (s.stopped || !(lastTurn(s)?.tool_calls?.length || lastTurn(s)?.invalid_tool_calls?.length) ? END : (lastTurn(s)!.tool_calls ?? []).some(c => c.name !== "ask_person") || lastTurn(s)!.invalid_tool_calls?.length ? "tools" : "ask"), ["tools", "ask", END])
+    .addConditionalEdges("model", s => (s.stopped || !(lastTurn(s)?.tool_calls?.length || lastTurn(s)?.invalid_tool_calls?.length) ? END : (lastTurn(s)!.tool_calls ?? []).filter(c => c.name !== "ask_person" || c !== asked(lastTurn(s))).length || lastTurn(s)!.invalid_tool_calls?.length ? "tools" : "ask"), ["tools", "ask", END])
     .addConditionalEdges("tools", s => (s.stopped ? END : asked(lastTurn(s)) ? "ask" : "model"), ["ask", "model", END])
     .addConditionalEdges("ask", s => (s.stopped ? END : "model"), ["model", END])
     .compile(checkpointer ? { checkpointer } : {});

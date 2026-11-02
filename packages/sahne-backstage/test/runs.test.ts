@@ -529,3 +529,22 @@ test("a plan's steps are of a known kind with lists where lists go; a budget is 
   again.resume();
   assert.equal(again.get(run.id)!.maxUsd, 10);
 });
+
+test("two questions in one turn: the first is put to the person, the second is answered 'one at a time', so every call has its answer", async () => {
+  const seen: Record<string, BaseMessage[][]> = {};
+  const { r } = runs(scripted({
+    cast_derya: (m: BaseMessage[]): Turn => (m.filter(x => x.getType() === "ai").length === 0
+      ? { calls: [{ name: "ask_person", args: { question: "Her name?" } }, { name: "ask_person", args: { question: "Her age?" } }] }
+      : finish("asked")),
+  }, { seen }));
+  const run = r.create({ goal: "g", plan: { brief: "b", steps: [{ ...PLAN.steps[0], owns: [] }] }, gates: false });
+  await r.idle();
+  assert.deepEqual([run.steps[0].status, run.steps[0].question?.question], ["asking", "Her name?"]);
+  await r.step(run.id, "cast_derya", { action: "answer", answer: "Defne" });
+  await r.idle();
+  assert.equal(run.steps[0].status, "done");
+  const last = seen.cast_derya.at(-1)!, turn = last.find(m => m.getType() === "ai") as unknown as { tool_calls: { id: string }[] };
+  const answered = last.filter(m => m.getType() === "tool").map(m => (m as unknown as { tool_call_id: string }).tool_call_id);
+  assert.deepEqual(turn.tool_calls.map(c => c.id).sort(), answered.sort(), "each tool call has its result");
+  assert.ok(last.some(m => /one question at a time/.test(String(m.content))));
+});
