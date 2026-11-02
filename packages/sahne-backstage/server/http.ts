@@ -20,7 +20,7 @@ import { headOf } from "./git.ts";
 import { blocksFor, readReview, writeReview } from "./review.ts";
 import { requestOf, runAssistant, usageSummary } from "./assistant.ts";
 import { localModels, MODELS } from "./ai/models.ts";
-import { overrides, readiness, readSettings, settingsFile, writeSettings, webOf } from "./settings.ts";
+import { clean as cleanSettings, fileSettings, overrides, readiness, readSettings, settingsFile, writeSettings, webOf } from "./settings.ts";
 import { Events, selectionOf } from "./events.ts";
 import { Agents, callOf } from "./agents.ts";
 import { createMcp, type AgentEdits } from "./mcp.ts";
@@ -271,13 +271,19 @@ export async function serve(o: Options): Promise<Running> {
     if (route === "settings" && m === "GET") return json(res, 200, settingsView());
     // the local server's models, for the composer's picker (none for Claude, whose models the editor knows)
     if (route === "models" && m === "GET") { const s = readSettings(); return json(res, 200, { models: s.provider === "openai" ? await localModels(s.baseUrl) : [] }); }
-    if (route === "settings" && m === "POST") { const s = writeSettings(await body(req)); if (s.agentEdits) agentEdits = s.agentEdits; return json(res, 200, settingsView()); }
+    if (route === "settings" && m === "POST") {
+      // the mode changes only when the person changed it: the page posts back the file's, which never overrides --agent-edits
+      const v = await body(req), was = fileSettings().agentEdits, asked = cleanSettings(v).agentEdits;
+      writeSettings(v);
+      if (asked && asked !== was) agentEdits = asked;
+      return json(res, 200, settingsView());
+    }
     if (route === "agents" && m === "GET") return json(res, 200, await agentsView(req));
     if (route === "agents" && m === "POST") {
       const v = await body(req) as { agentEdits?: unknown };
       if (v?.agentEdits !== "proposals" && v?.agentEdits !== "direct") throw new Fail(400, "expected { agentEdits: \"proposals\" | \"direct\" }");
       agentEdits = v.agentEdits;
-      writeSettings({ ...readSettings(), agentEdits });
+      writeSettings({ agentEdits });
       events.emit("activity", null);
       return json(res, 200, await agentsView(req));
     }

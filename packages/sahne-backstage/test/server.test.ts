@@ -288,6 +288,13 @@ test("the agents: an MCP client's session and its calls, and how their edits lan
   assert.equal(d.body.agentEdits, "direct");
   assert.equal((await call(rw.url, "GET", "world")).body.agentEdits, "direct");
   assert.equal(JSON.parse(readFileSync(join(config, "settings.json"), "utf8")).agentEdits, "direct");
+  // the Agents page keeps only the mode: nothing of the settings in effect (the defaults, the environment) joins the file
+  assert.deepEqual(Object.keys(JSON.parse(readFileSync(join(config, "settings.json"), "utf8"))), ["agentEdits"]);
+  // a settings save posts back the file's mode: unchanged, it never moves the mode in effect
+  writeFileSync(join(config, "settings.json"), JSON.stringify({ agentEdits: "proposals" }));
+  const shown = (await call(rw.url, "GET", "settings")).body.settings;
+  assert.equal((await call(rw.url, "POST", "settings", { ...shown, confirmOverUsd: 1 })).status, 200);
+  assert.equal((await call(rw.url, "GET", "world")).body.agentEdits, "direct");
   await call(rw.url, "POST", "agents", { agentEdits: "proposals" });
 });
 

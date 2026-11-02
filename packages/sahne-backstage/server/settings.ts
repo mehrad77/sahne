@@ -110,11 +110,14 @@ export function readSettings(): Settings {
 }
 
 /**
- * Save settings sent from the editor: merged over the file's, cleaned, written atomically. Choosing the OpenAI-compatible
- * provider without a server names LM Studio's. Returns the settings in effect.
+ * Save settings sent from the editor: merged over the file's, cleaned, written atomically. A field the environment
+ * overrides is left as the file has it. Choosing the OpenAI-compatible provider without a server names LM Studio's.
+ * Returns the settings in effect.
  */
 export function writeSettings(v: unknown): Settings {
   const cur = fileSettings(), next = clean(v);
+  // what the environment sets is not the person's to keep: the file keeps its own (the editor posts back what it was shown)
+  for (const k of Object.keys(overrides()) as (keyof ReturnType<typeof overrides>)[]) delete next[k];
   const merged: Partial<Settings> = { ...cur, ...next, ...(next.caps ? { caps: next.caps } : {}) };
   if ((merged.provider ?? DEFAULTS.provider) === "openai" && !merged.baseUrl) merged.baseUrl = LOCAL_BASE;
   // a model of the other provider goes when the provider changes (the chat's picker names one for the new provider)
