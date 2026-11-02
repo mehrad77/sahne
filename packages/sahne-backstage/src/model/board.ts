@@ -56,6 +56,9 @@ export function boardOf(season: SeasonDoc, dates: Record<string, string>, extra 
   });
 }
 
+/** The episodes a day of the board shows. One with no date, on a Sunday, or on a day another one has is not among them. */
+export const onBoard = (weeks: Week[]): Set<string> => new Set(weeks.flatMap(w => w.days.flatMap(d => (d.episode ? [d.episode] : []))));
+
 /** Whether a string is a day (`YYYY-MM-DD`, a real one): a date field being cleared or typed into is not. */
 export const isDay = (s: string | undefined): s is string => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(toDate(s).getTime());
 

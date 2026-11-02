@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { boardOf, isDay, rowOn, weekOf } from "../src/model/board.ts";
+import { boardOf, isDay, onBoard, rowOn, weekOf } from "../src/model/board.ts";
 
 const season = { v: 1, id: "s1", n: 1, title: { en: "Season 1" }, launch: "2026-09-14" } as never;
 const weeks = boardOf(season, { s1e01: "2026-09-14", s1e02: "2026-09-15" });
@@ -16,4 +16,13 @@ test("a cleared or half-typed date is no day, and has no row on the board", () =
   }
   assert.equal(isDay("2026-09-16"), true);
   assert.deepEqual(rowOn(weeks, "2026-09-19"), { date: "2026-09-19", kind: "special", week: 1 });
+});
+
+test("an episode on a Sunday, or on a day another one has, is not on the board, so it waits under it", () => {
+  const dates = { s1e01: "2026-09-14", s1e02: "2026-09-14", s1e03: "2026-09-20", s1e04: "2026-09-15" };
+  const shown = onBoard(boardOf(season, dates));
+  assert.equal(shown.size, 2);
+  assert.equal(shown.has("s1e03"), false, "a Sunday has no column");
+  assert.equal([shown.has("s1e01"), shown.has("s1e02")].filter(Boolean).length, 1, "one day shows one episode");
+  assert.equal(shown.has("s1e04"), true);
 });

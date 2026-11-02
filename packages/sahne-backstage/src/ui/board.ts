@@ -11,7 +11,7 @@
 import { html } from "htm/preact";
 import { useEffect, useState } from "preact/hooks";
 import { allLanguages, seasonOf, textOf, type SeasonDoc, type StoryDoc } from "sahne-story";
-import { arcOfWeek, boardOf, datesOf, rowOn, themed, weekOfArc, type Day, type Week } from "../model/board.ts";
+import { arcOfWeek, boardOf, datesOf, onBoard, rowOn, themed, weekOfArc, type Day, type Week } from "../model/board.ts";
 import { set } from "../model/path.ts";
 import { dirty } from "../model/history.ts";
 import { allProblems, change, checked, draftOf, drafts, keyOf, loadAllProblems, openDoc, review, route, saveDocs, say, world } from "../store.ts";
@@ -78,7 +78,8 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
   const dates = datesOf(se, eps.map(e => ({ id: e.id, releaseDate: story(e.id)?.releaseDate ?? e.releaseDate })));
   const arcWeeks = Object.fromEntries(eps.flatMap(e => { const wk = weekOfArc(story(e.id)?.arc?.id); return wk === undefined ? [] : [[e.id, wk]]; }));
   const weeks = boardOf(se, dates, 1, arcWeeks);
-  const unscheduled = eps.filter(e => !dates[e.id]);
+  // under the board: those no day shows (no date, a Sunday, or a day another episode has), so none goes missing
+  const shown = onBoard(weeks), unscheduled = eps.filter(e => !shown.has(e.id));
   const keys = [keyOf("season", p.id), ...eps.filter(e => !proposed.has(e.id)).map(e => keyOf("story", e.id))];
   const changed = keys.filter(k => { const [kind, id] = k.split(":") as ["season" | "story", string]; return dirty(draftOf(kind, id)); });
 
@@ -167,7 +168,7 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
         </div>`;
       })}
     </div>
-    ${unscheduled.length > 0 && html`<h3>Not on the calendar (${unscheduled.length})</h3><p class="note">Drag one onto a day.</p>
+    ${unscheduled.length > 0 && html`<h3>Not on the calendar (${unscheduled.length})</h3><p class="note">No date, a Sunday, or a day another episode has: drag one onto a day.</p>
       <div class="tray">${unscheduled.map(e => html`<${EpisodeCard} e=${e} story=${story(e.id)} mark=${markOf(e.id)} onDrag=${(on: boolean) => setDrag(on ? e.id : null)} />`)}</div>`}`}
     ${changed.length > 0 && html`<div class="savebar"><span class="grow">${changed.map(k => k.replace(":", " ")).join(", ")}
         ${changed.flatMap(k => (checked.value[k] ?? []).filter(x => x.new && x.level === "error")).map(x => html`<span class="bad-line">${x.story}: ${x.message}</span>`)}</span>
