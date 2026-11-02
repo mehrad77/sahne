@@ -129,13 +129,16 @@ const pageNow = () => route.value[0] || "board";
 /** The asks of the page open. */
 const asksHere = () => ASKS.filter(a => a.pages.includes(pageNow()));
 
-/** The context the assistant gets: the page, what it shows (an episode, a season, a place, a character) and what is selected on it. */
-const contextNow = () => {
+/**
+ * The context the assistant gets: the page, what it shows (an episode, a season, a place, a character) and what is selected
+ * on it. A selection counts only on its own page and document: one made in another episode is not this one's.
+ */
+export const contextNow = () => {
   const r = route.value, page = pageNow(), w = world.value;
-  const s = selection.value?.page === page ? selection.value : null;
   const firstSeason = w ? Object.values(w.seasons).sort((a, b) => a.n - b.n)[0]?.id : undefined;
   const shown: { kind?: string; id?: string } = page === "episode" ? { kind: "story", id: r[1] } : page === "season" ? { kind: "season", id: r[1] } : page === "board" && firstSeason ? { kind: "season", id: firstSeason }
     : page === "place" ? { kind: "place", id: r[1] } : page === "character" ? { kind: "character", id: r[1] } : {};
+  const sel = selection.value, s = sel?.page === page && (!shown.id || sel.id === shown.id) ? sel : null;
   return { page, ...(s?.kind ?? shown.kind ? { kind: s?.kind ?? shown.kind } : {}), ...(s?.id ?? shown.id ? { id: s?.id ?? shown.id } : {}), ...(s?.path ? { path: s.path } : {}) };
 };
 
