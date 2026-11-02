@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { storyFile } from "../../sahne-story/paths.ts";
 import type { StoryDoc } from "../../sahne-story/src/index.ts";
-import { episodeSig, nextStepOf, progressOf, stageOnPage, type ProgressInput } from "../src/model/progress.ts";
+import { approvedReview, episodeSig, nextStepOf, progressOf, stageOnPage, type ProgressInput } from "../src/model/progress.ts";
 import { rowKey } from "../src/model/review.ts";
 import { blocks } from "../src/model/script.ts";
 import { get, set } from "../src/model/path.ts";
@@ -116,4 +116,19 @@ test("progress: the stage on the page is the route's, else the one it opened at,
   // opened at Brief: finishing the brief (progress.next moves on) leaves the page on Brief
   assert.equal(stageOnPage({ sub: undefined, keys, live: false, landed: "brief" }), "brief");
   assert.equal(stageOnPage({ sub: undefined, keys, live: true, landed: "brief" }), "script");
+});
+
+test("progress: approving anyway asks for the reason, keeps it as a comment, and names only who approves now", () => {
+  const s = S1();
+  const p = progressOf(input(s));
+  assert.equal(nextStepOf(p, "review").alt?.action, "approve-anyway");
+  const before = { status: "draft" as const, reviewer: "Alice", comments: [] };
+  const r = approvedReview(before, { story: s, reviewer: "", notDone: ["translate"], reason: "the fa is next week", id: "c1", date: "2026-11-02 10:00" });
+  assert.equal(r.status, "approved");
+  assert.equal(r.sig, episodeSig(s));
+  assert.equal(r.reviewer, undefined, "an earlier approver's name is not kept");
+  assert.deepEqual(r.comments?.map(c => c.text), ["Approved before it was ready (translate): the fa is next week"]);
+  const ready = approvedReview({}, { story: s, reviewer: "Bob", notDone: [], id: "c2", date: "" });
+  assert.equal(ready.reviewer, "Bob");
+  assert.equal(ready.comments, undefined);
 });

@@ -10,15 +10,15 @@ import { html } from "htm/preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { allLanguages, langFor, lintStory, playOf, seasonOf, suggest, textOf, type StoryDoc } from "sahne-story";
 import type { Run } from "sahne";
-import { checkDocs, checked, change, draftOf, go, history, keyOf, openDoc, review, route, saveDocs, setReview, world } from "../../store.ts";
+import { checkDocs, checked, change, draftOf, go, history, keyOf, openDoc, review, route, saveDocs, world } from "../../store.ts";
 import { cueOf, cuePath, type Path } from "../../model/path.ts";
 import { flagsIn, wordsOnly } from "../../model/steps.ts";
 import { dirty } from "../../model/history.ts";
 import { KIT, Preview, solidsOf } from "../../stage.ts";
 import { pathOfKey } from "../review.ts";
-import { ReadThrough, ReviewSide } from "./reviewstage.ts";
+import { approve, ReadThrough, ReviewSide } from "./reviewstage.ts";
 import { blocksOf, checkedOf } from "../../model/review.ts";
-import { episodeSig, nextStepOf, progressOf, stageOnPage, type StageKey, type StepAction } from "../../model/progress.ts";
+import { nextStepOf, progressOf, stageOnPage, type StageKey, type StepAction } from "../../model/progress.ts";
 import { blocks } from "../../model/script.ts";
 import { marks as marksNow, runs as runsNow } from "../../runs.ts";
 import { NeedsYou } from "./needs.ts";
@@ -83,6 +83,7 @@ function Studio(p: { id: string }) {
   const [needsOpen, setNeedsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [watching, setWatching] = useState(false);
+  const [askWhy, setAskWhy] = useState(0);
   const [trLang, setTrLang] = useState<string>(langs.translations[0] ?? langs.main);
   // the Script stage's view: only the words, and a translation under each line (remembered in this browser)
   const [onlyWords, setOnlyWords] = useStored("backstage:words-only", false);
@@ -212,7 +213,9 @@ function Studio(p: { id: string }) {
       case "draft-language": return void send(`Fill in every missing ${langName(trLang)} translation in this episode, natural and simple. Propose them.`);
       case "settings": return setSettingsOpen(true);
       case "watch": return watch();
-      case "approve": return void setReview(p.id, r => ({ ...r, status: "approved", sig: episodeSig(story) }));
+      case "approve": return approve(p.id, story, progress);
+      // before it is ready: the reason, asked beside the stage as Review's own "Approve anyway…" asks it
+      case "approve-anyway": if (watching) unwatch(); return setAskWhy(n => n + 1);
     }
   };
   /** Watch it through: the stage full width from the opening scene, running on by itself. */
@@ -268,7 +271,7 @@ function Studio(p: { id: string }) {
         ${watching && player && html`<${Subtitle} info=${info[Math.max(0, player.next - 1)]} />`}
         ${player && html`<${Transport} preview=${pv!} redraw=${redraw} watch=${playOf(story, w.series) === "watch"} />`}
         ${watching && html`<div class="row" style="justify-content:center"><button onClick=${unwatch}>Back to reading</button></div>`}
-        ${stage === "review" && !watching && html`<${ReviewSide} id=${p.id} story=${story} progress=${progress} selected=${path} goStage=${goStage} onWatch=${watch} />`}
+        ${stage === "review" && !watching && html`<${ReviewSide} id=${p.id} story=${story} progress=${progress} selected=${path} goStage=${goStage} onWatch=${watch} ask=${askWhy} />`}
         ${pv && stage === "script" && html`<${Direct} preview=${pv} story=${story} path=${path} host=${box.current?.parentElement ?? null} edit=${edit} cast=${cast} />`}
         ${allFlags.length > 0 && html`<div class="flags"><span class="note">Flags from earlier stories:</span>${allFlags.map(f => html`<button class=${`chip${flags.includes(f) ? " on" : ""}`} aria-pressed=${flags.includes(f)} onClick=${() => {
           const next = flags.includes(f) ? flags.filter(x => x !== f) : [...flags, f];

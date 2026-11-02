@@ -9,7 +9,7 @@
 // step is one sentence and at most two actions for the stage on the page.
 
 import type { Languages, StoryDoc } from "sahne-story";
-import { checkedOf, hashOf, rowKey, sigAt, type EpisodeReview } from "./review.ts";
+import { checkedOf, hashOf, rowKey, sigAt, type Comment, type EpisodeReview } from "./review.ts";
 import { blocks } from "./script.ts";
 import { get, type Path } from "./path.ts";
 
@@ -55,6 +55,16 @@ const DIRECTING = ["do", "emo", "at", "to", "move", "obj", "react", "link", "cam
 
 /** The episode as approval vouches for it, a signature to compare with the review's: everything but when it comes out and the draft mark. */
 export const episodeSig = (story: StoryDoc) => { const { releaseDate: _d, draft: _x, ...rest } = story; return hashOf(rest); };
+
+/**
+ * The review once the episode is approved: its signature, and who approved it (no name kept from an earlier approval). An
+ * episode approved before it is ready says why, in a comment naming the stages not done: `reason` is required then.
+ */
+export function approvedReview(r: EpisodeReview, o: { story: StoryDoc; reviewer: string; notDone: string[]; reason?: string; id: string; date: string }): EpisodeReview {
+  const { reviewer: _was, ...rest } = r;
+  const c: Comment | null = o.notDone.length ? { id: o.id, by: o.reviewer || "someone", text: `Approved before it was ready (${o.notDone.join(", ")}): ${o.reason ?? ""}`, date: o.date } : null;
+  return { ...rest, status: "approved", sig: episodeSig(o.story), ...(o.reviewer ? { reviewer: o.reviewer } : {}), ...(c ? { comments: [...(r.comments ?? []), c] } : {}) };
+}
 
 /** Whether a line has no stage direction written. The narrator speaking to the viewer needs none. */
 export function isUnstaged(step: Record<string, unknown> | undefined): boolean {
@@ -124,7 +134,7 @@ export function stageOnPage(o: { sub?: string; keys: readonly StageKey[]; live: 
 }
 
 /** What an action of the next step does (the page carries it out). */
-export type StepAction = "draft" | `go:${string}` | "first-unstaged" | "add-all" | "first-untranslated" | "next-language" | "draft-language" | "settings" | "watch" | "approve";
+export type StepAction = "draft" | `go:${string}` | "first-unstaged" | "add-all" | "first-untranslated" | "next-language" | "draft-language" | "settings" | "watch" | "approve" | "approve-anyway";
 export interface NextStep { what: string; act?: { label: string; action: StepAction }; alt?: { label: string; action: StepAction } }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -161,7 +171,7 @@ export function nextStepOf(p: Progress, stage: StageKey, o: { lang?: string; tra
       const not = p.stages.filter(x => x.key !== "review" && !x.done).map(x => x.name.toLowerCase());
       const open = p.openComments ? plural(p.openComments, "open comment") : "";
       const why = [...not, open].filter(Boolean);
-      return why.length ? { what: `${p.changedSinceApproved ? "Changed since it was approved. " : ""}Not ready: ${why.join(", ")}. Watch it through anyway, then approve.`, act: { label: "Watch it", action: "watch" }, alt: { label: "Approve anyway…", action: "approve" } }
+      return why.length ? { what: `${p.changedSinceApproved ? "Changed since it was approved. " : ""}Not ready: ${why.join(", ")}. Watch it through anyway, then approve.`, act: { label: "Watch it", action: "watch" }, alt: { label: "Approve anyway…", action: "approve-anyway" } }
         : { what: `${p.changedSinceApproved ? "Changed since it was approved. " : ""}Everything is done. Watch it once, then approve.`, act: { label: "Approve", action: "approve" }, alt: { label: "Watch it", action: "watch" } };
     }
   }

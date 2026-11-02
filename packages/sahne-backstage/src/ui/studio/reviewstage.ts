@@ -5,12 +5,12 @@
 // change shows as changed since.
 
 import { html } from "htm/preact";
-import { useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { textOf, type StoryDoc } from "sahne-story";
 import { get, type Path } from "../../model/path.ts";
 import { blocks } from "../../model/script.ts";
 import { rowKey, type Comment, type EpisodeReview } from "../../model/review.ts";
-import { episodeSig, type Progress } from "../../model/progress.ts";
+import { approvedReview, type Progress } from "../../model/progress.ts";
 import { directionsOf } from "../../model/directions.ts";
 import { stagingIn } from "../../model/script.ts";
 import { review, reviewer, setReview, setReviewer, world } from "../../store.ts";
@@ -44,23 +44,32 @@ export function ReadThrough(p: { id: string; story: StoryDoc; selected: Path | n
   </div>`;
 }
 
-/** Beside the stage in Review: ready or not, Approve, Watch it, and the comments. */
-export function ReviewSide(p: { id: string; story: StoryDoc; progress: Progress; selected: Path | null; goStage(k: string): void; onWatch(): void }) {
+/** What stands between the episode and its approval: the stages not done, the open comments. */
+export const notDoneOf = (p: Progress) => [...p.stages.filter(x => x.key !== "review" && !x.done).map(x => x.name.toLowerCase()), ...(p.openComments ? [`${p.openComments} open comment${p.openComments > 1 ? "s" : ""}`] : [])];
+
+/** Approve the episode as the reviewer named here; before it is ready, only with a reason, kept as a comment (one write). */
+export function approve(id: string, story: StoryDoc, progress: Progress, reason?: string) {
+  const notDone = notDoneOf(progress);
+  if (notDone.length && !reason?.trim()) return;
+  void setReview(id, x => approvedReview(x, { story, reviewer: reviewer.value, notDone, reason: reason?.trim(), id: Math.random().toString(36).slice(2, 10), date: now() }));
+}
+
+/** Beside the stage in Review: ready or not, Approve, Watch it, and the comments. `ask` (bumped) opens "Approve anyway…"'s reason. */
+export function ReviewSide(p: { id: string; story: StoryDoc; progress: Progress; selected: Path | null; goStage(k: string): void; onWatch(): void; ask?: number }) {
   const r: EpisodeReview = review.value[p.id] ?? {}, langs = useLangs();
   const [text, setText] = useState(""), [why, setWhy] = useState<string | null>(null);
   const key = p.selected ? rowKey(p.selected) : null;
   const list = (r.comments ?? []).filter(c => (key ? c.at === key : true));
   const before = p.progress.stages.filter(x => x.key !== "review");
-  const ready = before.every(x => x.done) && !p.progress.openComments;
+  const ready = !notDoneOf(p.progress).length;
+  const whyBox = useRef<HTMLInputElement>(null);
+  // the page's Next bar asks for the reason here
+  useEffect(() => { if (p.ask && !ready && !p.progress.approved) { setWhy(w => w ?? ""); requestAnimationFrame(() => whyBox.current?.focus()); } }, [p.ask]);
   const comment = (t: string, at?: string | null) => {
     const c: Comment = { id: Math.random().toString(36).slice(2, 10), ...(at ? { at } : {}), by: reviewer.value || "someone", text: t, date: now() };
     void setReview(p.id, x => ({ ...x, comments: [...(x.comments ?? []), c] }));
   };
-  const approve = (reason?: string) => {
-    void setReview(p.id, x => ({ ...x, status: "approved", sig: episodeSig(p.story), ...(reviewer.value ? { reviewer: reviewer.value } : {}) }));
-    if (reason) comment(`Approved before it was ready (${before.filter(x => !x.done).map(x => x.name.toLowerCase()).join(", ")}): ${reason}`);
-    setWhy(null);
-  };
+  const approveIt = (reason?: string) => { approve(p.id, p.story, p.progress, reason); setWhy(null); };
   const fresh = ASKS.find(a => a.id === "second");
   return html`<div class="review-side">
     <div class="section-block"><h3>Ready to approve?</h3>
@@ -68,14 +77,14 @@ export function ReviewSide(p: { id: string; story: StoryDoc; progress: Progress;
         <li class=${p.progress.openComments ? "no" : "ok"}><span class="mark">${p.progress.openComments ? "•" : "✓"}</span><span class="grow">${p.progress.openComments ? `${p.progress.openComments} open comment${p.progress.openComments > 1 ? "s" : ""}` : "No open comments"}</span></li></ul>
       <div class="row wrap">
         ${p.progress.approved ? html`<span class="note">Approved${r.reviewer ? ` by ${r.reviewer}` : ""}.</span><button class="small" onClick=${() => void setReview(p.id, x => ({ ...x, status: "draft" }))}>Take the approval back</button>`
-          : ready ? html`<button class="primary" onClick=${() => approve()}>Approve</button>`
+          : ready ? html`<button class="primary" onClick=${() => approveIt()}>Approve</button>`
           : why === null ? html`<button onClick=${() => setWhy("")}>Approve anyway…</button>` : ""}
         <button onClick=${p.onWatch}>▶ Watch it</button>
         <span class="grow"></span>
         <label class="row note"><input type="checkbox" style="width:auto" checked=${r.ai !== false} onChange=${(e: Event) => void setReview(p.id, x => ({ ...x, ai: (e.target as HTMLInputElement).checked }))} /> AI wrote it</label></div>
       ${p.progress.changedSinceApproved && html`<p class="note warn">Changed since it was approved: look at what changed, then approve it again.</p>`}
-      ${why !== null && html`<div class="row"><input class="grow" placeholder="Why it can ship before it is ready" value=${why} aria-label="Why approve it now" onInput=${(e: Event) => setWhy((e.target as HTMLInputElement).value)} />
-        <button disabled=${!why.trim()} onClick=${() => approve(why.trim())}>Approve</button><button class="linkish" onClick=${() => setWhy(null)}>Cancel</button></div>`}
+      ${why !== null && html`<div class="row"><input ref=${whyBox} class="grow" placeholder="Why it can ship before it is ready" value=${why} aria-label="Why approve it now" onInput=${(e: Event) => setWhy((e.target as HTMLInputElement).value)} />
+        <button disabled=${!why.trim()} onClick=${() => approveIt(why)}>Approve</button><button class="linkish" onClick=${() => setWhy(null)}>Cancel</button></div>`}
     </div>
     <div class="section-block"><div class="row"><h3 class="grow">${key ? `Comments on line ${key}` : "Comments"}</h3>
       ${fresh && world.value?.ai && html`<button class="small" onClick=${() => void send(fresh.prompt, { fresh: true })} title="The assistant reads it as a second reader who did not write it, and leaves comments">✦ Ask a fresh reader</button>`}</div>
