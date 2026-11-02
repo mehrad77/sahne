@@ -577,3 +577,27 @@ test("undo keeps a person's save made between two writes of the task to one docu
   const { writeFileSync } = await import("node:fs");
   writeFileSync(file, was); forget();
 });
+
+test("undo never takes away a person or place the task made while a document that stays still names it", async () => {
+  const { existsSync: has } = await import("node:fs");
+  const ep = { ...episode, id: "s1e08", cast: ["dilek10", "nima"], place: "bakkal", releaseDate: "2026-09-22" };
+  const { r } = runs(scripted({
+    cast: [{ calls: [{ name: "create_character", args: { ...derya, id: "dilek10" } }] }, finish("dilek10")],
+    // a step that does not build on hers (no needs), so undoing her alone leaves its episode
+    ep: [{ calls: [{ name: "create_episode", args: ep }] }, finish("s1e08")],
+  }));
+  const run = r.create({ goal: "g", agentEdits: "direct", gates: false, concurrency: 1, plan: { brief: "b", steps: [
+    { id: "cast", kind: "character", title: "Dilek", brief: "make her", owns: [{ kind: "character", id: "dilek10" }] },
+    { id: "ep", kind: "episode", title: "Ep", brief: "write it", owns: [{ kind: "story", id: "s1e08" }] },
+  ] } });
+  await r.idle();
+  assert.equal(run.status, "done", JSON.stringify(run.steps.map(s => [s.id, s.status, s.error])));
+  const one = r.undo(run.id, [{ kind: "character", id: "dilek10" }]);
+  assert.deepEqual(one.undone, []);
+  assert.deepEqual(one.kept.map(k => [k.id, k.why]), [["dilek10", "s1e08 uses it: take it out of it first"]]);
+  assert.ok(has(join(root, "characters", "dilek10.json")));
+  // the whole task: the episode goes with her
+  const all = r.undo(run.id).undone.map(u => u.id);
+  assert.ok(all.includes("dilek10") && all.includes("s1e08"), all.join());
+  assert.ok(!has(join(root, "characters", "dilek10.json")) && !has(join(root, "stories", "s1e08.json")));
+});

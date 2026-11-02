@@ -9,7 +9,7 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
-import { fileOf, forget, type Before, type Kind } from "../content.ts";
+import { fileOf, forget, listing, usesOf, type Before, type Kind } from "../content.ts";
 import type { Store } from "./store.ts";
 import { writeAtomic } from "../../../sahne-story/json.ts";
 
@@ -69,9 +69,16 @@ export class Journal {
     return this.of(run).map(w => ({ step: w.step, kind: w.kind, id: w.id, created: w.before === null, at: w.at }));
   }
 
-  /** Take these writes back, document by document. What came back, and the writes kept (their document changed since). */
+  /**
+   * Take these writes back, document by document. What came back, and the writes kept: their document changed since, or
+   * it is one the run created that a document this undo leaves names (an episode that casts the character, a place that
+   * stands the drawn piece), which would break without it.
+   */
   undo(run: string, which: Written[]): { undone: Undone[]; kept: Kept[] } {
     const chosen = new Set(which.map(w => w.seq)), all = this.of(run), undone: Undone[] = [], kept: Kept[] = [];
+    forget();
+    // first each document's chain of writes to take back, then the ones that would go checked against what stays
+    const plans: { u: URL; chain: Written[] }[] = [];
     for (const key of [...new Set(which.map(w => `${w.kind}:${w.id}`))]) {
       const rows = all.filter(w => `${w.kind}:${w.id}` === key).reverse(), top = rows[0];
       const u = fileOf(top.kind, top.id), now = textAt(u);
@@ -89,8 +96,22 @@ export class Journal {
       }
       const why = !same ? "it changed after the task" : between ? "someone saved it between the task's writes, and that is kept" : "a step not being undone wrote it after";
       kept.push(...rows.filter(w => chosen.has(w.seq) && !chain.includes(w)).map(w => ({ ...w, why })));
-      if (!chain.length) continue;
-      const first = chain[chain.length - 1];
+      if (chain.length) plans.push({ u, chain });
+    }
+    // a document that would go while one that stays names it stays too, and so on (a kept place keeps the piece it stands)
+    const keyOf = (w: Written) => `${w.kind}:${w.id}`, going = new Set(plans.map(p => keyOf(p.chain[0]))), held = new Map<string, string[]>();
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const { chain } of plans) {
+        const first = chain[chain.length - 1], k = keyOf(first);
+        if (!going.has(k) || first.before !== null) continue;
+        const users = usersOf(first.kind, first.id).filter(d => !going.has(d));
+        if (users.length) { going.delete(k); held.set(k, users); grew = true; }
+      }
+    }
+    for (const { u, chain } of plans) {
+      const first = chain[chain.length - 1], users = held.get(keyOf(first));
+      if (users) { kept.push(...chain.map(w => ({ ...w, why: `${users.map(d => d.split(":")[1]).join(", ")} ${users.length > 1 ? "use" : "uses"} it: take it out of ${users.length > 1 ? "them" : "it"} first` }))); continue; }
       if (first.before === null) { rmSync(u); undone.push({ kind: first.kind, id: first.id, removed: true }); }
       else undone.push({ kind: first.kind, id: first.id, removed: false, mtime: writeAtomic(u, first.before) });
       const del = this.store.db.prepare("DELETE FROM journal WHERE seq = ?");
@@ -99,4 +120,11 @@ export class Journal {
     if (undone.length) forget();
     return { undone, kept };
   }
+}
+
+/** The documents (`kind:id`) that name a character, a place or a drawn piece, as a save would check them. */
+function usersOf(kind: Kind, id: string): string[] {
+  if (kind === "character" || kind === "place") return usesOf(kind, id).map(x => `story:${x.story}`);
+  if (kind === "kit_piece") return Object.entries(listing().places).filter(([, p]) => JSON.stringify(p).includes(JSON.stringify(id))).map(([pid]) => `place:${pid}`);
+  return [];
 }
