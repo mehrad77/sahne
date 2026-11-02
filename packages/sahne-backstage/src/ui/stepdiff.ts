@@ -8,11 +8,9 @@ import { html } from "htm/preact";
 import { useMemo, useRef, useState } from "preact/hooks";
 import { adaptStory, languagesOf, playOf, textOf, type StoryDoc } from "sahne-story";
 import type { Part } from "../model/diff.ts";
-import { dirty } from "../model/history.ts";
-import { get, set } from "../model/path.ts";
 import { stepDiff, type StepChange } from "../model/stepdiff.ts";
-import type { Proposal } from "../events.ts";
-import { draftOf, world } from "../store.ts";
+import { mergedOnto, type Proposal } from "../events.ts";
+import { world } from "../store.ts";
 import { cueThumb } from "../thumbs.ts";
 import { Picture } from "./kit/gallery.ts";
 import { inLang, langName, useLangs } from "./lang.ts";
@@ -21,12 +19,14 @@ import { storyPluginsOf } from "../model/plugins.ts";
 export type At = { was?: number; now?: number };
 
 /**
- * An episode as accepting a proposal would leave it, from `doc` as it is open: the proposal's whole document, or only its
- * places when the person has unsaved edits (as `applyEdit` in events.ts applies it), so the diff never shows their own
- * edits undone.
+ * An episode as accepting a proposal would leave it, from `doc` as it is open or on disk: the proposal's changes merged
+ * into it (`mergedOnto`, as `accept` in events.ts does), so the diff never shows the person's own edits, or a save made
+ * since, undone; unchanged when it cannot be taken.
  */
-export const afterAccepting = (x: Proposal, doc: StoryDoc): StoryDoc =>
-  dirty(draftOf("story", x.doc)) && x.paths.length ? x.paths.reduce((s, path) => set(s, path, get(x.next, path)), doc) : (x.next as StoryDoc);
+export const afterAccepting = (x: Proposal, doc: StoryDoc): StoryDoc => {
+  const r = mergedOnto(x, doc);
+  return ("doc" in r ? r.doc : doc) as StoryDoc;
+};
 
 const parts = (ps: Part[]) => ps.map(d => (d.op === "=" ? d.text : d.op === "-" ? html`<del>${d.text}</del>` : html`<ins>${d.text}</ins>`));
 

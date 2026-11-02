@@ -87,7 +87,7 @@ function ProposedSteps(p: { x: Proposal }) {
   useEffect(() => { if (!open && !p.x.create) void api.doc("story", p.x.doc).then(r => setDisk(r.status === 200 ? (r.doc as StoryDoc) : null)); }, [p.x.doc, !!open]);
   const was = p.x.create ? null : open ?? disk;
   if (was === undefined) return html`<p class="note">Reading the episode…</p>`;
-  return html`<${StepDiff} was=${was} now=${was && open ? afterAccepting(p.x, was) : p.x.next as StoryDoc} preview=${hrefOf("story", p.x.doc) + (p.x.create ? "" : `/proposal/${p.x.id}`)}
+  return html`<${StepDiff} was=${was} now=${was ? afterAccepting(p.x, was) : p.x.next as StoryDoc} preview=${hrefOf("story", p.x.doc) + (p.x.create ? "" : `/proposal/${p.x.id}`)}
     go=${(at: { was?: number; now?: number }) => { if (at.was !== undefined && !p.x.create) location.hash = `#/episode/${p.x.doc}/at/${at.was}`; }} />`;
 }
 
