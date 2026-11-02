@@ -609,11 +609,15 @@ export function createMcp(o: McpOptions): McpServer {
       { narrator: series.narrator, standin: series.standin, places, languages: languagesOf(series), lesson, play: playOf({ play: b.play }, series) });
     if (b.play && b.play !== playOf({}, series)) (next as { play?: string }).play = b.play;
     const edits: ProposalEdit[] = [{ kind: "story", doc: id, next, create: true }];
+    let after: string | undefined;
     if (se.calendar) {
       const s = await current("season", sid);
-      edits.push({ kind: "season", doc: sid, next: { ...s.doc, calendar: { ...(s.doc.calendar as object), [id]: { date: b.releaseDate, kind: b.kind, week: b.week } } }, base: s.mtime, paths: [["calendar", id]] });
+      // a season only proposed so far is created with the episode, and the episode is built on its proposal
+      const row = { ...s.doc, calendar: { ...(s.doc.calendar as object), [id]: { date: b.releaseDate, kind: b.kind, week: b.week } } };
+      edits.push(s.create ? { kind: "season", doc: sid, next: row, create: true } : { kind: "season", doc: sid, next: row, base: s.mtime, paths: [["calendar", id]] });
+      if (s.create) after = s.after;
     }
-    return submit(edits, { summary: `create ${id} (${textOf(b.title, languagesOf(series).main)})`, paths: [["steps"]] });
+    return submit(edits, { summary: `create ${id} (${textOf(b.title, languagesOf(series).main)})`, paths: [["steps"]], ...(after ? { after } : {}) });
   }));
 
   server.registerTool("set_calendar", {

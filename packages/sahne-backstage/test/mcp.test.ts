@@ -450,6 +450,26 @@ test("one author through two servers: edits to one document queue one after the 
   } finally { await one.close(); await two.close(); }
 });
 
+test("proposals mode: an episode in a season only proposed creates the season with it, built on that proposal", async () => {
+  const { client, events, close } = await connect({ write: true, agentEdits: "proposals" });
+  try {
+    const q = proposalsOf(events), before = q.all().length;
+    const se = await call(client, "create_season", { n: 2, title: { tr: "İkinci", en: "Two", fa: "دو" } });
+    assert.ok(!se.isError, se.text);
+    const seasonP = q.all().at(-1)!;
+    const ep = await call(client, "create_episode", { season: 2, releaseDate: "2026-10-13", kind: "episode", week: 1, place: "bakkal", cast: ["nima", "ismail"], words: ["a1-w-portakal", "a1-w-meyve", "a1-w-var", "a1-w-yok", "a1-w-domates"], lessons: ["g_a1_2_var_yok"], title: { tr: "Bir", en: "One", fa: "یک" }, level: "A1" });
+    assert.ok(!ep.isError, ep.text);
+    const p = q.all().at(-1)!;
+    assert.equal(p.doc, "s2e01");
+    assert.equal(p.after, seasonP.id);
+    const season = p.also!.find(e => e.kind === "season")!;
+    assert.equal(season.create, true);
+    assert.ok((season.next as { calendar: Record<string, unknown> }).calendar.s2e01);
+    assert.ok(!existsSync(join(root, "seasons", "s2.json")), "nothing is written");
+    for (const x of q.all().slice(before)) q.resolve(x.id, false);
+  } finally { await close(); }
+});
+
 test("over HTTP: a proposal reaches the editors under the client's name, and a person resolves it", async () => {
   const file = join(http1, "stories", "s1e00.json"), before = readFileSync(file, "utf8");
   const ac = new AbortController();
