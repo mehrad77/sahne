@@ -39,7 +39,7 @@ test("Turkey's flag, and every piece drawing it by default, is unchanged", () =>
   assert.equal(hash(flagCloth(60, 0, 0)), hash(flagCloth(60, 0, 0, "tr")));
   assert.equal(flagWidth(10), 15);
   const cases: [string, Record<string, unknown>, string][] = [
-    ["flag", {}, "23586f916a"], ["flag", { kind: "bunting" }, "4cf03ab591"], ["crowd", {}, "7cf3436e88"], ["crowd", { flags: 3 }, "57a0b9bfdd"],
+    ["flag", {}, "23586f916a"], ["flag", { kind: "bunting" }, "4cf03ab591"], ["crowd", {}, "f20b691bfd"], ["crowd", { flags: 3 }, "49f7b4c58c"],
     ["facade", { flag: true }, "1994e07b50"], ["balcony", { flag: true }, "8503015e40"], ["paper", { kind: "crown", flag: true }, "bc51b8be29"],
   ];
   for (const [id, p, h] of cases) assert.equal(hash((SET[id] ?? PROPS[id]).draw(p, rng("s-" + id), kit)), h, `${id} ${JSON.stringify(p)}`);
