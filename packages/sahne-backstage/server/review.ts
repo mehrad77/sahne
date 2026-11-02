@@ -68,8 +68,11 @@ export function writeReview(body: unknown): Review {
   if (typeof b?.id !== "string" || !/^s[1-9][0-9]?e[0-9]{2}$/.test(b.id)) throw Object.assign(new Error("expected { id: <episode id>, review }"), { status: 400 });
   const all = readReview();
   const next = clean(b.was !== undefined ? merge3(b.was, all.episodes[b.id] ?? {}, b.review, "theirs").doc : b.review);
-  // an approval vouches for the episode as it is saved now (model/progress.ts episodeSig), whoever approves it
-  if (next.status === "approved" && !next.sig && exists("story", b.id)) next.sig = episodeSig(readDoc("story", b.id).doc as StoryDoc);
+  // an approval vouches for the episode as it is saved now (model/progress.ts episodeSig), whoever approves it: a new one
+  // without its own signature, or carrying the one an earlier approval left, is signed again; notes not approved keep none
+  const before = all.episodes[b.id];
+  if (next.status !== "approved") delete next.sig;
+  else if ((!next.sig || (before?.status !== "approved" && next.sig === before?.sig)) && exists("story", b.id)) next.sig = episodeSig(readDoc("story", b.id).doc as StoryDoc);
   const episodes = { ...all.episodes };
   if (Object.keys(next).length) episodes[b.id] = next; else delete episodes[b.id];
   const doc: Review = { v: 1, episodes: Object.fromEntries(Object.entries(episodes).sort(([a], [c]) => a.localeCompare(c))) };
