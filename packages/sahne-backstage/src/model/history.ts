@@ -42,7 +42,7 @@ export function redo<T>(d: Draft<T>): Draft<T> {
 /** Back to the saved version (one undo step). */
 export const revert = <T>(d: Draft<T>): Draft<T> => edit(d, d.saved);
 
-/** Written: what was edited is now the saved version. */
-export const saved = <T>(d: Draft<T>, mtime: number): Draft<T> => ({ ...d, saved: d.doc, mtime, create: false });
+/** Written: `doc`, the version sent (what was edited then), is now the saved one; edits made since stay unsaved. */
+export const saved = <T>(d: Draft<T>, mtime: number, doc: T = d.doc): Draft<T> => ({ ...d, saved: doc, mtime, create: false });
 
 export const dirty = (d: Draft | undefined) => !!d && (d.create || !equal(d.doc, d.saved));

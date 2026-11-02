@@ -99,7 +99,8 @@ export async function checkDocs(keys: string[]) {
 export async function saveDocs(keys: string[]): Promise<boolean> {
   const list = keys.filter(k => H.dirty(drafts.value[k]));
   if (!list.length) { say("nothing changed"); return true; }
-  const r = await api.save(list.map(editOf));
+  const edits = list.map(editOf), sent = new Map(edits.map(e => [keyOf(e.kind, e.id), e.doc]));
+  const r = await api.save(edits);
   if (r.problems) {
     const by: Record<string, Problem[]> = Object.fromEntries(list.map(k => [k, []]));
     for (const p of r.problems) (by[p.doc] ??= []).push(p);
@@ -108,7 +109,7 @@ export async function saveDocs(keys: string[]): Promise<boolean> {
   if (r.status !== 200 || !r.saved) { say(r.message ?? `not saved (${r.status})`, true); return false; }
   batch(() => {
     const next = { ...drafts.value };
-    for (const [k, mtime] of Object.entries(r.saved!)) if (next[k]) next[k] = H.saved(next[k], mtime);
+    for (const [k, mtime] of Object.entries(r.saved!)) if (next[k]) next[k] = H.saved(next[k], mtime, sent.has(k) ? sent.get(k) : next[k].doc);
     drafts.value = next;
   });
   say(`saved ${list.map(k => k.replace(":", " ")).join(", ")}`);
