@@ -8,7 +8,7 @@ import type { PlaceDoc } from "sahne";
 import { PLACES } from "../paths.ts";
 import { adaptStory, isAct, isChoice, lintStory, playOf, type CharacterDoc, type Step, type StoryDoc } from "../src/index.ts";
 import { validateDoc } from "../check/schema.ts";
-import { checkStory } from "../check/rules.ts";
+import { checkSeries, checkStory } from "../check/rules.ts";
 import { loadWorld, type World } from "../check/world.ts";
 // the samples' series uses the lesson plugin: a test is a host, so it passes it in
 import { lesson } from "../../sahne-lesson/src/index.ts";
@@ -47,7 +47,7 @@ test("watch: no lint asks for the learner's turns", () => {
   assert.ok(lintStory(s, { places, characters, plugins: [lesson] }).every(p => p.rule !== "standin"));
 });
 
-test("watch: the check refuses a choice, an act and an arc mechanic that needs the viewer, and asks no choice count", () => {
+test("watch: the check refuses a choice, an act and, in a watch-only series, an arc mechanic that needs the viewer, and asks no choice count", () => {
   const world: World = loadWorld();
   const d = world.drafts.find(x => x.id === "s1e00")!;
   const errs = (story: StoryDoc, w: World = world) => checkStory({ ...d, story }, w, { plugins: [lesson] }).filter(p => p.level === "error");
@@ -71,5 +71,23 @@ test("watch: the check refuses a choice, an act and an arc mechanic that needs t
   assert.ok(errs(noField as StoryDoc).some(p => /choices/.test(p.message)), "in an interactive series it needs its choices");
   const mech = structuredClone(plain);
   mech.arc = { ...(mech.arc ?? { id: "s1w01", tr: "x" }), mechanics: ["say", "unlocks"] };
-  assert.ok(errs(mech).some(p => p.rule === "play" && /say/.test(p.message)));
+  // a watch-only episode in an interactive series carries its week's arc as it is; a series that only watches asks no viewer
+  assert.ok(!errs(mech).some(p => p.rule === "play"), "the week's arc of an interactive series");
+  assert.ok(errs(mech, watching).some(p => p.rule === "play" && /say/.test(p.message)));
+});
+
+test("watch: a watch-only special in an interactive week passes with the season's arc", () => {
+  const world: World = loadWorld();
+  const d = world.drafts.find(x => x.id === "s1e00")!;
+  const story = watched(d.story);
+  story.steps = story.steps.flatMap(st => {
+    if (isAct(st)) return [];
+    if (!isChoice(st)) return [st];
+    const { ok: _o, tone: _t, sets: _s, warm: _w, reply, ...line } = st.choice.options[0];
+    return [{ who: "nima", ...line } as Step, ...((reply ?? []) as Step[])];
+  });
+  const w: World = { ...world, drafts: [{ ...d, story }] };
+  // the season's arc s1w00 asks say, explore and act, as the week's interactive episodes do
+  const errors = [...checkStory({ ...d, story }, w, { plugins: [lesson] }), ...checkSeries(w, { plugins: [lesson] })].filter(p => p.level === "error");
+  assert.deepEqual(errors.map(p => `${p.rule}: ${p.message}`), []);
 });

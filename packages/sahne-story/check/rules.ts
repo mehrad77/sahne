@@ -147,8 +147,11 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
       if (isChoice(st)) add("play", "error", "a choice in a watch-only episode: the viewer only watches, so write the line that is said instead", i);
       if (isAct(st)) add("play", "error", "an act in a watch-only episode: the viewer only watches, so stage what happens instead", i);
     });
+    // the arc is the week's, shared by every story of the week (checkSeries): a watch-only episode in an interactive
+    // series (a watch-only special) carries its week's mechanics without using them; in a series that only watches, no
+    // arc may ask for the viewer
     const asks = (s.arc?.mechanics ?? []).filter(m => (INTERACTIVE_MECHANICS as readonly string[]).includes(m));
-    if (asks.length) add("play", "error", `the arc's mechanics ${asks.join(", ")} need the viewer, but the episode is watch-only`);
+    if (asks.length && playOf(null, world.series) === "watch") add("play", "error", `the arc's mechanics ${asks.join(", ")} need the viewer, but the series is watch-only`);
   } else {
     if (special ? choices !== 2 : choices < 1 || choices > 2) add("counts", "error", `${choices} choices; ${special ? "a special has 2" : "an episode has 1-2"}`);
     if (acts > 2 && day && day.week >= 2) add("counts", "warning", `${acts} acts; at most 2 from week 2 (Kumru's STORIES_STAGE.md §5, proposed)`);

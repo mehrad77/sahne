@@ -144,7 +144,7 @@ A series sets the default in `series.json` (`"play": "watch"` for a series of sh
 - **The adapter** (`play` in its options, `StoryStage.play`) makes no turn. The stand-in's lines are plain lines, a choice plays its first option, and an act plays only its reaction.
 - **The player** starts in auto. Each cue follows the last after a hold for reading: the time to read its line beyond the time to say it, so a spot's card, which takes no time on the stage, still stays up long enough. A host shows no Devam while the player is in auto. An editor passes `auto: false` and plays it with `setAuto`.
 - **The lints** ask for no learner's turns (`standin`).
-- **The check** refuses a choice, an act and an arc mechanic that needs the viewer (`say`, `act`, `explore`, `aloud`) with the `play` rule, and skips the choice and act counts.
+- **The check** refuses a choice and an act with the `play` rule, and skips the choice and act counts. An arc is its week's, shared by every story of the week, so a watch-only episode in an interactive series (a watch-only special) carries its week's arc as the season writes it; in a series that only watches, an arc mechanic that needs the viewer (`say`, `act`, `explore`, `aloud`) is refused too.
 - **A plugin** sees the mode in its contexts (`play`) and decides what its own parts do. The lesson plugin does not yet treat a watch-only episode differently.
 
 `test/watch.test.ts` and the auto tests in `test/player.test.ts` cover it.
@@ -182,7 +182,7 @@ Errors:
 - calendar: with `days.json`, release date, kind and arc against it; always, no Sunday, no break week, specials on Saturdays
 - cast limits (`CAST_ALLOW` holds s1e45's six)
 - counts: the choices, and each choice id once (no choice count in a watch-only episode)
-- play: in a watch-only episode, no choice, no act and no arc mechanic that needs the viewer
+- play: in a watch-only episode, no choice and no act; in a watch-only series, no arc mechanic that needs the viewer
 - flags: each read flag set by the earlier story it names, once that story is written
 - missing places and characters
 - every `lintStory` error
