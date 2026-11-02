@@ -79,6 +79,9 @@ export function addAfter(story: StoryDoc, path: Path, step: unknown): Edited {
   return { story: insert(story, list, i + 1, step), focus: [...list, i + 1] };
 }
 
+/** The last step of the story, which a block added at the end follows (never a trailing choice's option or reply). */
+export const lastStep = (story: Pick<StoryDoc, "steps">): Path => ["steps", (story.steps?.length ?? 0) - 1];
+
 /** The block at `path` deleted; the cursor goes to the block before it. An option is never deleted below two. */
 export function remove(story: StoryDoc, path: Path): Edited {
   const { list, i } = listOf(path);

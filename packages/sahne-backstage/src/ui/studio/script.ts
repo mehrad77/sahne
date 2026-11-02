@@ -15,7 +15,7 @@ import { html } from "htm/preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { allLanguages, languagesOf, textOf, type StoryDoc } from "sahne-story";
 import { get, set, type Path } from "../../model/path.ts";
-import { addAfter, blocks, convert, duplicateAt, emptyLine, INSERTS, moveBy, nextSpeaker, remove, stagingIn, template, type Block, type Insert } from "../../model/script.ts";
+import { addAfter, blocks, convert, duplicateAt, emptyLine, INSERTS, lastStep, moveBy, nextSpeaker, remove, stagingIn, template, type Block, type Insert } from "../../model/script.ts";
 import { chipsOf, parseParenthetical } from "../../model/parenthetical.ts";
 import { directionsOf } from "../../model/directions.ts";
 import { isUnstaged } from "../../model/progress.ts";
@@ -128,7 +128,7 @@ export function Script(p: ScriptProps) {
   const sel = p.selected ? key(p.selected) : null;
   return html`<div class="script" role="list" aria-label="The script">
     ${list.map(b => html`<${BlockView} key=${key(b.path)} b=${b} ...${common} />${sel === key(b.path) && b.depth === 0 ? row(b.path) : ""}`)}
-    ${row(list.at(-1)?.path ?? ["steps", -1], true)}
+    ${row(lastStep(p.story), true)}
     ${menu?.kind === "insert" && html`<${Popover} x=${menu.x} y=${menu.y} onClose=${() => setMenu(null)} label="Insert a block">
       <div class="menu">${kinds.map(k => html`<button onClick=${() => { insert(k, menu.path); setMenu(null); }}><b>${INSERT_NAMES[k][0]}</b><small>${INSERT_NAMES[k][1]}</small></button>`)}
         ${extra.map(b => html`<button onClick=${() => { apply(addAfter(p.story, menu.path, b.template({ story: p.story, langs }))); setMenu(null); }}><b>${b.name[0]}</b><small>${b.name[1]}</small></button>`)}</div></${Popover}>`}
