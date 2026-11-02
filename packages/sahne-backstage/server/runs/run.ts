@@ -298,6 +298,8 @@ export class Runs {
     const left = this.journal.of(run.id);
     for (const s of run.steps) if (s.status === "done" && which.some(w => w.step === s.id) && !left.some(w => w.step === s.id)) s.status = "undone";
     this.changed(run);
+    // where the run stands now: a step that waits for an undone one says so
+    this.tick(run);
     return { run, ...r };
   }
 
@@ -414,7 +416,10 @@ export class Runs {
       // the cast and places are made, and the rest waits for the person's look
       if (castGate && first.every(s => s.status === "done") && steps.some(s => s.status === "waiting")) { run.status = "gate"; run.gate = "castAndPlaces"; this.changed(run); return; }
       const stuck = steps.filter(s => s.status === "failed" || s.status === "stopped" || s.status === "stale");
-      if (stuck.length) { run.status = "paused"; run.why = `${stuck.map(s => s.title).join(", ")} ${stuck.length > 1 ? "need" : "needs"} you: try again, or stop the run`; this.changed(run); }
+      if (stuck.length) { run.status = "paused"; run.why = `${stuck.map(s => s.title).join(", ")} ${stuck.length > 1 ? "need" : "needs"} you: try again, or stop the run`; this.changed(run); return; }
+      // a step waits for one that was undone: it starts once that is made again
+      const gone = steps.filter(s => s.status === "undone" && steps.some(x => x.status === "waiting" && x.needs.includes(s.id)));
+      if (gone.length) { run.status = "paused"; run.why = `${gone.map(s => s.title).join(", ")} ${gone.length > 1 ? "were" : "was"} undone, and the steps after ${gone.length > 1 ? "them" : "it"} wait: make ${gone.length > 1 ? "them" : "it"} again, or stop the run`; this.changed(run); }
     }
   }
 

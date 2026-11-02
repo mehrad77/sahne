@@ -490,3 +490,25 @@ test("a proposal turned down while its step still works: the step is stale when 
   assert.deepEqual([run.steps[0].status, run.status], ["stale", "paused"]);
   assert.match(run.why!, /Derya needs you/);
 });
+
+test("a step that waits for an undone one: the task says so, and goes on once that is made again", async () => {
+  const { r } = runs(scripted({
+    cast: (m: BaseMessage[]): Turn => (m.filter(x => x.getType() === "ai").length === 0 ? { calls: [{ name: "create_character", args: { ...derya, id: "dilek9" } }] } : finish("dilek9")),
+    ep: [finish("episode")],
+  }));
+  const run = r.create({ goal: "g", agentEdits: "direct", gates: { plan: false, castAndPlaces: true }, plan: { brief: "b", steps: [
+    { id: "cast", kind: "character", title: "Dilek", brief: "make her", owns: [{ kind: "character", id: "dilek9" }] },
+    { id: "ep", kind: "episode", title: "Ep", brief: "write it", needs: ["cast"], owns: [] },
+  ] } });
+  await r.idle();
+  assert.deepEqual([run.status, run.gate], ["gate", "castAndPlaces"]);
+  r.undo(run.id, [{ kind: "character", id: "dilek9" }]);
+  assert.deepEqual([run.status, run.steps.map(s => s.status)], ["paused", ["undone", "waiting"]]);
+  assert.match(run.why!, /Dilek was undone, and the steps after it wait: make it again/);
+  await r.step(run.id, "cast", { action: "redo" });
+  await r.idle();
+  r.act(run.id, { action: "continue" });
+  await r.idle();
+  assert.deepEqual([run.status, run.steps.map(s => s.status)], ["done", ["done", "done"]], run.why);
+  r.undo(run.id);
+});
