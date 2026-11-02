@@ -7,7 +7,7 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { upgrade, type UpgradeKind } from "../src/upgrade.ts";
-import { NARRATOR, STANDIN, type CharacterDoc, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../src/types.ts";
+import { NARRATOR, seasonOf, STANDIN, type CharacterDoc, type SeasonDoc, type SeriesDoc, type StoryDoc, type StoryPlace } from "../src/types.ts";
 import { CARDS, CARDS_EXTRA, CHARACTERS, DAYS, EXTRAS, GRAMMAR, PLACES, SERIES, SYLLABUS, repoPath, seasonFile, seasonIds, storyFile, storyIds } from "../paths.ts";
 
 const json = (u: URL) => JSON.parse(readFileSync(u, "utf8"));
@@ -121,13 +121,15 @@ export const loadSeries = (): SeriesDoc | null => (existsSync(SERIES) ? doc("ser
 export const loadSeasons = (): Record<string, SeasonDoc> => Object.fromEntries(seasonIds().map(id => [id, doc("season", seasonFile(id))]));
 
 /**
- * The release calendar: every season's `calendar` when any season has one, else `days.json` of the content
- * root ({ <story id>: { date, week, kind } }), else null.
+ * The release calendar: each season's `calendar` for the stories of the seasons that have one, and `days.json` of the
+ * content root ({ <story id>: { date, week, kind } }) for the stories of the seasons that do not yet; null with neither.
  */
 export function calendarOf(seasons: Record<string, SeasonDoc>, file: Record<string, Day> | null = loadDaysFile()): Record<string, Day> | null {
-  const rows = Object.values(seasons).flatMap(s => Object.entries(s.calendar ?? {}));
-  if (!rows.length) return file;
-  return Object.fromEntries(rows.map(([id, d]) => [id, { id, date: d.date, week: d.week, kind: d.kind }]));
+  const own = Object.values(seasons).filter(s => s.calendar);
+  if (!own.length) return file;
+  const ns = new Set(own.map(s => s.n));
+  const rows = own.flatMap(s => Object.entries(s.calendar!));
+  return { ...Object.fromEntries(Object.entries(file ?? {}).filter(([id]) => !ns.has(seasonOf(id)))), ...Object.fromEntries(rows.map(([id, d]) => [id, { id, date: d.date, week: d.week, kind: d.kind }])) };
 }
 
 /** The release calendar as `loadWorld` reads it (`calendarOf` the seasons). */

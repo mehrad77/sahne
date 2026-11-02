@@ -104,9 +104,11 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   for (const [cid, c] of Object.entries(d.characters)) for (const p of [...validateDoc("character", c), ...characterLanguageGaps(c, langs)]) add("schema", "error", `character ${cid} ${p.path}: ${p.message}`);
   if (s.id !== d.id) add("id", "error", `the folder is ${d.id} but the story's id is ${s.id}`);
 
-  // the calendar rules run when the content root has one (days.json)
+  // the calendar rules run when the content root has one: the story's season's `calendar`, else days.json (a season
+  // without a calendar yet, beside one that has it, asks a row only while days.json is still written)
   const day = world.days?.[d.id];
-  if (world.days && !day) add("calendar", "error", `${d.id} has no row in days.json`);
+  const own = world.seasons?.[`s${seasonOf(d.id)}`]?.calendar, anyOwn = Object.values(world.seasons ?? {}).some(se => se.calendar);
+  if (world.days && !day && (own || !anyOwn || world.daysFile)) add("calendar", "error", `${d.id} has no row in ${own ? `season s${seasonOf(d.id)}'s calendar` : "days.json"}`);
   else if (day) {
     if (s.releaseDate !== day.date) add("calendar", "error", `releaseDate ${s.releaseDate} but Days has ${day.date}`);
     if (s.kind !== day.kind) add("calendar", "error", `kind ${s.kind} but Days has ${day.kind}`);
@@ -278,8 +280,9 @@ export function checkSeries(world: World, o: Pick<CheckOptions, "plugins"> = {})
     }
   }
   if (world.series) for (const d of world.drafts) { const n = seasonOf(d.id); if (n && !world.seasons[`s${n}`]) add("error", d.id, `season s${n} has no document in seasons/`); }
-  // days.json, where an app still writes it beside the seasons' calendars, follows them: the seasons are the source, so a
-  // difference is days.json to regenerate (a warning; the app's own generator check is its gate)
+  // days.json, where an app still writes it beside the seasons' calendars, follows them: the seasons that have a calendar
+  // are the source, so a difference is days.json to regenerate (a warning; the app's own generator check is its gate); the
+  // rows of a season without a calendar yet stay days.json's own
   if (world.daysFile && Object.values(world.seasons).some(se => se.calendar)) {
     const stale = (id: string, why: string) => add("warning", id, `days.json is behind the season's calendar (${why}): regenerate it from the seasons`, "calendar");
     for (const [id, d] of Object.entries(world.days ?? {})) {
