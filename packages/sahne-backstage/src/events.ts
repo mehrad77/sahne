@@ -161,6 +161,13 @@ export function neededFirst(p: Proposal): Proposal[] {
 /** The steps it needs whose work was turned down: it cannot be accepted until they are done again. */
 export const turnedDown = (p: Proposal): string[] => stepsBefore(p)?.turnedDown ?? [];
 
+/** A proposal with the pending ones it was built on (`after`), oldest first. */
+function chainOf(p: Proposal): Proposal[] {
+  const out = [p];
+  for (let q = proposals.value.find(x => x.id === p.after); q && !out.includes(q); q = proposals.value.find(x => x.id === q!.after)) out.unshift(q);
+  return out;
+}
+
 /** Accept a proposal: merged into the editor as an edit, then answered; first what it needs. */
 export async function accept(p: Proposal): Promise<void> { await take(p); }
 
@@ -169,7 +176,9 @@ async function take(p: Proposal): Promise<boolean> {
   const no = turnedDown(p);
   if (no.length) { say(`not taken: it needs ${no.join(", ")}, which you turned down. Do ${no.length > 1 ? "those steps" : "that step"} again first.`, true); return false; }
   const first = neededFirst(p), all = [...first, p];
-  const plan = await planOf(all.flatMap(q => [q, ...(q.also ?? [])]));
+  // each holds the pending proposals it was built on, which the server resolves with it: their changes go in first
+  const held = [...new Set(all.flatMap(chainOf))];
+  const plan = await planOf(held.flatMap(q => [q, ...(q.also ?? [])]));
   if (typeof plan === "string") { say(`not taken: ${plan}.`, true); return false; }
   put(plan);
   for (const q of all) await api.post(`proposals/${q.id}`, { accepted: true });
@@ -183,7 +192,7 @@ async function take(p: Proposal): Promise<boolean> {
  * saved with them, so that is asked first; no, and nothing happens.
  */
 export async function acceptAndSave(p: Proposal): Promise<boolean> {
-  const keys = [...neededFirst(p), p].flatMap(q => [q, ...(q.also ?? [])]).map(e => keyOf(e.kind, e.doc));
+  const keys = [...neededFirst(p), p].flatMap(chainOf).flatMap(q => [q, ...(q.also ?? [])]).map(e => keyOf(e.kind, e.doc));
   const theirs = keys.filter(k => drafts.value[k] && H.dirty(drafts.value[k]));
   if (theirs.length && !confirm(`This also saves your own unsaved edits to ${theirs.map(k => k.replace(":", " ")).join(", ")}. Go on?`)) return false;
   if (!await take(p)) return false;

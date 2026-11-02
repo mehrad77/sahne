@@ -29,3 +29,10 @@ test("one place changed both ways is a conflict; the same change both ways is ta
   assert.deepEqual(steps(merge3(disk, both, both).doc), steps(both));
   assert.deepEqual(merge3(disk, mine, set(disk, ["title"], "T")).doc, set(mine, ["title"], "T"));
 });
+
+test("a proposal built on another takes that one's changes too, applied first (events.ts chainOf)", () => {
+  const p1 = set(disk, ["steps", 2, "tr"], "s2 p1"), p2 = insert(p1, ["steps"], 5, line("p2"));
+  const alone = merge3(p1, mine, p2).doc, chained = merge3(p1, merge3(disk, mine, p1).doc, p2).doc;
+  assert.equal(steps(alone)[2], "s2", "merged from its own base only, the held change is missing");
+  assert.deepEqual(steps(chained), ["s0", "s1 mine", "s2 p1", "s3", "s4", "p2", "s5", "s6"]);
+});
