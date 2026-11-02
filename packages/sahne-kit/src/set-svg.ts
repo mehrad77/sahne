@@ -188,6 +188,8 @@ const sceneK = (f: NonNullable<Measured["scene"]>, D: Dims) => { const A = areaO
 function niceStep(k: number, px: number, min = 1): number {
   for (let d = min; ; d *= 10) for (const m of [1, 2, 5]) if (m * d * k >= px || m * d >= 1e5) return +(m * d).toPrecision(3);
 }
+/** The first of 1, 2, 5 × a power of ten at least `v` (0 for anything not over 0 and finite). */
+const roundUp = (v: number) => { if (!(v > 0 && Number.isFinite(v))) return 0; const p = 10 ** Math.floor(Math.log10(v)); return [1, 2, 5, 10].map(m => m * p).find(s => s >= v * (1 - 1e-12))!; };
 const fmtK = (k: number) => (k >= 10 ? String(Math.round(k)) : k >= 1 ? String(+k.toFixed(1)) : String(+k.toFixed(2)));
 /** `s` cut to `n` characters, with an ellipsis. */
 const clip = (s: string, n: number) => (s.length <= n ? s : `${s.slice(0, Math.max(1, Math.floor(n) - 1))}…`);
@@ -225,11 +227,17 @@ function cellSvg(m: Measured, zoom: SheetZoom, sheet: Shared, D: Dims) {
   const ox = pad + (A.w - (right - left) * k) / 2 - left * k, oy = zoom === "scene" && !own ? sheet.floorRow - f.floor * k : pad + (A.h - (bottom - top) * k) / 2 - top * k;
   // the grid over the cell's reach, in cm, its lines at least 8 px apart (10 cm in a scene), at most about 60 an axis
   const gx0f = -ox / k, gx1f = (W - ox) / k, gy0f = -oy / k, gy1f = (H - L - oy) / k;
-  const step = own ? niceStep(k, 8, cell.focus ? 0.1 : 1) : 10 * Math.max(1, Math.ceil(Math.max(gx1f - gx0f, gy1f - gy0f) / 600));
+  const span = Math.max(gx1f - gx0f, gy1f - gy0f);
+  // niceStep stops at 1e5 cm, so a crop or a fit kilometres wide takes a coarser one: never more than about 60 lines an axis
+  // (a frame of 1e21 cm on a 1e5 cm step drew lines without end, x += step no longer moving x)
+  const step = own ? Math.max(niceStep(k, 8, cell.focus ? 0.1 : 1), roundUp(span / 60)) : 10 * Math.max(1, Math.ceil(span / 600));
   const gx0 = Math.floor(gx0f / step) * step, gx1 = Math.ceil(gx1f / step) * step, gy0 = Math.floor(gy0f / step) * step, gy1 = Math.ceil(gy1f / step) * step;
   let grid = "";
-  for (let x = gx0; x <= gx1 + step / 2; x += step) grid += `M${+x.toFixed(3)} ${gy0}V${gy1}`;
-  for (let y = gy0; y <= gy1 + step / 2; y += step) grid += `M${gx0} ${+y.toFixed(3)}H${gx1}`;
+  // a frame that is not finite (a crop at ±1e308 overflows) draws no grid rather than loop on it
+  if ([gx0, gx1, gy0, gy1, step].every(Number.isFinite) && step > 0) {
+    for (let x = gx0; x <= gx1 + step / 2; x += step) grid += `M${+x.toFixed(3)} ${gy0}V${gy1}`;
+    for (let y = gy0; y <= gy1 + step / 2; y += step) grid += `M${gx0} ${+y.toFixed(3)}H${gx1}`;
+  }
   const gridInk = night ? "#8892B8" : "#8A7F70", px = (n: number) => +(n / k).toFixed(3);
   // in its own frame and held: no floor and no person; a cross marks the grip, the hand's place
   const grip = own && f.held
