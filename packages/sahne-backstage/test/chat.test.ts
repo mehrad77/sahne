@@ -18,3 +18,15 @@ test("a block selected in one episode is not the context of another", () => {
   route.value = ["cast"];
   assert.deepEqual(contextNow(), { page: "cast" });
 });
+
+const { askedBy, historyOf } = await import("../src/ui/assistant.ts");
+
+test("Go ahead sends its own question once, and only from the last answer", () => {
+  const q1 = { role: "user" as const, content: "draft the season" }, cost = { role: "assistant" as const, content: "", parts: [] };
+  const list = [{ role: "user" as const, content: "hi" }, { role: "assistant" as const, content: "hello" }, q1, cost];
+  assert.equal(askedBy(list, cost), q1);
+  assert.deepEqual(historyOf(list, { confirm: true }), [{ role: "user", content: "hi" }, { role: "assistant", content: "hello" }], "the question is the message, not also before it");
+  assert.deepEqual(historyOf(list).map(t => t.content), ["hi", "hello", "draft the season"]);
+  const later = [...list, { role: "user" as const, content: "something else" }, { role: "assistant" as const, content: "ok" }];
+  assert.equal(askedBy(later, cost), null, "an older cost card answers nothing now");
+});

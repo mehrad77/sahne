@@ -318,7 +318,7 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
   - a place: which episodes are set here (and which marks and props none uses), and scene ideas for it; the places: which suits a scene;
   - a character: how they speak, and where they appear; the cast: who suits a scene; review: what to review first.
   The context sent is the page and what it shows (the episode, the board's season, the place, the character), and the selected block only while its page is open.
-- **A big ask waits for a yes:** the server says what it would cost (`confirm`), and *Go ahead* sends it again.
+- **A big ask waits for a yes:** the server says what it would cost (`confirm`), and *Go ahead* sends that message again, once and with its pictures. Only the last answer's card offers it: one left behind by a later message answers nothing.
 - **The meter** in the top bar is today's spending against the day's cap (its title: the month's, and the tokens); it follows the `usage` events.
 - **Settings** (`#/settings`; its *Raw JSON* switch shows the file as saved, read-only and in colour, `src/ui/kit/json.ts`): Claude (its key from the environment) or a local model by its base URL (LM Studio, Ollama), the caps per day and month in dollars and in tokens, the cost above which an ask waits for a yes, the web (on through Tavily, or off, with which is in effect), and whether the rules' staging suggestions are taken as you leave each line. How agents' edits land is on the Agents page. They are kept in the person's config folder, never in the content root.
 

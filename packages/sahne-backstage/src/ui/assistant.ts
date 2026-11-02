@@ -31,7 +31,7 @@ import { liveLine, scrollerOf, ThinkingBlock, tick, ToolGroup, useStickToBottom,
 export type Part = { type: "start_run"; goal: string; started?: string } | { type: "text"; text: string } | Thinking | ToolPart | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number } | { type: "stopped" } | AskPart | { type: "sources"; list: { url: string; title?: string }[] } | { type: "remembered"; id: string; text: string; undone?: boolean };
 /** A question the assistant put to the person (ask_person, set_review): buttons that answer, proposals to accept and save, a status to set. */
 type AskPart = { type: "ask"; question: string; options?: string[]; save?: string[]; review?: { id: string; status: string }; remember?: string; answered?: string };
-interface Turn { role: "user" | "assistant"; content: string; parts?: Part[]; fresh?: boolean; at?: number; /** The files the person attached (their names; the pictures are not kept). */ files?: string[] }
+export interface Turn { role: "user" | "assistant"; content: string; parts?: Part[]; fresh?: boolean; at?: number; /** The files the person attached (their names; the pictures are not kept). */ files?: string[] }
 /** A file attached to a message: a picture sent as it is, a text file as words in the message. */
 interface Attached { name: string; mediaType: string; data: string; text?: string }
 
@@ -147,18 +147,40 @@ let stopper: AbortController | null = null;
 export function stop() { stopper?.abort(); }
 
 /** Send a message (or an ask), streaming the answer into the conversation. */
-export async function send(content: string, o: { fresh?: boolean; confirm?: boolean; files?: Attached[] } = {}) {
+/** The pictures attached to a message, while this tab is open (they are not kept), for a retry or a Go ahead to send again. */
+const picturesOf = new WeakMap<Turn, Attached[]>();
+
+/**
+ * What the model is given before the message: the conversation's words (an answer with no words, only tools or stopped,
+ * is not sent again). A Go ahead (`confirm`) sends the question it answers again as the message, so not also before it.
+ */
+export function historyOf(list: Turn[], o: { fresh?: boolean; confirm?: boolean } = {}): { role: Turn["role"]; content: string }[] {
+  if (o.fresh) return [];
+  const past = o.confirm ? list.slice(0, Math.max(0, list.map(t => t.role).lastIndexOf("user"))) : list;
+  return past.filter(t => (!t.fresh || t.role === "user") && t.content.trim()).map(t => ({ role: t.role, content: t.content }));
+}
+
+/** The person's message an answer is to, while that answer is the last turn (an older card's button answers nothing now). */
+export function askedBy(list: Turn[], answer: object): Turn | null {
+  const q = list.at(-2);
+  return list.at(-1) === answer && q?.role === "user" ? q : null;
+}
+
+export async function send(content: string, o: { fresh?: boolean; confirm?: boolean; files?: Attached[]; /** The names to show, when sent again. */ named?: string[] } = {}) {
   if (busy.value || !content.trim()) return;
   // the kept conversations are read before this one grows (an ask from a page can come before the panel ever opened)
   loadChats();
   assistantOpen.value = true;
   sideTab.value = "assistant";
-  // an answer with no words (only tools, or stopped) is not sent again
-  const history = o.fresh ? [] : turns.value.filter(t => (!t.fresh || t.role === "user") && t.content.trim()).map(t => ({ role: t.role, content: t.content }));
+  const history = historyOf(turns.value, o);
   // a text file is part of the message; a picture goes beside it
   const texts = (o.files ?? []).filter(f => f.text !== undefined), pictures = (o.files ?? []).filter(f => f.text === undefined);
   if (texts.length) content = `${content}\n\n${texts.map(f => `File ${f.name}:\n\`\`\`\n${f.text}\n\`\`\``).join("\n\n")}`;
-  if (!o.confirm) turns.value = [...turns.value, { role: "user", content, fresh: o.fresh, ...(o.files?.length ? { files: o.files.map(f => f.name) } : {}) }];
+  if (!o.confirm) {
+    const names = o.named ?? o.files?.map(f => f.name) ?? [], q: Turn = { role: "user", content, fresh: o.fresh, ...(names.length ? { files: names } : {}) };
+    if (pictures.length) picturesOf.set(q, pictures);
+    turns.value = [...turns.value, q];
+  }
   const reply: Turn = { role: "assistant", content: "", parts: [], fresh: o.fresh, at: Date.now() };
   turns.value = [...turns.value, reply];
   const update = (fn: (t: Turn) => void) => { fn(reply); turns.value = [...turns.value.slice(0, -1), { ...reply, parts: [...(reply.parts ?? [])] }]; };
@@ -249,7 +271,7 @@ function retry() {
   if (at < 0 || busy.value) return;
   const q = turns.value[at];
   turns.value = turns.value.slice(0, at);
-  void send(q.content, { fresh: q.fresh });
+  void send(q.content, { fresh: q.fresh, files: picturesOf.get(q), named: q.files });
 }
 
 /** An ask from the list, about what is selected. */
@@ -344,7 +366,7 @@ export function Answer(p: { turn: { content: string; parts?: Part[] }; live: boo
     } else if (x.type === "thinking") out.push(html`<${ThinkingBlock} part=${x} live=${p.live && i === parts.length - 1} />`);
     else if (x.type === "text") out.push(html`<${Markdown} class=${`said${!p.live && lastTool >= 0 && i > lastTool ? " answer" : ""}`} text=${x.text} />`);
     else if (x.type === "proposal") out.push(html`<${Proposed} id=${x.id} />`);
-    else if (x.type === "confirm") out.push(html`<div class="confirm">${x.why} It would cost about ${fmtUsd(x.estimateUsd)}. <button class="small primary" onClick=${() => { const q = [...turns.value].reverse().find(y => y.role === "user"); if (q) void send(q.content, { confirm: true, fresh: q.fresh }); }}>Go ahead</button></div>`);
+    else if (x.type === "confirm") out.push(html`<div class="confirm">${x.why} It would cost about ${fmtUsd(x.estimateUsd)}. ${(q => q && html`<button class="small primary" onClick=${() => void send(q.content, { confirm: true, fresh: q.fresh, files: picturesOf.get(q) })}>Go ahead</button>`)(askedBy(turns.value, p.turn))}</div>`);
     else if (x.type === "error") out.push(html`<div class="chat-error"><span class="grow">${x.message}</span>${!p.live && p.turn === turns.value.at(-1) && html`<button type="button" class="small" onClick=${retry}>Try again</button>`}</div>`);
     else if (x.type === "remembered") out.push(html`<div class="tool ok remembered">${x.undone ? html`Forgot: ${x.text}` : html`Remembered for later conversations: ${x.text} <button type="button" class="linkish" onClick=${async () => { const r = await fetch(`/api/memory/${x.id}`, { method: "DELETE" }); if (r.ok) { x.undone = true; turns.value = [...turns.value]; } }}>Undo</button>`}</div>`);
     else if (x.type === "sources") out.push(html`<div class="sources" aria-label="Sources">${x.list.map(s => html`<a class="chip" href=${s.url} target="_blank" rel="noreferrer" title=${s.title ?? s.url}>${hostOf(s.url)}</a>`)}</div>`);
