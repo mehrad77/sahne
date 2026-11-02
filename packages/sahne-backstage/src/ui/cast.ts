@@ -160,12 +160,12 @@ function DeleteCharacter(p: { id: string; onClose(): void; onDone?(): void }) {
 
 export function CharacterPage(p: { id?: string }) {
   const id = p.id ?? "";
-  const [ready, setReady] = useState(!!draftOf("character", id));
-  useEffect(() => { if (!draftOf("character", id) && !proposedNew("character", id)) void openDoc("character", id).then(d => setReady(!!d)); }, [id]);
+  // opened from disk unless only proposed; one accepted on its preview is a draft already, and shows at once
+  useEffect(() => { if (!draftOf("character", id) && !proposedNew("character", id)) void openDoc("character", id); }, [id]);
   const d = draftOf("character", id);
   const proposed = proposedNew("character", id);
   if (!d && proposed) return html`<${ProposedDoc} x=${proposed} />`;
-  if (!ready || !d) return html`<p>Opening ${id}…</p>`;
+  if (!d) return html`<p>Opening ${id}…</p>`;
   return html`<${MadeByTask} kind="character" id=${id} /><${Character} key=${id} id=${id} />`;
 }
 

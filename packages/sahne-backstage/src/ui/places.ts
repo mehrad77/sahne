@@ -63,11 +63,11 @@ export function PlacesPage() {
 
 export function PlacePage(p: { id?: string }) {
   const id = p.id ?? "";
-  const [ready, setReady] = useState(!!draftOf("place", id));
-  useEffect(() => { if (!draftOf("place", id) && !proposedNew("place", id)) void openDoc("place", id).then(d => setReady(!!d)); }, [id]);
+  // opened from disk unless only proposed; one accepted on its preview is a draft already, and shows at once
+  useEffect(() => { if (!draftOf("place", id) && !proposedNew("place", id)) void openDoc("place", id); }, [id]);
   const proposed = proposedNew("place", id);
   if (!draftOf("place", id) && proposed) return html`<${ProposedDoc} x=${proposed} />`;
-  if (!ready || !draftOf("place", id)) return html`<p>Opening ${id}…</p>`;
+  if (!draftOf("place", id)) return html`<p>Opening ${id}…</p>`;
   return html`<${MadeByTask} kind="place" id=${id} /><${Place} key=${id} id=${id} />`;
 }
 
