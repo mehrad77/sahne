@@ -490,7 +490,7 @@ test("proposals mode: an episode in a season only proposed creates the season wi
   } finally { await close(); }
 });
 
-test("proposals mode: a new id, season number or cast order is picked past another author's; an author proposing again gets its own", async () => {
+test("proposals mode: a new id, season number or cast order is picked past another author's; an author proposing the same again gets its own, a different one the next", async () => {
   const events = new Events();
   const a = await connect({ write: true, agentEdits: "proposals" }, events), b = await connect({ write: true, agentEdits: "proposals", name: "other-agent" }, events);
   try {
@@ -500,13 +500,14 @@ test("proposals mode: a new id, season number or cast order is picked past anoth
     // a step done over proposes the same episode again: it gets the proposal it made, under the same id
     for (const r of [await episode(a, "Bir", "2026-09-15"), await episode(a, "Bir", "2026-09-15")]) assert.ok(!r.isError, r.text);
     assert.deepEqual(mine().map(p => p.doc), ["s1e01"]);
+    // the same author's different episode takes the next id
+    assert.ok(!(await episode(a, "Yeni", "2026-09-18")).isError);
     // another author's episode takes the next id, and never one the first proposed
     assert.ok(!(await episode(b, "Iki", "2026-09-16")).isError);
-    assert.deepEqual(mine().map(p => `${p.by}:${p.doc}`), ["test-agent:s1e01", "other-agent:s1e02"]);
+    assert.deepEqual(mine().map(p => `${p.by}:${p.doc}`), ["test-agent:s1e01", "test-agent:s1e02", "other-agent:s1e03"]);
     assert.match((await episode(b, "Uc", "2026-09-17", "s1e01")).text, /s1e01 is proposed already \(p\d+, by test-agent\)/);
-    assert.ok(!(await call(a.client, "create_season", { title: T("Two") })).isError);
-    assert.ok(!(await call(b.client, "create_season", { title: T("Three") })).isError);
-    assert.deepEqual(mine().filter(p => p.kind === "season").map(p => p.doc), ["s2", "s3"]);
+    for (const [c, n] of [[a, "Two"], [a, "Two"], [a, "Three"], [b, "Four"]] as const) assert.ok(!(await call(c.client, "create_season", { title: T(n) })).isError);
+    assert.deepEqual(mine().filter(p => p.kind === "season").map(p => `${(p.next as { title: { en: string } }).title.en}:${p.doc}`), ["Two:s2", "Three:s3", "Four:s4"]);
     const person = (c: typeof a, id: string) => call(c.client, "create_character", { id, name: T(id), role: T("a neighbour"), bio: T("lives upstairs") });
     for (const r of [await person(a, "tarik"), await person(a, "tarik"), await person(b, "leyla")]) assert.ok(!r.isError, r.text);
     const chars = mine().filter(p => p.kind === "character");

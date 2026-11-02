@@ -336,9 +336,9 @@ export function createMcp(o: McpOptions): McpServer {
 
   /** The answer for a document that is not on disk: none at all, or one only proposed so far. */
   /**
-   * The documents of a kind waiting in other authors' proposals (as their document or one they carry), by id: a new id or
-   * season number is picked past them, so two authors never propose one id. This author's own are its to propose again (a
-   * step done over gets the proposal it made, proposals.ts), so they are not counted.
+   * The documents of a kind waiting in proposals (as their document or one they carry), by id: other authors' only, or with
+   * `mine` this author's too. A new id or season number is picked past all of them, but this author's own are its to propose
+   * again (a step done over gets the proposal it made, proposals.ts), so `taken` counts only other authors'.
    */
   const proposed = async (kind: Kind, o: { mine?: boolean } = {}): Promise<Map<string, { next: unknown; by: string; id: string }>> => {
     const out = new Map<string, { next: unknown; by: string; id: string }>();
@@ -605,15 +605,6 @@ export function createMcp(o: McpOptions): McpServer {
     const places = await withMine("place", w.places as Record<string, StoryPlace>);
     const series = w.series as SeriesDoc | undefined;
     if (!series) return fail("the content root has no series.json: start the series in the editor first");
-    let id = b.id;
-    if (!id) {
-      const used = [...new Set([...idsOf("story"), ...(await proposed("story")).keys()])].filter(x => seasonOf(x) === b.season).map(x => Number(x.slice(-2)));
-      id = `${sid}e${String((used.length ? Math.max(...used) : 0) + 1).padStart(2, "0")}`;
-    }
-    if (seasonOf(id) !== b.season) return fail(`${id} is not an episode id of season ${b.season} (s${b.season}eNN)`);
-    if (exists("story", id)) return fail(`${id} exists already: ids are permanent, pick a new one`);
-    const pendingEp = await taken("story", id);
-    if (pendingEp) return fail(pendingEp);
     // an own key: "constructor" is no place
     if (!Object.hasOwn(places, b.place)) return fail(`there is no place ${b.place} (kit_search places)`);
     const aid = arcId(b.season, b.week), arc = se.arcs?.[aid];
@@ -623,9 +614,27 @@ export function createMcp(o: McpOptions): McpServer {
     }
     if (!b.title[languagesOf(series).main]) return fail(`the title needs the main language's (${languagesOf(series).main})`);
     const lesson = storyPluginsOf(series).some(pl => pl.id === "lesson");
-    const next = skeleton({ id, season: b.season, releaseDate: b.releaseDate, kind: b.kind, week: b.week, arc: { ...arc, id: aid }, place: b.place, cast: b.cast, title: b.title, summary: b.summary, ...(lesson ? { words: b.words ?? [], lessons: b.lessons ?? [], level: b.level } : {}) },
-      { narrator: series.narrator, standin: series.standin, places, languages: languagesOf(series), lesson, play: playOf({ play: b.play }, series) });
-    if (b.play && b.play !== playOf({}, series)) (next as { play?: string }).play = b.play;
+    const draft = (id: string) => {
+      const d = skeleton({ id, season: b.season, releaseDate: b.releaseDate, kind: b.kind, week: b.week, arc: { ...arc, id: aid }, place: b.place, cast: b.cast, title: b.title, summary: b.summary, ...(lesson ? { words: b.words ?? [], lessons: b.lessons ?? [], level: b.level } : {}) },
+        { narrator: series.narrator, standin: series.standin, places, languages: languagesOf(series), lesson, play: playOf({ play: b.play }, series) });
+      if (b.play && b.play !== playOf({}, series)) (d as { play?: string }).play = b.play;
+      return d;
+    };
+    let id = b.id;
+    if (!id) {
+      // the same episode proposed again (a step done over) gets its own proposal back; another takes the id past every pending one
+      const pending = await proposed("story", { mine: true });
+      id = [...pending].find(([x, p]) => p.by === by() && seasonOf(x) === b.season && !exists("story", x) && JSON.stringify(draft(x)) === JSON.stringify(p.next))?.[0];
+      if (!id) {
+        const used = [...new Set([...idsOf("story"), ...pending.keys()])].filter(x => seasonOf(x) === b.season).map(x => Number(x.slice(-2)));
+        id = `${sid}e${String((used.length ? Math.max(...used) : 0) + 1).padStart(2, "0")}`;
+      }
+    }
+    if (seasonOf(id) !== b.season) return fail(`${id} is not an episode id of season ${b.season} (s${b.season}eNN)`);
+    if (exists("story", id)) return fail(`${id} exists already: ids are permanent, pick a new one`);
+    const pendingEp = await taken("story", id);
+    if (pendingEp) return fail(pendingEp);
+    const next = draft(id);
     const edits: ProposalEdit[] = [{ kind: "story", doc: id, next, create: true }];
     let after: string | undefined;
     if (se.calendar) {
@@ -718,12 +727,15 @@ export function createMcp(o: McpOptions): McpServer {
     description: `Start a new season: its number (the next free one), its titles, its launch day, and the themes of its first weeks. Then plan its weeks with set_week_theme and start episodes in them. ${writeNote}`,
     inputSchema: { n: z.number().int().positive().optional().describe("Default: the next free number"), title: TEXT0, launch: z.string().optional().describe("YYYY-MM-DD, a Monday"), weeks: z.record(z.string(), z.record(z.string(), z.string())).optional().describe("Week number → its theme by language, e.g. { \"1\": { \"tr\": \"…\" } }") },
   }, run("create_season", async ({ n, title, launch, weeks }) => {
-    const nn = n ?? Math.max(0, ...[...idsOf("season"), ...(await proposed("season")).keys()].map(x => Number(x.slice(1)))) + 1, id = `s${nn}`;
+    const draft = (nn: number) => ({ v: 1, id: `s${nn}`, n: nn, title, ...(launch ? { launch } : {}), arcs: Object.fromEntries(Object.entries(weeks ?? { 1: Object.fromEntries(Object.keys(title).map(l => [l, "…"])) }).map(([w, t]) => [arcId(nn, Number(w)), { ...t, mechanics: ["say"] }])), calendar: {} });
+    // the same season proposed again gets its own proposal back; another takes the number past every pending one
+    const pending = await proposed("season", { mine: true });
+    const again = n === undefined ? [...pending].find(([x, p]) => p.by === by() && !exists("season", x) && JSON.stringify(draft(Number(x.slice(1)))) === JSON.stringify(p.next))?.[0] : undefined;
+    const nn = n ?? (again ? Number(again.slice(1)) : Math.max(0, ...[...idsOf("season"), ...pending.keys()].map(x => Number(x.slice(1)))) + 1), id = `s${nn}`;
     if (exists("season", id)) return fail(`season ${id} exists already: pick another number`);
     const pendingSe = await taken("season", id);
     if (pendingSe) return fail(pendingSe);
-    const arcs = Object.fromEntries(Object.entries(weeks ?? { 1: Object.fromEntries(Object.keys(title).map(l => [l, "…"])) }).map(([w, t]) => [arcId(nn, Number(w)), { ...t, mechanics: ["say"] }]));
-    const doc = { v: 1, id, n: nn, title, ...(launch ? { launch } : {}), arcs, calendar: {} };
+    const doc = draft(nn);
     return submit([{ kind: "season", doc: id, next: doc, create: true }], { summary: `start season ${nn}`, paths: [[]] });
   }));
 
