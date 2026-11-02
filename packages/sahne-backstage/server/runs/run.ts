@@ -512,7 +512,10 @@ export class Runs {
       else if (failed) throw new Error(failed);
       else {
         const last = [...(state.values.messages ?? [])].reverse().find(m => m.getType() === "ai");
-        s.summary ??= (last ? String(typeof last.content === "string" ? last.content : (last.content as { type: string; text?: string }[]).filter(b => b.type === "text").map(b => b.text).join("")).slice(0, 2000) : undefined);
+        const words = last ? String(typeof last.content === "string" ? last.content : (last.content as { type: string; text?: string }[]).filter(b => b.type === "text").map(b => b.text).join("")).slice(0, 2000) : undefined;
+        // a planner that ends without a plan (it asked in words, or gave up) has not planned: the task is not done, it waits
+        if (s.kind === "plan" && s.summary === undefined) throw new Error(`the planner ended without a plan (propose_plan)${words?.trim() ? `; it said: ${words.trim()}` : ""}`);
+        s.summary ??= words;
         s.status = "done"; s.endedAt = Date.now(); delete s.error;
         await this.saver.deleteThread(thread.configurable.thread_id);
       }

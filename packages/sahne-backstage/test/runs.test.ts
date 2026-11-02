@@ -431,3 +431,13 @@ test("a step whose answer was cut off runs again, told why, and is done only whe
   await r2.idle();
   assert.deepEqual([run2.steps[0].status, calls], ["failed", -96]);
 });
+
+test("a planner that ends without a plan (it asked in words) leaves the task waiting, not done", async () => {
+  for (const mode of ["check", "auto"] as const) {
+    const { r } = runs(scripted({ plan: () => ({ text: "Which season should they go in: s1 or s2?" }) }));
+    const run = r.create({ goal: "A week at the library", mode });
+    await r.idle();
+    assert.deepEqual([run.status, run.steps[0].status], ["paused", "failed"], mode);
+    assert.match(run.steps[0].error!, /ended without a plan.*Which season should they go in/);
+  }
+});
