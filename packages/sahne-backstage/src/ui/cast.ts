@@ -178,7 +178,7 @@ function Character(p: { id: string }) {
   const put = (k: string, v: unknown) => edit(x => set(x, [k], v), k);
   const host = useRef<HTMLDivElement>(null);
   const ui = useRef<BuilderUI | null>(null);
-  const [outfit, setOutfit] = useState<string>("");
+  const [picked, setOutfit] = useState<string>("");
   const [deleting, setDeleting] = useState(false);
 
   // the look the builder made last: a look that differs came from outside (an accepted proposal, undo, redo), and the
@@ -194,7 +194,9 @@ function Character(p: { id: string }) {
   useEffect(() => { const t = setTimeout(() => void checkDocs([key]), 600); return () => clearTimeout(t); }, [c]);
 
   const outfits = Object.keys(c.outfits ?? {});
-  const look = outfit && c.avatar ? applyLook(c.avatar, c.outfits![outfit]) : c.avatar;
+  // the outfit picked, while it is still there (an undo, an accepted proposal or an agent may take it away)
+  const outfit = outfits.includes(picked) ? picked : "";
+  const look = outfit && c.avatar ? applyLook(c.avatar, c.outfits?.[outfit]) : c.avatar;
   const size = c.avatar ? bytes(c.avatar) : 0;
   const others = Object.values(w.characters).filter(o => o.kind === "cast" && o.id !== p.id);
   return html`<section>
