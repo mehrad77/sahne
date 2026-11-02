@@ -335,6 +335,20 @@ export function createMcp(o: McpOptions): McpServer {
   }
 
   /** The answer for a document that is not on disk: none at all, or one only proposed so far. */
+  /**
+   * The documents of a kind waiting in any proposal (as its document or one it carries), by id: a new id, season number or
+   * cast order is picked past them, so two proposals never make one id, and a proposed id is not proposed again.
+   */
+  const proposed = async (kind: Kind): Promise<Map<string, { next: unknown; by: string; id: string }>> => {
+    const out = new Map<string, { next: unknown; by: string; id: string }>();
+    for (const p of await queue.pending()) for (const e of [{ kind: p.kind, doc: p.doc, next: p.next }, ...(p.also ?? [])]) if (e.kind === kind) out.set(e.doc, { next: e.next, by: p.by, id: p.id });
+    return out;
+  };
+  const taken = async (kind: Kind, id: string): Promise<string | null> => {
+    const p = (await proposed(kind)).get(id);
+    return p && !exists(kind, id) ? `${id} is proposed already (${p.id}, by ${p.by === by() ? "you" : p.by}): edit that proposal, or pick another` : null;
+  };
+
   const absent = async (id: string, what: string, kind: Kind = "story"): Promise<Result> => {
     const p = (await queue.pending()).find(x => x.kind === kind && x.doc === id && x.create);
     return fail(p ? `${id} is only proposed (${p.id}), not saved yet: ${what} once a person accepts it` : `there is no ${kind} ${id}${kind === "story" ? " (list_episodes lists them)" : ""}`);
@@ -592,11 +606,13 @@ export function createMcp(o: McpOptions): McpServer {
     if (!series) return fail("the content root has no series.json: start the series in the editor first");
     let id = b.id;
     if (!id) {
-      const used = idsOf("story").filter(x => seasonOf(x) === b.season).map(x => Number(x.slice(-2)));
+      const used = [...new Set([...idsOf("story"), ...(await proposed("story")).keys()])].filter(x => seasonOf(x) === b.season).map(x => Number(x.slice(-2)));
       id = `${sid}e${String((used.length ? Math.max(...used) : 0) + 1).padStart(2, "0")}`;
     }
     if (seasonOf(id) !== b.season) return fail(`${id} is not an episode id of season ${b.season} (s${b.season}eNN)`);
     if (exists("story", id)) return fail(`${id} exists already: ids are permanent, pick a new one`);
+    const pendingEp = await taken("story", id);
+    if (pendingEp) return fail(pendingEp);
     if (!places[b.place]) return fail(`there is no place ${b.place} (kit_search places)`);
     const aid = arcId(b.season, b.week), arc = se.arcs?.[aid];
     if (!arc) {
@@ -700,8 +716,10 @@ export function createMcp(o: McpOptions): McpServer {
     description: `Start a new season: its number (the next free one), its titles, its launch day, and the themes of its first weeks. Then plan its weeks with set_week_theme and start episodes in them. ${writeNote}`,
     inputSchema: { n: z.number().int().positive().optional().describe("Default: the next free number"), title: TEXT0, launch: z.string().optional().describe("YYYY-MM-DD, a Monday"), weeks: z.record(z.string(), z.record(z.string(), z.string())).optional().describe("Week number → its theme by language, e.g. { \"1\": { \"tr\": \"…\" } }") },
   }, run("create_season", async ({ n, title, launch, weeks }) => {
-    const nn = n ?? Math.max(0, ...idsOf("season").map(x => Number(x.slice(1)))) + 1, id = `s${nn}`;
+    const nn = n ?? Math.max(0, ...[...idsOf("season"), ...(await proposed("season")).keys()].map(x => Number(x.slice(1)))) + 1, id = `s${nn}`;
     if (exists("season", id)) return fail(`season ${id} exists already: pick another number`);
+    const pendingSe = await taken("season", id);
+    if (pendingSe) return fail(pendingSe);
     const arcs = Object.fromEntries(Object.entries(weeks ?? { 1: Object.fromEntries(Object.keys(title).map(l => [l, "…"])) }).map(([w, t]) => [arcId(nn, Number(w)), { ...t, mechanics: ["say"] }]));
     const doc = { v: 1, id, n: nn, title, ...(launch ? { launch } : {}), arcs, calendar: {} };
     return submit([{ kind: "season", doc: id, next: doc, create: true }], { summary: `start season ${nn}`, paths: [[]] });
@@ -713,8 +731,11 @@ export function createMcp(o: McpOptions): McpServer {
     inputSchema: { id: z.string().regex(/^[a-z][a-z0-9_]*$/), name: TEXT0, role: TEXT0.optional(), bio: TEXT0.optional(), level: z.string().optional(), color: z.string().optional().describe("#RRGGBB") },
   }, run("create_character", async ({ id, name, role, bio, level, color }) => {
     if (exists("character", id)) return fail(`${id} is a character already: ids are permanent, pick a new one`);
+    const pendingCh = await taken("character", id);
+    if (pendingCh) return fail(pendingCh);
     const w = listing(), chars = w.characters as Record<string, { kind?: string; order?: number; avatar?: unknown }>;
-    const order = Math.max(0, ...Object.values(chars).filter(c => c.kind !== "extra").map(c => Number(c.order ?? 0))) + 1;
+    const all = [...Object.values(chars), ...[...(await proposed("character")).values()].map(p => p.next as { kind?: string; order?: number })];
+    const order = Math.max(0, ...all.filter(c => c.kind !== "extra").map(c => Number(c.order ?? 0))) + 1;
     const base = chars[(w.series as SeriesDoc | undefined)?.standin ?? ""]?.avatar;
     const doc = { id, order, name, kind: "cast", role: role ?? { en: "…" }, bio: bio ?? { en: "…" }, color: color ?? "#7A6A58", level: level ?? "A1", ...(base ? { avatar: base } : {}) };
     return submit([{ kind: "character", doc: id, next: doc, create: true }], { summary: `add the character ${id}`, paths: [[]] });
@@ -726,6 +747,8 @@ export function createMcp(o: McpOptions): McpServer {
     inputSchema: { id: z.string().regex(/^[a-z0-9_]+$/), name: TEXT0, from: z.string().optional().describe("A place to copy") },
   }, run("create_place", async ({ id, name, from }) => {
     if (exists("place", id)) return fail(`${id} is a place already: ids are permanent, pick a new one`);
+    const pendingPl = await taken("place", id);
+    if (pendingPl) return fail(pendingPl);
     let doc: Record<string, unknown> = { v: 1, id, name, size: { w: 6, d: 4 }, pieces: [], marks: { a: { x: 0, z: 0 } } };
     if (from) { const b = docOf("place", from).doc; const { site: _site, ...rest } = structuredClone(b); doc = { ...rest, id, name }; }
     return submit([{ kind: "place", doc: id, next: doc, create: true }], { summary: `add the place ${id}${from ? ` (a copy of ${from})` : ""}`, paths: [[]] });

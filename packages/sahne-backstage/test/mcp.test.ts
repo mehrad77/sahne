@@ -470,6 +470,25 @@ test("proposals mode: an episode in a season only proposed creates the season wi
   } finally { await close(); }
 });
 
+test("proposals mode: a new id, season number or cast order is picked past the ones already proposed", async () => {
+  const { client, events, close } = await connect({ write: true, agentEdits: "proposals" });
+  try {
+    const q = proposalsOf(events), before = q.all().length, T = (s: string) => ({ tr: s, en: s, fa: s });
+    const episode = (title: string, releaseDate: string) => call(client, "create_episode", { season: 1, releaseDate, kind: "episode", week: 0, place: "bakkal", cast: ["nima", "ismail"], words: ["a1-w-portakal", "a1-w-meyve", "a1-w-var", "a1-w-yok", "a1-w-domates"], lessons: ["g_a1_2_var_yok"], title: T(title), level: "A1" });
+    for (const r of [await episode("Bir", "2026-09-15"), await episode("Iki", "2026-09-16")]) assert.ok(!r.isError, r.text);
+    assert.deepEqual(q.all().slice(before).map(p => p.doc), ["s1e01", "s1e02"]);
+    assert.match((await call(client, "create_episode", { season: 1, id: "s1e01", releaseDate: "2026-09-17", kind: "episode", week: 0, place: "bakkal", cast: ["nima", "ismail"], title: T("Uc") })).text, /s1e01 is proposed already/);
+    for (const n of ["Two", "Three"]) assert.ok(!(await call(client, "create_season", { title: T(n) })).isError);
+    assert.deepEqual(q.all().filter(p => p.kind === "season" && p.create).map(p => p.doc), ["s2", "s3"]);
+    const person = (id: string) => call(client, "create_character", { id, name: T(id), role: T("a neighbour"), bio: T("lives upstairs") });
+    for (const r of [await person("tarik"), await person("leyla")]) assert.ok(!r.isError, r.text);
+    const orders = q.all().filter(p => p.kind === "character").map(p => (p.next as { order: number }).order);
+    assert.equal(new Set(orders).size, 2, `two orders: ${orders}`);
+    assert.match((await person("tarik")).text, /tarik is proposed already/);
+    for (const x of q.all().slice(before)) q.resolve(x.id, false);
+  } finally { await close(); }
+});
+
 test("over HTTP: a proposal reaches the editors under the client's name, and a person resolves it", async () => {
   const file = join(http1, "stories", "s1e00.json"), before = readFileSync(file, "utf8");
   const ac = new AbortController();
