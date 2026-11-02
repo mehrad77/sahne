@@ -38,10 +38,10 @@ const { proposalsOf } = await import("../server/proposals.ts");
 const { forget } = await import("../server/content.ts");
 
 type Mode = "proposals" | "direct";
-async function connect(o: { write: boolean; agentEdits: Mode; shareCards?: boolean }, events = new Events()) {
+async function connect(o: { write: boolean; agentEdits: Mode; shareCards?: boolean; name?: string }, events = new Events()) {
   const server = createMcp({ write: o.write, agentEdits: o.agentEdits, shareCards: o.shareCards ?? false, events });
   const [a, b] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: "test-agent", version: "1.0.0" });
+  const client = new Client({ name: o.name ?? "test-agent", version: "1.0.0" });
   await Promise.all([server.connect(a), client.connect(b)]);
   return { client, events, close: () => client.close() };
 }
@@ -490,23 +490,31 @@ test("proposals mode: an episode in a season only proposed creates the season wi
   } finally { await close(); }
 });
 
-test("proposals mode: a new id, season number or cast order is picked past the ones already proposed", async () => {
-  const { client, events, close } = await connect({ write: true, agentEdits: "proposals" });
+test("proposals mode: a new id, season number or cast order is picked past another author's; an author proposing again gets its own", async () => {
+  const events = new Events();
+  const a = await connect({ write: true, agentEdits: "proposals" }, events), b = await connect({ write: true, agentEdits: "proposals", name: "other-agent" }, events);
   try {
     const q = proposalsOf(events), before = q.all().length, T = (s: string) => ({ tr: s, en: s, fa: s });
-    const episode = (title: string, releaseDate: string) => call(client, "create_episode", { season: 1, releaseDate, kind: "episode", week: 0, place: "bakkal", cast: ["nima", "ismail"], words: ["a1-w-portakal", "a1-w-meyve", "a1-w-var", "a1-w-yok", "a1-w-domates"], lessons: ["g_a1_2_var_yok"], title: T(title), level: "A1" });
-    for (const r of [await episode("Bir", "2026-09-15"), await episode("Iki", "2026-09-16")]) assert.ok(!r.isError, r.text);
-    assert.deepEqual(q.all().slice(before).map(p => p.doc), ["s1e01", "s1e02"]);
-    assert.match((await call(client, "create_episode", { season: 1, id: "s1e01", releaseDate: "2026-09-17", kind: "episode", week: 0, place: "bakkal", cast: ["nima", "ismail"], title: T("Uc") })).text, /s1e01 is proposed already/);
-    for (const n of ["Two", "Three"]) assert.ok(!(await call(client, "create_season", { title: T(n) })).isError);
-    assert.deepEqual(q.all().filter(p => p.kind === "season" && p.create).map(p => p.doc), ["s2", "s3"]);
-    const person = (id: string) => call(client, "create_character", { id, name: T(id), role: T("a neighbour"), bio: T("lives upstairs") });
-    for (const r of [await person("tarik"), await person("leyla")]) assert.ok(!r.isError, r.text);
-    const orders = q.all().filter(p => p.kind === "character").map(p => (p.next as { order: number }).order);
-    assert.equal(new Set(orders).size, 2, `two orders: ${orders}`);
-    assert.match((await person("tarik")).text, /tarik is proposed already/);
-    for (const x of q.all().slice(before)) q.resolve(x.id, false);
-  } finally { await close(); }
+    const mine = () => q.all().slice(before);
+    const episode = (c: typeof a, title: string, releaseDate: string, id?: string) => call(c.client, "create_episode", { season: 1, ...(id ? { id } : {}), releaseDate, kind: "episode", week: 0, place: "bakkal", cast: ["nima", "ismail"], words: ["a1-w-portakal", "a1-w-meyve", "a1-w-var", "a1-w-yok", "a1-w-domates"], lessons: ["g_a1_2_var_yok"], title: T(title), level: "A1" });
+    // a step done over proposes the same episode again: it gets the proposal it made, under the same id
+    for (const r of [await episode(a, "Bir", "2026-09-15"), await episode(a, "Bir", "2026-09-15")]) assert.ok(!r.isError, r.text);
+    assert.deepEqual(mine().map(p => p.doc), ["s1e01"]);
+    // another author's episode takes the next id, and never one the first proposed
+    assert.ok(!(await episode(b, "Iki", "2026-09-16")).isError);
+    assert.deepEqual(mine().map(p => `${p.by}:${p.doc}`), ["test-agent:s1e01", "other-agent:s1e02"]);
+    assert.match((await episode(b, "Uc", "2026-09-17", "s1e01")).text, /s1e01 is proposed already \(p\d+, by test-agent\)/);
+    assert.ok(!(await call(a.client, "create_season", { title: T("Two") })).isError);
+    assert.ok(!(await call(b.client, "create_season", { title: T("Three") })).isError);
+    assert.deepEqual(mine().filter(p => p.kind === "season").map(p => p.doc), ["s2", "s3"]);
+    const person = (c: typeof a, id: string) => call(c.client, "create_character", { id, name: T(id), role: T("a neighbour"), bio: T("lives upstairs") });
+    for (const r of [await person(a, "tarik"), await person(a, "tarik"), await person(b, "leyla")]) assert.ok(!r.isError, r.text);
+    const chars = mine().filter(p => p.kind === "character");
+    assert.deepEqual(chars.map(p => p.doc), ["tarik", "leyla"], "tarik proposed again is the one proposal");
+    assert.equal(new Set(chars.map(p => (p.next as { order: number }).order)).size, 2);
+    assert.match((await person(b, "tarik")).text, /tarik is proposed already/);
+    for (const x of mine()) q.resolve(x.id, false);
+  } finally { await a.close(); await b.close(); }
 });
 
 test("a key every object has is no place", async () => {

@@ -336,17 +336,18 @@ export function createMcp(o: McpOptions): McpServer {
 
   /** The answer for a document that is not on disk: none at all, or one only proposed so far. */
   /**
-   * The documents of a kind waiting in any proposal (as its document or one it carries), by id: a new id, season number or
-   * cast order is picked past them, so two proposals never make one id, and a proposed id is not proposed again.
+   * The documents of a kind waiting in other authors' proposals (as their document or one they carry), by id: a new id or
+   * season number is picked past them, so two authors never propose one id. This author's own are its to propose again (a
+   * step done over gets the proposal it made, proposals.ts), so they are not counted.
    */
-  const proposed = async (kind: Kind): Promise<Map<string, { next: unknown; by: string; id: string }>> => {
+  const proposed = async (kind: Kind, o: { mine?: boolean } = {}): Promise<Map<string, { next: unknown; by: string; id: string }>> => {
     const out = new Map<string, { next: unknown; by: string; id: string }>();
-    for (const p of await queue.pending()) for (const e of [{ kind: p.kind, doc: p.doc, next: p.next }, ...(p.also ?? [])]) if (e.kind === kind) out.set(e.doc, { next: e.next, by: p.by, id: p.id });
+    for (const p of await queue.pending()) if (o.mine || p.by !== by()) for (const e of [{ kind: p.kind, doc: p.doc, next: p.next }, ...(p.also ?? [])]) if (e.kind === kind) out.set(e.doc, { next: e.next, by: p.by, id: p.id });
     return out;
   };
   const taken = async (kind: Kind, id: string): Promise<string | null> => {
     const p = (await proposed(kind)).get(id);
-    return p && !exists(kind, id) ? `${id} is proposed already (${p.id}, by ${p.by === by() ? "you" : p.by}): edit that proposal, or pick another` : null;
+    return p && !exists(kind, id) ? `${id} is proposed already (${p.id}, by ${p.by}): pick another` : null;
   };
 
   const absent = async (id: string, what: string, kind: Kind = "story"): Promise<Result> => {
@@ -735,8 +736,10 @@ export function createMcp(o: McpOptions): McpServer {
     const pendingCh = await taken("character", id);
     if (pendingCh) return fail(pendingCh);
     const w = listing(), chars = w.characters as Record<string, { kind?: string; order?: number; avatar?: unknown }>;
-    const all = [...Object.values(chars), ...[...(await proposed("character")).values()].map(p => p.next as { kind?: string; order?: number })];
-    const order = Math.max(0, ...all.filter(c => c.kind !== "extra").map(c => Number(c.order ?? 0))) + 1;
+    // past every pending character's order, everyone's; this id's own proposal, made again, keeps the order it had
+    const pending = await proposed("character", { mine: true }), again = (pending.get(id)?.next as { order?: number } | undefined)?.order;
+    const all = [...Object.values(chars), ...[...pending].filter(([k]) => k !== id).map(([, p]) => p.next as { kind?: string; order?: number })];
+    const order = again ?? Math.max(0, ...all.filter(c => c.kind !== "extra").map(c => Number(c.order ?? 0))) + 1;
     const base = chars[(w.series as SeriesDoc | undefined)?.standin ?? ""]?.avatar;
     const doc = { id, order, name, kind: "cast", role: role ?? { en: "…" }, bio: bio ?? { en: "…" }, color: color ?? "#7A6A58", level: level ?? "A1", ...(base ? { avatar: base } : {}) };
     return submit([{ kind: "character", doc: id, next: doc, create: true }], { summary: `add the character ${id}`, paths: [[]] });
