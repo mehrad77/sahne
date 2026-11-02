@@ -56,8 +56,11 @@ export function boardOf(season: SeasonDoc, dates: Record<string, string>, extra 
   });
 }
 
-/** The week a date falls in: its row's (null for a break, or a date off the board). */
-export const weekOf = (weeks: Week[], date: string): number | null => weeks.find(w => w.monday === mondayOf(date))?.week ?? null;
+/** Whether a string is a day (`YYYY-MM-DD`, a real one): a date field being cleared or typed into is not. */
+export const isDay = (s: string | undefined): s is string => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(toDate(s).getTime());
+
+/** The week a date falls in: its row's (null for a break, a date off the board, or no date at all). */
+export const weekOf = (weeks: Week[], date: string): number | null => (isDay(date) ? weeks.find(w => w.monday === mondayOf(date))?.week ?? null : null);
 
 /** An episode's calendar row on `date` (Saturday makes it a special, any other day an episode), or null in a break. */
 export function rowOn(weeks: Week[], date: string): CalendarRow | null {

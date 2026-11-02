@@ -9,7 +9,7 @@ import { html } from "htm/preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { allLanguages, playOf, textOf, type SeasonDoc, type StoryDoc, type StoryPlace } from "sahne-story";
 import { set } from "../model/path.ts";
-import { addDays, arcOfWeek, boardOf, datesOf, isSunday, rowOn, weekOfArc } from "../model/board.ts";
+import { addDays, arcOfWeek, boardOf, datesOf, isDay, isSunday, rowOn, weekOfArc } from "../model/board.ts";
 import { duplicate, skeleton } from "../model/skeleton.ts";
 import { change, createDoc, draftOf, go, openDoc, world } from "../store.ts";
 import { placeThumb } from "../thumbs.ts";
@@ -39,7 +39,9 @@ export function NewEpisode(p: { season?: string; date?: string }) {
   // the day: the route's, else the first free weekday after the season's last episode
   const firstFree = () => { const used = new Set(Object.values(dates)); let d = addDays(Object.values(dates).sort().pop() ?? se.launch ?? new Date().toISOString().slice(0, 10), 1); while (used.has(d) || isSunday(d)) d = addDays(d, 1); return d; };
   const [date, setDate] = useState(p.date ?? firstFree());
-  const row = rowOn(boardOf(se, { ...dates, [id]: date }, 1, arcWeeks), date);
+  // a date field being cleared or typed into holds no day yet: nothing is placed until it does
+  const day = isDay(date) ? date : null;
+  const row = day ? rowOn(boardOf(se, { ...dates, [id]: day }, 1, arcWeeks), day) : null;
   const [mode, setMode] = useState<"new" | "copy">("new");
   const [from, setFrom] = useState<string | null>(null);
   const [place, setPlace] = useState<string | null>(null), [time, setTime] = useState<string | null>(null);
@@ -61,9 +63,10 @@ export function NewEpisode(p: { season?: string; date?: string }) {
   const on = Object.entries(dates).find(([, d]) => d === date)?.[0];
   const missing = [
     taken.has(id) && `${id} exists already`,
-    !row && "a day that is not in a break week",
+    !day && "a release day",
+    day && !row && "a day that is not in a break week",
     on && `${on} is on that day already`,
-    isSunday(date) && "a day other than a Sunday",
+    day && isSunday(day) && "a day other than a Sunday",
     mode === "copy" && !from && "the episode to start from",
     !place && "a place",
     !cast.length && "at least one of the cast",
@@ -93,7 +96,7 @@ export function NewEpisode(p: { season?: string; date?: string }) {
   return html`<section class="new-episode">
     <div class="pagehead"><div class="grow">
       <h2>A new ${kind === "special" ? "special" : "episode"} · ${id}</h2>
-      <span class="note">Season ${se.n} · <input type="date" class="inline-date" value=${date} aria-label="Release day" onInput=${(e: Event) => setDate((e.target as HTMLInputElement).value)} /> ${long(date)}${week !== null ? ` · week ${week}` : " · a break week"}
+      <span class="note">Season ${se.n} · <input type="date" class="inline-date" value=${date} aria-label="Release day" onInput=${(e: Event) => setDate((e.target as HTMLInputElement).value)} /> ${day ? `${long(day)}${week !== null ? ` · week ${week}` : " · a break week"}` : ""}
         ${arc && html` · theme: <span ...${inLang(langs.main)}>${textOf(arc, langs.main)}</span>`}</span></div>
       <div class="segmented" role="group" aria-label="Start">
         <button aria-pressed=${mode === "new"} onClick=${() => { setMode("new"); setFrom(null); }}>From scratch</button>
