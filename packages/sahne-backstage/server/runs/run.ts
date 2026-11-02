@@ -28,6 +28,7 @@ import { readMemory } from "../memory.ts";
 import { readSettings, type Settings } from "../settings.ts";
 
 export type StepKind = "plan" | "season" | "character" | "place" | "episode" | "review" | "task";
+const KINDS: StepKind[] = ["plan", "season", "character", "place", "episode", "review", "task"];
 /** The steps that come before the cast-and-places gate. */
 const FIRST: StepKind[] = ["season", "character", "place"];
 export type StepStatus = "waiting" | "running" | "asking" | "done" | "failed" | "stopped" | "stale" | "skipped" | "undone";
@@ -134,6 +135,14 @@ export function planProblems(p: Plan): string[] {
   const out: string[] = [], ids = new Set<string>(), made = new Map<string, string>();
   if (!p || typeof p.brief !== "string" || !Array.isArray(p.steps) || !p.steps.length) return ["a plan is { brief, steps: [{ id, kind, title, brief, needs?, owns? }] }, with at least one step"];
   for (const s of p.steps) {
+    // the shape first: a kind the estimate knows (else the budget is NaN and never binds), lists where lists go
+    const was = out.length;
+    if (!s || typeof s !== "object") { out.push(`a step is { id, kind, title, brief, needs?, owns? }, not ${JSON.stringify(s)}`); continue; }
+    if (!KINDS.includes(s.kind)) out.push(`step ${s.id}: kind ${JSON.stringify(s.kind)} is not one of ${KINDS.join(", ")}`);
+    if (typeof s.title !== "string" || typeof s.brief !== "string") out.push(`step ${s.id}: a title and a brief, as text`);
+    if (s.needs !== undefined && !(Array.isArray(s.needs) && s.needs.every(n => typeof n === "string"))) out.push(`step ${s.id}: needs is a list of step ids`);
+    if (s.owns !== undefined && !(Array.isArray(s.owns) && s.owns.every(o => o && typeof o.kind === "string" && typeof o.id === "string"))) out.push(`step ${s.id}: owns is a list of { kind, id }`);
+    if (out.length > was) continue;
     if (!/^[a-z][a-z0-9_]*$/.test(s.id ?? "")) out.push(`step id ${JSON.stringify(s.id)}: a-z, 0-9 and _`);
     else if (ids.has(s.id)) out.push(`step ${s.id} is there twice`);
     ids.add(s.id);
@@ -143,6 +152,7 @@ export function planProblems(p: Plan): string[] {
       made.set(k, s.id);
     }
   }
+  if (out.length) return out;
   for (const s of p.steps) for (const n of s.needs ?? []) if (!ids.has(n)) out.push(`step ${s.id} needs ${n}, which is not a step`);
   // a cycle: a step that needs itself, through others
   const by = new Map(p.steps.map(s => [s.id, s.needs ?? []]));
@@ -184,6 +194,8 @@ export class Runs {
     o.store.db.exec("CREATE TABLE IF NOT EXISTS run_log (run TEXT NOT NULL, step TEXT NOT NULL, seq INTEGER NOT NULL, event TEXT NOT NULL, PRIMARY KEY (run, step, seq))");
     const kept = o.store.get<{ n: number; runs: Run[] }>("runs", { n: 0, runs: [] });
     this.n = kept.n; this.list = kept.runs;
+    // a budget an older backstage stored as no number (NaN, null) would never bind, or stop the scheduler: it is the default again
+    for (const r of this.list) if (typeof r.maxUsd !== "number" || !Number.isFinite(r.maxUsd)) { r.maxUsd = 10; delete r.maxSet; }
     // a person turning down a step's proposal: that step, and the finished steps built on it, need a redo
     o.events.on((name, data) => {
       const d = data as { action?: string; accepted?: boolean; withdrawn?: boolean; proposal?: { by: string; step?: string } };
@@ -227,6 +239,7 @@ export class Runs {
     const plan: Plan = v.plan ?? { brief: "", steps: [{ id: "plan", kind: "plan", title: "Plan the task", brief: PLANNING }] };
     const bad = planProblems(plan);
     if (bad.length) throw new Error(`the plan: ${bad.join("; ")}`);
+    if (v.maxUsd !== undefined && !(Number.isFinite(v.maxUsd) && v.maxUsd >= 0)) throw new Error(`a budget is a number of dollars, not ${JSON.stringify(v.maxUsd)}`);
     const s = this.settings(), id = `r${++this.n}`, mode = v.mode ?? s.runMode ?? "check";
     // checking with the person shows the plan first; after that it stops only for a real choice (a new person or place is
     // not one: it can be undone), unless the gates say otherwise
@@ -255,6 +268,7 @@ export class Runs {
   private setPlan(run: Run, plan: Plan): string[] {
     const kept = run.steps.filter(s => s.kind === "plan" || s.status !== "waiting");
     const planner = kept.find(s => s.kind === "plan");
+    if (Array.isArray(plan?.steps) && plan.steps.some(p => p?.kind === "plan")) return ["a plan's steps make things: season, character, place, episode, review or task, never another plan"];
     const steps = plan.steps.map(p => ({ ...p, needs: [...new Set([...(p.needs ?? []), ...(planner ? [planner.id] : [])])] }));
     const bad = planProblems({ brief: plan.brief, steps: [...kept, ...steps] });
     if (bad.length) return bad;
@@ -328,6 +342,7 @@ export class Runs {
     }
     if (a.action === "continue" && run.status === "gate" && run.gate) { run.passed.push(run.gate); delete run.gate; run.status = "running"; }
     if (a.action === "gates") run.gates = { ...run.gates, ...a.gates };
+    if (a.action === "budget" && !(typeof a.maxUsd === "number" && Number.isFinite(a.maxUsd) && a.maxUsd >= 0)) throw new Error(`a budget is a number of dollars, not ${JSON.stringify(a.maxUsd)}`);
     if (a.action === "budget") { run.maxUsd = a.maxUsd; run.maxSet = true; if (run.status === "paused") { run.status = "running"; delete run.why; } }
     if (a.action === "continue" && run.status === "paused") { run.status = "running"; delete run.why; }
     if (a.action === "budget" || a.action === "continue") this.healBudget(run);
@@ -486,7 +501,7 @@ export class Runs {
             const v = c.input as { brief?: unknown; steps?: unknown };
             const steps = Array.isArray(v.steps) ? v.steps as PlanStep[] : [];
             // a retired character id is never made again: say so before any step finds out
-            const retired = new Set(listing().retired), gone = steps.flatMap(x => x.owns ?? []).filter(o => o.kind === "character" && retired.has(o.id)).map(o => o.id);
+            const retired = new Set(listing().retired), gone = steps.flatMap(x => (Array.isArray(x?.owns) ? x.owns : [])).filter(o => o.kind === "character" && retired.has(o.id)).map(o => o.id);
             const bad = gone.length ? gone.map(id => `the character id ${id} is retired (a character that was deleted): pick another id, and use it everywhere in the brief`) : this.setPlan(run, { brief: String(v.brief ?? ""), steps });
             if (bad.length) return { text: `The plan is not set; fix this and propose it again:\n${bad.map(b => `- ${b}`).join("\n")}`, isError: true };
             s.summary = `The plan: ${run.steps.filter(x => x.kind !== "plan").map(x => x.title).join("; ")}.`;

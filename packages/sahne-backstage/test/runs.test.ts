@@ -512,3 +512,20 @@ test("a step that waits for an undone one: the task says so, and goes on once th
   assert.deepEqual([run.status, run.steps.map(s => s.status)], ["done", ["done", "done"]], run.why);
   r.undo(run.id);
 });
+
+test("a plan's steps are of a known kind with lists where lists go; a budget is a number, and one stored as none is the default", async () => {
+  assert.match(planProblems({ brief: "b", steps: [{ id: "a", kind: "cast" as never, title: "A", brief: "a" }] }).join(), /kind "cast" is not one of/);
+  assert.match(planProblems({ brief: "b", steps: [{ id: "a", kind: "task", title: "A", brief: "a", needs: "b" as never }] }).join(), /needs is a list/);
+  assert.match(planProblems({ brief: "b", steps: [{ id: "a", kind: "task", title: "A", brief: "a", owns: {} as never }] }).join(), /owns is a list/);
+  const { r, store } = runs(scripted({}));
+  assert.throws(() => r.create({ goal: "g", plan: { brief: "b", steps: [{ id: "a", kind: "cast" as never, title: "A", brief: "a" }] } }), /kind "cast"/);
+  const run = r.create({ goal: "g", plan: { brief: "b", steps: [{ id: "a", kind: "task", title: "A", brief: "a" }] }, gates: { plan: true } });
+  assert.ok(Number.isFinite(run.estimateUsd) && Number.isFinite(run.maxUsd));
+  for (const maxUsd of [undefined, null, NaN, -1, "5"]) assert.throws(() => r.act(run.id, { action: "budget", maxUsd: maxUsd as never }), /a budget is a number of dollars/);
+  assert.equal(run.status, "gate", "a refused budget changes nothing");
+  // a run an older backstage stored with no budget: a new process starts, with the default
+  store.set("runs", { n: 1, runs: [{ ...run, status: "paused", maxUsd: null }] });
+  const again = new Runs({ store, events: new Events(), write: true, shareCards: false, settings: () => ({ ...DEFAULTS, caps: {} }), model: scripted({}) });
+  again.resume();
+  assert.equal(again.get(run.id)!.maxUsd, 10);
+});
