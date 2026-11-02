@@ -577,7 +577,7 @@ Every request must come from this machine: `Host` and `Origin` must be localhost
 | `GET /api/lessons` | `{ lessons: [{ id, ref? }] }`: the grammar lessons, when the root has them |
 | `GET /api/kit` | `{ docs, problems }`: the content root's own kit items that are good (the stage adds them with `withDrawings`), and a line for each file that is not |
 | `GET /api/problems` | `{ problems }`: every problem of the content root, as `stories.ts --check` finds them (the review page) |
-| `GET /api/review`, `POST /api/review` `{ id, review }` | The review notes; a POST replaces one episode's (cleaned: unknown keys dropped) and answers all of them |
+| `GET /api/review`, `POST /api/review` `{ id, review, was? }` | The review notes; a POST replaces one episode's (cleaned: unknown keys dropped) and answers all of them. With `was`, the notes the editor changed into `review`, only that change is merged into the notes as they are now, so a comment an agent wrote since stays; the editor reads the notes again after an agent's `comment` or `set_review` |
 | `POST /api/reload` | The server forgets the world it has read (after a change made elsewhere) |
 | `GET /api/docs`, `GET /api/docs/<id>` | The guides: `{ docs: [{ id, title, path }] }`, then one as `{ id, title, path, markdown }`. Only `backstage` and `format`; any other id is 404 |
 

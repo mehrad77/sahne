@@ -11,7 +11,7 @@ import { api, type Kind } from "./api.ts";
 import { merge3, type Path } from "./model/path.ts";
 import { pathWords } from "./model/tools.ts";
 import * as H from "./model/history.ts";
-import { change, createDoc, drafts, go, keyOf, loadWorld, openDoc, route, saveDocs, say } from "./store.ts";
+import { change, createDoc, drafts, go, keyOf, loadReview, loadWorld, openDoc, route, saveDocs, say } from "./store.ts";
 import { loadKitDocs } from "./kitdocs.ts";
 import { answerLook, type LookAsk } from "./look.ts";
 import { heardRun, loadRuns, runs } from "./runs.ts";
@@ -87,6 +87,8 @@ export function connectEvents() {
   source.addEventListener("activity", e => {
     const c = JSON.parse((e as MessageEvent).data) as Call | null;
     if (c) activity.value = [c, ...activity.value].slice(0, 200);
+    // an agent's comment or review status is written at once: read the notes again
+    if (c?.ok && (c.tool === "comment" || c.tool === "set_review")) void loadReview();
     agentsTick.value++;
   });
   source.addEventListener("usage", e => { usage.value = JSON.parse((e as MessageEvent).data) as Usage; });

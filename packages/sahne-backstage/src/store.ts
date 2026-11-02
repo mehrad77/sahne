@@ -125,18 +125,27 @@ export type { Comment, EpisodeReview, Status, StepNote };
 export const review = signal<Record<string, EpisodeReview>>({});
 export const allProblems = signal<Problem[] | null>(null);
 
+let writing = 0;
 export async function loadReview() {
   const r = await api.get<{ episodes: Record<string, EpisodeReview> }>("review");
-  if (r.status === 200) review.value = r.episodes;
+  // while a change of the notes is on its way, its answer brings them
+  if (r.status === 200 && !writing) review.value = r.episodes;
 }
 
-/** Change one episode's notes and write them (the notes are saved at once, apart from the story). */
+/**
+ * Change one episode's notes and write them (the notes are saved at once, apart from the story). The server is sent the
+ * notes as they were here too, and merges only this change into what it has: a comment an agent left meanwhile stays.
+ */
 export async function setReview(id: string, fn: (r: EpisodeReview) => EpisodeReview) {
-  const next = fn(review.value[id] ?? {});
+  const was = review.value[id] ?? {}, next = fn(was);
   review.value = { ...review.value, [id]: next };
   if (!world.value?.writable) { say("read-only: the notes are not written (start backstage with --write)", true); return; }
-  const r = await api.post<{ episodes: Record<string, EpisodeReview> }>("review", { id, review: next });
-  if (r.status === 200) review.value = r.episodes; else say(`notes not saved: ${(r as { message?: string }).message ?? r.status}`, true);
+  writing++;
+  try {
+    const r = await api.post<{ episodes: Record<string, EpisodeReview> }>("review", { id, review: next, was });
+    // an older answer never undoes a newer change shown here: the last answer brings them all
+    if (r.status === 200) { if (writing === 1) review.value = r.episodes; } else say(`notes not saved: ${(r as { message?: string }).message ?? r.status}`, true);
+  } finally { writing--; }
 }
 
 /** Every problem of the content root (the review dashboard), from the server. */

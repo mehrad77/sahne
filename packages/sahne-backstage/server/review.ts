@@ -11,6 +11,7 @@ import { plain, readFile, textFor, writeAtomic } from "../../sahne-story/json.ts
 import { languagesOf, type SeriesDoc, type StoryDoc } from "../../sahne-story/src/index.ts";
 import { blocksOf, type Block, type Comment, type EpisodeReview, type Standing, type Status, type StepNote } from "../src/model/review.ts";
 import { episodeSig, progressOf } from "../src/model/progress.ts";
+import { merge3 } from "../src/model/path.ts";
 import { storyPluginsOf } from "../src/model/plugins.ts";
 import { exists, readDoc, type Problem } from "./content.ts";
 
@@ -57,12 +58,16 @@ function clean(e: unknown): EpisodeReview {
   return out;
 }
 
-/** Replace one episode's notes: `{ id, review }`. Returns all the notes. */
+/**
+ * Write one episode's notes: `{ id, review }` replaces them; with `was`, the notes the writer changed into `review`, only
+ * that change is merged into the notes as they are now (model/path.ts `merge3`, the writer's side winning a place both
+ * changed), so an editor working from notes read earlier never erases what an agent wrote since. Returns all the notes.
+ */
 export function writeReview(body: unknown): Review {
-  const b = body as { id?: unknown; review?: unknown };
+  const b = body as { id?: unknown; review?: unknown; was?: unknown };
   if (typeof b?.id !== "string" || !/^s[1-9][0-9]?e[0-9]{2}$/.test(b.id)) throw Object.assign(new Error("expected { id: <episode id>, review }"), { status: 400 });
   const all = readReview();
-  const next = clean(b.review);
+  const next = clean(b.was !== undefined ? merge3(b.was, all.episodes[b.id] ?? {}, b.review, "theirs").doc : b.review);
   // an approval vouches for the episode as it is saved now (model/progress.ts episodeSig), whoever approves it
   if (next.status === "approved" && !next.sig && exists("story", b.id)) next.sig = episodeSig(readDoc("story", b.id).doc as StoryDoc);
   const episodes = { ...all.episodes };
