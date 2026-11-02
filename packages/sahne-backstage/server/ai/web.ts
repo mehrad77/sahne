@@ -13,12 +13,13 @@ export const PAGE_MAX = 8000;
 
 export interface Found { title: string; url: string; content: string }
 
-async function call(path: string, body: unknown, signal?: AbortSignal): Promise<Record<string, unknown>> {
+async function call(path: string, body: unknown, signal?: AbortSignal, wait = WAIT): Promise<Record<string, unknown>> {
   const key = process.env.TAVILY_API_KEY;
   if (!key) throw new ProviderError(503, "the web through Tavily needs TAVILY_API_KEY in backstage's environment");
   let r: Response;
   try {
-    r = await net(`${TAVILY}${path}`, { method: "POST", signal: signal ?? AbortSignal.timeout(WAIT), headers: { "content-type": "application/json", authorization: `Bearer ${key}` }, body: JSON.stringify(body) });
+    // the caller's stop and the time limit both: a graph's tool always has a signal, so one alone would never time out
+    r = await net(`${TAVILY}${path}`, { method: "POST", signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(wait)]) : AbortSignal.timeout(wait), headers: { "content-type": "application/json", authorization: `Bearer ${key}` }, body: JSON.stringify(body) });
   } catch (e) {
     if ((e as Error).name === "AbortError" && signal?.aborted) throw e;
     throw new ProviderError(502, (e as Error).name === "TimeoutError" || (e as Error).name === "AbortError" ? "Tavily did not answer in time" : `could not reach Tavily: ${(e as Error).message}`);
@@ -31,14 +32,14 @@ async function call(path: string, body: unknown, signal?: AbortSignal): Promise<
 }
 
 /** Search the web: the pages found, each with its title, address and the passage that matched. */
-export async function tavilySearch(query: string, o: { max?: number; signal?: AbortSignal } = {}): Promise<Found[]> {
-  const j = await call("/search", { query: query.slice(0, 400), max_results: Math.min(10, o.max ?? 5), search_depth: "basic" }, o.signal);
+export async function tavilySearch(query: string, o: { max?: number; signal?: AbortSignal; wait?: number } = {}): Promise<Found[]> {
+  const j = await call("/search", { query: query.slice(0, 400), max_results: Math.min(10, o.max ?? 5), search_depth: "basic" }, o.signal, o.wait);
   return ((j.results ?? []) as { title?: string; url?: string; content?: string }[]).filter(x => x.url).map(x => ({ title: String(x.title ?? ""), url: String(x.url), content: String(x.content ?? "").slice(0, 1200) }));
 }
 
 /** Read pages: each one's text (at most `PAGE_MAX` characters), or why it could not be read. */
-export async function tavilyExtract(urls: string[], signal?: AbortSignal): Promise<{ url: string; text?: string; failed?: string }[]> {
-  const j = await call("/extract", { urls: urls.slice(0, 3) }, signal);
+export async function tavilyExtract(urls: string[], signal?: AbortSignal, wait?: number): Promise<{ url: string; text?: string; failed?: string }[]> {
+  const j = await call("/extract", { urls: urls.slice(0, 3) }, signal, wait);
   const ok = ((j.results ?? []) as { url?: string; raw_content?: string }[]).map(x => ({ url: String(x.url), text: String(x.raw_content ?? "").slice(0, PAGE_MAX) }));
   const bad = ((j.failed_results ?? []) as { url?: string; error?: string }[]).map(x => ({ url: String(x.url), failed: String(x.error ?? "could not be read") }));
   return [...ok, ...bad];
