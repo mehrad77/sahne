@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { storyFile } from "../../sahne-story/paths.ts";
 import type { StoryDoc } from "../../sahne-story/src/index.ts";
-import { episodeSig, nextStepOf, progressOf, type ProgressInput } from "../src/model/progress.ts";
+import { episodeSig, nextStepOf, progressOf, stageOnPage, type ProgressInput } from "../src/model/progress.ts";
 import { rowKey } from "../src/model/review.ts";
 import { blocks } from "../src/model/script.ts";
 import { get, set } from "../src/model/path.ts";
@@ -107,4 +107,13 @@ test("directions: a step's staging in plain words", async () => {
     ["nods", "happy", "looks at the portakal", "says it to İsmail", "camera: two people"]);
   assert.deepEqual(directionsOf({ to: "viewer", move: { who: "ismail", to: "counter", how: "enter" } } as never, name).map(d => d.label), ["says it to us", "İsmail comes in, to counter"]);
   assert.deepEqual(directionsOf({ link: { portakal: "obj:portakal" }, voice: "whisper" } as never, name).map(d => [d.key, d.label]), [["link", "times “portakal” to the portakal"], ["voice", "whispers"]]);
+});
+
+test("progress: the stage on the page is the route's, else the one it opened at, kept as stages get done", () => {
+  const keys = ["brief", "script", "translate", "review"];
+  assert.equal(stageOnPage({ sub: "translate", keys, live: false, landed: "brief" }), "translate");
+  assert.equal(stageOnPage({ sub: "at", keys, live: false, landed: "brief" }), "script");
+  // opened at Brief: finishing the brief (progress.next moves on) leaves the page on Brief
+  assert.equal(stageOnPage({ sub: undefined, keys, live: false, landed: "brief" }), "brief");
+  assert.equal(stageOnPage({ sub: undefined, keys, live: true, landed: "brief" }), "script");
 });

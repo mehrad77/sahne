@@ -111,6 +111,18 @@ export function progressOf(i: ProgressInput): Progress {
   return { stages, next: stages.find(x => !x.done)?.key ?? null, lines, unstaged, suggestions, langs: langsDone, openComments, approved, changedSinceApproved };
 }
 
+/**
+ * The stage on the episode's page: the route's (`#/episode/<id>/<stage>`, a block's `at/<key>` in Script); without one,
+ * `landed`, the stage the episode was at when the page opened, kept while the person works there, so finishing a stage
+ * never swaps the view from under the cursor. A task drafting the episode shows Script.
+ */
+export function stageOnPage(o: { sub?: string; keys: readonly StageKey[]; live: boolean; landed: StageKey }): StageKey {
+  if (o.sub && o.keys.includes(o.sub)) return o.sub;
+  if (o.sub === "at") return "script";
+  if (o.sub === "review") return "review";
+  return o.live ? "script" : o.landed;
+}
+
 /** What an action of the next step does (the page carries it out). */
 export type StepAction = "draft" | `go:${string}` | "first-unstaged" | "add-all" | "first-untranslated" | "next-language" | "draft-language" | "settings" | "watch" | "approve";
 export interface NextStep { what: string; act?: { label: string; action: StepAction }; alt?: { label: string; action: StepAction } }

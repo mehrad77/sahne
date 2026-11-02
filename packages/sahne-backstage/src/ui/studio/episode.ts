@@ -18,7 +18,7 @@ import { KIT, Preview, solidsOf } from "../../stage.ts";
 import { pathOfKey } from "../review.ts";
 import { ReadThrough, ReviewSide } from "./reviewstage.ts";
 import { blocksOf, checkedOf } from "../../model/review.ts";
-import { episodeSig, nextStepOf, progressOf, type StageKey, type StepAction } from "../../model/progress.ts";
+import { episodeSig, nextStepOf, progressOf, stageOnPage, type StageKey, type StepAction } from "../../model/progress.ts";
 import { blocks } from "../../model/script.ts";
 import { marks as marksNow, runs as runsNow } from "../../runs.ts";
 import { NeedsYou } from "./needs.ts";
@@ -192,7 +192,10 @@ function Studio(p: { id: string }) {
   const progress = progressOf({ story, langs, review: review.value[p.id], errors, suggestions, drafting: live ? { step: Math.max(1, blocks(story).length), total: Math.max(1, blocks(story).length) } : null, stages: pluginStages });
   const keys = progress.stages.map(x => x.key);
   const [, , sub, k] = route.value;
-  const stage: StageKey = keys.includes(sub) ? sub : sub === "at" ? "script" : sub === "review" ? "review" : live ? "script" : progress.next ?? "review";
+  // without a stage in the route, the one it was at when it opened, kept until the route changes
+  const landed = useRef<{ at: string; stage: StageKey } | null>(null);
+  if (landed.current?.at !== route.value.join("/")) landed.current = { at: route.value.join("/"), stage: progress.next ?? "review" };
+  const stage = stageOnPage({ sub, keys, live: !!live, landed: landed.current.stage });
   const goStage = (s: StageKey) => go("episode", p.id, s);
   // from the review page: a block (#/episode/<id>/at/<key>); from a translator's link: the language (#/episode/<id>/translate/<lang>)
   useEffect(() => { if (sub === "at" && k) select(pathOfKey(k), true); if (sub === "translate" && k && langs.translations.includes(k)) setTrLang(k); }, [route.value.join("/")]);
