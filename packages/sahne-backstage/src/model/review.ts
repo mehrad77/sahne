@@ -31,9 +31,15 @@ export const rowKey = (path: Path) => [path[1], path[4], path[6]].filter(x => x 
 /** The translations a note says were checked. */
 export const checkedOf = (n: StepNote | undefined): string[] => [...new Set([...(n?.checked ?? []), ...(n?.persian ? ["fa"] : [])])];
 
-/** A short, stable hash of a value (FNV-1a over its JSON, keys sorted): 8 hex digits. */
+/** The order keys are sorted in for a hash: English collation, whatever the browser's or the server's own locale. */
+const KEYS = new Intl.Collator("en");
+
+/**
+ * A short, stable hash of a value (FNV-1a over its JSON, keys sorted): 8 hex digits. The same in the browser and the server
+ * (a Turkish locale sorts `çay` after `cuma`, an English one before), since one signs what the other checks.
+ */
 export function hashOf(v: unknown): string {
-  const json = JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))) : x));
+  const json = JSON.stringify(v, (_k, x) => (x && typeof x === "object" && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => KEYS.compare(a, b))) : x));
   let h = 0x811c9dc5;
   for (let i = 0; i < (json ?? "").length; i++) { h ^= json.charCodeAt(i); h = Math.imul(h, 0x01000193); }
   return (h >>> 0).toString(16).padStart(8, "0");
