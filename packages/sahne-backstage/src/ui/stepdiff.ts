@@ -9,7 +9,7 @@ import { useMemo, useRef, useState } from "preact/hooks";
 import { adaptStory, languagesOf, playOf, textOf, type StoryDoc } from "sahne-story";
 import type { Part } from "../model/diff.ts";
 import { stepDiff, type StepChange } from "../model/stepdiff.ts";
-import { mergedOnto, type Proposal } from "../events.ts";
+import { acceptedOnto, type Proposal } from "../events.ts";
 import { world } from "../store.ts";
 import { cueThumb } from "../thumbs.ts";
 import { Picture } from "./kit/gallery.ts";
@@ -18,14 +18,21 @@ import { storyPluginsOf } from "../model/plugins.ts";
 
 export type At = { was?: number; now?: number };
 
+/** The episodes `afterAccepting` gave back unchanged because the proposal would not be taken, with why. */
+const refused = new WeakMap<object, string>();
+
 /**
  * An episode as accepting a proposal would leave it, from `doc` as it is open or on disk: the proposal's changes merged
- * into it (`mergedOnto`, as `accept` in events.ts does), so the diff never shows the person's own edits, or a save made
- * since, undone; unchanged when it cannot be taken.
+ * into it, with the proposals it holds and what it needs first (`acceptedOnto`, as `accept` in events.ts does), so the
+ * diff never shows the person's own edits, or a save made since, undone. When it would not be taken, the episode as it
+ * is, and the diff says why.
  */
 export const afterAccepting = (x: Proposal, doc: StoryDoc): StoryDoc => {
-  const r = mergedOnto(x, doc);
-  return ("doc" in r ? r.doc : doc) as StoryDoc;
+  const r = acceptedOnto(x, doc);
+  if ("doc" in r) return r.doc as StoryDoc;
+  const same = { ...doc };
+  refused.set(same, r.why);
+  return same;
 };
 
 const parts = (ps: Part[]) => ps.map(d => (d.op === "=" ? d.text : d.op === "-" ? html`<del>${d.text}</del>` : html`<ins>${d.text}</ins>`));
@@ -58,6 +65,8 @@ export function StepDiff(p: {
   const [open, setOpen] = useState<Set<number>>(new Set()), [anyway, setAnyway] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const c = d.counts;
+  const why = refused.get(p.now);
+  if (why) return html`<p class="note bad">Not taken as things are: ${why}.</p>`;
   const jump = (pred: (e: StepChange) => boolean) => {
     const k = d.steps.findIndex(pred);
     if (k < 0) return;

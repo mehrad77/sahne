@@ -186,6 +186,24 @@ function chainOf(p: Proposal): Proposal[] {
   return out;
 }
 
+/**
+ * The document `p` is about as accepting it would leave it, from `doc` (as open, or on disk): merged as `accept` merges,
+ * with what it needs and the proposals it holds first; or why it would not be taken. For the step diff (ui/stepdiff.ts).
+ */
+export function acceptedOnto(p: Proposal, doc: unknown): { doc: unknown } | { why: string } {
+  const no = turnedDown(p);
+  if (no.length) return { why: `it needs ${no.join(", ")}, which you turned down` };
+  let now = doc;
+  for (const q of [...new Set([...neededFirst(p), p].flatMap(chainOf))])
+    for (const e of [q, ...(q.also ?? [])]) {
+      if (e.kind !== p.kind || e.doc !== p.doc) continue;
+      const r = mergedOnto(e, now);
+      if ("why" in r) return r;
+      now = r.doc;
+    }
+  return { doc: now };
+}
+
 /** Accept a proposal: merged into the editor as an edit, then answered; first what it needs. */
 export async function accept(p: Proposal): Promise<void> { await take(p); }
 
