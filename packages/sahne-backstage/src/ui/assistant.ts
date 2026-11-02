@@ -424,7 +424,8 @@ export function AssistantChat() {
   const box = useRef<HTMLTextAreaElement>(null), pick = useRef<HTMLInputElement>(null);
   // the message box grows with what is typed, up to its CSS max-height, and shrinks back once sent
   useEffect(() => { const b = box.current; if (b) { b.style.height = "auto"; b.style.height = `${b.scrollHeight}px`; } }, [text]);
-  const go = () => { if (!text.trim() && !files.length) return; void send(text.trim() || "Look at what I attached.", { files }); setText(""); setFiles([]); };
+  // while an answer runs nothing is sent, so what is typed (and attached) stays in the box for after it
+  const go = () => { if (busy.value || (!text.trim() && !files.length)) return; void send(text.trim() || "Look at what I attached.", { files }); setText(""); setFiles([]); };
   /** Read dropped or pasted files: pictures (up to 5 MB, four at most) and text files (up to 200 KB). */
   const attach = async (list: FileList) => {
     const got: Attached[] = [];
