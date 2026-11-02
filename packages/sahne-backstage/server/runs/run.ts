@@ -19,7 +19,7 @@ import type { Events } from "../events.ts";
 import { listing, type Kind } from "../content.ts";
 import type { AgentEdits, McpOptions } from "../mcp.ts";
 import { systemPrompt, usageSummary, type AssistantEvent } from "../assistant.ts";
-import { agentGraph } from "../agent/graph.ts";
+import { agentGraph, type Call, type Outcome } from "../agent/graph.ts";
 import { backstage, callTool } from "../agent/tools.ts";
 import { BudgetError, guard, record, type Usage } from "../ai/budget.ts";
 import { MODELS, claude, local, type Model } from "../ai/models.ts";
@@ -186,12 +186,17 @@ export class Runs {
   private n: number;
   private readonly live = new Map<string, AbortController>();
   private readonly seqs = new Map<string, { seq: number; type?: string }>();
+  /** The tool calls at work now, by thread and call id: a step that starts again waits for its own instead of calling twice. */
+  private readonly calls = new Map<string, Promise<Outcome>>();
 
   constructor(o: RunsOptions) {
     this.o = o;
     this.saver = new NodeSqliteSaver(o.store.db);
     this.journal = new Journal(o.store);
     o.store.db.exec("CREATE TABLE IF NOT EXISTS run_log (run TEXT NOT NULL, step TEXT NOT NULL, seq INTEGER NOT NULL, event TEXT NOT NULL, PRIMARY KEY (run, step, seq))");
+    // each tool call a step's thread finished, with its answer: a turn run again (after a stop, a failure or a restart)
+    // gives those answers back instead of making the edits twice
+    o.store.db.exec("CREATE TABLE IF NOT EXISTS run_calls (thread TEXT NOT NULL, call TEXT NOT NULL, outcome TEXT NOT NULL, PRIMARY KEY (thread, call))");
     const kept = o.store.get<{ n: number; runs: Run[] }>("runs", { n: 0, runs: [] });
     this.n = kept.n; this.list = kept.runs;
     // a budget an older backstage stored as no number (NaN, null) would never bind, or stop the scheduler: it is the default again
@@ -295,6 +300,8 @@ export class Runs {
   undo(id: string, items?: { kind: Kind; id: string }[]): { run: Run; undone: Undone[]; kept: Kept[] } {
     const run = this.need(id), all = this.journal.of(run.id);
     if (run.steps.some(s => s.status === "running" || s.status === "asking")) throw new Error("stop the run first: its steps are still working");
+    // a stopped step's tool call may still be saving: its write would land after the undo
+    if ([...this.calls.keys()].some(k => k.startsWith(`${run.by}:`))) throw new Error("a stopped step is still finishing a tool call: try again in a moment");
     let which = all;
     if (items) {
       // the documents named, and everything the steps after theirs wrote (they built on them)
@@ -366,7 +373,7 @@ export class Runs {
     else if (a.action === "redo") {
       // from its start again, with what the person said; its proposals still waiting are what it builds on
       if (s.status === "running" || s.status === "asking" || this.live.has(`${run.id}:${s.id}`)) throw new Error(`step ${stepId} is ${s.status === "asking" ? "asking" : "still working"}: stop it first`);
-      await this.saver.deleteThread(`${run.by}:${s.id}`);
+      this.forgetThread(`${run.by}:${s.id}`);
       s.status = "waiting"; s.attempts = 0; delete s.error; delete s.summary; delete s.question; delete s.turnedDown;
       if (a.note?.trim()) s.brief = `${s.brief}\n\nDone again, because: ${a.note.trim()}`;
       // what it makes, changed by the person (an id that cannot be made): no other step may make the same
@@ -390,6 +397,28 @@ export class Runs {
     this.changed(run);
     this.tick(run);
     return run;
+  }
+
+  /** A tool call of a step's thread, once: its answer if the thread had it, the one at work if it still is, else made now. */
+  private async once(thread: string, c: Call, make: () => Promise<Outcome>): Promise<Outcome> {
+    if (!c.id) return make();
+    const key = `${thread}:${c.id}`, at = this.calls.get(key);
+    if (at) return at;
+    const row = this.o.store.db.prepare("SELECT outcome FROM run_calls WHERE thread = ? AND call = ?").get(thread, c.id) as { outcome: string } | undefined;
+    if (row) return JSON.parse(row.outcome) as Outcome;
+    const p = make();
+    this.calls.set(key, p);
+    try {
+      const o = await p;
+      this.o.store.db.prepare("INSERT OR REPLACE INTO run_calls (thread, call, outcome) VALUES (?, ?, ?)").run(thread, c.id, JSON.stringify(o));
+      return o;
+    } finally { this.calls.delete(key); }
+  }
+
+  /** A step's thread gone (done, or to do again): its checkpoints and the answers of its tool calls. */
+  private forgetThread(thread: string): void {
+    void this.saver.deleteThread(thread);
+    this.o.store.db.prepare("DELETE FROM run_calls WHERE thread = ?").run(thread);
   }
 
   /** A step's log from `after` on: what it said, thought and did. */
@@ -514,7 +543,7 @@ export class Runs {
             const decided = Array.isArray(v.decided) ? v.decided.filter((d): d is string => typeof d === "string" && !!d.trim()).map(d => d.trim().slice(0, 200)).slice(0, 8) : [];
             if (decided.length) s.decided = decided; else delete s.decided;
             this.keep(); return { text: "Noted: your step is done.", isError: false, end: true }; }
-          return callTool(mcp, c);
+          return this.once(thread.configurable.thread_id, c, () => callTool(mcp, c));
         },
       }, this.saver);
       // from its start, unless it has a checkpoint to go on from: one that waits (a question, a model call a pause or a
@@ -542,7 +571,7 @@ export class Runs {
         if (s.kind === "plan" && s.summary === undefined) throw new Error(`the planner ended without a plan (propose_plan)${words?.trim() ? `; it said: ${words.trim()}` : ""}`);
         s.summary ??= words;
         s.status = s.turnedDown ? "stale" : "done"; s.endedAt = Date.now(); delete s.error; delete s.turnedDown;
-        await this.saver.deleteThread(thread.configurable.thread_id);
+        this.forgetThread(thread.configurable.thread_id);
       }
     } catch (e) {
       if (stop.signal.aborted || (e as Error).name === "AbortError") { if (s.status === "running") s.status = "stopped"; }
@@ -557,7 +586,10 @@ export class Runs {
         s.status = e instanceof BudgetError || s.attempts >= 2 ? "failed" : "waiting";
       }
     } finally {
-      await bs?.close();
+      // a tool call still at work (the step was stopped mid-turn) finishes on its server before that closes, so its edit is
+      // answered and kept for the step's next try, never lost half-way or made twice
+      const open = bs, pending = [...this.calls].filter(([k]) => k.startsWith(`${thread.configurable.thread_id}:`)).map(([, p]) => p.catch(() => {}));
+      if (open) void Promise.all(pending).then(() => open.close());
       this.live.delete(key);
       this.changed(run);
       this.tick(run);

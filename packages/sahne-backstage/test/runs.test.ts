@@ -601,3 +601,30 @@ test("undo never takes away a person or place the task made while a document tha
   assert.ok(all.includes("dilek10") && all.includes("s1e08"), all.join());
   assert.ok(!has(join(root, "characters", "dilek10.json")) && !has(join(root, "stories", "s1e08.json")));
 });
+
+test("a step stopped between two tool calls of a turn and tried again does not make the first one's edit twice", async () => {
+  const { readFileSync, writeFileSync } = await import("node:fs");
+  const { looksOf } = await import("../server/look.ts");
+  const file = join(root, "stories", "s1e00.json"), was = readFileSync(file, "utf8"), count = () => (JSON.parse(readFileSync(file, "utf8")) as { steps: unknown[] }).steps.length, n0 = count();
+  const { r, events } = runs(scripted({
+    // one turn: an insert (saved at once), then a look that waits for an editor
+    x: [{ calls: [{ name: "insert_step", args: { id: "s1e00", at: "steps/1", step: { beat: { who: "nima", wait: 500 } } } }, { name: "look", args: { id: "s1e00" } }] }, finish("done")],
+  }));
+  const rids: string[] = [];
+  events.on((name, d) => { if (name === "look") rids.push((d as { rid: string }).rid); });
+  const run = r.create({ goal: "g", agentEdits: "direct", gates: false, plan: { brief: "b", steps: [{ id: "x", kind: "episode", title: "X", brief: "add a beat", owns: [{ kind: "story", id: "s1e00" }] }] } });
+  while (!rids.length) await new Promise(res => setTimeout(res, 10));
+  await r.step(run.id, "x", { action: "stop" });
+  await r.idle();
+  assert.equal(count(), n0 + 1);
+  assert.throws(() => r.undo(run.id), /still finishing a tool call/, "the look is still at work");
+  await r.step(run.id, "x", { action: "retry" });
+  // the retry waits for the same look, not a new one; it ends
+  await new Promise(res => setTimeout(res, 50));
+  assert.equal(rids.length, 1);
+  looksOf(events).answer(rids[0], null);
+  await r.idle();
+  assert.deepEqual([run.steps[0].status, count()], ["done", n0 + 1], "inserted once");
+  writeFileSync(file, was);
+  (await import("../server/content.ts")).forget();
+});
