@@ -44,13 +44,27 @@ export function Select(p: { label: string; value: unknown; options: readonly (st
 }
 
 export function NumberField(p: { label: string; value: unknown; step?: number; min?: number; max?: number; changed?: boolean; onInput(v: number | undefined): void }) {
-  const v = typeof p.value === "number" ? String(p.value) : "";
   const id = useId();
   return html`<div class=${`field${p.changed ? " changed" : ""}`}>
     <label for=${id}>${p.label}</label>
-    <input id=${id} type="number" step=${p.step ?? 1} min=${p.min} max=${p.max} value=${v}
-      onInput=${(e: Event) => { const t = (e.target as HTMLInputElement).value; p.onInput(t === "" ? undefined : Number(t)); }} />
+    <${NumberInput} id=${id} value=${p.value} step=${p.step ?? 1} min=${p.min} max=${p.max} onInput=${p.onInput} />
   </div>`;
+}
+
+/**
+ * A number input on its own. Its value goes in as text, so what is being typed stays as typed ("-" or "1." on the way to
+ * "-1.5": the browser reads both as no number, and a value set back would wipe them and move the caret). Only a number
+ * is written; an emptied field writes undefined, unless `required` (then it writes nothing until a number is typed).
+ */
+export function NumberInput(p: { value: unknown; step?: number; min?: number; max?: number; id?: string; style?: string; label?: string; required?: boolean; onInput(v: number | undefined): void }) {
+  return html`<input id=${p.id} type="number" step=${p.step} min=${p.min} max=${p.max} style=${p.style} aria-label=${p.label} value=${typeof p.value === "number" ? String(p.value) : ""}
+    onInput=${(e: Event) => {
+      const t = e.target as HTMLInputElement;
+      if (t.validity.badInput) return;
+      if (t.value === "") { if (!p.required) p.onInput(undefined); return; }
+      const v = Number(t.value);
+      if (Number.isFinite(v)) p.onInput(v);
+    }} />`;
 }
 
 export function Check(p: { label: string; value: unknown; onInput(v: boolean): void }) {

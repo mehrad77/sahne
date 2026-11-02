@@ -8,7 +8,7 @@ import type { StoryPlace } from "sahne-story";
 import { set } from "../../model/path.ts";
 import { duplicate, heights, posOf, remove, type Sel } from "../../model/place.ts";
 import { KIT } from "../../stage.ts";
-import { Check, NumberField, Text } from "../fields.ts";
+import { Check, NumberField, NumberInput, Text } from "../fields.ts";
 import { Texts } from "../lang.ts";
 import { pieceItems } from "../galleries.ts";
 import { Picture } from "../kit/gallery.ts";
@@ -24,7 +24,7 @@ const Chips = (p: { options: readonly string[]; value: readonly string[]; onTogg
 
 function Xyz(p: { at: { x: number; y: number; z: number }; y?: boolean; onInput(k: "x" | "y" | "z", v: number): void }) {
   return html`<div class="pl-xyz">${(p.y === false ? ["x", "z"] as const : ["x", "y", "z"] as const).map(k => html`<label>${k === "x" ? "across (x)" : k === "y" ? "up (y)" : "depth (z)"}
-    <input type="number" step="0.05" value=${p.at[k]} onInput=${(e: Event) => { const v = Number((e.target as HTMLInputElement).value); if (!Number.isNaN(v)) p.onInput(k, v); }} /></label>`)}</div>`;
+    <${NumberInput} required step=${0.05} value=${p.at[k]} onInput=${(v: number | undefined) => v !== undefined && p.onInput(k, v)} /></label>`)}</div>`;
 }
 
 /** The states a thing shows in (`in`): none picked means every state. */
@@ -67,9 +67,9 @@ function PlaceCard(p: { doc: StoryPlace; edit: Edit }) {
     <div><div class="lbl">The floor sounds like</div><${Chips} label="Floor sound" options=${["stone", "wood", "tile", "carpet"]} value=${doc.surface ? [doc.surface] : []} onToggle=${(s: string) => edit(x => set(x, ["surface"], x.surface === s ? undefined : s))} /></div>
     <div><div class="lbl">The wide shot spans (metres across; the red bracket on the plan)</div>
       ${wide ? html`<div class="pl-xyz">
-        <label>from <input type="number" step="0.1" value=${r2(wide.x - wide.w / 2)} onInput=${(e: Event) => setWide(Number((e.target as HTMLInputElement).value), wide.x + wide.w / 2)} /></label>
-        <label>to <input type="number" step="0.1" value=${r2(wide.x + wide.w / 2)} onInput=${(e: Event) => setWide(wide.x - wide.w / 2, Number((e.target as HTMLInputElement).value))} /></label>
-        <label>at depth <input type="number" step="0.1" value=${wide.z ?? ""} onInput=${(e: Event) => { const v = (e.target as HTMLInputElement).value; edit(x => set(x, ["camera", "wide", "z"], v === "" ? undefined : Number(v)), "camera.wide.z"); }} /></label></div>`
+        <label>from <${NumberInput} required step=${0.1} value=${r2(wide.x - wide.w / 2)} onInput=${(v?: number) => v !== undefined && setWide(v, wide.x + wide.w / 2)} /></label>
+        <label>to <${NumberInput} required step=${0.1} value=${r2(wide.x + wide.w / 2)} onInput=${(v?: number) => v !== undefined && setWide(wide.x - wide.w / 2, v)} /></label>
+        <label>at depth <${NumberInput} step=${0.1} value=${wide.z} onInput=${(v?: number) => edit(x => set(x, ["camera", "wide", "z"], v), "camera.wide.z")} /></label></div>`
         : html`<button class="small" onClick=${() => edit(x => set(x, ["camera", "wide"], { x: 0, w: x.size.w }))}>Frame the wide shot</button>`}
     </div>
   </div>`;
@@ -137,7 +137,7 @@ function MarkCard(p: { doc: StoryPlace; id: string; edit: Edit; select(s: Sel): 
     <${Xyz} at=${{ x: m.x, y: m.y ?? 0, z: m.z }} onInput=${(k: "x" | "y" | "z", v: number) => put(k, k === "y" && v === 0 ? undefined : v)} />
     <div class="row">
       <${Check} label="A seat" value=${m.seat !== undefined} onInput=${(on: boolean) => put("seat", on ? 0.45 : undefined)} />
-      ${m.seat !== undefined && html`<label class="row" style="font-size:13px">seat height <input type="number" step="0.05" style="width:70px" value=${m.seat} onInput=${(e: Event) => put("seat", Number((e.target as HTMLInputElement).value))} /></label>`}
+      ${m.seat !== undefined && html`<label class="row" style="font-size:13px">seat height <${NumberInput} required step=${0.05} style="width:70px" value=${m.seat} onInput=${(v?: number) => v !== undefined && put("seat", v)} /></label>`}
     </div>
     <${Check} label="In the air (a bird hovers there)" value=${!!m.air} onInput=${(on: boolean) => put("air", on || undefined)} />
     <${Check} label="Kerim's perch" value=${doc.perch === id} onInput=${(on: boolean) => edit(x => set(x, ["perch"], on ? id : undefined))} />

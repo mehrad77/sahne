@@ -9,7 +9,7 @@ import type { StoryPlace } from "sahne-story";
 import { set } from "../../model/path.ts";
 import { pinned } from "../../model/place.ts";
 import { KIT } from "../../stage.ts";
-import { Check, NumberField, Section, Select, Text } from "../fields.ts";
+import { Check, NumberField, NumberInput, Section, Select, Text } from "../fields.ts";
 import { Json } from "../staging.ts";
 
 type Edit = (fn: (x: StoryPlace) => StoryPlace, field?: string) => void;
@@ -37,9 +37,9 @@ export function PlaceSource(p: { doc: StoryPlace; edit: Edit }) {
     <${Section} title=${`Marks (${Object.keys(doc.marks).length})`}>
       <table class="grid"><thead><tr><th>Mark</th><th>x</th><th>y</th><th>z</th><th>facing</th><th>seat</th><th></th></tr></thead><tbody>
       ${Object.entries(doc.marks).map(([mid, m]) => html`<tr><td>${mid}</td>
-        ${(["x", "y", "z"] as const).map(k => html`<td><input type="number" step="0.05" style="width:70px" value=${m[k] ?? ""} onInput=${(e: Event) => { const v = (e.target as HTMLInputElement).value; edit(x => set(x, ["marks", mid, k], v === "" ? undefined : Number(v)), `m.${mid}.${k}`); }} /></td>`)}
+        ${(["x", "y", "z"] as const).map(k => html`<td><${NumberInput} step=${0.05} style="width:70px" label=${`${mid} ${k}`} required=${k !== "y"} value=${m[k]} onInput=${(v?: number) => edit(x => set(x, ["marks", mid, k], v), `m.${mid}.${k}`)} /></td>`)}
         <td><select value=${m.facing ?? ""} style="width:auto" onChange=${(e: Event) => edit(x => set(x, ["marks", mid, "facing"], (e.target as HTMLSelectElement).value || undefined))}>${["", "l", "r", "back", "side_l", "side_r"].map(f => html`<option value=${f}>${f || "—"}</option>`)}</select></td>
-        <td><input type="number" step="0.05" style="width:60px" value=${m.seat ?? ""} onInput=${(e: Event) => { const v = (e.target as HTMLInputElement).value; edit(x => set(x, ["marks", mid, "seat"], v === "" ? undefined : Number(v))); }} /></td>
+        <td><${NumberInput} step=${0.05} style="width:60px" label=${`${mid} seat`} value=${m.seat} onInput=${(v?: number) => edit(x => set(x, ["marks", mid, "seat"], v))} /></td>
         <td><button class="small danger" onClick=${() => confirm(`Delete the mark ${mid}? A story that names it breaks.`) && edit(x => set(x, ["marks", mid], undefined))}>×</button></td></tr>`)}
       </tbody></table></${Section}>
     <${Pieces} doc=${doc} edit=${edit} />
