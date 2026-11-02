@@ -489,6 +489,15 @@ test("proposals mode: a new id, season number or cast order is picked past the o
   } finally { await close(); }
 });
 
+test("a key every object has is no place", async () => {
+  const { client, close } = await connect({ write: true, agentEdits: "proposals" });
+  try {
+    const r = await call(client, "create_episode", { season: 1, releaseDate: "2026-09-17", kind: "episode", week: 0, place: "constructor", cast: ["nima", "ismail"], title: { tr: "Uc" } });
+    assert.ok(r.isError);
+    assert.match(r.text, /there is no place constructor/);
+  } finally { await close(); }
+});
+
 test("over HTTP: a proposal reaches the editors under the client's name, and a person resolves it", async () => {
   const file = join(http1, "stories", "s1e00.json"), before = readFileSync(file, "utf8");
   const ac = new AbortController();

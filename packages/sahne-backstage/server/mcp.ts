@@ -386,7 +386,7 @@ export function createMcp(o: McpOptions): McpServer {
       if (!seasons.has(sid)) seasons.set(sid, { id: sid, title: "(no season document)", episodes: [] });
       seasons.get(sid)!.episodes.push({ id: e.id, title: textOf(e.title, c.langs.main), kind: e.kind, releaseDate: e.releaseDate, draft: e.draft, place: e.place });
     }
-    const name = (id?: string) => (id && w.characters[id] ? textOf(w.characters[id].name, c.langs.main) ?? id : id);
+    const name = (id?: string) => (id && Object.hasOwn(w.characters, id) ? textOf(w.characters[id].name, c.langs.main) ?? id : id);
     return ok("The series", {
       id: c.series?.id ?? null, title: c.series?.title ?? null, summary: c.series?.summary ?? null,
       languages: c.langs, narrator: { id: c.series?.narrator, name: name(c.series?.narrator) }, standin: { id: c.series?.standin, name: name(c.series?.standin) },
@@ -613,7 +613,8 @@ export function createMcp(o: McpOptions): McpServer {
     if (exists("story", id)) return fail(`${id} exists already: ids are permanent, pick a new one`);
     const pendingEp = await taken("story", id);
     if (pendingEp) return fail(pendingEp);
-    if (!places[b.place]) return fail(`there is no place ${b.place} (kit_search places)`);
+    // an own key: "constructor" is no place
+    if (!Object.hasOwn(places, b.place)) return fail(`there is no place ${b.place} (kit_search places)`);
     const aid = arcId(b.season, b.week), arc = se.arcs?.[aid];
     if (!arc) {
       const weeks = Object.keys(se.arcs ?? {}).map(k => Number(k.split("w")[1])).sort((x, y) => x - y);
