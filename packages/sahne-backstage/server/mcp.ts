@@ -758,7 +758,7 @@ export function createMcp(o: McpOptions): McpServer {
     const noTheme = weeks.map(w => w.week).filter((w): w is number => typeof w === "number" && !se.arcs?.[arcId(n, w)]);
     const lines = [
       `${sid}: ${eps.length} episode${eps.length === 1 ? "" : "s"}, ${rows.filter(r => r.errors.length).length} with errors, ${rows.filter(r => r.status === "approved").length} approved`,
-      ...rows.map(r => `${r.id} · ${r.date ?? "no date"} · ${r.status}${r.draft ? " · draft" : ""}${r.errors.length ? ` · ${r.errors.length} error${r.errors.length > 1 ? "s" : ""}` : ""}${r.warnings ? ` · ${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : ""}`),
+      ...rows.map(r => `${r.id} · ${r.date ?? "no date"} · ${r.stage} (${r.reviewed} blocks reviewed)${r.draft ? " · draft" : ""}${r.errors.length ? ` · ${r.errors.length} error${r.errors.length > 1 ? "s" : ""}` : ""}${r.warnings ? ` · ${r.warnings} warning${r.warnings > 1 ? "s" : ""}` : ""}`),
       `free weekdays: ${empty.length ? empty.join(", ") : "none"}`,
       `weeks without a theme: ${noTheme.length ? noTheme.join(", ") : "none"}`,
     ];
@@ -794,9 +794,9 @@ export function createMcp(o: McpOptions): McpServer {
       ? ok(`asked the person to mark ${id} ${status}: a card in the conversation does it when they click it`, { ask: { question: `Mark ${id} as ${status}?`, review: { id, status } } })
       : ok(`not set: in proposals mode a person decides where an episode stands. Tell them you suggest ${status} for ${id}, and why; they set it on the Review page`);
     const cur: EpisodeReview = readReview().episodes[id] ?? {};
-    writeReview({ id, review: { ...cur, status } });
     // approving is a sign-off on a Ready episode, for agents as for the person (model/review.ts)
     if (status === "approved") { const st = standingFor(id, allProblems(), cur); if (st.missing.length) return fail(`not approved: ${id} is not ready (${st.missing.join(", ")})`); }
+    writeReview({ id, review: { ...cur, status } });
     return ok(`${id} is ${status}`);
   }));
 

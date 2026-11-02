@@ -6,7 +6,7 @@
 // A set piece or prop written in TypeScript is read when the process starts: `kit_render` and `kit_read` say so when its
 // source changed since; a client that starts a process per call always sees the current source.
 
-import { existsSync, mkdtempSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -614,11 +614,13 @@ export function registerKitTools(server: McpServer, k: KitToolsCtx): void {
     if (!exists("kit_piece", kitId)) throw new Refusal(`there is no drawing ${kitId} in this content root (kit_search lists this series' items)`);
     const { promote } = await import("../../sahne-kit/drawing/promote.ts");
     const out = mkdtempSync(join(tmpdir(), "sahne-promote-")), doc = readDoc("kit_piece", kitId).doc as DrawingDoc;
-    const r = await promote({ source: doc, id, family, by, contact, consent, story, dry: true, out });
-    const q = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
-    const cmd = `node packages/sahne-kit/drawing/promote.ts <content-root>/kit/pieces/${kitId}.json --id ${id} --family ${family} --by ${q(by)} --contact ${q(contact)} --consent${story ? ` --story ${q(story)}` : ""} --pr`;
-    const text = [`${kitId} → ${id} (${family}): ${r.ok ? "ready to offer" : "not ready"}`, ...r.lines, ...(r.ok ? [`To offer it, your person runs: ${cmd}`] : [])].join("\n");
-    const res = ok(text, { ok: r.ok, problems: r.problems, ...(r.pr ? { pr: r.pr } : {}), ...(r.patch ? { patch: r.patch } : {}) }, r.images.map(f => readFileSync(f)));
-    return r.ok ? res : { ...res, isError: true };
+    try {
+      const r = await promote({ source: doc, id, family, by, contact, consent, story, dry: true, out });
+      const q = (v: string) => `'${v.replace(/'/g, `'\\''`)}'`;
+      const cmd = `node packages/sahne-kit/drawing/promote.ts <content-root>/kit/pieces/${kitId}.json --id ${id} --family ${family} --by ${q(by)} --contact ${q(contact)} --consent${story ? ` --story ${q(story)}` : ""} --pr`;
+      const text = [`${kitId} → ${id} (${family}): ${r.ok ? "ready to offer" : "not ready"}`, ...r.lines, ...(r.ok ? [`To offer it, your person runs: ${cmd}`] : [])].join("\n");
+      const res = ok(text, { ok: r.ok, problems: r.problems, ...(r.pr ? { pr: r.pr } : {}), ...(r.patch ? { patch: r.patch } : {}) }, r.images.map(f => readFileSync(f)));
+      return r.ok ? res : { ...res, isError: true };
+    } finally { rmSync(out, { recursive: true, force: true }); } // the sheets are read into the reply: the folder is only for the way there
   }));
 }
