@@ -56,6 +56,9 @@ export function boardOf(season: SeasonDoc, dates: Record<string, string>, extra 
   });
 }
 
+/** Today in this computer's time zone (not UTC's, which is another day for hours around midnight), as the board writes days. */
+export const localDay = (d = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
 /** The episodes a day of the board shows. One with no date, on a Sunday, or on a day another one has is not among them. */
 export const onBoard = (weeks: Week[]): Set<string> => new Set(weeks.flatMap(w => w.days.flatMap(d => (d.episode ? [d.episode] : []))));
 

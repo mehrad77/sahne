@@ -9,7 +9,7 @@ import { html } from "htm/preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { allLanguages, playOf, textOf, type SeasonDoc, type StoryDoc, type StoryPlace } from "sahne-story";
 import { set } from "../model/path.ts";
-import { addDays, arcOfWeek, boardOf, datesOf, isDay, isSunday, rowOn, weekOfArc } from "../model/board.ts";
+import { addDays, arcOfWeek, boardOf, datesOf, isDay, localDay, isSunday, rowOn, weekOfArc } from "../model/board.ts";
 import { duplicate, skeleton } from "../model/skeleton.ts";
 import { change, createDoc, draftOf, go, openDoc, world } from "../store.ts";
 import { placeThumb } from "../thumbs.ts";
@@ -42,7 +42,7 @@ export function NewEpisode(p: { season?: string; date?: string }) {
   // an episode's week where the calendar has no row: its arc's
   const arcWeeks = Object.fromEntries(eps.flatMap(e => { const wk = weekOfArc((draftOf("story", e.id)?.doc as StoryDoc | undefined)?.arc?.id); return wk === undefined ? [] : [[e.id, wk]]; }));
   // the day: the route's, else the first free weekday after the season's last episode
-  const firstFree = () => { const used = new Set(Object.values(dates)); let d = addDays(Object.values(dates).sort().pop() ?? se.launch ?? new Date().toISOString().slice(0, 10), 1); while (used.has(d) || isSunday(d)) d = addDays(d, 1); return d; };
+  const firstFree = () => { const used = new Set(Object.values(dates)); let d = addDays(Object.values(dates).sort().pop() ?? se.launch ?? localDay(), 1); while (used.has(d) || isSunday(d)) d = addDays(d, 1); return d; };
   const [date, setDate] = useState(p.date ?? firstFree());
   // a date field being cleared or typed into holds no day yet: nothing is placed until it does
   const day = isDay(date) ? date : null;

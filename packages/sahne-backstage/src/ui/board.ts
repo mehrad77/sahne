@@ -11,7 +11,7 @@
 import { html } from "htm/preact";
 import { useEffect, useState } from "preact/hooks";
 import { allLanguages, seasonOf, textOf, type SeasonDoc, type StoryDoc } from "sahne-story";
-import { arcOfWeek, boardOf, datesOf, onBoard, rowOn, themed, weekOfArc, type Day, type Week } from "../model/board.ts";
+import { arcOfWeek, boardOf, datesOf, localDay, onBoard, rowOn, themed, weekOfArc, type Day, type Week } from "../model/board.ts";
 import { set } from "../model/path.ts";
 import { dirty } from "../model/history.ts";
 import { allProblems, change, checked, draftOf, drafts, keyOf, loadAllProblems, openDoc, review, route, saveDocs, say, world } from "../store.ts";
@@ -30,7 +30,6 @@ import { marks } from "../runs.ts";
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MECHANICS = ["say", "explore", "act", "aloud", "unlocks"] as const;
 const short = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
-const today = new Date().toISOString().slice(0, 10);
 /** A day's label on the board: its number, with the month where a month begins and in the board's first cell. */
 const dayLabel = (date: string, first: boolean) => (first || date.endsWith("-01") ? short(date) : String(Number(date.slice(8))));
 /** A week's span, Monday to Saturday: `14–19 Sept`, or `28 Sept – 3 Oct` across a month. */
@@ -54,6 +53,8 @@ export function Board(p: { id?: string }) {
 }
 
 function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setSettings(s: "series" | "season" | null): void }) {
+  // read at each drawing, so a board left open past midnight moves on
+  const today = localDay();
   const w = world.value!, langs = useLangs(), gloss = langs.translations[0];
   const n = w.seasons[p.id].n;
   const onDisk = w.episodes.filter(e => e.season === n);

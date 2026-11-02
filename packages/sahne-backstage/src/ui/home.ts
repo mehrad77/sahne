@@ -9,14 +9,14 @@ import { textOf } from "sahne-story";
 import { go, world } from "../store.ts";
 import type { Episode } from "../api.ts";
 import { recent, resumeAt } from "../recent.ts";
+import { localDay } from "../model/board.ts";
 import { placeThumb } from "../thumbs.ts";
 import { Icon, MOD } from "./kit/index.ts";
 import { Picture, type Art } from "./kit/gallery.ts";
 
-const today = new Date().toISOString().slice(0, 10);
 
 /** The episode to go back to when nothing was worked on here: the next to be released, else the last, else the first. */
-function next(eps: Episode[]): Episode | undefined {
+function next(eps: Episode[], today: string): Episode | undefined {
   const dated = eps.filter(e => e.releaseDate).sort((a, b) => a.releaseDate!.localeCompare(b.releaseDate!));
   return dated.find(e => e.releaseDate! >= today) ?? dated.at(-1) ?? eps[0];
 }
@@ -52,9 +52,9 @@ export function HomePage() {
   const w = world.value!;
   const ref = useRef<HTMLElement>(null);
   const title = w.series ? textOf(w.series.title, "en") ?? "Your series" : null;
-  const last = recent();
+  const today = localDay(), last = recent();
   const worked = last && w.episodes.find(e => e.id === last.id);
-  const ep = worked ?? next(w.episodes), place = ep && w.places[ep.place];
+  const ep = worked ?? next(w.episodes, today), place = ep && w.places[ep.place];
   const epTitle = ep && (textOf(ep.title, "en") ?? ep.id);
   const art: Art = worked && last.picture ? { url: last.picture } : place ? () => placeThumb(place) : null;
   const links: [string, string, string, number?][] = [["cast", "cast", "Cast", Object.keys(w.characters).length], ["places", "places", "Places", Object.keys(w.places).length], ["kit", "hand", "Kit"], ["docs", "book", "Guides"]];

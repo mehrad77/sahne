@@ -3,7 +3,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { boardOf, isDay, onBoard, rowOn, weekOf } from "../src/model/board.ts";
+import { boardOf, isDay, localDay, onBoard, rowOn, weekOf } from "../src/model/board.ts";
 
 const season = { v: 1, id: "s1", n: 1, title: { en: "Season 1" }, launch: "2026-09-14" } as never;
 const weeks = boardOf(season, { s1e01: "2026-09-14", s1e02: "2026-09-15" });
@@ -25,4 +25,9 @@ test("an episode on a Sunday, or on a day another one has, is not on the board, 
   assert.equal(shown.has("s1e03"), false, "a Sunday has no column");
   assert.equal([shown.has("s1e01"), shown.has("s1e02")].filter(Boolean).length, 1, "one day shows one episode");
   assert.equal(shown.has("s1e04"), true);
+});
+
+test("today is the day in this computer's time zone", () => {
+  assert.equal(localDay(new Date(2026, 0, 1, 0, 30)), "2026-01-01");
+  assert.equal(localDay(new Date(2026, 11, 31, 23, 59)), "2026-12-31");
 });
