@@ -105,6 +105,8 @@ const STEP_TURNS = 60;
 /** Why a task the person paused waits; and what a step meets at its next model call then. */
 const PAUSED = "you paused it";
 class Paused extends Error { constructor() { super("paused"); this.name = "Paused"; } }
+/** A planner that ended without a plan: it asked in words, or gave up. The person reads what it said; it is not pushed again. */
+class NoPlan extends Error {}
 const STEP_ASK: ToolDef = { name: "ask_person", description: "Ask the person a question and wait for the answer: this step waits, the task's other steps go on. Use it only for a real choice the goal leaves open (which of two ideas, a name, a fact only the person knows) or for their reply, never to confirm making or changing something: they can undo it. With options, they answer with a button.", schema: { type: "object", properties: { question: { type: "string" }, options: { type: "array", items: { type: "string" }, maxItems: 6 } }, required: ["question"] } };
 const PLAN_STEPS = { type: "array", items: { type: "object", properties: {
   id: { type: "string", description: "a-z, 0-9, _: cast_derya, place_library, ep_s2e01, review" },
@@ -598,7 +600,7 @@ export class Runs {
         const last = [...(state.values.messages ?? [])].reverse().find(m => m.getType() === "ai");
         const words = last ? String(typeof last.content === "string" ? last.content : (last.content as { type: string; text?: string }[]).filter(b => b.type === "text").map(b => b.text).join("")).slice(0, 2000) : undefined;
         // a planner that ends without a plan (it asked in words, or gave up) has not planned: the task is not done, it waits
-        if (s.kind === "plan" && s.summary === undefined) throw new Error(`the planner ended without a plan (propose_plan)${words?.trim() ? `; it said: ${words.trim()}` : ""}`);
+        if (s.kind === "plan" && s.summary === undefined) throw new NoPlan(`the planner ended without a plan (propose_plan)${words?.trim() ? `; it said: ${words.trim()}` : ""}`);
         s.summary ??= words;
         s.status = s.turnedDown ? "stale" : "done"; s.endedAt = Date.now(); delete s.error; delete s.turnedDown;
         this.forgetThread(thread.configurable.thread_id);
@@ -613,7 +615,7 @@ export class Runs {
         this.write(run, s, { type: "error", message: s.error });
         // a budget spent is not tried again; anything else once, from its last checkpoint
         if (e instanceof BudgetError) s.budget = true;
-        s.status = e instanceof BudgetError || s.attempts >= 2 ? "failed" : "waiting";
+        s.status = e instanceof BudgetError || e instanceof NoPlan || s.attempts >= 2 ? "failed" : "waiting";
       }
     } finally {
       // a tool call still at work (the step was stopped mid-turn) finishes on its server before that closes, so its edit is
