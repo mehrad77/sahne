@@ -304,7 +304,8 @@ export function refuse(e: Edit): string | null {
   const d = e.doc as { id?: unknown; of?: unknown; name?: unknown };
   const docId = e.kind === "kit_variant" ? `${String(d.of)}.${String(d.name)}` : d.id;
   if (e.kind !== "series" && docId !== e.id) return `${e.kind} ${e.id}: its id is ${String(docId)}; ids never change`;
-  if (e.kind === "character" && !e.create && (e.doc as CharacterDoc).kind === "extra") return `${e.id} is an extra: extras are written by sahne-story/cast/extras.ts`;
+  // an extra is the file's: one edited into a cast member is an extra still, and a cast member is not made one by hand
+  if (e.kind === "character" && !e.create && ((readDoc("character", e.id).doc as CharacterDoc).kind === "extra" || (e.doc as CharacterDoc).kind === "extra")) return `${e.id} is an extra: extras are written by sahne-story/cast/extras.ts`;
   return null;
 }
 

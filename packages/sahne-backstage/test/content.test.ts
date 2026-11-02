@@ -14,7 +14,7 @@ cpSync(SAMPLES, root, { recursive: true, filter: s => !s.endsWith("/samples/kit"
 process.env.SAHNE_CONTENT = root;
 after(() => rmSync(root, { recursive: true, force: true }));
 
-const { check, forget, readDoc, save } = await import("../server/content.ts");
+const { check, forget, readDoc, refuse, save } = await import("../server/content.ts");
 
 const storyFile = join(root, "stories", "s1e00.json");
 /** Change a file of the root as another editor would, and read the root again. */
@@ -74,4 +74,13 @@ test("a kit item is checked as the root's loader reads it: a variant whose param
   assert.ok(bad.some(p => p.new && p.level === "error" && p.doc === "kit_variant:flag.x_club"), JSON.stringify(bad));
   const good = check([{ kind: "kit_variant", id: "flag.x_club", doc: { of: "flag", name: "x_club", params: { kind: "bunting", w: 420 } }, create: true }]);
   assert.deepEqual(good.filter(p => p.new && p.level === "error"), []);
+});
+
+test("an extra is never edited by hand, not even into a cast member", () => {
+  const extra = readDoc("character", "child_1").doc as Record<string, unknown>;
+  assert.match(refuse({ kind: "character", id: "child_1", doc: { ...extra, kind: "cast" } }) ?? "", /is an extra/);
+  assert.match(refuse({ kind: "character", id: "child_1", doc: extra }) ?? "", /is an extra/);
+  const cast = readDoc("character", "ismail").doc as Record<string, unknown>;
+  assert.match(refuse({ kind: "character", id: "ismail", doc: { ...cast, kind: "extra" } }) ?? "", /is an extra/);
+  assert.equal(refuse({ kind: "character", id: "ismail", doc: cast }), null);
 });
