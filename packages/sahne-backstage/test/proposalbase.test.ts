@@ -38,3 +38,11 @@ test("a save made after the proposal is kept when it is accepted", () => {
   const saved = { ...disk, steps: disk.steps.slice(1) };
   assert.deepEqual(merge3(disk, saved, proposed).doc, { ...saved, title: proposed.title });
 });
+
+test("the same proposal with a carried document twice is the one there is", async () => {
+  const q = new Proposals(new Events()), season = readDoc("season", "s1");
+  const mk = () => ({ kind: "story" as const, doc: "s1e09", next: { id: "s1e09" }, create: true, also: [{ kind: "season" as const, doc: "s1", next: { ...(season.doc as object), x: 1 }, base: season.mtime, paths: [["x"]] }], paths: [[]], summary: "new", by: "agent", problems: [] });
+  const a = await q.add(mk());
+  assert.ok("from" in a.also![0]);
+  assert.equal((await q.add(mk())).id, a.id);
+});

@@ -91,7 +91,9 @@ export class Proposals implements Queue {
   async resolved(): Promise<Resolved[]> { return [...this.done]; }
 
   async add(p: NewProposal): Promise<Proposal> {
-    const same = this.all().find(q => q.by === p.by && q.kind === p.kind && q.doc === p.doc && JSON.stringify([q.next, q.also ?? []]) === JSON.stringify([p.next, p.also ?? []]));
+    // what it proposes, not what it was computed from (`from`, which add puts on each edit)
+    const what = (x: { next: unknown; also?: ProposalEdit[] }) => JSON.stringify([x.next, (x.also ?? []).map(({ from: _f, ...a }) => a)]);
+    const same = this.all().find(q => q.by === p.by && q.kind === p.kind && q.doc === p.doc && what(q) === what(p));
     if (same) return same;
     const out: Proposal = { ...p, ...this.fromOf(p, p.by), ...(p.also ? { also: p.also.map(a => ({ ...a, ...this.fromOf(a, p.by) })) } : {}), id: `p${++this.n}`, at: Date.now() };
     this.list.set(out.id, out);
