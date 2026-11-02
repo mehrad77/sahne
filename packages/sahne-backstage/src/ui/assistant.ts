@@ -260,7 +260,7 @@ export function ask(id: string) {
 /** The asks as a menu (where you work). */
 export function AskMenu(p: { onDone?(): void; chips?: boolean }) {
   const w = world.value!;
-  if (!w.ai) return html`<p class="note">The assistant is off: set it up in <a href="#/settings">Settings</a>.</p>`;
+  if (!w.ai) return html`<p class="note">The assistant is off: start backstage with <code>ANTHROPIC_API_KEY</code> set, or choose a local model in <a href="#/settings">Settings</a>.</p>`;
   const hasBlock = !!contextNow().path, asks = asksHere();
   if (!asks.length) return null;
   const about = (a: (typeof asks)[number]) => `${a.on === "block" ? "the selected block" : a.on === "episode" ? "the whole episode" : ABOUT[pageNow()] ?? "this page"}${a.fresh ? ", in a new conversation" : ""}`;
@@ -438,7 +438,7 @@ export function AssistantChat() {
   const ctx = contextNow();
   const empty = !turns.value.length;
   return html`
-    ${!w.ai ? html`<p>The assistant is off. Set up Claude (an API key) or a local model (LM Studio, Ollama) in <a href="#/settings">Settings</a>.</p>` : html`
+    ${!w.ai ? html`<p>The assistant is off. For Claude, stop backstage and start it again with <code>ANTHROPIC_API_KEY</code> set in its environment (the key never goes in a file). Or choose a local model (LM Studio, Ollama) in <a href="#/settings">Settings</a>.</p>` : html`
     <div class="chat">
       ${empty && html`<div class="note">Ask anything about the series, or pick an ask. It sees ${ctx.id ? html`${ctx.kind === "season" ? "season " : ctx.kind === "place" ? "the place " : ctx.kind === "character" ? "the character " : ""}<b>${ctx.id}</b>${(ctx as { path?: Path }).path ? html` at <b>${(ctx as { path: Path }).path.slice(1).join(".")}</b>` : ""}` : `the ${ctx.page} page`}.<${AskMenu} chips /></div>`}
       ${turns.value.map((t, i) => html`<div class=${`turn ${t.role}${t.fresh ? " fresh" : ""}`}>

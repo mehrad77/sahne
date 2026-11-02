@@ -62,7 +62,7 @@ function DraftCard(p: Props) {
         <button class=${mode0 === "auto" ? "primary" : ""} disabled=${busy} onClick=${() => void start("auto")} title="No stops: it decides the choices itself and tells you what it chose">Just do it</button>
         <label class="row note">up to $ <input type="number" min="1" step="1" style="max-width:70px" value=${budget} onInput=${(e: Event) => setBudget(Math.max(1, Number((e.target as HTMLInputElement).value) || 1))} /></label>
         <button class="linkish" onClick=${p.onWrite}>Write it myself</button></div>`
-      : html`<div class="row"><button class="primary" onClick=${p.onWrite}>Write it in Script</button><span class="note">The assistant is off (no key in the settings).</span></div>`}
+      : html`<div class="row"><button class="primary" onClick=${p.onWrite}>Write it in Script</button><span class="note">The assistant is off: backstage was started without <code>ANTHROPIC_API_KEY</code>.</span></div>`}
   </div>`;
 }
 
