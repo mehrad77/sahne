@@ -3,7 +3,7 @@
 // fetched once per page load.
 
 import type { AvatarDoc, PlaceDoc } from "sahne";
-import type { CardIndex, CharacterDoc, Needs, StoryDoc } from "sahne-story";
+import type { CardIndex, CharacterDoc, Needs, SeriesDoc, StoryDoc } from "sahne-story";
 import type { DrawingDoc, VariantDoc } from "sahne-kit/drawing";
 
 /** A planned place of Kumru's STORIES_WORLD.md §2. */
@@ -25,6 +25,8 @@ export interface Doc extends DocEntry { file: string; html: string; toc: { id: s
 export interface DataMap {
   places: PlaceDoc[];
   needs: Needs;
+  /** The content root's series, null without one (its languages are what a place is named in). */
+  series: SeriesDoc | null;
   /** The content root's own kit items (kit/), [] when it has none. */
   kit: (DrawingDoc | VariantDoc)[];
   /** The content root's cards, or null without them (the card rules do not run). */

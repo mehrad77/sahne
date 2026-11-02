@@ -2,7 +2,7 @@
 // each place's standard (lintPlace) and its wide-shot thumbnail.
 
 import { hashString, type PlaceDoc } from "sahne";
-import { lintPlace, needsOf, PLACE_RULES, type CardIndex, type Needs, type PlaceProblem, type StoryPlace } from "sahne-story";
+import { languagesOf, lintPlace, needsOf, PLACE_RULES, type CardIndex, type Needs, type PlaceProblem, type SeriesDoc, type StoryPlace } from "sahne-story";
 import { $, chip } from "../shell/dom.ts";
 import type { Ctx } from "../shell/ctx.ts";
 import type { WorldRow } from "../shell/data.ts";
@@ -14,14 +14,14 @@ export type Doc = PlaceDoc & { placeholder?: string; district?: string };
 /** The gallery's own test places (src/bench.ts): sets composed from the kit to try its pieces and the engine, not story places. */
 export const BENCH_DOCS: Doc[] = Object.values(BENCHES);
 
-export interface Board { docs: Doc[]; benches: Doc[]; world: WorldRow[]; needs: Needs; cards: CardIndex | null }
+export interface Board { docs: Doc[]; benches: Doc[]; world: WorldRow[]; needs: Needs; cards: CardIndex | null; series: SeriesDoc | null }
 export async function board(ctx: Ctx): Promise<Board> {
-  const [docs, world, needs, cards] = await Promise.all([ctx.data("places"), ctx.data("world").catch(() => []), ctx.data("needs").catch(() => ({})), ctx.data("cards").catch(() => ({}))]);
-  return { docs: docs as Doc[], benches: BENCH_DOCS, world, needs, cards };
+  const [docs, world, needs, cards, series] = await Promise.all([ctx.data("places"), ctx.data("world").catch(() => []), ctx.data("needs").catch(() => ({})), ctx.data("cards").catch(() => ({})), ctx.data("series").catch(() => null)]);
+  return { docs: docs as Doc[], benches: BENCH_DOCS, world, needs, cards, series };
 }
 
-/** A place's problems against the standard. */
-export const problems = (b: Board, doc: Doc, ctx: Ctx): PlaceProblem[] => lintPlace(doc as StoryPlace, { kit: ctx.kit, cards: b.cards, needs: b.needs });
+/** A place's problems against the standard, its names asked in the series' languages (Turkish, English and Persian without a series). */
+export const problems = (b: Board, doc: Doc, ctx: Ctx): PlaceProblem[] => lintPlace(doc as StoryPlace, { kit: ctx.kit, cards: b.cards, needs: b.needs, languages: languagesOf(b.series) });
 
 /** One chip per rule: ✓, ! (warnings) or ✗ (errors), with the messages on hover. */
 export function ruleChips(ps: PlaceProblem[]) {

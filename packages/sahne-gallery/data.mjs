@@ -8,7 +8,7 @@ import { Marked } from "marked";
 import { execFileSync } from "node:child_process";
 import { CARDS, PLACES, STORIES_WORLD } from "../sahne-story/paths.ts";
 import { loadContentKit, loadNeeds } from "../sahne-story/load.ts";
-import { loadCast, loadDrafts, loadExtras } from "../sahne-story/check/world.ts";
+import { loadCast, loadDrafts, loadExtras, loadSeries } from "../sahne-story/check/world.ts";
 
 const at = p => new URL(p, import.meta.url);
 const json = p => JSON.parse(readFileSync(at(p), "utf8"));
@@ -97,6 +97,8 @@ function measure() {
 export const DATA = {
   places: () => readdirSync(PLACES).filter(f => f.endsWith(".json") && f !== "needs.json").sort().map(f => JSON.parse(readFileSync(new URL(f, PLACES), "utf8"))),
   needs: () => loadNeeds() ?? {},
+  // the content root's series.json (its languages: what the place lints ask a name in), null without one
+  series: () => loadSeries(),
   // the content root's own kit items (kit/ of the root, sahne-story/load.ts `loadContentKit`): the good documents, checked against
   // the whole kit one at a time as backstage checks them (checkPiece, a variant's params), so a bad one leaves out only itself; [] without kit/
   kit: async () => loadContentKit({ kit: (await import("../sahne-kit/src/full.ts")).default }).docs,
