@@ -151,7 +151,7 @@ A series sets the default in `series.json` (`"play": "watch"` for a series of sh
 
 ## Places
 
-The place documents are read by the gallery, the stories and the tests from `places/` of the content root. The checker prints every place against the standard:
+The place documents are read by the gallery, the stories and the tests from `places/` of the content root. The checker prints every place against the standard, its name in each of the series' languages, and a kit item of the root that is not good as an error `kit` (`test/placecheck.test.ts`):
 
 ```bash
 node packages/sahne-story/places.ts            # the table and the problems

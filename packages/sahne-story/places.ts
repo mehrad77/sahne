@@ -12,22 +12,25 @@ import full from "../sahne-kit/src/full.ts";
 import { withDrawings } from "../sahne-kit/src/drawing.ts";
 import { loadCards, loadContentKit, loadNeeds } from "./load.ts";
 import { PLACES as DIR } from "./paths.ts";
-import { lintPlace, PLACE_RULES, type Needs, type StoryPlace } from "./src/index.ts";
+import { loadSeries } from "./check/world.ts";
+import { languagesOf, lintPlace, PLACE_RULES, type Needs, type StoryPlace } from "./src/index.ts";
 
 const { values: o, positionals } = parseArgs({ allowPositionals: true, options: { check: { type: "boolean", default: false }, file: { type: "string", multiple: true } } });
-const own = loadContentKit({ kit: full }); // the root's own kit items, so a place may use them
+const own = loadContentKit({ kit: full }); // the root's own kit items, so a place may use them; a file that is not good is an error
 const kit = withDrawings(full, own.docs);
 const needs: Needs | undefined = loadNeeds();
 const files = [...readdirSync(DIR).filter(f => f.endsWith(".json") && f !== "needs.json").map(f => new URL(f, DIR)), ...(o.file ?? [])];
 const docs: StoryPlace[] = files.map(f => JSON.parse(readFileSync(f, "utf8"))).filter(d => !positionals.length || positionals.includes(d.id));
 const cards = loadCards();
+// a place is named in the series' languages (series.json; Turkish with English and Persian without one)
+const languages = languagesOf(loadSeries());
 
 const width = Math.max(8, ...docs.map(d => d.id.length));
 console.log(["place".padEnd(width), ...PLACE_RULES.map(r => r.padEnd(8))].join(" "));
-let errors = 0;
-const details: string[] = [];
+let errors = own.problems.length;
+const details: string[] = own.problems.map(m => `kit  error  kit      ${m}`);
 for (const doc of docs) {
-  const ps = lintPlace(doc, { kit, cards, needs });
+  const ps = lintPlace(doc, { kit, cards, needs, languages });
   errors += ps.filter(p => p.level === "error").length;
   console.log([doc.id.padEnd(width), ...PLACE_RULES.map(r => {
     const mine = ps.filter(p => p.rule === r);
