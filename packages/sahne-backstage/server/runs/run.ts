@@ -14,7 +14,7 @@ import { Command } from "@langchain/langgraph";
 import { HumanMessage } from "@langchain/core/messages";
 import type { Store } from "./store.ts";
 import { NodeSqliteSaver } from "./saver.ts";
-import { Journal, type Undone, type Written } from "./journal.ts";
+import { Journal, type Kept, type Undone, type Written } from "./journal.ts";
 import type { Events } from "../events.ts";
 import { listing, type Kind } from "../content.ts";
 import type { AgentEdits, McpOptions } from "../mcp.ts";
@@ -292,7 +292,7 @@ export class Runs {
    * (undoing a character undoes the episodes that use her). A document someone changed since the run is kept. The steps
    * whose writes are all undone are `undone`, and may be done again.
    */
-  undo(id: string, items?: { kind: Kind; id: string }[]): { run: Run; undone: Undone[]; kept: Written[] } {
+  undo(id: string, items?: { kind: Kind; id: string }[]): { run: Run; undone: Undone[]; kept: Kept[] } {
     const run = this.need(id), all = this.journal.of(run.id);
     if (run.steps.some(s => s.status === "running" || s.status === "asking")) throw new Error("stop the run first: its steps are still working");
     let which = all;

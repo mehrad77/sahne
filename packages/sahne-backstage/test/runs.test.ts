@@ -548,3 +548,32 @@ test("two questions in one turn: the first is put to the person, the second is a
   assert.deepEqual(turn.tool_calls.map(c => c.id).sort(), answered.sort(), "each tool call has its result");
   assert.ok(last.some(m => /one question at a time/.test(String(m.content))));
 });
+
+test("undo keeps a person's save made between two writes of the task to one document, and says so", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { save, readDoc, forget } = await import("../server/content.ts");
+  const file = join(root, "seasons", "s1.json"), was = readFileSync(file, "utf8");
+  const { r } = runs(scripted({
+    x: (m: BaseMessage[]): Turn => {
+      const n = m.filter(x => x.getType() === "ai").length;
+      if (n === 1) {
+        // between the task's two writes, the person saves the season's title
+        forget();
+        const d = readDoc("season", "s1") as { doc: Record<string, unknown>; mtime: number };
+        assert.equal(save([{ kind: "season", id: "s1", doc: { ...d.doc, title: { ...(d.doc.title as object), en: "THE PERSON'S TITLE" } }, mtime: d.mtime }], { write: true }).status, 200);
+      }
+      return n < 2 ? { calls: [{ name: "edit_doc", args: { kind: "season", id: "s1", path: "", patch: { summary: { en: `The task's change ${n + 1}.` } } } }] } : finish("done");
+    },
+  }));
+  const run = r.create({ goal: "g", agentEdits: "direct", gates: false, plan: { brief: "b", steps: [{ id: "x", kind: "task", title: "X", brief: "change the season", owns: [] }] } });
+  await r.idle();
+  assert.equal(run.status, "done", JSON.stringify(run.steps));
+  const u = r.undo(run.id);
+  const now = readFileSync(file, "utf8");
+  // back to what the person saved (which held the task's first change), not to before the task
+  assert.ok(now.includes("THE PERSON'S TITLE") && now.includes("The task's change 1.") && !now.includes("The task's change 2."), "back to what the person saved");
+  assert.deepEqual(u.kept.map(k => [k.id, k.why]), [["s1", "someone saved it between the task's writes, and that is kept"]]);
+  // put the season back for the other tests
+  const { writeFileSync } = await import("node:fs");
+  writeFileSync(file, was); forget();
+});

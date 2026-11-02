@@ -3,7 +3,9 @@
 // run's newest write of it back through the writes being undone, as long as the file still holds what the newest left; it
 // then gets the text from before the earliest of them (or goes, if the run created it). A document written after that (by
 // a person, or by a step that is not being undone) is kept and said, so a shared one (a season several steps added rows
-// to) comes back exactly as it was before the undone steps. In the run store (store.ts).
+// to) comes back exactly as it was before the undone steps. A save by someone else between two of the run's writes (the
+// later write found a text the earlier did not leave) ends the walk there: the undo goes back to what they saved, and says
+// so. In the run store (store.ts).
 
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
@@ -12,6 +14,8 @@ import type { Store } from "./store.ts";
 import { writeAtomic } from "../../../sahne-story/json.ts";
 
 export interface Written { seq: number; run: string; step: string; kind: Kind; id: string; before: string | null; after: number; hash: string | null; at: number }
+/** A write undo kept, and why: its document changed after the run, or between the run's writes of it. */
+export type Kept = Written & { why: string };
 export interface Undone { kind: Kind; id: string; removed: boolean; mtime?: number }
 /** One write of a run, as a person reads it in its history. */
 export interface Did { step: string; kind: Kind; id: string; created: boolean; at: number }
@@ -66,16 +70,25 @@ export class Journal {
   }
 
   /** Take these writes back, document by document. What came back, and the writes kept (their document changed since). */
-  undo(run: string, which: Written[]): { undone: Undone[]; kept: Written[] } {
-    const chosen = new Set(which.map(w => w.seq)), all = this.of(run), undone: Undone[] = [], kept: Written[] = [];
+  undo(run: string, which: Written[]): { undone: Undone[]; kept: Kept[] } {
+    const chosen = new Set(which.map(w => w.seq)), all = this.of(run), undone: Undone[] = [], kept: Kept[] = [];
     for (const key of [...new Set(which.map(w => `${w.kind}:${w.id}`))]) {
       const rows = all.filter(w => `${w.kind}:${w.id}` === key).reverse(), top = rows[0];
       const u = fileOf(top.kind, top.id), now = textAt(u);
       // the file must still be as the run's newest write left it (an older row has no hash: its mtime says)
       const same = top.hash !== null ? hashOf(now) === top.hash : now !== null && Math.abs(statSync(u).mtimeMs - top.after) < 1;
       const chain: Written[] = [];
-      if (same) for (const w of rows) { if (!chosen.has(w.seq)) break; chain.push(w); }
-      kept.push(...rows.filter(w => chosen.has(w.seq) && !chain.includes(w)));
+      let between = false;
+      if (same) for (const w of rows) {
+        if (!chosen.has(w.seq)) break;
+        // someone saved it between this write and the run's next one (the next found a text this one did not leave):
+        // what they saved is kept, so the undo goes back only to it
+        const next = chain.at(-1);
+        if (next && w.hash !== null && hashOf(next.before) !== w.hash) { between = true; break; }
+        chain.push(w);
+      }
+      const why = !same ? "it changed after the task" : between ? "someone saved it between the task's writes, and that is kept" : "a step not being undone wrote it after";
+      kept.push(...rows.filter(w => chosen.has(w.seq) && !chain.includes(w)).map(w => ({ ...w, why })));
       if (!chain.length) continue;
       const first = chain[chain.length - 1];
       if (first.before === null) { rmSync(u); undone.push({ kind: first.kind, id: first.id, removed: true }); }
