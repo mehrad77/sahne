@@ -97,8 +97,9 @@ function measure() {
 export const DATA = {
   places: () => readdirSync(PLACES).filter(f => f.endsWith(".json") && f !== "needs.json").sort().map(f => JSON.parse(readFileSync(new URL(f, PLACES), "utf8"))),
   needs: () => loadNeeds() ?? {},
-  // the content root's own kit items (kit/ of the root, sahne-story/load.ts `loadContentKit`): the good documents; [] without kit/
-  kit: () => loadContentKit().docs,
+  // the content root's own kit items (kit/ of the root, sahne-story/load.ts `loadContentKit`): the good documents, checked against
+  // the whole kit one at a time as backstage checks them (checkPiece, a variant's params), so a bad one leaves out only itself; [] without kit/
+  kit: async () => loadContentKit({ kit: (await import("../sahne-kit/src/full.ts")).default }).docs,
   // the content root's cards for the place and story lints (sahne-story/load.ts): id → level, Turkish, English, retired;
   // null without cards (the card rules do not run); read only
   cards: async () => (await import(at(`../sahne-story/load.ts?${Date.now()}`).href)).loadCards(),

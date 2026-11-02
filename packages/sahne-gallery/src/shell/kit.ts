@@ -12,12 +12,17 @@ import { data } from "./data.ts";
 export const KIT: Kit = { ...full, puppets: { ...full.puppets, ...kerim, ...animals } };
 export const LANG = tr;
 
-/** Adds the content root's drawn kit items to `KIT` (in place, so every holder of it sees them). Nothing to do without any. */
+/** Adds the content root's drawn kit items to `KIT` (in place, so every holder of it sees them), one at a time: one that will
+ *  not go on leaves out only itself. Nothing to do without any. */
 export async function addContentKit(): Promise<void> {
   try {
     const docs = await data("kit");
     if (!docs.length) return;
     const { withDrawings } = await import("sahne-kit/drawing");
-    Object.assign(KIT, withDrawings(KIT, docs));
+    let kit: Kit = KIT;
+    for (const doc of docs) {
+      try { kit = withDrawings(kit, [doc]); } catch (e) { console.warn(`a content kit item is not on the stage: ${(e as Error).message}`); }
+    }
+    Object.assign(KIT, kit);
   } catch (e) { console.warn(`the content root's kit items are not on the stage: ${(e as Error).message}`); }
 }
