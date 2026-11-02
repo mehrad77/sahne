@@ -52,7 +52,9 @@ export function tokens(text: string): Token[] {
       const end = i + m[1].length, after = text.slice(end, end + 12);
       // "am 2. Mai", "der 3. Stock": a number and a dot is an ordinal before a lower-case word, or after an article or
       // preposition before a word of any case; "am", "im", "den"… (dative, accusative) take -n: "am dritten Mai"
-      const dotted = /^\d+$/.test(m[1]) && /^\.\s+\p{L}/u.test(after);
+      // a date is the same with day and month ("am 24.12. ist", "der 12.05."): ordinals, never a clock time
+      const date = /^(\d{1,2})\.(\d{1,2})$/.exec(m[1]), isDate = !!date && after[0] === "." && +date[1] >= 1 && +date[1] <= 31 && +date[2] >= 1 && +date[2] <= 12;
+      const dotted = (/^\d+$/.test(m[1]) || isDate) && /^\.\s+\p{L}/u.test(after);
       const ord = dotted && (/^\.\s+\p{Ll}/u.test(after) || BEFORE_ORD.has(prev));
       if (ord) skip = end;
       const price = /^(\d+),(\d{2})$/.exec(m[1]);
@@ -60,10 +62,12 @@ export function tokens(text: string): Token[] {
       // "10:30 Uhr", "10.30 Uhr": the numeral already says "zehn Uhr dreißig", so the written Uhr is not said again
       const clock = /^(\d{1,2})[:.](\d{2})$/.exec(m[1]), uhr = clock && +clock[1] <= 24 && +clock[2] < 60 ? /^\s*(Uhr)(?![\p{L}\p{N}])/iu.exec(text.slice(end)) : null;
       if (uhr) skipWord = end + uhr[0].length - uhr[1].length;
+      // "10.30" is a clock time only before Uhr; otherwise "3.50 Euro" or a date
+      const word = uhr ? m[1].replace(".", ":") : m[1];
       if (euro && price) {
         if (euro[1]) skipWord = end + euro[0].length - euro[1].length;
         out.push({ kind: "word", i, text: m[1], said: sayEuro(price[1], price[2]) });
-      } else out.push({ kind: "word", i, text: m[1], said: sayWord(m[1], ord ? (TAKES_N.has(prev) ? "en" : true) : false) });
+      } else out.push({ kind: "word", i, text: m[1], said: sayWord(word, ord || isDate ? (TAKES_N.has(prev) ? "en" : true) : false) });
       prev = lowerDe(m[1]);
     } else if (i !== skip) {
       const p = m[2];

@@ -167,6 +167,11 @@ test("numbers are timed as their German words, and the span covers the digits", 
   assert.deepEqual(said("Um 10.30 Uhr"), ["um", "zehn uhr dreißig"]);
   assert.deepEqual(said("Um 10 Uhr"), ["um", "zehn", "uhr"]);
   assert.deepEqual(speech("Um 10:00 Uhr.").words.map(w => w.text), ["Um", "10:00"], "the written Uhr has no span of its own");
+  // a date or a price with a dot is no clock time: only "10.30 Uhr" is
+  assert.deepEqual(said("Am 24.12. ist Weihnachten."), ["am", "vierundzwanzigsten zwölften", "ist", "weihnachten", "stop"]);
+  assert.deepEqual(said("Heute ist der 12.05."), ["heute", "ist", "der", "zwölfte fünfte", "stop"]);
+  assert.deepEqual(said("Das kostet 3.50 Euro."), ["das", "kostet", "drei fünfzig", "euro", "stop"]);
+  assert.equal(sayWord("10.30"), "zehn dreißig");
   // "am 2. Mai": an ordinal, read "zweiten" (-n after am), with no full stop after it
   assert.deepEqual(tokens("am 2. mai").map(t => t.kind === "word" ? t.said : t.mark), ["am", "zweiten", "mai"]);
   assert.equal(sayNumeral("3", true), "dritte");

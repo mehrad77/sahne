@@ -157,3 +157,8 @@ test("a written time with Uhr is said once: 10:30 Uhr is zehn Uhr dreißig", () 
   assert.equal(matchLine("zehn Uhr dreißig", ["10:30 Uhr."]).matched, true);
   assert.equal(matchLine("um zehn Uhr", ["Um 10:00 Uhr."]).matched, true);
 });
+
+test("a date is said as one: am vierundzwanzigsten zwölften, not vierundzwanzig Uhr zwölf", () => {
+  assert.equal(normalise("Am 24.12. ist Weihnachten."), "am vierundzwanzigsten zwölften ist weihnachten");
+  assert.equal(matchLine("am vierundzwanzigsten zwölften ist weihnachten", ["Am 24.12. ist Weihnachten."]).matched, true);
+});

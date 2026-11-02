@@ -66,14 +66,16 @@ export function sayEuro(euro: string, cent: string): string {
 const whole = (d: string): string => (d.length > 1 && d[0] === "0") || d.length > 15 ? sayDigits(d) : sayNumber(+d);
 
 /**
- * A numeral as written in a line: "15", "1990", "1.000" (thousands), "3,5" (decimal comma), "10:30" or "10.30"
- * (a clock time, "zehn Uhr dreißig"), "50%" ("fünfzig Prozent"); `ord` makes it an ordinal ("2." → "zweite", "zweiten" when `ord` is "en", as after "am").
+ * A numeral as written in a line: "15", "1990", "1.000" (thousands), "3,5" (decimal comma), "10:30" (a clock time,
+ * "zehn Uhr dreißig"; "10.30" is one only before "Uhr", which `tokens` sees), "50%" ("fünfzig Prozent"); `ord` makes it an
+ * ordinal ("2." → "zweite", "zweiten" when `ord` is "en", as after "am"), and a date of it ("24.12." → "vierundzwanzigste zwölfte").
  */
 export function sayNumeral(s: string, ord: boolean | "en" = false): string {
   let post = "";
   if (s.endsWith("%")) { post = " Prozent"; s = s.slice(0, -1); }
   let out: string, m: RegExpExecArray | null;
-  if ((m = /^(\d{1,2})[:.](\d{2})$/.exec(s)) && +m[1] <= 24 && +m[2] < 60) out = +m[2] ? `${sayNumber(+m[1]).replace(/^eins$/, "ein")} Uhr ${whole(m[2])}` : `${sayNumber(+m[1]).replace(/^eins$/, "ein")} Uhr`;
+  if ((m = /^(\d{1,2}):(\d{2})$/.exec(s)) && +m[1] <= 24 && +m[2] < 60) out = +m[2] ? `${sayNumber(+m[1]).replace(/^eins$/, "ein")} Uhr ${whole(m[2])}` : `${sayNumber(+m[1]).replace(/^eins$/, "ein")} Uhr`;
+  else if (ord && (m = /^(\d{1,2})\.(\d{1,2})$/.exec(s)) && +m[1] >= 1 && +m[1] <= 31 && +m[2] >= 1 && +m[2] <= 12) out = [m[1], m[2]].map(d => ordinal(+d, ord === "en" ? "en" : "e")).join(" ");
   else if (/^\d{1,3}(\.\d{3})+$/.test(s)) out = sayNumber(+s.replace(/\./g, ""));
   else if ((m = /^(\d+),(\d+)$/.exec(s))) out = `${whole(m[1])} Komma ${sayDigits(m[2])}`;
   else if (/^\d+$/.test(s)) out = ord && s.length < 10 ? ordinal(+s, ord === "en" ? "en" : "e") : whole(s);
