@@ -422,6 +422,26 @@ test("direct mode: an edit is saved; a stale read is refused (409) and a new err
   } finally { await close(); }
 });
 
+test("direct mode: re-approving an episode changed since its approval signs it as it is now", async () => {
+  const { episodeSig } = await import("../src/model/progress.ts");
+  const reviewFile = join(root, ".backstage", "review.json"), was = existsSync(reviewFile) ? readFileSync(reviewFile, "utf8") : null;
+  const doc = JSON.parse(readFileSync(story, "utf8"));
+  // every line's translations checked, so the episode is ready; approved once, under a signature it no longer has
+  const steps: Record<string, { checked: string[] }> = {};
+  doc.steps.forEach((s: { choice?: { options?: { reply?: unknown[] }[] } }, i: number) => {
+    steps[i] = { checked: ["en", "fa"] };
+    (s.choice?.options ?? []).forEach((o, k) => { steps[`${i}.${k}`] = { checked: ["en", "fa"] }; (o.reply ?? []).forEach((_r, j) => { steps[`${i}.${k}.${j}`] = { checked: ["en", "fa"] }; }); });
+  });
+  mkdirSync(join(root, ".backstage"), { recursive: true });
+  writeFileSync(reviewFile, JSON.stringify({ v: 1, episodes: { s1e00: { status: "approved", sig: "deadbeef", steps } } }));
+  const { client, close } = await connect({ write: true, agentEdits: "direct" });
+  try {
+    const r = await call(client, "set_review", { id: "s1e00", status: "approved" });
+    assert.ok(!r.isError, r.text);
+    assert.equal(JSON.parse(readFileSync(reviewFile, "utf8")).episodes.s1e00.sig, episodeSig(doc));
+  } finally { await close(); if (was === null) rmSync(reviewFile, { force: true }); else writeFileSync(reviewFile, was); }
+});
+
 test("one author through two servers: edits to one document queue one after the other, and its pending documents are there for its next ones", async () => {
   const events = new Events();
   const one = await connect({ write: true, agentEdits: "proposals" }, events), two = await connect({ write: true, agentEdits: "proposals" }, events);

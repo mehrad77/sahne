@@ -824,7 +824,9 @@ export function createMcp(o: McpOptions): McpServer {
     const cur: EpisodeReview = readReview().episodes[id] ?? {};
     // approving is a sign-off on a Ready episode, for agents as for the person (model/review.ts)
     if (status === "approved") { const st = standingFor(id, allProblems(), cur); if (st.missing.length) return fail(`not approved: ${id} is not ready (${st.missing.join(", ")})`); }
-    writeReview({ id, review: { ...cur, status } });
+    // an approval vouches for the episode as saved now: the old one's sig goes, and writeReview signs it again
+    const { sig: _was, ...notes } = cur;
+    writeReview({ id, review: status === "approved" ? { ...notes, status } : { ...cur, status } });
     return ok(`${id} is ${status}`);
   }));
 
