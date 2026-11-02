@@ -492,9 +492,13 @@ export class Runs {
           return callTool(mcp, c);
         },
       }, this.saver);
-      // from its start, unless it has a checkpoint to go on from
-      const begun = !!(await this.saver.getTuple(thread));
-      const input = resume ?? (begun ? null : { messages: [new HumanMessage(stepPrompt(run, s))] });
+      // from its start, unless it has a checkpoint to go on from: one that waits (a question, a model call a pause or a
+      // failure cut short) goes on from there; one whose graph ended without the step being done (an answer cut off, a
+      // refusal, its rounds used up) runs the model again, told why, with its rounds counted afresh
+      const begun = !!(await this.saver.getTuple(thread)), ended = begun && !resume && !(await graph.getState(thread)).next.length;
+      const input = resume ?? (!begun ? { messages: [new HumanMessage(stepPrompt(run, s))] }
+        : ended ? { messages: [new HumanMessage(`Your last try stopped before your step was done${s.error ? ` (${s.error})` : ""}. Go on from where you are${s.kind === "plan" ? ", and end with propose_plan" : ", and end with finish_step"}.`)], stopped: null, turns: 0 }
+        : null);
       for await (const e of await graph.stream(input, { ...thread, streamMode: "custom", signal: stop.signal, recursionLimit: STEP_TURNS * 3 + 5, durability: "sync" })) {
         const ev = e as AssistantEvent;
         if (ev.type === "proposal" && !s.proposals.includes(ev.id)) s.proposals.push(ev.id);
@@ -509,7 +513,7 @@ export class Runs {
       else {
         const last = [...(state.values.messages ?? [])].reverse().find(m => m.getType() === "ai");
         s.summary ??= (last ? String(typeof last.content === "string" ? last.content : (last.content as { type: string; text?: string }[]).filter(b => b.type === "text").map(b => b.text).join("")).slice(0, 2000) : undefined);
-        s.status = "done"; s.endedAt = Date.now();
+        s.status = "done"; s.endedAt = Date.now(); delete s.error;
         await this.saver.deleteThread(thread.configurable.thread_id);
       }
     } catch (e) {

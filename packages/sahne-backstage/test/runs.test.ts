@@ -400,3 +400,34 @@ test("a document's text before the task first wrote it, and now; steps keep when
   assert.ok(s.startedAt! <= s.endedAt!, JSON.stringify(s));
   r.undo(run.id);
 });
+
+test("a step whose answer was cut off runs again, told why, and is done only when it finishes", async () => {
+  let calls = 0;
+  const seen: BaseMessage[][] = [];
+  const { r } = runs(() => ({
+    id: "anthropic", model: "claude-sonnet-5-5", pictures: true, tools: defs => defs.map(t => ({ name: t.name })),
+    chat: { bindTools: () => ({ async *stream(messages: BaseMessage[]) {
+      seen.push(messages);
+      // the first answer is cut off; the second finishes the step
+      if (calls++ === 0) { yield new AIMessageChunk({ content: "partial", additional_kwargs: { stop_reason: "max_tokens" }, usage_metadata: { input_tokens: 10, output_tokens: 10, total_tokens: 20 } }); return; }
+      yield new AIMessageChunk({ content: "", tool_call_chunks: [{ id: "f1", name: "finish_step", args: JSON.stringify({ summary: "made after the retry" }), index: 0, type: "tool_call_chunk" }], usage_metadata: { input_tokens: 10, output_tokens: 10, total_tokens: 20 } });
+    } }) } as never,
+  }));
+  const run = r.create({ goal: "g", plan: { brief: "b", steps: [{ id: "cast_x", kind: "character", title: "X", brief: "make her", owns: [] }] }, gates: false });
+  await r.idle();
+  assert.equal(calls, 2, "the retry asked the model again");
+  assert.deepEqual([run.status, run.steps[0].status, run.steps[0].summary, run.steps[0].error], ["done", "done", "made after the retry", undefined]);
+  assert.match(String(seen[1].at(-1)!.content), /Your last try stopped before your step was done \(the answer was cut off/);
+  // cut off every time: it fails, and Try again asks the model again, never done unfinished
+  calls = -100;
+  const { r: r2 } = runs(() => ({
+    id: "anthropic", model: "claude-sonnet-5-5", pictures: true, tools: defs => defs.map(t => ({ name: t.name })),
+    chat: { bindTools: () => ({ async *stream() { calls++; yield new AIMessageChunk({ content: "partial", additional_kwargs: { stop_reason: "max_tokens" }, usage_metadata: { input_tokens: 10, output_tokens: 10, total_tokens: 20 } }); } }) } as never,
+  }));
+  const run2 = r2.create({ goal: "g", plan: { brief: "b", steps: [{ id: "cast_x", kind: "character", title: "X", brief: "make her", owns: [] }] }, gates: false });
+  await r2.idle();
+  assert.deepEqual([run2.steps[0].status, calls], ["failed", -98]);
+  await r2.step(run2.id, "cast_x", { action: "retry" });
+  await r2.idle();
+  assert.deepEqual([run2.steps[0].status, calls], ["failed", -96]);
+});
