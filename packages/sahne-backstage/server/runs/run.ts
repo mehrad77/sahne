@@ -464,7 +464,8 @@ export class Runs {
           if (run.usd >= run.maxUsd) throw new BudgetError(`the task's budget, $${run.maxUsd.toFixed(2)}, is spent`);
           if (run.status === "paused" && run.why === PAUSED) throw new Paused();
         },
-        inbox: () => { const t = s.told ?? []; delete s.told; if (t.length) this.keep(); return t; },
+        inbox: () => [...(s.told ?? [])],
+        taken: n => { s.told = (s.told ?? []).slice(n); if (!s.told.length) delete s.told; this.keep(); },
         after: (u: Usage) => {
           const e = record(model.id, model.model, u);
           s.usd += e.usd; run.usd += e.usd;

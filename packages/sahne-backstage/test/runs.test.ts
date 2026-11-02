@@ -441,3 +441,28 @@ test("a planner that ends without a plan (it asked in words) leaves the task wai
     assert.match(run.steps[0].error!, /ended without a plan.*Which season should they go in/);
   }
 });
+
+test("a note told to a step stays until a model turn reads it: a call that fails reads it again", async () => {
+  const seen: BaseMessage[][] = [];
+  let r!: InstanceType<typeof Runs>, run!: ReturnType<InstanceType<typeof Runs>["create"]>;
+  const { r: made } = runs(() => ({
+    id: "anthropic", model: "claude-sonnet-5-5", pictures: true, tools: defs => defs.map(t => ({ name: t.name })),
+    chat: { bindTools: () => ({ async *stream(messages: BaseMessage[]) {
+      seen.push(messages);
+      const k = seen.length - 1;
+      if (k === 0) void r.step(run.id, "cast_x", { action: "tell", text: "make her older" });
+      await new Promise(res => setTimeout(res, 20));
+      // the call that first reads the note fails
+      if (k === 1) throw new Error("overloaded");
+      const calls = k === 0 ? [{ name: "kit_search", args: { kind: "characters" } }] : [{ name: "finish_step", args: { summary: "made" } }];
+      yield new AIMessageChunk({ content: "", tool_call_chunks: calls.map((c, i) => ({ id: `t${k}_${i}`, name: c.name, args: JSON.stringify(c.args), index: i, type: "tool_call_chunk" as const })), usage_metadata: { input_tokens: 10, output_tokens: 10, total_tokens: 20 } });
+    } }) } as never,
+  }));
+  r = made;
+  run = r.create({ goal: "g", plan: { brief: "b", steps: [{ id: "cast_x", kind: "character", title: "X", brief: "make her", owns: [] }] }, gates: false });
+  await r.idle();
+  assert.equal(run.steps[0].status, "done", JSON.stringify(run.steps[0]));
+  const has = (ms: BaseMessage[]) => ms.some(m => /make her older/.test(String(m.content)));
+  assert.deepEqual(seen.map(has), [false, true, true], "the retry reads the note too");
+  assert.equal(run.steps[0].told, undefined, "read, it goes");
+});

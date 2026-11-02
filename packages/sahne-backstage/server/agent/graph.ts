@@ -25,8 +25,10 @@ export interface Agent {
   maxTurns: number;
   /** Before each model call: throws at a cap (budget.ts guard), or when the person paused the work. */
   before(): void;
-  /** What the person said while it works, taken before each model call and read as their message (a task's step). */
+  /** What the person said while it works, read before each model call as their message (a task's step); kept until `taken`. */
   inbox?(): string[];
+  /** The first `n` of the inbox are in the conversation now (the model's turn came back): they may go. */
+  taken?(n: number): void;
   /** After each: what it used, to log and price. */
   after(u: Usage): void;
   /** One call of any tool but ask_person. */
@@ -75,8 +77,10 @@ export function agentGraph(a: Agent, checkpointer?: BaseCheckpointSaver) {
       return { stopped: "limit" };
     }
     a.before();
-    const told = (a.inbox?.() ?? []).map(t => new HumanMessage(`The person says, while you work: ${t}`));
-    for (const m of told) emit(config, { type: "text", text: `\n\n> **You said:** ${String(m.content).replace(/^The person says, while you work: /, "")}\n\n` });
+    // what the person said leaves the inbox only with the turn that read it: a call that fails reads it again
+    const said = a.inbox?.() ?? [], told = said.map(t => new HumanMessage(`The person says, while you work: ${t}`));
+    for (const t of said) emit(config, { type: "text", text: `\n\n> **You said:** ${t}\n\n` });
+    const heard = () => { if (said.length) a.taken?.(said.length); };
     const bound = a.model.chat.bindTools!(a.model.tools(a.tools));
     const say = (text: string) => emit(config, { type: "text", text }), think = (text: string) => emit(config, { type: "thinking", text });
     // a local reasoning model may write its thinking into the text, between <think> tags
@@ -102,13 +106,15 @@ export function agentGraph(a: Agent, checkpointer?: BaseCheckpointSaver) {
       : { input: estimateTokens(JSON.stringify(input.map(m => m.content))), output: estimateTokens(text + JSON.stringify(full.tool_call_chunks ?? [])) });
     const stop = String(full.additional_kwargs?.stop_reason ?? full.response_metadata?.finish_reason ?? "");
     const calls = (full.tool_calls?.length ?? 0) + (full.invalid_tool_calls?.length ?? 0);
-    if (stop === "refusal" || stop === "content_filter") { emit(config, { type: "error", message: "the model declined this request" }); return { stopped: "refusal" }; }
+    if (stop === "refusal" || stop === "content_filter") { heard(); emit(config, { type: "error", message: "the model declined this request" }); return { messages: told, stopped: "refusal" }; }
     if (stop === "max_tokens" || stop === "length") {
+      heard();
       emit(config, { type: "error", message: calls ? "the answer was cut off in the middle of a tool call: ask for less at a time" : "the answer was cut off (too long)" });
-      return { stopped: "cut" };
+      return { messages: told, stopped: "cut" };
     }
     // kept as a whole message, its content as the model sent it
     const turn = new AIMessage({ content: full.content, tool_calls: full.tool_calls, invalid_tool_calls: full.invalid_tool_calls, additional_kwargs: full.additional_kwargs, response_metadata: full.response_metadata, usage_metadata: full.usage_metadata, ...(full.id ? { id: full.id } : {}) });
+    heard();
     return { messages: [...told, turn], turns: s.turns + 1 };
   }
 
