@@ -3,7 +3,7 @@
 // `event:` name:
 //   proposal  { action: "added" | "resolved", proposal, accepted? }   an agent's edit waiting for a person (proposals.ts)
 //   doc       { kind, id, mtime }                                       a document an agent wrote itself (direct mode)
-//   show      { id, step }                                              an agent asks the open editors to go there
+//   show      { id, step } | { id, kit }                                an agent asks the open editors to go there (an episode's step, or a kit item's shelf)
 //   usage     { today, month, caps }                                    after each AI call (ai/budget.ts)
 //   activity  { at, by, tool, ok, ms, summary } | null                  an agent's tool call, or null when one connects or goes (agents.ts)
 //   run       { run } | { id, step, seq, event }                         a run changed (a step, a gate, a question), or one of its steps did something (runs/run.ts)
@@ -21,12 +21,16 @@ type Listener = (name: EventName, data: unknown) => void;
 
 export class Events {
   private listeners = new Set<Listener>();
+  /** The listeners that reach an editor: a browser's stream, or a forwarder to a running backstage. */
+  private editors = new Set<Listener>();
   /** The editor's last selection (`POST /api/selection`), or null before one. */
   selection: Selection | null = null;
 
-  on(fn: Listener): () => void {
+  /** Listen; `editor` when what is heard reaches an editor (a browser's stream, a forwarder), for `size`. */
+  on(fn: Listener, o: { editor?: boolean } = {}): () => void {
     this.listeners.add(fn);
-    return () => { this.listeners.delete(fn); };
+    if (o.editor) this.editors.add(fn);
+    return () => { this.listeners.delete(fn); this.editors.delete(fn); };
   }
 
   emit(name: EventName, data: unknown): void {
@@ -35,14 +39,14 @@ export class Events {
     }
   }
 
-  /** How many listen (browsers on /api/events, a forwarder). */
-  get size(): number { return this.listeners.size; }
+  /** How many editors hear it (browsers on /api/events, a forwarder): not the server's own listeners (a run's). */
+  get size(): number { return this.editors.size; }
 
   /** Answer `GET /api/events`: a stream that stays open until the browser goes. */
   stream(req: http.IncomingMessage, res: http.ServerResponse, keepAliveMs = 20_000): void {
     res.writeHead(200, { "content-type": "text/event-stream; charset=utf-8", "cache-control": "no-store", connection: "keep-alive", "x-accel-buffering": "no" });
     res.write(": backstage events\n\n");
-    const off = this.on((name, data) => { res.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`); });
+    const off = this.on((name, data) => { res.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`); }, { editor: true });
     const beat = setInterval(() => res.write(": keep-alive\n\n"), keepAliveMs);
     beat.unref();
     const end = () => { clearInterval(beat); off(); };

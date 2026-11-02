@@ -150,7 +150,7 @@ export async function serve(o: Options): Promise<Running> {
       // another backstage process on this root (cli.ts mcp --backstage) tells the editors what it did
       const e = await body(req) as { event?: unknown; data?: unknown };
       const d = (e?.data ?? {}) as Record<string, unknown>;
-      if (e?.event === "show" && typeof d.id === "string") { events.emit("show", { id: d.id, step: Array.isArray(d.step) ? d.step : null }); return json(res, 200, { ok: true }); }
+      if (e?.event === "show" && typeof d.id === "string") { events.emit("show", d.kit === "set" || d.kit === "props" ? { id: d.id, kit: d.kit } : { id: d.id, step: Array.isArray(d.step) ? d.step : null }); return json(res, 200, { ok: true }); }
       if (e?.event === "doc" && typeof d.kind === "string" && typeof d.id === "string") { forget(); events.emit("doc", { kind: d.kind, id: d.id, mtime: d.mtime, ...(typeof d.by === "string" ? { by: d.by } : {}) }); return json(res, 200, { ok: true }); }
       if (e?.event === "look" && typeof d.rid === "string" && /^[0-9a-f]{16}$/.test(d.rid)) { looks.wait(d.rid); events.emit("look", d); return json(res, 200, { ok: true }); }
       if (e?.event === "activity") { const c = callOf(d); if (!c) throw new Fail(400, "an activity is { by, tool, ok, ms, summary }"); agents.record(c); return json(res, 200, { ok: true }); }

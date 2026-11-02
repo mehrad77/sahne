@@ -73,7 +73,7 @@ export async function startMcpStdio(o: McpStdioOptions = {}): Promise<void> {
       if (name !== "show" && name !== "doc" && name !== "activity" && name !== "look") return;
       fetch(new URL("api/events", remote), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ event: name, data }) })
         .catch(e => console.error(`sahne-backstage mcp: could not reach ${remote.href}: ${(e as Error).message}`));
-    });
+    }, { editor: true });
   }
   const selection = remote ? async () => {
     try { return ((await (await fetch(new URL("api/selection", remote))).json()) as { selection: null }).selection; } catch { return null; }

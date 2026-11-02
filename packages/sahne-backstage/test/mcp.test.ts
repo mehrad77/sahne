@@ -374,7 +374,7 @@ test("proposals mode: a checked proposal is queued, the file is untouched, and a
     assert.equal(JSON.parse(readFileSync(join(root, ".backstage", "review.json"), "utf8")).episodes.s1e00.status, undefined);
     // show reaches the listening editors
     const shown: unknown[] = [];
-    events.on((name, data) => { if (name === "show") shown.push(data); });
+    events.on((name, data) => { if (name === "show") shown.push(data); }, { editor: true });
     await call(client, "show", { id: "s1e00", step: "steps/4" });
     assert.deepEqual(shown, [{ id: "s1e00", step: ["steps", 4] }]);
     events.selection = { page: "episode", kind: "story", id: "s1e00", path: ["steps", 4], at: 1 };
@@ -523,6 +523,25 @@ test("over HTTP: a proposal reaches the editors under the client's name, and a p
   const lost = await fetch(web.url + "mcp", { method: "POST", headers: { "content-type": "application/json", "mcp-session-id": "nope" }, body: "{}" });
   assert.equal(lost.status, 404);
   await lost.text();
+});
+
+test("over HTTP: the editors are the browsers that listen, and a forwarded show keeps its kit shelf", async () => {
+  // no browser listens: the server's own listeners (its runs') are no editors
+  assert.equal((await api(web.url, "GET", "agents")).body.editors, 0);
+  const client = await httpClient(web.url);
+  try { assert.match((await call(client, "show", { id: "s1e00" })).text, /no editor is listening/); } finally { await client.close(); }
+  const ac = new AbortController();
+  const stream = await fetch(web.url + "api/events", { signal: ac.signal });
+  const reader = stream.body!.getReader();
+  let got = "";
+  const heard = (async () => { while (!/event: show\n/.test(got)) { const { value, done } = await reader.read(); if (done) break; got += new TextDecoder().decode(value); } })();
+  try {
+    assert.equal((await api(web.url, "GET", "agents")).body.editors, 1);
+    // a stdio agent's show of a prop, as its forwarder posts it
+    assert.equal((await api(web.url, "POST", "events", { event: "show", data: { id: "tea", kit: "props" } })).status, 200);
+    await heard;
+    assert.match(got, /event: show\ndata: \{"id":"tea","kit":"props"\}/);
+  } finally { ac.abort(); }
 });
 
 test("search_words: ids and levels; the main word only with --share-cards; never a translation or a note", async () => {
@@ -883,7 +902,9 @@ test("show opens a set piece or prop on the kit page", async () => {
   const { client, close } = await connect({ write: false, agentEdits: "proposals" }, events);
   try {
     assert.match((await call(client, "show", { id: "tea" })).text, /no editor is listening/);
-    events.on((n, data) => { if (n === "show") seen.push(data); });
+    events.on(() => {}); // the server's own listener (a run's) is no editor
+    assert.match((await call(client, "show", { id: "tea" })).text, /no editor is listening/);
+    events.on((n, data) => { if (n === "show") seen.push(data); }, { editor: true });
     assert.match((await call(client, "show", { id: "tea" })).text, /prop tea on the kit page/);
     assert.match((await call(client, "show", { id: "frontage" })).text, /set piece frontage/);
     assert.deepEqual(seen, [{ id: "tea", kit: "props" }, { id: "frontage", kit: "set" }]);
