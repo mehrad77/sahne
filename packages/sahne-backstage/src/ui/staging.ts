@@ -66,7 +66,7 @@ export function Staging(p: StagingProps) {
     <${Moves} value=${v.move} cast=${p.cast} marks=${marks} onInput=${(x: unknown) => put("move", x)} />
     <${Objs} value=${v.obj} props=${props} targets=${targets} onInput=${(x: unknown) => put("obj", x)} />
     <${Reacts} value=${v.react} cast=${p.cast} onInput=${(x: unknown) => put("react", x)} />
-    <${Links} value=${v.link} targets=${targets} line=${String(v.tr ?? "")} onInput=${(x: unknown) => put("link", x)} />
+    <${Links} value=${v.link} targets=${targets} line=${String(v[mainLang()] ?? "")} onInput=${(x: unknown) => put("link", x)} />
     <${Sfx} value=${v.sfx} onInput=${(x: unknown) => put("sfx", x)} />
     <details><summary>More: place changes, phone, a word to stress, a wait, a flashback, clothes</summary>
       <div class="fields" style="margin-top:6px">
