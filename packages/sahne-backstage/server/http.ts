@@ -269,10 +269,10 @@ export async function serve(o: Options): Promise<Running> {
       return;
     }
     if (route === "settings" && m === "GET") return json(res, 200, settingsView());
-    if (route === "settings" && m === "POST") { const s = writeSettings(await body(req)); if (s.agentEdits) agentEdits = s.agentEdits; return json(res, 200, settingsView()); }
-    if (route === "agents" && m === "GET") return json(res, 200, await agentsView(req));
     // the local server's models, for the composer's picker (none for Claude, whose models the editor knows)
     if (route === "models" && m === "GET") { const s = readSettings(); return json(res, 200, { models: s.provider === "openai" ? await localModels(s.baseUrl) : [] }); }
+    if (route === "settings" && m === "POST") { const s = writeSettings(await body(req)); if (s.agentEdits) agentEdits = s.agentEdits; return json(res, 200, settingsView()); }
+    if (route === "agents" && m === "GET") return json(res, 200, await agentsView(req));
     if (route === "agents" && m === "POST") {
       const v = await body(req) as { agentEdits?: unknown };
       if (v?.agentEdits !== "proposals" && v?.agentEdits !== "direct") throw new Fail(400, "expected { agentEdits: \"proposals\" | \"direct\" }");
