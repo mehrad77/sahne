@@ -633,7 +633,7 @@ test("a step stopped between two tool calls of a turn and tried again does not m
 test("two backstages on one root: the one that came second reads the tasks, runs none, and takes them over once the first has gone", async () => {
   const file = join(config, "two.sqlite"), first = runs(scripted({ cast_derya: [finish("made")] }), new Events(), new Store(file)).r;
   const run = first.create({ goal: "g", plan: { brief: "b", steps: [PLAN.steps[0]] }, gates: { plan: true } });
-  // another live process holds the tasks (this test's parent stands in for it)
+  // another process runs them and said so just now (any pid: what counts is that it says so)
   const s = new Store(file);
   s.set("owner:runs", { pid: process.ppid, at: Date.now() });
   const log: string[] = [];
@@ -642,11 +642,38 @@ test("two backstages on one root: the one that came second reads the tasks, runs
   assert.deepEqual(second.all().map(x => x.id), [run.id], "it reads them");
   assert.throws(() => second.create({ goal: "g2" }), /another backstage \(process \d+\) on this content root runs its tasks/);
   assert.throws(() => second.act(run.id, { action: "continue" }), /another backstage/);
-  // the first one has gone (a pid no process has): the second takes over, and goes on
-  s.set("owner:runs", { pid: 2 ** 22 + 12345, at: Date.now() });
+  // the other one stopped saying so long ago (its pid may well be a live process now): the second takes over and goes on
+  s.set("owner:runs", { pid: process.ppid, at: Date.now() - 60_000 });
   second.act(run.id, { action: "continue" });
   await second.idle();
   assert.deepEqual([second.get(run.id)!.status, log], ["done", ["ran"]]);
+});
+
+test("a read-only backstage never takes the tasks from one that writes", () => {
+  const file = join(config, "readonly.sqlite");
+  const quiet = new Runs({ store: new Store(file), events: new Events(), write: false, shareCards: false, settings: () => ({ ...DEFAULTS, caps: {} }), model: scripted({}) });
+  assert.throws(() => quiet.create({ goal: "g" }), /read-only/);
+  assert.equal(new Store(file).get("owner:runs", null), null, "it claimed nothing");
+  const writer = runs(scripted({}), new Events(), new Store(file)).r;
+  assert.ok(writer.create({ goal: "g", plan: { brief: "b", steps: [PLAN.steps[0]] }, gates: { plan: true } }));
+});
+
+test("a proposal turned down in the backstage that does not run the tasks reaches the one that does", async () => {
+  const file = join(config, "relay.sqlite"), events = new Events();
+  const { r: holder } = runs(scripted({ cast_derya: [finish("made")] }), events, new Store(file));
+  const run = holder.create({ goal: "g", plan: { brief: "b", steps: [PLAN.steps[0]] }, gates: false });
+  await holder.idle();
+  assert.equal(run.steps[0].status, "done");
+  // the second backstage (another process: its holder said so just now) hears the person turn a proposal down
+  const s = new Store(file), other = new Events();
+  s.set("owner:runs", { pid: process.ppid, at: Date.now() });
+  new Runs({ store: s, events: other, write: true, shareCards: false, settings: () => ({ ...DEFAULTS, caps: {} }), model: scripted({}) });
+  other.emit("proposal", { action: "resolved", accepted: false, proposal: { by: run.by, step: "cast_derya" } });
+  // the one that runs them reads it at its next beat (claimed again by this process: it is the holder)
+  s.set("owner:runs", { pid: process.pid, at: Date.now() });
+  const fast = new Runs({ store: new Store(file), events, write: true, shareCards: false, settings: () => ({ ...DEFAULTS, caps: {} }), model: scripted({}), beatMs: 10 });
+  await new Promise(res => setTimeout(res, 50));
+  assert.equal(fast.get(run.id)!.steps[0].status, "stale");
 });
 
 test("a step stopped mid-turn whose writes are undone starts over when tried again, never told of edits that are gone", async () => {

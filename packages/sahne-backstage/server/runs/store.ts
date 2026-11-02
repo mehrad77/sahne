@@ -32,23 +32,19 @@ export class Store {
   }
   /**
    * Take `name` for this process (the runs: one backstage on a root runs its tasks, since each keeps them in memory and
-   * writes them whole): null when this process has it now, else the pid of the live one that does.
+   * writes them whole), or say it again: null when this process has it now, else the pid of the one that does, which said
+   * so less than `goneMs` ago. A holder that stops saying so has gone, whatever process its pid is by now.
    */
-  claim(name: string): number | null {
+  claim(name: string, goneMs: number): number | null {
     this.db.exec("BEGIN IMMEDIATE");
     let held: number | null = null;
     try {
-      const owner = this.get<{ pid: number } | null>(`owner:${name}`, null);
-      if (owner && owner.pid !== process.pid && alive(owner.pid)) held = owner.pid;
+      const owner = this.get<{ pid: number; at: number } | null>(`owner:${name}`, null);
+      if (owner && owner.pid !== process.pid && Date.now() - owner.at < goneMs) held = owner.pid;
       else this.set(`owner:${name}`, { pid: process.pid, at: Date.now() });
       this.db.exec("COMMIT");
     } catch (e) { this.db.exec("ROLLBACK"); throw e; }
     return held;
   }
   close(): void { this.db.close(); }
-}
-
-/** Whether a process is there (one of another user's still is: EPERM). */
-function alive(pid: number): boolean {
-  try { process.kill(pid, 0); return true; } catch (e) { return (e as NodeJS.ErrnoException).code === "EPERM"; }
 }

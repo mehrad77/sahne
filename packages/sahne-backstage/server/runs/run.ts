@@ -97,7 +97,12 @@ export interface RunsOptions {
   /** A step's model (the tests'); default: Opus for planning and review, Sonnet for the rest, or the local model. */
   model?: (step: Step, run: Run) => Model;
   onCall?: McpOptions["onCall"];
+  /** How often the backstage that runs the tasks says so in the store, in ms (the tests'; default 5 s). */
+  beatMs?: number;
 }
+
+/** A backstage that has not said it runs the tasks for this long has gone: another takes them over. */
+const GONE = 30_000;
 
 /** The most rounds of tools one step takes. */
 const STEP_TURNS = 60;
@@ -190,8 +195,9 @@ export class Runs {
   private readonly seqs = new Map<string, { seq: number; type?: string }>();
   /** The tool calls at work now, by thread and call id: a step that starts again waits for its own instead of calling twice. */
   private readonly calls = new Map<string, Promise<Outcome>>();
-  /** Another backstage on this root that runs its tasks (its pid), or null when this one does: then this one only reads. */
-  private held: number | null;
+  /** Whether this backstage runs the tasks; else it only reads them (it is read-only, or `holder` runs them). */
+  private leads = false;
+  private holder: number | null = null;
 
   constructor(o: RunsOptions) {
     this.o = o;
@@ -201,19 +207,45 @@ export class Runs {
     // each tool call a step's thread finished, with its answer: a turn run again (after a stop, a failure or a restart)
     // gives those answers back instead of making the edits twice
     o.store.db.exec("CREATE TABLE IF NOT EXISTS run_calls (thread TEXT NOT NULL, call TEXT NOT NULL, outcome TEXT NOT NULL, PRIMARY KEY (thread, call))");
+    // a proposal turned down in another backstage on this root, for the one that runs the tasks to mark
+    o.store.db.exec("CREATE TABLE IF NOT EXISTS run_rejected (author TEXT NOT NULL, step TEXT NOT NULL)");
     // one backstage on a root runs its tasks: each keeps them in memory and writes them whole, so a second one would run
-    // the same steps again, number its tasks as the first does and write over its list
-    this.held = o.store.claim("runs");
+    // the same steps again, number its tasks as the first does and write over its list. A writing one takes them when no
+    // other has said it runs them for GONE ms (a heartbeat: a pid alone could be another process's by now); a read-only
+    // one never does
     this.n = 0; this.list = [];
+    if (o.write) {
+      this.take();
+      // a store closed under it (the tests') ends the beat, never the process
+      const beat = setInterval(() => { try { this.beat(); } catch { clearInterval(beat); } }, o.beatMs ?? 5000);
+      beat.unref?.();
+    }
     this.load();
     // a person turning down a step's proposal: that step, and the finished steps built on it, need a redo
     o.events.on((name, data) => {
-      if (this.held !== null) return;
       const d = data as { action?: string; accepted?: boolean; withdrawn?: boolean; proposal?: { by: string; step?: string } };
       if (name !== "proposal" || d.action !== "resolved" || d.accepted || d.withdrawn || !d.proposal?.step) return;
+      if (!this.leads) { o.store.db.prepare("INSERT INTO run_rejected (author, step) VALUES (?, ?)").run(d.proposal.by, d.proposal.step); return; }
       const run = this.list.find(r => r.by === d.proposal!.by);
       if (run) this.rejected(run, d.proposal.step);
     });
+  }
+
+  /** Take the tasks if no other backstage runs them now: whether this one does. */
+  private take(): boolean {
+    this.holder = this.o.store.claim("runs", GONE);
+    this.leads = this.holder === null;
+    return this.leads;
+  }
+
+  /** Every beat: the one that runs the tasks says so and marks the steps turned down elsewhere; another takes them if it has gone. */
+  private beat(): void {
+    if (!this.leads) { if (this.take()) { this.load(); this.resume(); } else return; }
+    else if (!this.take()) return;
+    const rows = this.o.store.db.prepare("SELECT author, step FROM run_rejected").all() as { author: string; step: string }[];
+    if (!rows.length) return;
+    this.o.store.db.exec("DELETE FROM run_rejected");
+    for (const x of rows) { const run = this.list.find(r => r.by === x.author); if (run) this.rejected(run, x.step); }
   }
 
   /** The steps that need `id`, through the steps they need. */
@@ -249,14 +281,15 @@ export class Runs {
 
   /** Before a change: this backstage runs the tasks (taking them over when the one that did has gone), or it refuses. */
   private lead(): void {
-    if (this.held === null) return;
-    this.held = this.o.store.claim("runs");
-    if (this.held !== null) throw new Error(`another backstage (process ${this.held}) on this content root runs its tasks: use that one, or stop it`);
+    if (this.leads) return;
+    if (!this.o.write) throw new Error("this backstage is read-only (no --write): it runs no tasks");
+    if (!this.take()) throw new Error(`another backstage (process ${this.holder}) on this content root runs its tasks: use that one, or stop it`);
     this.load();
     this.resume();
+    this.beat();
   }
 
-  all(): Run[] { if (this.held !== null) this.load(); return this.list; }
+  all(): Run[] { if (!this.leads) this.load(); return this.list; }
   get(id: string): Run | undefined { return this.all().find(r => r.id === id); }
   private keep() { this.o.store.set("runs", { n: this.n, runs: this.list }); }
   private changed(run: Run) { this.keep(); this.o.events.emit("run", { run }); }
@@ -309,7 +342,7 @@ export class Runs {
 
   /** After a restart: every run that was going goes on, its running steps from their last checkpoint. */
   resume(): void {
-    if (this.held !== null) return;
+    if (!this.leads) return;
     for (const run of this.list) {
       if (run.status === "done" || run.status === "stopped") continue;
       for (const s of run.steps) if (s.status === "running") s.status = "waiting";
