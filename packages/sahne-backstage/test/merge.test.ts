@@ -42,3 +42,11 @@ test("the same step added twice by the proposal lands twice; once when the perso
   assert.equal((merge3(disk, mine, twice).doc as { steps: unknown[] }).steps.filter(s => "beat" in (s as object)).length, 2);
   assert.equal((merge3(disk, insert(mine, ["steps"], 3, wait), twice).doc as { steps: unknown[] }).steps.filter(s => "beat" in (s as object)).length, 2);
 });
+
+test("a step both rewrote, or one removed and the other rewrote, is a conflict, not two steps", () => {
+  const rewrite = (d: unknown, tr: string) => set(d, ["steps", 0], { who: "a", tr, en: `${tr} en` });
+  assert.deepEqual(merge3(disk, rewrite(disk, "mine"), rewrite(disk, "theirs")).conflict, ["steps", 0]);
+  assert.deepEqual(merge3(disk, set(disk, ["steps", 0], undefined), rewrite(disk, "theirs")).conflict, ["steps", 0]);
+  assert.deepEqual(steps(merge3(disk, rewrite(disk, "same"), rewrite(disk, "same")).doc)[0], "same");
+  assert.deepEqual(steps(merge3(disk, set(disk, ["steps", 0], undefined), set(disk, ["steps", 0], undefined)).doc)[0], "s1");
+});

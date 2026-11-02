@@ -142,12 +142,19 @@ export function merge3(base: unknown, mine: unknown, theirs: unknown, prefer?: "
   }
   if (!Array.isArray(mine) || !Array.isArray(theirs)) return lose();
   const b = Array.isArray(base) ? base : [], A = align(b, mine), B = align(b, theirs), out: unknown[] = [];
+  const same = (x: unknown[], y: unknown[]) => x.length === y.length && x.every((v, k) => equal(v, y[k]));
   for (let i = 0; i <= b.length; i++) {
     // both sides' additions here, one each of what both added (a side may add the same thing twice)
     const adds = A.added[i].map(j => mine[j]), pool = [...adds];
     for (const j of B.added[i]) { const k = pool.findIndex(x => equal(x, theirs[j])); if (k >= 0) pool.splice(k, 1); else adds.push(theirs[j]); }
     if (i === b.length) { out.push(...adds); break; }
     const a = A.to[i], t = B.to[i];
+    if (a === undefined && t === undefined && !prefer) {
+      // gone on both sides: fine for two removals, or the same rewrite (removed, and added in its stretch); not for a
+      // removal against a rewrite, or two different rewrites
+      const ma = A.added[A.end[i]].map(j => mine[j]), ta = B.added[B.end[i]].map(j => theirs[j]);
+      if (ma.length || ta.length) if (!same(ma, ta)) return { conflict: [...at, i] };
+    }
     out.push(...adds);
     if (a !== undefined && t !== undefined) {
       const r = merge3(b[i], mine[a], theirs[t], prefer, [...at, i]);
