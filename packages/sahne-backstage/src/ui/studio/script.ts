@@ -4,6 +4,7 @@
 // replies indented under it; an act on stage; a plugin's step in its own block (ui/plugins: the lesson plugin's grammar spot).
 // The keys of a screenplay:
 //   Enter              a new line after this one, said by the one before last (a conversation alternates)
+//   ⌥ Enter            every staging suggestion of the line taken
 //   Tab, Shift Tab     an empty line becomes an action, an action a line
 //   @ in an empty line  pick the speaker          / in an empty line  insert a block (scene, line, choice …)
 //   (                  type how it is said: (waves, happy, to İsmail) becomes the staging (model/parenthetical.ts)
@@ -77,7 +78,8 @@ export function Script(p: ScriptProps) {
     const empty = !text;
     const target = e.target as HTMLElement;
     const rect = () => { const r = target.getBoundingClientRect(); return { x: r.left, y: r.bottom + 4 }; };
-    if (e.key === "Enter" && !e.shiftKey && !isMod(e)) {
+    if (e.key === "Enter" && e.altKey) { e.preventDefault(); takeAll(b.path); }
+    else if (e.key === "Enter" && !e.shiftKey && !isMod(e)) {
       e.preventDefault();
       const who = nextSpeaker(p.story, b.path, { standin, narrator });
       apply(addAfter(p.story, b.path, emptyLine(who, langs)));
@@ -92,7 +94,6 @@ export function Script(p: ScriptProps) {
       p.select(b.path, true);
     } else if (e.key === "@" && empty && b.kind === "line") { e.preventDefault(); setMenu({ kind: "speaker", path: b.path, ...rect() }); }
     else if (e.key === "/" && empty && b.depth === 0) { e.preventDefault(); setMenu({ kind: "insert", path: b.path, ...rect() }); }
-    else if (e.key === "Enter" && e.altKey) { e.preventDefault(); takeAll(b.path); }
     else if (e.key === "(" && !e.altKey && (b.kind === "line" || b.kind === "option" || b.kind === "action")) { e.preventDefault(); setParen(key(b.path)); }
     else if (isMod(e) && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); apply(moveBy(p.story, b.path, e.key === "ArrowUp" ? -1 : 1)); }
     else if (isMod(e) && e.key.toLowerCase() === "d") { e.preventDefault(); apply(duplicateAt(p.story, b.path)); }
