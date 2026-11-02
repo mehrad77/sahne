@@ -2,6 +2,7 @@
 // commit"). The content root may be any git repo (Kumru's data/ is in Kumru's), or none: then there is no HEAD.
 
 import { execFile } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { fileOf, type Kind } from "./content.ts";
@@ -11,7 +12,8 @@ const run = (args: string[], cwd: string) => new Promise<string | null>(res =>
 
 /** The document at HEAD, or null (no repo, or not committed yet). */
 export async function headOf(kind: Kind, id: string): Promise<unknown> {
-  const file = fileURLToPath(fileOf(kind, id)), dir = dirname(file);
+  // git names its top folder by its real path: so is the file, or a root reached through a link (macOS /tmp) is outside it
+  const file = realpathSync(fileURLToPath(fileOf(kind, id))), dir = dirname(file);
   const top = (await run(["rev-parse", "--show-toplevel"], dir))?.trim();
   if (!top) return null;
   const text = await run(["show", `HEAD:${relative(top, file).split("\\").join("/")}`], top);
