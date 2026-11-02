@@ -213,6 +213,7 @@ function problemsIn(w: World, edits: Edit[], k?: Kit): Problem[] {
   if (characters.length) out.push(...checkCast(w, o).map(p => tag(`character:${p.story.split(":")[1]}`)(p)));
   for (const e of edits.filter(e => e.kind === "place")) {
     const doc = w.places[e.id];
+    if (!doc) continue; // a new place, in the files' baseline
     out.push(...checkPlaces({ ...w, places: { [e.id]: doc } }).map(tag(`place:${e.id}`)));
     for (const p of lintPlace(doc, { kit: o.kit, cards: o.cards, needs: o.needs, languages: languagesOf(w.series) })) out.push({ rule: p.rule, level: p.level, story: `place:${e.id}`, message: p.message, doc: `place:${e.id}` });
   }
@@ -241,7 +242,8 @@ export function check(edits: Edit[], context: Edit[] = []): Problem[] {
   const w0 = around.length ? withEdits(world(), around) : world();
   // how many of each problem the files had: one more of a kind than they had is new
   const before = new Map<string, number>();
-  for (const p of problemsIn(w0, edits.filter(e => !e.create && exists(e.kind, e.id) && !isKitKind(e.kind)).map(e => ({ ...e, doc: currentDoc(w0, e) })))) before.set(key(p), (before.get(key(p)) ?? 0) + 1);
+  // a new document's baseline too: the rules across documents it joins (the season's, the cast's) ran on the files without it
+  for (const p of problemsIn(w0, edits.filter(e => !isKitKind(e.kind)).map(e => ({ ...e, doc: currentDoc(w0, e) })))) before.set(key(p), (before.get(key(p)) ?? 0) + 1);
   const old = (p: CheckProblem) => { const n = before.get(key(p)) ?? 0; if (n) before.set(key(p), n - 1); return n > 0; };
   const kitAround = around.filter(e => isKitKind(e.kind));
   const withKit = edits.some(e => isKitKind(e.kind)) || kitAround.length ? kitWithEdits([...kitAround, ...edits]) : null;

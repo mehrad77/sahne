@@ -35,3 +35,17 @@ test("an old problem stays old when a step above it is inserted, deleted or move
     assert.ok(brought([{ kind: "story", id: "s1e00", doc: twice }]).some(m => /narr is only for/.test(m)), "a second narrating ismail is new");
   } finally { writeFileSync(storyFile, was); forget(); }
 });
+
+test("a new document is checked against the files' own baseline: an old problem across documents does not block it", () => {
+  const was = readFileSync(storyFile, "utf8");
+  try {
+    onDisk(storyFile, d => { d.steps[2].if = "s1e09_seen"; }); // s1e00 names a flag no story sets: the season's rule, already broken
+    const next = structuredClone(readDoc("story", "s1e00").doc) as Record<string, unknown> & { steps: Record<string, unknown>[] };
+    delete next.steps[2].if;
+    const created = { ...next, id: "s1e01", releaseDate: "2026-09-15", title: { tr: "Bir", en: "One", fa: "یک" } };
+    const problems = check([{ kind: "story", id: "s1e01", doc: created, create: true }]);
+    const flag = problems.find(p => /flag s1e09_seen/.test(p.message));
+    assert.ok(flag, "the old flag problem is reported");
+    assert.ok(!flag.new, "and it is not the new episode's");
+  } finally { writeFileSync(storyFile, was); forget(); }
+});
