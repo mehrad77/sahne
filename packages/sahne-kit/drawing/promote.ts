@@ -5,7 +5,8 @@
 //
 //   node packages/sahne-kit/drawing/promote.ts <content-root>/kit/pieces/x_cafe_chalkboard.json \
 //     --id chalkboard --family bakery --by "Ada L." --contact github:ada --consent [--pr] [--dry] [--out promote-out]
-//   node packages/sahne-kit/drawing/promote.ts --check      the generated files below are current
+//   node packages/sahne-kit/drawing/promote.ts --check      the generated files below are current, and every drawing in the folder
+//                                                           passes the official checks (a hand-made one too: `officialStale`)
 //   node packages/sahne-kit/drawing/promote.ts --regenerate  write them
 //   node packages/sahne-kit/drawing/promote.ts --sheet butter_cookie,chalkboard [--out dir]   the review sheets of items already in the kit
 //
@@ -29,7 +30,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { KIT_ID, type Credit, type DrawingDoc } from "../src/drawing.ts";
 import { creditProblems, type Problem } from "../src/check.ts";
@@ -130,11 +131,55 @@ export function regenerate(): void {
   if (b.status !== 0) throw new Error(`set/build.ts failed:\n${b.stderr || b.stdout}`);
 }
 
-/** Everything this script generates is current, SET.md and families.gen.ts too: the lines that say what is not. */
+/** Everything this script generates is current, SET.md and families.gen.ts too, and every drawing in the folder passes the
+ *  official checks (`official`, in a fresh process: it loads the kit): the lines that say what is not. */
 export function check(): string[] {
   const out = stale();
   const b = node([join(KIT, "set/build.ts"), "--check"]);
   if (b.status !== 0) out.push("SET.md or families.gen.ts is stale: run node packages/sahne-kit/set/build.ts");
+  const o = node([fileURLToPath(import.meta.url), "--official"]);
+  if (o.status !== 0) out.push(...(`${o.stdout}${o.stderr}`.trim() || "the official checks failed").split("\n"));
+  return out;
+}
+
+/** The ids a wired family's file gives generators of its own: the family loaded with its drawn/<family>.gen.ts empty, in a
+ *  process of its own (a family spreads its drawings last, so a drawing under one of these ids would silently replace it). */
+export function ownGenerators(family: string): { set: string[]; props: string[] } {
+  const script = `import { registerHooks } from "node:module";
+registerHooks({ resolve: (s, c, next) => s.endsWith(${JSON.stringify(`drawn/${family}.gen.ts`)}) ? { url: "data:text/javascript,export const DRAWN = [];", format: "module", shortCircuit: true } : next(s, c) });
+const m = await import(${JSON.stringify(pathToFileURL(join(SET_DIR, `${family}.ts`)).href)});
+console.log(JSON.stringify({ set: Object.keys(m.set ?? {}), props: Object.keys(m.props ?? {}) }));`;
+  const r = node(["--input-type=module", "-e", script]);
+  if (r.status !== 0) throw new Error(`could not load ${family}.ts without its drawings:\n${r.stderr.trim()}`);
+  return JSON.parse(r.stdout.trim().split("\n").pop()!);
+}
+
+/**
+ * The official checks (`officialProblems`, the schema) on every drawing already in the folder, as a promotion holds a new one,
+ * so a drawing added by hand in a pull request is held to the same rules: each against the kit without itself (its entries and
+ * its own alias left out), except where its family has a generator of its own under that id, which it may never take.
+ */
+export async function officialStale(): Promise<string[]> {
+  const items = readDrawn();
+  if (!items.length) return [];
+  const [{ officialProblems }, { default: full }, { FAMILIES }, groups, schema] = await Promise.all([
+    import("../src/check.ts"), import("../src/full.ts"), import("../src/set/index.ts"),
+    import("../../sahne-backstage/src/model/kitgroups.ts"), import("../../sahne-story/check/schema.ts"),
+  ]);
+  const tagsOf = (shelves: readonly { tags?: readonly string[] }[]) => new Set(shelves.flatMap(s => s.tags ?? []));
+  const shelfTags = { props: tagsOf(groups.PROP_SHELVES), set: tagsOf(groups.SET_SHELVES) };
+  const wired = wiredFamilies(), own = new Map<string, { set: string[]; props: string[] }>(), out: string[] = [];
+  for (const i of items) {
+    const id = i.doc.id, at = `src/set/drawn/${i.family}/${id}.json`;
+    if (wired.includes(i.family) && !own.has(i.family)) own.set(i.family, ownGenerators(i.family));
+    const mine = own.get(i.family) ?? { set: [], props: [] }, set = { ...full.set }, props = { ...full.props };
+    if (!mine.set.includes(id)) delete set[id];
+    if (!mine.props.includes(id)) delete props[id];
+    const aliases = Object.fromEntries(Object.entries(full.aliases ?? {}).filter(([, to]) => to !== id));
+    for (const e of schema.validateDoc("kit_piece", { ...strip(i.doc), id: i.doc.credit?.from ?? "x_" })) out.push(`${at}: schema ${e.path} ${e.message}`);
+    for (const p of officialProblems(i.doc, { kit: { ...full, set, props, aliases }, family: i.family, families: Object.keys(FAMILIES), wired: wired.includes(i.family), shelfTags }))
+      if (p.level === "error") out.push(`${at}: ${p.msg}`);
+  }
   return out;
 }
 
@@ -413,7 +458,7 @@ export async function main(argv: string[]): Promise<number> {
   let parsed;
   try { parsed = parseArgs({ args: argv, allowPositionals: true, options: {
     id: { type: "string" }, family: { type: "string" }, by: { type: "string" }, contact: { type: "string" }, story: { type: "string" }, date: { type: "string" }, out: { type: "string" },
-    sheet: { type: "string" }, consent: { type: "boolean" }, project: { type: "boolean" }, pr: { type: "boolean" }, dry: { type: "boolean" }, check: { type: "boolean" }, regenerate: { type: "boolean" }, help: { type: "boolean", short: "h" },
+    sheet: { type: "string" }, consent: { type: "boolean" }, project: { type: "boolean" }, pr: { type: "boolean" }, dry: { type: "boolean" }, check: { type: "boolean" }, official: { type: "boolean" }, regenerate: { type: "boolean" }, help: { type: "boolean", short: "h" },
   } }); } catch (e) { console.error(`${(e as Error).message}\n(a value that starts with "-" is written --by=-Ada)`); return 2; }
   const { values: v, positionals } = parsed;
   if (v.check) {
@@ -421,6 +466,12 @@ export async function main(argv: string[]): Promise<number> {
     for (const b of bad) console.error(b);
     if (bad.length) { console.error("run node packages/sahne-kit/drawing/promote.ts --regenerate (it writes them)"); return 1; }
     return 0;
+  }
+  if (v.official) {
+    // internal (check() runs it in a process of its own): the official checks on the drawings in the folder
+    const bad = await officialStale();
+    for (const b of bad) console.log(b);
+    return bad.length ? 1 : 0;
   }
   if (v.regenerate) { regenerate(); return 0; }
   if (v.sheet !== undefined) {
