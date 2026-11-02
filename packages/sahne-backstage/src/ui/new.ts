@@ -20,6 +20,7 @@ import { inLang, langName, Texts, useLangs } from "./lang.ts";
 import { lessonOf } from "sahne-lesson";
 import { storyPluginsOf } from "../model/plugins.ts";
 import { editorPluginsOf, viewerOf } from "./plugins/index.ts";
+import { proposals } from "../events.ts";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const long = (date: string) => new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
@@ -30,7 +31,11 @@ export function NewEpisode(p: { season?: string; date?: string }) {
   if (!se) return html`<${Empty} icon="board" title=${`No season ${p.season ?? ""}`}><a href="#/board">Back to the board</a></${Empty}>`;
   const eps = w.episodes.filter(e => e.season === se.n);
   const taken = new Set(w.episodes.map(e => e.id));
-  const id = useMemo(() => { let k = 1; while (taken.has(`s${se.n}e${pad(k)}`)) k++; return `s${se.n}e${pad(k)}`; }, [se.n]);
+  // the season's next id no episode has: on disk, new and not saved yet, or proposed by an agent
+  const id = useMemo(() => {
+    const used = (x: string) => taken.has(x) || !!draftOf("story", x) || proposals.value.some(q => q.kind === "story" && q.create && q.doc === x);
+    let k = 1; while (used(`s${se.n}e${pad(k)}`)) k++; return `s${se.n}e${pad(k)}`;
+  }, [se.n]);
   const [, opened] = useState(0);
   useEffect(() => { void Promise.all(eps.map(e => openDoc("story", e.id))).then(() => opened(n => n + 1)); }, [se.id]);
   const dates = datesOf(se, eps);

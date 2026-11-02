@@ -108,6 +108,13 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
     }
   };
 
+  /** Undo the board's unsaved edits: each document as it is on disk again, and a new episode never saved dropped (it has no file to read). */
+  const discard = () => {
+    const fresh = changed.filter(k => !drafts.value[k]?.create), gone = changed.filter(k => drafts.value[k]?.create);
+    if (gone.length) drafts.value = Object.fromEntries(Object.entries(drafts.value).filter(([k]) => !gone.includes(k)));
+    for (const k of fresh) { const [kind, id] = k.split(":") as ["season" | "story", string]; void openDoc(kind, id, true); }
+  };
+
   /** A week's theme, written in the season and every story of the week. */
   const theme = (week: number, next: NonNullable<SeasonDoc["arcs"]>[string]) => {
     const t = themed(se, week, next);
@@ -164,7 +171,7 @@ function SeasonBoard(p: { id: string; settings: "series" | "season" | null; setS
       <div class="tray">${unscheduled.map(e => html`<${EpisodeCard} e=${e} story=${story(e.id)} mark=${markOf(e.id)} onDrag=${(on: boolean) => setDrag(on ? e.id : null)} />`)}</div>`}`}
     ${changed.length > 0 && html`<div class="savebar"><span class="grow">${changed.map(k => k.replace(":", " ")).join(", ")}
         ${changed.flatMap(k => (checked.value[k] ?? []).filter(x => x.new && x.level === "error")).map(x => html`<span class="bad-line">${x.story}: ${x.message}</span>`)}</span>
-      <button onClick=${() => { for (const k of changed) { const [kind, id] = k.split(":") as ["season" | "story", string]; void openDoc(kind, id, true); } }}>Discard</button>
+      <button onClick=${discard}>Discard</button>
       <${SaveButton} onSave=${() => void saveDocs(changed)} label="Save the board" /></div>`}
     ${menu && html`<${Popover} x=${menu.x} y=${menu.y} onClose=${() => setMenu(null)} label=${`Week ${menu.week}`}>
       <div class="fields" style="width:min(360px,80vw)"><b>Week ${menu.week}: ${arcOfWeek(se.n, menu.week)}</b>
