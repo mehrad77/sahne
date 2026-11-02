@@ -1,7 +1,8 @@
 // Places in a document, as paths of keys and indexes (["steps", 3, "choice", "options", 1, "reply", 0, "tr"]): reading one,
 // writing one without touching the rest (a new object along the path, the same objects elsewhere, and a key keeps its
 // place in its object), and the place in a story each cue of the stage comes from (sahne-story's CueInfo: step, option,
-// reply). Pure: Node-tested (test/model.test.ts).
+// reply), and a three-way merge of two edits of one document (`merge3`: an agent's proposal over the person's own
+// edits). Pure: Node-tested (test/model.test.ts, test/merge.test.ts).
 
 import type { CueInfo } from "sahne-story";
 
@@ -74,4 +75,85 @@ export function equal(a: unknown, b: unknown): boolean {
   if (Array.isArray(a) !== Array.isArray(b)) return false;
   const ka = Object.keys(a as object), kb = Object.keys(b as object);
   return ka.length === kb.length && ka.every(k => equal((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]));
+}
+
+/** A three-way merge's outcome: the merged document, or the first place both sides changed differently. */
+export type Merged = { doc: unknown; conflict?: undefined } | { doc?: undefined; conflict: Path };
+
+const isPlain = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+
+/** How alike two values are, 0 to 1: 1 the same; an object by its keys, each counted as alike as its values. */
+function alike(a: unknown, b: unknown): number {
+  if (equal(a, b)) return 1;
+  if (!isPlain(a) || !isPlain(b)) return 0;
+  const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])];
+  return keys.reduce((n, k) => n + alike(a[k], b[k]), 0) / keys.length;
+}
+
+/**
+ * How a list became another: for each item of `base`, its index in `side` (undefined: removed), and the items `side`
+ * added before each index of `base` (`base.length`: at the end). Items kept as they were are matched first (the longest
+ * common run); between two of those, a base item and the side's at the same place, when as many were there and they are
+ * alike, are the same item changed. Anything else is a removal and an addition (a move is both).
+ */
+function align(base: readonly unknown[], side: readonly unknown[]): { to: (number | undefined)[]; added: number[][] } {
+  const n = base.length, m = side.length, L = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) L[i][j] = equal(base[i], side[j]) ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const anchors: [number, number][] = [];
+  for (let i = 0, j = 0; i < n && j < m;) {
+    if (equal(base[i], side[j])) anchors.push([i++, j++]);
+    else if (L[i + 1][j] >= L[i][j + 1]) i++;
+    else j++;
+  }
+  const to: (number | undefined)[] = new Array(n).fill(undefined), added: number[][] = Array.from({ length: n + 1 }, () => []);
+  const bounds: [number, number][] = [[-1, -1], ...anchors, [n, m]];
+  for (let g = 0; g + 1 < bounds.length; g++) {
+    const [i0, j0] = bounds[g], [i1, j1] = bounds[g + 1];
+    const bs = Array.from({ length: i1 - i0 - 1 }, (_, k) => i0 + 1 + k), ss = Array.from({ length: j1 - j0 - 1 }, (_, k) => j0 + 1 + k);
+    const paired = bs.length === ss.length && bs.every((i, k) => alike(base[i], side[ss[k]]) >= 0.5);
+    if (paired) bs.forEach((i, k) => { to[i] = ss[k]; });
+    else added[i1].push(...ss);
+    if (i1 < n) to[i1] = j1;
+  }
+  return { to, added };
+}
+
+/**
+ * `mine` and `theirs`, two edits of `base`, made one: what only one side changed is taken from it, what both changed the
+ * same way once; objects merge key by key, lists item by item (`align`), so an item added, removed or moved on one side
+ * lands where it belongs among the other side's. A place both changed differently is a conflict (with `prefer`, that
+ * side's value wins there instead).
+ */
+export function merge3(base: unknown, mine: unknown, theirs: unknown, prefer?: "mine" | "theirs", at: Path = []): Merged {
+  if (equal(mine, theirs)) return { doc: mine };
+  if (equal(base, mine)) return { doc: theirs };
+  if (equal(base, theirs)) return { doc: mine };
+  const lose = (): Merged => (prefer ? { doc: prefer === "mine" ? mine : theirs } : { conflict: at });
+  if (isPlain(mine) && isPlain(theirs)) {
+    const b = isPlain(base) ? base : {}, out: Record<string, unknown> = {};
+    for (const k of [...new Set([...Object.keys(mine), ...Object.keys(theirs)])]) {
+      const r = merge3(b[k], mine[k], theirs[k], prefer, [...at, k]);
+      if (r.conflict) return r;
+      if (r.doc !== undefined) out[k] = r.doc;
+    }
+    return { doc: out };
+  }
+  if (!Array.isArray(mine) || !Array.isArray(theirs)) return lose();
+  const b = Array.isArray(base) ? base : [], A = align(b, mine), B = align(b, theirs), out: unknown[] = [];
+  for (let i = 0; i <= b.length; i++) {
+    const adds = A.added[i].map(j => mine[j]);
+    for (const j of B.added[i]) if (!adds.some(x => equal(x, theirs[j]))) adds.push(theirs[j]);
+    out.push(...adds);
+    if (i === b.length) break;
+    const a = A.to[i], t = B.to[i];
+    if (a !== undefined && t !== undefined) {
+      const r = merge3(b[i], mine[a], theirs[t], prefer, [...at, i]);
+      if (r.conflict) return r;
+      out.push(r.doc);
+    }
+    // removed on one side: fine while the other kept it as it was
+    else if (a !== undefined && !equal(mine[a], b[i])) { if (prefer === "mine") out.push(mine[a]); else if (!prefer) return { conflict: [...at, i] }; }
+    else if (t !== undefined && !equal(theirs[t], b[i])) { if (prefer === "theirs") out.push(theirs[t]); else if (!prefer) return { conflict: [...at, i] }; }
+  }
+  return { doc: out };
 }

@@ -1,0 +1,31 @@
+// Two edits of one document made one (src/model/path.ts `merge3`), as accepting an agent's proposal over the person's
+// unsaved edits does (src/events.ts): a step the proposal adds, removes or moves lands among the person's steps, a change
+// to a step lands on that step wherever the person moved it, and a place both changed differently is a conflict.
+
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { insert, merge3, move, set } from "../src/model/path.ts";
+
+const line = (n: string, tr = n) => ({ who: "a", tr, en: n });
+const disk = { title: "t", steps: ["s0", "s1", "s2", "s3", "s4", "s5", "s6"].map(n => line(n)) };
+const mine = set(disk, ["steps", 1, "tr"], "s1 mine");
+const steps = (d: unknown) => (d as typeof disk).steps.map(s => s.tr);
+
+test("a step added, removed or moved by the proposal lands right among the person's edits", () => {
+  assert.deepEqual(steps(merge3(disk, mine, insert(disk, ["steps"], 4, line("new"))).doc), ["s0", "s1 mine", "s2", "s3", "new", "s4", "s5", "s6"]);
+  assert.deepEqual(steps(merge3(disk, mine, set(disk, ["steps", 2], undefined)).doc), ["s0", "s1 mine", "s3", "s4", "s5", "s6"]);
+  assert.deepEqual(steps(merge3(disk, mine, move(disk, ["steps"], 5, 2)).doc), ["s0", "s1 mine", "s5", "s2", "s3", "s4", "s6"]);
+});
+
+test("a step's new words land on that step, after the person added a line before it", () => {
+  const added = insert(disk, ["steps"], 2, line("mine"));
+  assert.deepEqual(steps(merge3(disk, added, set(disk, ["steps", 5, "tr"], "s5 theirs")).doc), ["s0", "s1", "mine", "s2", "s3", "s4", "s5 theirs", "s6"]);
+});
+
+test("one place changed both ways is a conflict; the same change both ways is taken once", () => {
+  assert.deepEqual(merge3(disk, mine, set(disk, ["steps", 1, "tr"], "s1 theirs")).conflict, ["steps", 1, "tr"]);
+  assert.equal(merge3(disk, set(disk, ["steps", 2], undefined), set(disk, ["steps", 2, "tr"], "x")).conflict?.join("/"), "steps/2");
+  const both = insert(disk, ["steps"], 3, line("same"));
+  assert.deepEqual(steps(merge3(disk, both, both).doc), steps(both));
+  assert.deepEqual(merge3(disk, mine, set(disk, ["title"], "T")).doc, set(mine, ["title"], "T"));
+});

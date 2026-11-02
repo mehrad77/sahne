@@ -1,13 +1,15 @@
 // What agents do, as the editor hears it (server/events.ts): their proposed edits waiting for a person, a file written by
 // one directly, an episode they point at, and the AI's spending. A proposal is accepted as an edit like any other (Undo,
-// the check, Save): its whole document where the editor has no unsaved edits of it, else only the places it changes, so
-// nothing typed is lost. A direct write reloads a document that has no unsaved edits; one that has them is marked in
+// the check, Save): what it changes is merged with what the editor has (model/path.ts `merge3`: the person's unsaved
+// edits stay, a step it adds, removes or moves lands among theirs), and where both changed the same place differently it
+// is not taken, so nothing typed is lost and nothing lands on the wrong step. A direct write reloads a document that has no unsaved edits; one that has them is marked in
 // conflict instead of being overwritten. The editor's selection goes back to the server for the agents' `selection`.
 // Each agent's tool call (`activity`) is kept for the Agents page, newest first, and runs (`run`) for their view (runs.ts).
 
 import { signal } from "@preact/signals";
 import { api, type Kind } from "./api.ts";
-import { get, set, type Path } from "./model/path.ts";
+import { merge3, type Path } from "./model/path.ts";
+import { pathWords } from "./model/tools.ts";
 import * as H from "./model/history.ts";
 import { change, createDoc, drafts, go, keyOf, loadWorld, openDoc, route, saveDocs, say } from "./store.ts";
 import { loadKitDocs } from "./kitdocs.ts";
@@ -93,14 +95,43 @@ export function connectEvents() {
   source.addEventListener("run", e => heardRun(JSON.parse((e as MessageEvent).data)));
 }
 
-/** Put one proposed document into the editor: whole, or only its changed places over unsaved edits (always only those, `exact`). */
-async function applyEdit(e: ProposalEdit, paths: Path[], exact = false) {
-  const k = keyOf(e.kind, e.doc);
-  if (e.create && !drafts.value[k]) { createDoc(e.kind, e.doc, e.next); return; }
-  const d = drafts.value[k] ?? await openDoc(e.kind, e.doc);
-  if (!d) return;
-  if ((!H.dirty(d) && !exact) || !paths.length) change(e.kind, e.doc, () => e.next, `proposal.${k}`);
-  else change(e.kind, e.doc, doc => paths.reduce((x, p) => set(x, p, get(e.next, p)), doc), `proposal.${k}`);
+/** The document a proposal was computed from, when the editor can tell: the file as read here, if it is that version. */
+const baseOf = (e: ProposalEdit, d: H.Draft | undefined): { doc: unknown } | null =>
+  e.create && !d ? { doc: undefined } : d && !d.create && d.mtime === e.base ? { doc: d.saved } : null;
+
+/** A proposed document over the editor's (`doc`, the draft or the file): merged, or why it cannot be. */
+export function mergedOnto(e: ProposalEdit, doc: unknown, d: H.Draft | undefined = drafts.value[keyOf(e.kind, e.doc)]): { doc: unknown } | { why: string } {
+  const base = baseOf(e, d);
+  // another version than it was proposed on, and nothing unsaved to keep: the proposal as it is
+  if (!base && !H.dirty(d)) return { doc: e.next };
+  if (!base) return { why: `${e.kind} ${e.doc} is not the version it was proposed on, and it has unsaved edits: save them first` };
+  const m = merge3(base.doc, doc, e.next);
+  return m.conflict ? { why: `your unsaved edits and the proposal both change ${e.kind} ${e.doc} at ${pathWords(m.conflict)}: save or undo yours first` } : { doc: m.doc };
+}
+
+/**
+ * The documents accepting these edits makes, each merged with the editor's draft (opened when it is not open yet), or
+ * why one cannot be taken (then none is). Nothing changes in the editor until `put`.
+ */
+async function planOf(edits: ProposalEdit[]): Promise<Map<string, { e: ProposalEdit; doc: unknown }> | string> {
+  const out = new Map<string, { e: ProposalEdit; doc: unknown }>();
+  for (const e of edits) {
+    const k = keyOf(e.kind, e.doc);
+    const d = e.create && !drafts.value[k] ? undefined : drafts.value[k] ?? await openDoc(e.kind, e.doc) ?? undefined;
+    if (!d && !e.create) return `${e.kind} ${e.doc} could not be opened`;
+    const r = mergedOnto(e, out.get(k)?.doc ?? d?.doc, d);
+    if ("why" in r) return r.why;
+    out.set(k, { e, doc: r.doc });
+  }
+  return out;
+}
+
+/** Put planned documents into the editor, each as one edit (Undo takes it back). */
+function put(plan: Map<string, { e: ProposalEdit; doc: unknown }>) {
+  for (const [k, { e, doc }] of plan) {
+    if (!drafts.value[k]) createDoc(e.kind, e.doc, doc);
+    else change(e.kind, e.doc, () => doc, `proposal.${k}`);
+  }
 }
 
 /** The steps a run's step needs, through the steps they need. */
@@ -129,22 +160,21 @@ export function neededFirst(p: Proposal): Proposal[] {
 /** The steps it needs whose work was turned down: it cannot be accepted until they are done again. */
 export const turnedDown = (p: Proposal): string[] => stepsBefore(p)?.turnedDown ?? [];
 
-async function acceptOne(p: Proposal) {
-  await applyEdit(p, p.paths);
-  // a document carried along changes only where the proposal says, when it says
-  for (const a of p.also ?? []) await applyEdit(a, a.paths ?? [], !!a.paths?.length);
-  await api.post(`proposals/${p.id}`, { accepted: true });
-}
+/** Accept a proposal: merged into the editor as an edit, then answered; first what it needs. */
+export async function accept(p: Proposal): Promise<void> { await take(p); }
 
-/** Accept a proposal: applied as an edit (and the ones it was built on, which it holds), then answered; first what it needs. */
-export async function accept(p: Proposal) {
+/** `accept`, saying whether it was taken. */
+async function take(p: Proposal): Promise<boolean> {
   const no = turnedDown(p);
-  if (no.length) { say(`not taken: it needs ${no.join(", ")}, which you turned down. Do ${no.length > 1 ? "those steps" : "that step"} again first.`, true); return; }
-  const first = neededFirst(p);
-  for (const q of first) await acceptOne(q);
-  await acceptOne(p);
+  if (no.length) { say(`not taken: it needs ${no.join(", ")}, which you turned down. Do ${no.length > 1 ? "those steps" : "that step"} again first.`, true); return false; }
+  const first = neededFirst(p), all = [...first, p];
+  const plan = await planOf(all.flatMap(q => [q, ...(q.also ?? [])]));
+  if (typeof plan === "string") { say(`not taken: ${plan}.`, true); return false; }
+  put(plan);
+  for (const q of all) await api.post(`proposals/${q.id}`, { accepted: true });
   await refresh();
   say(`taken: ${p.summary}${first.length ? `, with ${first.length} it needs (${first.map(q => q.doc).join(", ")})` : ""}. Save to write ${first.length ? "them" : "it"}.`);
+  return true;
 }
 
 /**
@@ -155,8 +185,7 @@ export async function acceptAndSave(p: Proposal): Promise<boolean> {
   const keys = [...neededFirst(p), p].flatMap(q => [q, ...(q.also ?? [])]).map(e => keyOf(e.kind, e.doc));
   const theirs = keys.filter(k => drafts.value[k] && H.dirty(drafts.value[k]));
   if (theirs.length && !confirm(`This also saves your own unsaved edits to ${theirs.map(k => k.replace(":", " ")).join(", ")}. Go on?`)) return false;
-  if (turnedDown(p).length) { await accept(p); return false; }
-  await accept(p);
+  if (!await take(p)) return false;
   return saveDocs([...new Set(keys)]);
 }
 
