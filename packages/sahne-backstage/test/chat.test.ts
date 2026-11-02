@@ -30,3 +30,10 @@ test("Go ahead sends its own question once, and only from the last answer", () =
   const later = [...list, { role: "user" as const, content: "something else" }, { role: "assistant" as const, content: "ok" }];
   assert.equal(askedBy(later, cost), null, "an older cost card answers nothing now");
 });
+
+const { withStatus } = await import("../src/ui/assistant.ts");
+
+test("a status the assistant sets drops an earlier approval's signature", () => {
+  const r = { status: "approved" as const, sig: "abc", reviewer: "Ada", comments: [] };
+  assert.deepEqual(withStatus(r, "reviewed"), { status: "reviewed", reviewer: "Ada", comments: [] });
+});

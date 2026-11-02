@@ -18,7 +18,7 @@ import { signal } from "@preact/signals";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { Path } from "../model/path.ts";
 import { api } from "../api.ts";
-import { go, loadWorld, route, say, setReview, world } from "../store.ts";
+import { go, loadWorld, route, say, setReview, world, type EpisodeReview } from "../store.ts";
 import { acceptAndSave, proposals, selection, usage } from "../events.ts";
 import { abilities } from "../model/abilities.ts";
 import { Icon, Popover } from "./kit/index.ts";
@@ -326,6 +326,15 @@ function Proposed(p: { id: string }) {
   return html`<div class="tool ok">Proposed an edit to the ${what} <b>${x.doc}</b>: <a href=${href}>accept or reject it</a> ${x.kind === "story" ? "above the script" : "on its page"}.</div>`;
 }
 
+/**
+ * An episode's notes with a status the assistant asked to set, other than approved (approving signs the episode as it is,
+ * on its Review tab): the signature of an earlier approval goes with it, so it is not read as approved and changed since.
+ */
+export function withStatus(r: EpisodeReview, status: NonNullable<EpisodeReview["status"]>): EpisodeReview {
+  const { sig: _sig, ...rest } = r;
+  return { ...rest, status };
+}
+
 /** A question for the person, as a card: its buttons answer it (the answer is sent as their message), save proposals, or set a status. */
 function AskCard(p: { part: AskPart; latest: boolean }) {
   const [busy2, setBusy2] = useState(false);
@@ -340,7 +349,7 @@ function AskCard(p: { part: AskPart; latest: boolean }) {
       ${x.review && (x.review.status === "approved"
         // approving is a sign-off on a Ready episode: it happens on the episode's Review tab, which says what is missing
         ? html`<a class="button primary" href=${`#/episode/${x.review.id}/review`}>Open ${x.review.id}'s review</a>`
-        : html`<button class="primary" disabled=${!p.latest || busy2} onClick=${() => { void setReview(x.review!.id, r => ({ ...r, status: x.review!.status as never })); answer(`Marked ${x.review!.id} ${x.review!.status}.`); }}>Mark ${x.review.status}</button>`)}
+        : html`<button class="primary" disabled=${!p.latest || busy2} onClick=${() => { void setReview(x.review!.id, r => withStatus(r, x.review!.status as never)); answer(`Marked ${x.review!.id} ${x.review!.status}.`); }}>Mark ${x.review.status}</button>`)}
       ${waiting.length > 0 && html`<button class="primary" disabled=${busy2} onClick=${async () => { setBusy2(true); let n = 0; for (const q of waiting) if (await acceptAndSave(q)) n++; setBusy2(false); answer(n ? `Accepted and saved ${n} proposal${n > 1 ? "s" : ""}.` : "Nothing was saved."); }}>Accept and save ${waiting.length > 1 ? `all ${waiting.length}` : "it"}</button>`}
       ${(x.options ?? []).map(o => html`<button disabled=${!open} onClick=${() => { answer(`You answered: ${o}`); void send(o); }}>${o}</button>`)}
       ${(x.review || x.remember || waiting.length > 0) && html`<button disabled=${!open} onClick=${() => answer("Not now.")}>Not now</button>`}
