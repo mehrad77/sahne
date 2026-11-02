@@ -52,7 +52,8 @@ function Glosses(p: EpisodeProps) {
         ${langs.translations.map(l => html`<td><input ...${inLang(l)} value=${g[l] ?? ""} aria-label=${`${w} in ${langName(l)}`} onInput=${(e: Event) => p.edit(s => set(s, ["gl", w, l], (e.target as HTMLInputElement).value), `gl.${w}.${l}`)} /></td>`)}
         <td><button class="iconbtn" aria-label=${`Remove ${w}`} onClick=${() => p.edit(s => set(s, ["gl", w], undefined))}><${Icon} name="trash" size=${15} /></button></td></tr>`)}
     </tbody></table>` : html`<p class="note">None yet.</p>`}
-    <form class="row" onSubmit=${(e: Event) => { e.preventDefault(); const w = word.trim().toLocaleLowerCase(langs.main); if (!w) return; p.edit(s => set(s, ["gl", w], Object.fromEntries(langs.translations.map(l => [l, ""])))); setWord(""); }}>
+    <form class="row" onSubmit=${(e: Event) => { e.preventDefault(); const w = word.trim().toLocaleLowerCase(langs.main); if (!w) return; // a word glossed already keeps its glosses (only a missing language is added)
+      p.edit(s => { const was = get(s, ["gl", w]); return set(s, ["gl", w], { ...Object.fromEntries(langs.translations.map(l => [l, ""])), ...(was && typeof was === "object" ? was : {}) }); }); setWord(""); }}>
       <input ...${inLang(langs.main)} value=${word} placeholder="a word, lower case" style="max-width:220px" aria-label="A word to gloss" onInput=${(e: Event) => setWord((e.target as HTMLInputElement).value)} /><button>Gloss it</button></form>
   </div>`;
 }
