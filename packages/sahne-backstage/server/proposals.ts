@@ -9,17 +9,19 @@
 // agent's own latest pending proposal on it (`after` names that one), so each holds the ones before it. Accepting one
 // therefore applies those it was built on as well (they are resolved with it); rejecting one drops those built on it.
 // Proposals of different agents are independent, each against the disk. `base` is the mtime the proposal was computed
-// from, so the editor can tell when the file changed since. The same author proposing the same documents again (a step
+// from, and `from` the document itself (the file at that mtime, or the agent's own pending proposal it was built on, as
+// mcp.ts `current` reads it): the editor merges the proposal's changes from `from` into what it has, so a save made since
+// is kept, never reverted. The same author proposing the same documents again (a step
 // of a run that starts over after a restart) gets the proposal it made, not a second one.
 
-import type { Kind, Problem } from "./content.ts";
+import { exists, readDoc, type Kind, type Problem } from "./content.ts";
 import type { Events } from "./events.ts";
 import type { Store } from "./runs/store.ts";
 
 /** A document that changes with a proposal's main one (a season's calendar row with its episode's date). */
 /** A document a proposal changes. `paths` (for one that changes with the main one) are its changed places: accepting it
  * sets only those, so it never undoes a person's unsaved edits or an earlier accepted proposal on the same document. */
-export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean; paths?: (string | number)[][] }
+export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean; paths?: (string | number)[][]; /** The document it was computed from (`add` finds it). */ from?: unknown }
 
 export interface Proposal {
   id: string;
@@ -46,6 +48,8 @@ export interface Proposal {
   after?: string;
   /** The step of a run that made it (runs/). */
   step?: string;
+  /** The document it was computed from (`add` finds it). */
+  from?: unknown;
 }
 
 export type NewProposal = Omit<Proposal, "id" | "at">;
@@ -89,11 +93,30 @@ export class Proposals implements Queue {
   async add(p: NewProposal): Promise<Proposal> {
     const same = this.all().find(q => q.by === p.by && q.kind === p.kind && q.doc === p.doc && JSON.stringify([q.next, q.also ?? []]) === JSON.stringify([p.next, p.also ?? []]));
     if (same) return same;
-    const out: Proposal = { ...p, id: `p${++this.n}`, at: Date.now() };
+    const out: Proposal = { ...p, ...this.fromOf(p, p.by), ...(p.also ? { also: p.also.map(a => ({ ...a, ...this.fromOf(a, p.by) })) } : {}), id: `p${++this.n}`, at: Date.now() };
     this.list.set(out.id, out);
     this.keep();
     this.events.emit("proposal", { action: "added", proposal: out });
     return out;
+  }
+
+  /**
+   * The document an edit was computed from, as mcp.ts `current` gives it to the agent: its own latest pending proposal of
+   * the document, else one that carried it along, else the file, when it is still at the edit's `base`. Nothing for a new
+   * document, or for a file that changed since (the editor then refuses to merge rather than guess).
+   */
+  private fromOf(e: { kind: Kind; doc: string; base?: number; create?: boolean }, by: string): { from?: unknown } {
+    const mine = this.all().filter(x => x.by === by);
+    const own = latestOf(mine, by, e.kind, e.doc);
+    if (own) return { from: own.next };
+    const carried = [...mine].sort((a, b) => b.at - a.at).flatMap(x => x.also ?? []).find(a => a.kind === e.kind && a.doc === e.doc);
+    if (carried) return { from: carried.next };
+    if (e.create || e.base === undefined) return {};
+    try {
+      if (!exists(e.kind, e.doc)) return {};
+      const r = readDoc(e.kind, e.doc);
+      return r.mtime === e.base ? { from: r.doc } : {};
+    } catch { return {}; }
   }
 
   /**

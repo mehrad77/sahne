@@ -17,7 +17,7 @@ import { answerLook, type LookAsk } from "./look.ts";
 import { heardRun, loadRuns, runs } from "./runs.ts";
 import { who } from "./model/who.ts";
 
-export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean; paths?: Path[] }
+export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean; paths?: Path[]; /** The document it was computed from (server/proposals.ts). */ from?: unknown }
 export interface Proposal extends ProposalEdit {
   id: string; also?: ProposalEdit[]; paths: Path[]; summary: string; by: string; at: number;
   problems: { level: string; message: string; new?: boolean; step?: number }[]; after?: string;
@@ -95,18 +95,19 @@ export function connectEvents() {
   source.addEventListener("run", e => heardRun(JSON.parse((e as MessageEvent).data)));
 }
 
-/** The document a proposal was computed from, when the editor can tell: the file as read here, if it is that version. */
+/**
+ * The document a proposal was computed from: as the server kept it (`from`), else nothing for a new one, else the file as
+ * read here when it is still that version. Null when it cannot be told: the file changed since.
+ */
 const baseOf = (e: ProposalEdit, d: H.Draft | undefined): { doc: unknown } | null =>
-  e.create && !d ? { doc: undefined } : d && !d.create && d.mtime === e.base ? { doc: d.saved } : null;
+  "from" in e ? { doc: e.from } : e.create ? { doc: undefined } : d && !d.create && d.mtime === e.base ? { doc: d.saved } : null;
 
 /** A proposed document over the editor's (`doc`, the draft or the file): merged, or why it cannot be. */
 export function mergedOnto(e: ProposalEdit, doc: unknown, d: H.Draft | undefined = drafts.value[keyOf(e.kind, e.doc)]): { doc: unknown } | { why: string } {
   const base = baseOf(e, d);
-  // another version than it was proposed on, and nothing unsaved to keep: the proposal as it is
-  if (!base && !H.dirty(d)) return { doc: e.next };
-  if (!base) return { why: `${e.kind} ${e.doc} is not the version it was proposed on, and it has unsaved edits: save them first` };
+  if (!base) return { why: `${e.kind} ${e.doc} changed since it was proposed: ask for it again` };
   const m = merge3(base.doc, doc, e.next);
-  return m.conflict ? { why: `your unsaved edits and the proposal both change ${e.kind} ${e.doc} at ${pathWords(m.conflict)}: save or undo yours first` } : { doc: m.doc };
+  return m.conflict ? { why: `your edits and the proposal both change ${e.kind} ${e.doc} at ${pathWords(m.conflict)}: save or undo yours first` } : { doc: m.doc };
 }
 
 /**
