@@ -628,3 +628,22 @@ test("a step stopped between two tool calls of a turn and tried again does not m
   writeFileSync(file, was);
   (await import("../server/content.ts")).forget();
 });
+
+test("two backstages on one root: the one that came second reads the tasks, runs none, and takes them over once the first has gone", async () => {
+  const file = join(config, "two.sqlite"), first = runs(scripted({ cast_derya: [finish("made")] }), new Events(), new Store(file)).r;
+  const run = first.create({ goal: "g", plan: { brief: "b", steps: [PLAN.steps[0]] }, gates: { plan: true } });
+  // another live process holds the tasks (this test's parent stands in for it)
+  const s = new Store(file);
+  s.set("owner:runs", { pid: process.ppid, at: Date.now() });
+  const log: string[] = [];
+  const second = runs(scripted({ cast_derya: () => { log.push("ran"); return finish("made twice"); } }), new Events(), s).r;
+  second.resume();
+  assert.deepEqual(second.all().map(x => x.id), [run.id], "it reads them");
+  assert.throws(() => second.create({ goal: "g2" }), /another backstage \(process \d+\) on this content root runs its tasks/);
+  assert.throws(() => second.act(run.id, { action: "continue" }), /another backstage/);
+  // the first one has gone (a pid no process has): the second takes over, and goes on
+  s.set("owner:runs", { pid: 2 ** 22 + 12345, at: Date.now() });
+  second.act(run.id, { action: "continue" });
+  await second.idle();
+  assert.deepEqual([second.get(run.id)!.status, log], ["done", ["ran"]]);
+});

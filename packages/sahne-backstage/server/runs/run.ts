@@ -188,6 +188,8 @@ export class Runs {
   private readonly seqs = new Map<string, { seq: number; type?: string }>();
   /** The tool calls at work now, by thread and call id: a step that starts again waits for its own instead of calling twice. */
   private readonly calls = new Map<string, Promise<Outcome>>();
+  /** Another backstage on this root that runs its tasks (its pid), or null when this one does: then this one only reads. */
+  private held: number | null;
 
   constructor(o: RunsOptions) {
     this.o = o;
@@ -197,12 +199,14 @@ export class Runs {
     // each tool call a step's thread finished, with its answer: a turn run again (after a stop, a failure or a restart)
     // gives those answers back instead of making the edits twice
     o.store.db.exec("CREATE TABLE IF NOT EXISTS run_calls (thread TEXT NOT NULL, call TEXT NOT NULL, outcome TEXT NOT NULL, PRIMARY KEY (thread, call))");
-    const kept = o.store.get<{ n: number; runs: Run[] }>("runs", { n: 0, runs: [] });
-    this.n = kept.n; this.list = kept.runs;
-    // a budget an older backstage stored as no number (NaN, null) would never bind, or stop the scheduler: it is the default again
-    for (const r of this.list) if (typeof r.maxUsd !== "number" || !Number.isFinite(r.maxUsd)) { r.maxUsd = 10; delete r.maxSet; }
+    // one backstage on a root runs its tasks: each keeps them in memory and writes them whole, so a second one would run
+    // the same steps again, number its tasks as the first does and write over its list
+    this.held = o.store.claim("runs");
+    this.n = 0; this.list = [];
+    this.load();
     // a person turning down a step's proposal: that step, and the finished steps built on it, need a redo
     o.events.on((name, data) => {
+      if (this.held !== null) return;
       const d = data as { action?: string; accepted?: boolean; withdrawn?: boolean; proposal?: { by: string; step?: string } };
       if (name !== "proposal" || d.action !== "resolved" || d.accepted || d.withdrawn || !d.proposal?.step) return;
       const run = this.list.find(r => r.by === d.proposal!.by);
@@ -233,14 +237,32 @@ export class Runs {
     this.tick(run);
   }
 
-  all(): Run[] { return this.list; }
-  get(id: string): Run | undefined { return this.list.find(r => r.id === id); }
+  /** The runs as the store has them. */
+  private load(): void {
+    const kept = this.o.store.get<{ n: number; runs: Run[] }>("runs", { n: 0, runs: [] });
+    this.n = kept.n; this.list = kept.runs;
+    // a budget an older backstage stored as no number (NaN, null) would never bind, or stop the scheduler: it is the default again
+    for (const r of this.list) if (typeof r.maxUsd !== "number" || !Number.isFinite(r.maxUsd)) { r.maxUsd = 10; delete r.maxSet; }
+  }
+
+  /** Before a change: this backstage runs the tasks (taking them over when the one that did has gone), or it refuses. */
+  private lead(): void {
+    if (this.held === null) return;
+    this.held = this.o.store.claim("runs");
+    if (this.held !== null) throw new Error(`another backstage (process ${this.held}) on this content root runs its tasks: use that one, or stop it`);
+    this.load();
+    this.resume();
+  }
+
+  all(): Run[] { if (this.held !== null) this.load(); return this.list; }
+  get(id: string): Run | undefined { return this.all().find(r => r.id === id); }
   private keep() { this.o.store.set("runs", { n: this.n, runs: this.list }); }
   private changed(run: Run) { this.keep(); this.o.events.emit("run", { run }); }
   private settings() { return this.o.settings?.() ?? readSettings(); }
 
   /** Start a run: of a plan, or from its goal alone, a planning step first. */
   create(v: { goal: string; plan?: Plan; gates?: Partial<Gates> | false; maxUsd?: number; concurrency?: number; agentEdits?: AgentEdits; mode?: "check" | "auto"; asks?: "choices" | "never" }): Run {
+    this.lead();
     const plan: Plan = v.plan ?? { brief: "", steps: [{ id: "plan", kind: "plan", title: "Plan the task", brief: PLANNING }] };
     const bad = planProblems(plan);
     if (bad.length) throw new Error(`the plan: ${bad.join("; ")}`);
@@ -285,6 +307,7 @@ export class Runs {
 
   /** After a restart: every run that was going goes on, its running steps from their last checkpoint. */
   resume(): void {
+    if (this.held !== null) return;
     for (const run of this.list) {
       if (run.status === "done" || run.status === "stopped") continue;
       for (const s of run.steps) if (s.status === "running") s.status = "waiting";
@@ -298,6 +321,7 @@ export class Runs {
    * whose writes are all undone are `undone`, and may be done again.
    */
   undo(id: string, items?: { kind: Kind; id: string }[]): { run: Run; undone: Undone[]; kept: Kept[] } {
+    this.lead();
     const run = this.need(id), all = this.journal.of(run.id);
     if (run.steps.some(s => s.status === "running" || s.status === "asking")) throw new Error("stop the run first: its steps are still working");
     // a stopped step's tool call may still be saving: its write would land after the undo
@@ -326,6 +350,7 @@ export class Runs {
 
   /** The person's answer at a gate (go on, or stop), or new gates. */
   act(id: string, a: { action: "continue" } | { action: "pause" } | { action: "stop" } | { action: "gates"; gates: Partial<Gates> } | { action: "budget"; maxUsd: number } | { action: "plan"; plan: Plan }): Run {
+    this.lead();
     const run = this.need(id);
     if (a.action === "plan") {
       if (run.status !== "gate" || run.gate !== "plan") throw new Error("the plan can change at the plan gate only");
@@ -360,6 +385,7 @@ export class Runs {
 
   /** The person answers a step's question, stops it, or has it try again. */
   async step(id: string, stepId: string, a: { action: "answer"; answer: string } | { action: "tell"; text: string } | { action: "stop" } | { action: "retry" } | { action: "redo"; note?: string; owns?: Owned[] }): Promise<Run> {
+    this.lead();
     const run = this.need(id), s = run.steps.find(x => x.id === stepId);
     if (!s) throw new Error(`run ${id} has no step ${stepId}`);
     if (a.action === "stop") { this.live.get(`${run.id}:${s.id}`)?.abort(); s.status = "stopped"; delete s.question; }
