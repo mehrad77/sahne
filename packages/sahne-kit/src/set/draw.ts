@@ -19,8 +19,8 @@ export const num = (v: unknown, d: number) => typeof v === "number" && Number.is
 export const hex = (v: unknown, d: string) => typeof v === "string" ? SET[v] ?? FABRIC[v] ?? METAL[v] ?? SKIN[v] ?? HAIR[v] ?? (/^#[0-9a-f]{6}$/i.test(v) ? v : d) : d;
 /** A param as a string, else `d`. */
 export const str = (v: unknown, d: string) => typeof v === "string" ? v : d;
-/** Mirror shapes about x = 0 (a plane or a traveller going left). */
-export const flip = (sh: Shape[], dir: number) => dir < 0 ? sh.map(s => ({ ...s, path: s.path.mirrorX() })) : sh;
+/** Mirror shapes about x = 0 (a plane or a traveller going left), their clips with them. */
+export const flip = (sh: Shape[], dir: number) => dir < 0 ? sh.map(s => ({ ...s, path: s.path.mirrorX(), ...(s.clip ? { clip: Array.isArray(s.clip) ? s.clip.map(c => c.mirrorX()) : s.clip.mirrorX() } : {}) })) : sh;
 /** An outline with holes cut in it (even-odd). */
 export const holed = (outer: Path, holes: Path[]) => { for (const h of holes) outer.add(h); return outer; };
 /** A path from a piece's params: `go` (offsets in the place, cm), `ms`, `wait`, `phase`, `hide` (default on); undefined without `go`. */
