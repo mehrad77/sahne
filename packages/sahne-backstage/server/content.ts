@@ -197,7 +197,10 @@ function problemsIn(w: World, edits: Edit[], k?: Kit): Problem[] {
   const tag = (doc: string) => (p: CheckProblem): Problem => ({ ...p, doc });
   // a place or a character is checked with the stories that use it: a mark taken away, a voice changed, breaks them
   const users = edits.filter(e => e.kind === "place" || e.kind === "character").flatMap(e => usesOf(e.kind as "place" | "character", e.id, undefined, w).map(u => u.story));
-  const stories = [...new Set([...edits.filter(e => e.kind === "story").map(e => e.id), ...users])];
+  // a season's calendar and arcs are its stories' dates and themes, and the series' languages and plugins every story's
+  const seasons = new Set(edits.filter(e => e.kind === "season").map(e => Number(e.id.slice(1))));
+  const governed = edits.some(e => e.kind === "series") ? w.drafts.map(d => d.id) : w.drafts.filter(d => seasons.has(seasonOf(d.id))).map(d => d.id);
+  const stories = [...new Set([...edits.filter(e => e.kind === "story").map(e => e.id), ...users, ...governed])];
   if (stories.length) {
     const placed = sol(w.places);
     const opts: CheckOptions = { ...o, solids: Object.fromEntries(stories.map(id => [id, placed])) };

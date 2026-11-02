@@ -14,7 +14,7 @@ cpSync(SAMPLES, root, { recursive: true, filter: s => !s.endsWith("/samples/kit"
 process.env.SAHNE_CONTENT = root;
 after(() => rmSync(root, { recursive: true, force: true }));
 
-const { check, forget, readDoc } = await import("../server/content.ts");
+const { check, forget, readDoc, save } = await import("../server/content.ts");
 
 const storyFile = join(root, "stories", "s1e00.json");
 /** Change a file of the root as another editor would, and read the root again. */
@@ -48,4 +48,23 @@ test("a new document is checked against the files' own baseline: an old problem 
     assert.ok(flag, "the old flag problem is reported");
     assert.ok(!flag.new, "and it is not the new episode's");
   } finally { writeFileSync(storyFile, was); forget(); }
+});
+
+test("a season or series edit is checked with the stories it governs", () => {
+  const seasonFile = join(root, "seasons", "s1.json"), seriesFile = join(root, "series.json");
+  const was = { season: readFileSync(seasonFile, "utf8"), series: readFileSync(seriesFile, "utf8") };
+  try {
+    onDisk(seasonFile, d => { d.calendar = { s1e00: { date: "2026-09-14", kind: "episode", week: 0 } }; });
+    // the calendar row moved, the story's date not: the story breaks
+    const season = readDoc("season", "s1").doc as Record<string, unknown>;
+    const moved = { ...season, calendar: { s1e00: { date: "2026-09-15", kind: "episode", week: 0 } } };
+    assert.ok(brought([{ kind: "season", id: "s1", doc: moved }]).some(m => /releaseDate 2026-09-14 but Days has 2026-09-15/.test(m)));
+    // the lesson plugin turned off: every story's lesson fields are now wrong
+    const series = readDoc("series", "series").doc as { plugins?: string[] };
+    assert.ok(brought([{ kind: "series", id: "series", doc: { ...series, plugins: (series.plugins ?? []).filter(p => p !== "lesson") } }]).length > 0);
+    // a translation added is the translation work, not a broken story: it saves
+    const langs = (series as { languages: { main: string; translations: string[] } }).languages;
+    const r = save([{ kind: "series", id: "series", doc: { ...series, languages: { ...langs, translations: [...langs.translations, "de"] } } }], { write: true });
+    assert.equal(r.status, 200, r.message);
+  } finally { writeFileSync(seasonFile, was.season); writeFileSync(seriesFile, was.series); forget(); }
 });
