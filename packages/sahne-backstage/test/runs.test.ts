@@ -647,3 +647,31 @@ test("two backstages on one root: the one that came second reads the tasks, runs
   await second.idle();
   assert.deepEqual([second.get(run.id)!.status, log], ["done", ["ran"]]);
 });
+
+test("a step stopped mid-turn whose writes are undone starts over when tried again, never told of edits that are gone", async () => {
+  const { existsSync: has } = await import("node:fs");
+  const { looksOf } = await import("../server/look.ts");
+  const seen: Record<string, BaseMessage[][]> = {};
+  const { r, events } = runs(scripted({
+    x: (m: BaseMessage[]): Turn => {
+      const n = m.filter(y => y.getType() === "ai").length;
+      // its first turn makes her, then looks (and waits for an editor); after a fresh start it only finishes
+      return n === 0 && !m.some(y => /Your last try/.test(String(y.content))) && seen.x.length === 1 ? { calls: [{ name: "create_character", args: { ...derya, id: "dilek11" } }, { name: "look", args: { id: "s1e00" } }] } : finish("done");
+    },
+  }, { seen }));
+  const rids: string[] = [];
+  events.on((name, d) => { if (name === "look") rids.push((d as { rid: string }).rid); });
+  const run = r.create({ goal: "g", agentEdits: "direct", gates: false, plan: { brief: "b", steps: [{ id: "x", kind: "character", title: "X", brief: "make her", owns: [{ kind: "character", id: "dilek11" }] }] } });
+  while (!rids.length) await new Promise(res => setTimeout(res, 10));
+  await r.step(run.id, "x", { action: "stop" });
+  await r.idle();
+  looksOf(events).answer(rids[0], null);
+  await new Promise(res => setTimeout(res, 50));
+  r.undo(run.id);
+  assert.ok(!has(join(root, "characters", "dilek11.json")));
+  await r.step(run.id, "x", { action: "retry" });
+  await r.idle();
+  const last = seen.x.at(-1)!;
+  assert.equal(last.filter(y => y.getType() === "ai").length, 0, "a fresh start: no turn of the old try");
+  assert.ok(!last.some(y => /saved: add the character dilek11/.test(String(y.content))));
+});

@@ -342,6 +342,10 @@ export class Runs {
     // a step none of whose writes are left is undone; it may be done again
     const left = this.journal.of(run.id);
     for (const s of run.steps) if (s.status === "done" && which.some(w => w.step === s.id) && !left.some(w => w.step === s.id)) s.status = "undone";
+    // a step not done (stopped or failed mid-turn) whose writes were taken back starts over when tried again: its
+    // checkpoint and its kept tool answers would tell it of edits that are gone
+    const gone = (w: Written) => r.undone.some(u => u.kind === w.kind && u.id === w.id);
+    for (const s of run.steps) if (s.status !== "done" && s.status !== "undone" && which.some(w => w.step === s.id && gone(w))) this.forgetThread(`${run.by}:${s.id}`);
     this.changed(run);
     // where the run stands now: a step that waits for an undone one says so
     this.tick(run);
