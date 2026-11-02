@@ -124,7 +124,8 @@ function Studio(p: { id: string }) {
   }, [story]);
 
   const { lints, suggestions } = useMemo(() => {
-    const o = { places: w.places, characters: w.characters, kit: KIT, lang, plugins: storyPluginsOf(w.series) };
+    // how it plays as the series says (a watch series' episode has no learner's turns), as the server's check reads it
+    const o = { places: w.places, characters: w.characters, kit: KIT, lang, plugins: storyPluginsOf(w.series), play: playOf(story, w.series) };
     try {
       const ps = lintStory(story, { ...o, solids: solidsOf(w.places) }).map(x => ({ ...x, doc: key, story: p.id } as Problem));
       const raw = suggest(story, o);
