@@ -71,6 +71,9 @@ test("Path.fromSvg reads every command, absolute and relative, into the Cmd set"
   assert.equal(Path.fromSvg("M0 0C1 1 2 2 3 0S5-2 6 0").toD(), "M0 0C1 1 2 2 3 0C4 -2 5 -2 6 0", "S reflects the last cubic control");
   assert.equal(Path.fromSvg("M0 0S1 1 2 0").toD(), "M0 0C0 0 1 1 2 0", "S after no cubic starts at the point");
   assert.equal(Path.fromSvg("M0 0Q2 2 4 0T8 0").toD(), "M0 0Q2 2 4 0Q6 -2 8 0", "T reflects the last quad control");
+  assert.equal(Path.fromSvg("M0 0C1 1 2 2 3 0S5-2 6 0S8 2 9 0").toD(), "M0 0C1 1 2 2 3 0C4 -2 5 -2 6 0C7 2 8 2 9 0", "S after S reflects too");
+  assert.equal(Path.fromSvg("M0 0c1 1 2 2 3 0s2-2 3 0 2 2 3 0").toD(), "M0 0C1 1 2 2 3 0C4 -2 5 -2 6 0C7 2 8 2 9 0", "and its implicit repeats");
+  assert.equal(Path.fromSvg("M0 0Q2 2 4 0T8 0T12 0").toD(), "M0 0Q2 2 4 0Q6 -2 8 0Q10 2 12 0", "T after T reflects too");
   assert.equal(Path.fromSvg("M0 0 10 10").toD(), "M0 0L10 10");
 });
 

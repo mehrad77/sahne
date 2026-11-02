@@ -107,17 +107,20 @@ function parseSvgPath(d: string): Path {
       case "h": x = ox + num(); y = cy; p.lineTo(x, y); break;
       case "v": x = cx; y = oy + num(); p.lineTo(x, y); break;
       case "c": case "s": {
-        // S: the first control is the last one reflected, when the command before was a cubic
+        // S: the first control is the last one reflected, when the command before was a cubic (C or S)
         let x1: number, y1: number;
+        const after = prev === "c" || prev === "s";
         if (c === "c") { x1 = ox + num(); y1 = oy + num(); }
-        else { x1 = prev === "c" ? 2 * cx - kx : cx; y1 = prev === "c" ? 2 * cy - ky : cy; }
+        else { x1 = after ? 2 * cx - kx : cx; y1 = after ? 2 * cy - ky : cy; }
         const x2 = ox + num(), y2 = oy + num(); x = ox + num(); y = oy + num();
         p.cubicTo(x1, y1, x2, y2, x, y); kx = x2; ky = y2; break;
       }
       case "q": case "t": {
+        // T: the same with the last quadratic control (Q or T)
         let x1: number, y1: number;
+        const after = prev === "q" || prev === "t";
         if (c === "q") { x1 = ox + num(); y1 = oy + num(); }
-        else { x1 = prev === "q" ? 2 * cx - kx : cx; y1 = prev === "q" ? 2 * cy - ky : cy; }
+        else { x1 = after ? 2 * cx - kx : cx; y1 = after ? 2 * cy - ky : cy; }
         x = ox + num(); y = oy + num(); p.quadTo(x1, y1, x, y); kx = x1; ky = y1; break;
       }
       default: { // a
