@@ -14,12 +14,25 @@ const LINE = new Set(["floor", "wall", "street"]);
 const DIR: Record<string, [number, number]> = { l: [-1, 0.35], r: [1, 0.35], back: [0, -1], side_l: [-1, 0], side_r: [1, 0] };
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
+/** A drag on the plan: the thing where it was, the pointer where it went down (on the plan, and on the screen). */
+export interface PlanDrag { x0: number; z0: number; at0: [number, number]; px0: [number, number]; line: boolean }
+
+/**
+ * Where a drag puts the thing, with the pointer at `at` on the plan (`px` on the screen): moved by as much as the pointer
+ * moved, not to it (a thing grabbed by its edge stays under the pointer); nothing until the pointer has gone 4 px, so a
+ * click never moves it; a line across the room (the floor, a wall, the street) only in depth, since it spans the room.
+ */
+export function dragTo(g: PlanDrag, at: [number, number], px: [number, number]): { x: number; z: number } | null {
+  if (Math.hypot(px[0] - g.px0[0], px[1] - g.px0[1]) < 4) return null;
+  return { x: g.line ? g.x0 : r2(g.x0 + at[0] - g.at0[0]), z: r2(g.z0 + at[1] - g.at0[1]) };
+}
+
 export function GroundPlan(p: { doc: StoryPlace; sel: Sel; drop: Drop | null; select(s: Sel): void; moveTo(s: Sel, x: number, z: number): void; onDrop(at: { x: number; y: number; z: number }, d: Drop): void }) {
   const { doc } = p, w = doc.size.w, d = doc.size.d;
   const back = -d / 2 - 0.9; // the strip for what stands behind the room
   const x0 = -w / 2 - 0.6, x1 = w / 2 + 0.6, z0 = back - 0.4, z1 = d / 2 + 0.5;
   const svg = useRef<SVGSVGElement>(null);
-  const [drag, setDrag] = useState<{ sel: Sel; x: number; z: number; moved: boolean } | null>(null);
+  const [drag, setDrag] = useState<PlanDrag & { sel: Sel; x: number; z: number; moved: boolean } | null>(null);
 
   const toPlan = (e: PointerEvent): [number, number] => {
     const m = svg.current!.getScreenCTM()!.inverse(), pt = svg.current!.createSVGPoint();
@@ -37,12 +50,13 @@ export function GroundPlan(p: { doc: StoryPlace; sel: Sel; drop: Drop | null; se
     const pos = posOf(doc, s);
     if (!pos) return;
     try { (e.currentTarget as Element).setPointerCapture(e.pointerId); } catch { /* a pointer the page did not see go down */ }
-    setDrag({ sel: s, x: pos.x, z: pos.z, moved: false });
+    const line = s?.kind === "piece" && LINE.has(doc.pieces[s.i].kit);
+    setDrag({ sel: s, x: pos.x, z: pos.z, moved: false, x0: pos.x, z0: pos.z, at0: toPlan(e), px0: [e.clientX, e.clientY], line });
   };
   const move = (e: PointerEvent) => {
     if (!drag) return;
-    const [x, z] = toPlan(e);
-    setDrag({ ...drag, x, z, moved: true });
+    const to = dragTo(drag, toPlan(e), [e.clientX, e.clientY]);
+    if (to) setDrag({ ...drag, ...to, moved: true });
   };
   const up = () => {
     if (drag?.moved) p.moveTo(drag.sel, drag.x, drag.z);

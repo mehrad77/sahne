@@ -67,3 +67,11 @@ test("new ids, and the heights things sit at", () => {
   assert.ok(h.some(x => x.label === "0.9 · counter" && x.kit === "counter"), JSON.stringify(h));
   assert.ok(h.some(x => x.label === "1.4 · shelf"), JSON.stringify(h));
 });
+
+test("a drag on the ground plan moves a thing by as much as the pointer moved, after 4 px, and a wall only in depth", async () => {
+  const { dragTo } = await import("../src/ui/place/plan.ts");
+  const g = { x0: 1, z0: -1, at0: [1.2, -0.9] as [number, number], px0: [100, 100] as [number, number], line: false };
+  assert.equal(dragTo(g, [1.22, -0.9], [101, 100]), null, "a jittery click moves nothing");
+  assert.deepEqual(dragTo(g, [1.7, -0.4], [130, 130]), { x: 1.5, z: -0.5 }, "grabbed off-centre, it keeps the offset");
+  assert.deepEqual(dragTo({ ...g, x0: 0, line: true }, [3, -0.4], [200, 130]), { x: 0, z: -0.5 }, "a wall keeps its x");
+});
