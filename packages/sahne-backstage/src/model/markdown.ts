@@ -1,11 +1,12 @@
 // The repo's READMEs as blocks the Docs page draws, pure: headings, paragraphs, lists (nested, with tables and code in
-// their items), fenced code, tables and quotes, and in the words `code`, **bold**, *emphasis* and [links](…). Enough of
+// their items), fenced code, tables and quotes, and in the words `code`, **bold**, *emphasis*, [links](…) and ![pictures](…). Enough of
 // Markdown for what the repo writes, not all of it. A paragraph that opens with a bold phrase (**The board** (…): …)
 // is a "lead": the READMEs name their parts that way, so it gets an anchor and a place in the contents like a heading.
 // Links are resolved against the document's path in the repo: to another guide the editor shows, to its page (#/docs);
-// to anything else, to the repo on GitHub. Node-tested (test/docs.test.ts).
+// to anything else, to the repo on GitHub. A picture in the repo's assets/ is served by backstage (`/assets/…`), any other
+// from GitHub. Node-tested (test/docs.test.ts).
 
-export type Inline = { t: "text"; text: string } | { t: "code"; text: string } | { t: "b" | "i"; kids: Inline[] } | { t: "a"; href: string; kids: Inline[] };
+export type Inline = { t: "text"; text: string } | { t: "code"; text: string } | { t: "b" | "i"; kids: Inline[] } | { t: "a"; href: string; kids: Inline[] } | { t: "img"; src: string; alt: string };
 export type Block =
   | { t: "h"; level: number; id: string; text: string; kids: Inline[] }
   | { t: "p"; kids: Inline[]; lead?: { id: string; text: string } }
@@ -18,7 +19,7 @@ export type Block =
 export const slug = (s: string) => s.toLowerCase().replace(/[`*_[\]()]/g, "").replace(/[^\p{L}\p{N}\s-]/gu, "").trim().replace(/\s/g, "-");
 
 /** The words of a run of inlines. */
-export const plain = (xs: Inline[]): string => xs.map(x => (x.t === "text" || x.t === "code" ? x.text : plain(x.kids))).join("");
+export const plain = (xs: Inline[]): string => xs.map(x => (x.t === "text" || x.t === "code" ? x.text : x.t === "img" ? x.alt : plain(x.kids))).join("");
 
 /** A line's words: code first (nothing inside it is read), then links, bold and emphasis. */
 export function inline(s: string): Inline[] {
@@ -30,6 +31,10 @@ export function inline(s: string): Inline[] {
     if (c === "`") {
       const j = s.indexOf("`", i + 1);
       if (j > i) { flush(); out.push({ t: "code", text: s.slice(i + 1, j) }); i = j + 1; continue; }
+    }
+    if (c === "!" && s[i + 1] === "[") {
+      const m = /^!\[([^\]]*)\]\(([^)\s]+)\)/.exec(s.slice(i));
+      if (m) { flush(); out.push({ t: "img", alt: m[1], src: m[2] }); i += m[0].length; continue; }
     }
     if (c === "[") {
       const m = /^\[((?:[^\]`]|`[^`]*`)+)\]\(([^)\s]+)\)/.exec(s.slice(i));
@@ -130,6 +135,15 @@ export function linkOf(href: string, from: string, guides: { id: string; path: s
   const path = parts.join("/"), g = guides.find(x => x.path === path);
   if (g) return `#/docs/${g.id}${hash ? `/${hash}` : ""}`;
   return `${repo}${path}${hash ? `#${hash}` : ""}`;
+}
+
+/** Where a picture comes from: the repo's assets/ as backstage serves them, else the file on GitHub, else as written. */
+export function pictureOf(src: string, from: string, raw = "https://raw.githubusercontent.com/mehrad77/sahne/main/"): string {
+  if (/^[a-z]+:/i.test(src)) return src;
+  const parts = from.split("/").slice(0, -1);
+  for (const p of src.split("/")) { if (p === "..") parts.pop(); else if (p && p !== ".") parts.push(p); }
+  const path = parts.join("/");
+  return path.startsWith("assets/") ? `/${path}` : `${raw}${path}`;
 }
 
 /** The blocks under an anchor: from its heading (or lead) to the next one at its depth or above. */

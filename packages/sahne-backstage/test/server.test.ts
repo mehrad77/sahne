@@ -333,3 +333,10 @@ test("runs: started from a plan, held at the plan's gate, stopped; a bad plan or
   assert.equal((await call(rw.url, "POST", `runs/${run.id}`, { action: "stop" })).body.run.status, "stopped");
   assert.equal((await call(rw.url, "GET", "runs/r9")).status, 404);
 });
+
+test("the guides' pictures: the repo's assets/ and nothing else", async () => {
+  const ok = await fetch(`${ro.url}assets/poster.jpg`);
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get("content-type"), "image/jpeg");
+  for (const bad of ["assets/../package.json", "assets/%2e%2e/package.json", "assets/README.md", "assets/nope.png"]) assert.equal((await fetch(`${ro.url}${bad}`)).status, 404, bad);
+});

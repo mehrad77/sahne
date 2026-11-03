@@ -35,6 +35,7 @@ const HERE = new URL("../", import.meta.url);
 const CLI_PATH = fileURLToPath(new URL("cli.ts", import.meta.url));
 export { DOCS } from "./guides.ts";
 const SOUNDS = new URL("../../sahne-kit/sounds/", import.meta.url);
+const ASSETS = new URL("../../../assets/", import.meta.url);
 const FONTS = new URL("node_modules/@fontsource/comic-neue/files/", HERE);
 
 export interface Options { port: number; write: boolean; host?: string; log?: boolean; agentEdits?: AgentEdits; shareCards?: boolean }
@@ -346,6 +347,15 @@ export async function serve(o: Options): Promise<Running> {
         const u = new URL(s[1], SOUNDS);
         if (!existsSync(u)) throw new Fail(404, "no such sound");
         res.writeHead(200, { "content-type": "audio/mp4" }).end(readFileSync(u));
+        return;
+      }
+      // the guides' pictures: the repo's assets/ (a picture's name only, its folders, no way out of it)
+      const pic = /^\/assets\/((?:[a-z0-9_-]+\/)*[a-z0-9_.-]+\.(png|jpe?g|svg|webp))$/i.exec(url.pathname);
+      if (pic && !pic[1].includes("..")) {
+        const u = new URL(pic[1], ASSETS);
+        if (!existsSync(u)) throw new Fail(404, "no such picture");
+        const type = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", svg: "image/svg+xml", webp: "image/webp" }[pic[2].toLowerCase()]!;
+        res.writeHead(200, { "content-type": type, "cache-control": "max-age=300" }).end(readFileSync(u));
         return;
       }
       if (!url.pathname.startsWith("/dist/app/")) throw new Fail(404, "not found");

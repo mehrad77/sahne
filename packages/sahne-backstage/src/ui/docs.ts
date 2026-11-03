@@ -10,7 +10,7 @@ import { signal } from "@preact/signals";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { api } from "../api.ts";
 import { route } from "../store.ts";
-import { contents, linkOf, parse, sectionOf, textOf, type Block, type Inline } from "../model/markdown.ts";
+import { contents, linkOf, parse, pictureOf, sectionOf, textOf, type Block, type Inline } from "../model/markdown.ts";
 import { Icon } from "./kit/index.ts";
 
 interface Guide { id: string; title: string; path: string; blocks: Block[] }
@@ -42,6 +42,7 @@ const HELP: Record<string, [string, string]> = {
 function Words(p: { xs: Inline[]; g: Guide; all: Guide[] }): JSX.Element {
   const link = (to: string, kids: Inline[]) => { const href = linkOf(to, p.g.path, p.all); return html`<a href=${href} target=${href.startsWith("#") ? undefined : "_blank"} rel="noreferrer"><${Words} xs=${kids} g=${p.g} all=${p.all} /></a>`; };
   return html`${p.xs.map(x => x.t === "text" ? x.text : x.t === "code" ? html`<code>${x.text}</code>`
+    : x.t === "img" ? html`<img class="doc-pic" src=${pictureOf(x.src, p.g.path)} alt=${x.alt} loading="lazy" />`
     : x.t === "a" ? link(x.href, x.kids) : x.t === "b" ? html`<b><${Words} xs=${x.kids} g=${p.g} all=${p.all} /></b>` : html`<em><${Words} xs=${x.kids} g=${p.g} all=${p.all} /></em>`)}` as JSX.Element;
 }
 

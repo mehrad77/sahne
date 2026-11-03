@@ -1,6 +1,7 @@
 // Markdown a model writes (the assistant's answers), drawn: the same parser as the guides (src/model/markdown.ts), so
 // **bold**, `code`, lists, tables and fenced code read as they should, not as their marks. Links open beside the editor,
-// except the editor's own (#/…). A table scrolls sideways in a narrow panel. Streaming text is parsed again as it grows.
+// except the editor's own (#/…). A picture is never loaded from where a model points: it shows as its words. A table
+// scrolls sideways in a narrow panel. Streaming text is parsed again as it grows.
 
 import { html } from "htm/preact";
 import type { JSX } from "preact";
@@ -9,6 +10,7 @@ import { parse, type Block, type Inline } from "../model/markdown.ts";
 
 function Words(p: { xs: Inline[] }): JSX.Element {
   return html`${p.xs.map(x => x.t === "text" ? x.text : x.t === "code" ? html`<code>${x.text}</code>`
+    : x.t === "img" ? `[${x.alt || "picture"}]`
     : x.t === "a" ? html`<a href=${x.href} target=${x.href.startsWith("#") ? undefined : "_blank"} rel="noreferrer"><${Words} xs=${x.kids} /></a>`
     : x.t === "b" ? html`<b><${Words} xs=${x.kids} /></b>` : html`<em><${Words} xs=${x.kids} /></em>`)}` as JSX.Element;
 }

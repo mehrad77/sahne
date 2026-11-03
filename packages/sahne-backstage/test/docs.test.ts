@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { contents, inline, linkOf, parse, plain, sectionOf, slug } from "../src/model/markdown.ts";
+import { contents, inline, linkOf, parse, pictureOf, plain, sectionOf, slug } from "../src/model/markdown.ts";
 
 const MD = `# Title
 
@@ -79,4 +79,13 @@ test("the repo's guides: every part the side panel opens is there", () => {
     assert.ok(sectionOf(b, id).length, `backstage's README has ${id}`);
   const f = parse(readFileSync(new URL("../../sahne-story/README.md", import.meta.url), "utf8"));
   assert.ok(sectionOf(f, "languages").length && sectionOf(f, "series-seasons-episodes").length);
+});
+
+test("pictures: parsed with their words, from the repo's assets/ as backstage serves them, else from GitHub", () => {
+  assert.deepEqual(inline("a ![the board](../../assets/backstage/board.jpg) b"), [{ t: "text", text: "a " }, { t: "img", alt: "the board", src: "../../assets/backstage/board.jpg" }, { t: "text", text: " b" }]);
+  const from = "packages/sahne-backstage/README.md";
+  assert.equal(pictureOf("../../assets/backstage/board.jpg", from), "/assets/backstage/board.jpg");
+  assert.equal(pictureOf("shot.png", from), "https://raw.githubusercontent.com/mehrad77/sahne/main/packages/sahne-backstage/shot.png");
+  assert.equal(pictureOf("https://example.com/x.png", from), "https://example.com/x.png");
+  assert.equal(plain(inline("![the board](x.jpg)")), "the board");
 });
