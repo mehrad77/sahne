@@ -9,7 +9,7 @@ import { html } from "htm/preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { textOf, type StoryPlace } from "sahne-story";
 import { route, say, world } from "../store.ts";
-import { act, actStep, elsewhere, loadLog, loadRecord, loadRecords, logs, records, runs, runsError, undo, type Did, type Run, type RunStep, type TaskRecord } from "../runs.ts";
+import { act, actStep, elsewhere, loadLog, loadRecord, loadRecords, logs, records, runs, runsError, runsRead, undo, type Did, type Run, type RunStep, type TaskRecord } from "../runs.ts";
 import { acceptAndSave, neededFirst, proposals, reject, turnedDown, type Proposal } from "../events.ts";
 import { hrefOf, openProposal } from "./proposed.ts";
 import { Answer } from "./assistant.ts";
@@ -131,7 +131,8 @@ function RecordView(p: { id: string }) {
 
 function RunView(p: { id: string }) {
   const run = runs.value.find(r => r.id === p.id);
-  if (!run) return html`<${RecordView} id=${p.id} />`;
+  // the live tasks are read first: a task of this backstage never flashes as one that ran elsewhere
+  if (!run) return runsRead() || runsError.value ? html`<${RecordView} id=${p.id} />` : html`<p class="note">Reading task ${p.id}…</p>`;
   // undone or skipped steps are over too: a done task's bar is full
   const work = run.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done" || s.status === "undone" || s.status === "skipped").length, doing = work.filter(s => s.status === "running").length;
   const share = (n: number) => `width:${work.length ? (n / work.length) * 100 : 0}%`;

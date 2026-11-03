@@ -5,7 +5,7 @@
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -721,4 +721,19 @@ test("task ids: unique on the root, numbered after its records, though each back
   }
   a.act(one.id, { action: "stop" });
   assert.equal(JSON.parse(readFileSync(join(root, ".backstage", "tasks", `${one.id}.json`), "utf8")).status, "stopped", "written again as it changes");
+});
+
+test("records: a task without one gets it when a backstage takes the tasks; another store's task of the same old id is never written over", async () => {
+  const { r, store } = runs(scripted({}));
+  const run = r.create({ goal: "before the records", plan: PLAN });
+  const file = join(root, ".backstage", "tasks", `${run.id}.json`);
+  rmSync(file);
+  const again = new Runs({ store, events: new Events(), write: true, shareCards: false, settings: () => ({ ...DEFAULTS, caps: {} }), model: scripted({}) });
+  again.resume();
+  assert.equal(JSON.parse(readFileSync(file, "utf8")).goal, "before the records");
+  const { Records } = await import("../server/runs/record.ts");
+  const theirs = join(root, ".backstage", "tasks", "r3.json");
+  writeFileSync(theirs, JSON.stringify({ id: "r3", goal: "theirs", createdAt: 1, updatedAt: 1, steps: [], made: [], did: [] }));
+  new Records().write({ ...run, id: "r3", goal: "mine", at: 2 }, [], []);
+  assert.equal(JSON.parse(readFileSync(theirs, "utf8")).goal, "theirs");
 });

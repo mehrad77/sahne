@@ -358,6 +358,8 @@ export class Runs {
   /** After a restart: every run that was going goes on, its running steps from their last checkpoint. */
   resume(): void {
     if (!this.leads) return;
+    // a task from before the records (or whose record was lost) gets one now
+    for (const run of this.list) this.recorded(run);
     for (const run of this.list) {
       if (run.status === "done" || run.status === "stopped") continue;
       for (const s of run.steps) if (s.status === "running") s.status = "waiting";

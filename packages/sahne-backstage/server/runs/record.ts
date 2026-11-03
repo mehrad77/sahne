@@ -38,8 +38,13 @@ export class Records {
     if (!safeId(run.id)) return;
     const same = JSON.stringify(recordOf(run, made, did, 0));
     if (this.last.get(run.id) === same) return;
-    // a record already on disk that says the same (after a restart) is left as it is
-    if (!this.last.has(run.id)) { const old = readRecord(run.id); if (old && JSON.stringify({ ...old, updatedAt: 0 }) === same) { this.last.set(run.id, same); return; } }
+    if (!this.last.has(run.id)) {
+      const old = readRecord(run.id);
+      // another store's task of the same old id (`r3`, from before ids had a tail): never written over
+      if (old && old.createdAt !== run.at) { console.error(`task ${run.id}: the series has a record of another task of that id; this one's is not written`); this.last.set(run.id, same); return; }
+      // a record already on disk that says the same (after a restart) is left as it is
+      if (old && JSON.stringify({ ...old, updatedAt: 0 }) === same) { this.last.set(run.id, same); return; }
+    }
     writeAtomic(taskFile(run.id), JSON.stringify(recordOf(run, made, did, Date.now()), null, 2) + "\n");
     this.last.set(run.id, same);
   }

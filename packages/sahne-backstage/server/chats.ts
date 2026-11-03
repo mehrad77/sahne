@@ -36,7 +36,7 @@ export function writeChat(id: string, v: unknown): ChatSummary {
   if (!chat) throw fail(400, "a conversation is { title, at, turns: [{ role, content, parts? }] }");
   const text = JSON.stringify(chat, null, 2) + "\n";
   writeAtomic(chatFile(id), text);
-  for (const old of listChats().slice(KEEP_CHATS)) rmSync(chatFile(old.id), { force: true });
+  if (ids().length > KEEP_CHATS) for (const old of listChats().slice(KEEP_CHATS)) rmSync(chatFile(old.id), { force: true });
   return summaryOf(chat, text.length);
 }
 
