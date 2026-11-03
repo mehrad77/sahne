@@ -4,7 +4,9 @@ Ask for a week of episodes and watch it happen. A planner reads your series and 
 
 This works because in Sahne **a story is data and the stage is code**. An agent doesn't need to paint a picture or cut a video. It writes who says what, to whom, with which gesture, and a whole illustrated, lip-synced, lit scene follows from that. Writing is the one thing language models are best at, and here it is the whole job.
 
-<video controls preload="none" playsinline poster="assets/whats-new/backstage-poster.jpg" style="width:100%;border-radius:12px"><source src="assets/whats-new/backstage.mp4" type="video/mp4"></video>
+<iframe src="https://www.youtube-nocookie.com/embed/HlKaonCS_YE?rel=0" title="Meet Sahne Backstage" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen style="display:block;width:100%;aspect-ratio:16/9;border:0;border-radius:12px"></iframe>
+
+*Meet Backstage*, a 3½-minute tour, narrated in English, Türkçe, Deutsch and فارسی: pick the audio track and the subtitles under ⚙ in the player, or [watch it on YouTube](https://youtu.be/HlKaonCS_YE).
 
 ![How agents write stories in Sahne: the assistant, Claude Code and a task's agents call Backstage's MCP server, which reads, writes, looks at the stage and draws kit items into the content root; their proposals reach the person in the editor, and the stage plays whatever they write.](../../../assets/agents/architecture.svg)
 

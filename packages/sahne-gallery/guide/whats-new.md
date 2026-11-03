@@ -6,7 +6,9 @@ Each release, newest first. The packages' `package.json` files carry the version
 
 **Latest. Backstage: a studio for the whole series.** Also English, German and Persian, story plugins with lessons as the first, and more kit, drawn by more hands.
 
-<video controls preload="none" playsinline poster="assets/whats-new/backstage-poster.jpg" style="width:100%;border-radius:12px"><source src="assets/whats-new/backstage.mp4" type="video/mp4"></video>
+<iframe src="https://www.youtube-nocookie.com/embed/HlKaonCS_YE?rel=0" title="Meet Sahne Backstage" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen style="display:block;width:100%;aspect-ratio:16/9;border:0;border-radius:12px"></iframe>
+
+*Meet Backstage*, a 3½-minute tour, narrated in English, Türkçe, Deutsch and فارسی: pick the audio track and the subtitles under ⚙ in the player, or [watch it on YouTube](https://youtu.be/HlKaonCS_YE).
 
 Until now, Sahne played what someone had written by hand in JSON. **Backstage** is where a series is now made: a studio in the browser for writers, directors and reviewers who don't program. AI can help at every step, and nothing reaches the learner until a person has approved it.
 
