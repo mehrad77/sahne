@@ -126,7 +126,9 @@ export async function render(host: HTMLElement, ctx: Ctx) {
   for (const [name, role, text, hash] of PACKAGES) {
     const a = link("", hash);
     a.className = "card";
-    a.append($("code", "", name), $("b", "", role), $("small", "", text));
+    const head = $("span", "pkg");
+    head.append(Object.assign($("img", "", ""), { src: `assets/brand/${name.split(" ")[0]}-favicon.svg`, alt: "", width: 22, height: 22 }), $("code", "", name));
+    a.append(head, $("b", "", role), $("small", "", text));
     pk.append(a);
   }
   host.append(pk);

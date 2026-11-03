@@ -20,6 +20,8 @@ a { color: var(--accent); }
 .side nav a.top { font-weight: 650; margin-top: 6px; }
 .side nav a.sub { padding-left: 18px; color: var(--mute); }
 .side nav a.sub small { opacity: .8; }
+.side nav a.sub:has(.icon) { display: flex; gap: 7px; align-items: flex-start; }
+.side nav a.sub .icon { width: 16px; height: 16px; flex: none; margin-top: 2px; border-radius: 3px; }
 .side nav .group { padding: 8px 8px 2px 18px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--mute); }
 .side nav a:hover { background: var(--chip); }
 .side nav details.explore { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
@@ -126,6 +128,7 @@ a.card.news small { text-transform: uppercase; letter-spacing: .06em; color: var
 a.card.news b { font-size: 17px; } a.card.news span { color: var(--mute); }
 a.card.news:hover { border-color: var(--ink); }
 .cards.packages code { font-size: 12px; color: var(--accent); }
+.cards.packages .pkg { display: flex; align-items: center; gap: 8px; } .cards.packages .pkg img { border-radius: 5px; flex: none; }
 .cards.stats { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .hero { padding: 18px 0 6px; }
 .hero .wordmark { margin: 0; }

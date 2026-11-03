@@ -7,7 +7,7 @@ import type { Ctx } from "./shell/ctx.ts";
 import { data } from "./shell/data.ts";
 import { SYSTEMS } from "./systems/registry.ts";
 
-export interface NavItem { label: string; hash: string; group?: string; note?: string }
+export interface NavItem { label: string; hash: string; group?: string; note?: string; /** A picture before the label (a package's favicon). */ icon?: string }
 export interface View { render(host: HTMLElement, ctx: Ctx): void | Promise<void> }
 export interface Section { id: string; title: string; about: string; nav?: () => NavItem[] | Promise<NavItem[]>; load: () => Promise<View>; /** Folded under Explore in the sidebar. */ explore?: boolean }
 
@@ -22,7 +22,7 @@ export const SECTIONS: Section[] = [
   { id: "get-started", title: "Get started", about: "Write episodes, put a stage in an app, or draw for the kit", load: () => import("./sections/docs.ts") },
   {
     id: "docs", title: "Docs", about: "Every package, the engine's design, the kit, the story format",
-    nav: async () => (await data("docs")).filter(d => d.slug !== "new" && d.slug !== "get-started").map(d => ({ label: d.title, hash: `#/docs/${d.slug}`, group: d.group })),
+    nav: async () => (await data("docs")).filter(d => d.slug !== "new" && d.slug !== "get-started").map(d => ({ label: d.title, hash: `#/docs/${d.slug}`, group: d.group, ...(d.group === "Packages" ? { icon: `assets/brand/${d.title.split(":")[0]}-favicon.svg` } : {}) })),
     load: () => import("./sections/docs.ts"),
   },
   {

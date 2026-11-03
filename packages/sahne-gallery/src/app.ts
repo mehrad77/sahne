@@ -45,7 +45,9 @@ function drawNav() {
     let group = "";
     for (const it of items.get(s.id) ?? []) {
       if (it.group && it.group !== group) { group = it.group; subs.append($("div", "group", group)); }
-      const a = Object.assign($("a", "sub", it.label), { href: it.hash });
+      const a = Object.assign($("a", "sub"), { href: it.hash });
+      if (it.icon) a.append(Object.assign($("img", "icon"), { src: it.icon, alt: "", width: 16, height: 16 }));
+      a.append(it.label);
       if (it.note) a.append(" ", $("small", "", it.note));
       subs.append(a);
     }
