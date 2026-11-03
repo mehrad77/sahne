@@ -71,6 +71,8 @@ export interface McpOptions {
 /** What any step of a run may edit, one at a time (`inTurn`): the season and the series, and kit drawings (new ids each). */
 const SHARED = new Set<Kind>(["season", "series", "kit_piece", "kit_variant"]);
 
+/** Backstage's version, from its package.json: the MCP server and its own clients say it. */
+export const VERSION: string = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
 const FORMAT = new URL("../../sahne-story/README.md", import.meta.url);
 
 /** The staging keys a line, an option or a beat carries beside its texts, in the editor's order. */
@@ -219,7 +221,7 @@ function inTurn<T>(author: string, fn: () => Promise<T>): Promise<T> {
 
 export function createMcp(o: McpOptions): McpServer {
   const queue = o.queue ?? proposalsOf(o.events);
-  const server = new McpServer({ name: "sahne-backstage", version: "0.1.0" }, {
+  const server = new McpServer({ name: "sahne-backstage", version: VERSION }, {
     instructions: `Backstage edits a Sahne content root: a series of short scenes played on a paper-theatre stage (series_overview says how its episodes play and which plugins it turns on: with the lesson plugin, they are language-learning scenes with target words, a grammar spot and a quiz). Start with series_overview (the languages, the narrator, the stand-in, the seasons), read an episode with read_episode, and look up valid staging with kit_search. To draw a new set piece, prop or variant of this series, read the sahne://kit-guide resource, then kit_search, kit_read a neighbour, draft_kit_item (or draft_variant) and look at its sheet, revise until it has no problems, and save_kit_item (save_variant). Paths name a place in a document: "steps/3", "steps/12/choice/options/0/reply/1", "title" (with the lesson plugin, "quiz/0"). ${o.agentEdits === "proposals" ? "Your edits are proposals: each is checked and shown to a person in the editor, who accepts or rejects it. Nothing is saved until they do." : "Your edits are saved at once (direct mode), each after the same check a person's save passes."} An edit that brings a new error is refused: fix it and try again. Ids are permanent: never rename one.`,
   });
   const by = () => o.by ?? server.server.getClientVersion()?.name ?? "agent";

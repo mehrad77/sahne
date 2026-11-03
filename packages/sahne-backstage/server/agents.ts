@@ -7,7 +7,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Events } from "./events.ts";
-import type { AgentEdits } from "./mcp.ts";
+import { VERSION, type AgentEdits } from "./mcp.ts";
 
 /** One tool call by an agent. */
 export interface Call { at: number; by: string; tool: string; ok: boolean; ms: number; summary: string; /** The call in words (src/model/tools.ts). */ label?: string }
@@ -58,7 +58,7 @@ export class Agents {
   /** The tools, as an MCP client lists them from a server made by `make` (once). */
   async catalog(make: () => McpServer): Promise<ToolInfo[]> {
     if (this.tools) return this.tools;
-    const server = make(), [a, b] = InMemoryTransport.createLinkedPair(), client = new Client({ name: "backstage-catalog", version: "0.1.0" });
+    const server = make(), [a, b] = InMemoryTransport.createLinkedPair(), client = new Client({ name: "backstage-catalog", version: VERSION });
     await Promise.all([server.connect(a), client.connect(b)]);
     try {
       this.tools = (await client.listTools()).tools.map(t => ({ name: t.name, ...(t.title ? { title: t.title } : {}), description: t.description ?? "", readOnly: t.annotations?.readOnlyHint === true }));

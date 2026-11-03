@@ -5,7 +5,7 @@
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createMcp, type McpOptions } from "../mcp.ts";
+import { createMcp, VERSION, type McpOptions } from "../mcp.ts";
 import type { AssistantEvent } from "../assistant.ts";
 import type { ToolDef } from "../ai/provider.ts";
 import type { Call, Outcome } from "./graph.ts";
@@ -16,7 +16,7 @@ export interface Backstage { client: Client; tools: ToolDef[]; readOnly: Set<str
 export async function backstage(o: McpOptions, name = "assistant"): Promise<Backstage> {
   const server = createMcp(o);
   const [a, b] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name, version: "0.1.0" });
+  const client = new Client({ name, version: VERSION });
   await Promise.all([server.connect(a), client.connect(b)]);
   const listed = (await client.listTools()).tools;
   return {
