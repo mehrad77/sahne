@@ -30,7 +30,7 @@ export function checkLesson({ story, characters, world: w, lang, texts: all, nam
   if (world.lessons) for (const l of s.lessons ?? []) {
     const g = world.lessons[l];
     if (!g) add("ref", "error", `lesson ${l} is not in grammar/`);
-    else if (unit && unitOfRef(g.ref) > unit) add("ref", "error", `lesson ${l} is from ${g.ref}, after week ${day?.week}'s A1_${unit}`);
+    else if (unit && unitOfRef(g.ref) > unit) add("ref", "error", `lesson ${l} is from ${g.ref}, after week ${day?.week}'s ${level}_${unit}`);
   }
   story.steps.forEach((st, i) => { if (isSpot(st) && !(s.lessons ?? []).includes(st.spot.lesson)) add("ref", "error", `spot lesson ${st.spot.lesson} is not in the story's lessons`, i); });
   if (world.cards) for (const wd of s.words ?? []) {
@@ -38,7 +38,7 @@ export function checkLesson({ story, characters, world: w, lang, texts: all, nam
     if (!c) add("ref", "error", `word ${wd} is not a card`);
     else if (!unitOfRef(c.ref)) add("ref", "error", `word ${wd} (${c.tr}) has no unit: its card has no ref`);
     else if (c.level && levelIndex(c.level) > levelIndex(level)) add("ref", "error", `word ${wd} (${c.tr}) is ${c.level.startsWith("A") ? "an" : "a"} ${c.level} card, above the story's ${level}`);
-    else if (unit && unitOfRef(c.ref) > unit) add("ref", "error", `word ${wd} (${c.tr}) is from ${c.ref}, after week ${day?.week}'s A1_${unit}`);
+    else if (unit && unitOfRef(c.ref) > unit) add("ref", "error", `word ${wd} (${c.tr}) is from ${c.ref}, after week ${day?.week}'s ${level}_${unit}`);
   }
   for (const c of story.cast ?? []) {
     const doc = characters[c];

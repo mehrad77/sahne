@@ -11,6 +11,7 @@ import { validateDoc } from "../../sahne-story/check/schema.ts";
 import { checkSeason, checkStory } from "../../sahne-story/check/rules.ts";
 import { loadWorld, type Draft, type World } from "../../sahne-story/check/world.ts";
 import { isSpot, lesson, lessonOf, type LessonStory } from "../src/index.ts";
+import * as lessonTypes from "../src/types.ts";
 
 const world: World = loadWorld();
 const d0 = world.drafts.find(x => x.id === "s1e00")!;
@@ -95,3 +96,13 @@ test("lesson: the season's recycling report runs only with the plugin", () => {
 });
 
 function addDay(date: string) { return new Date(Date.parse(`${date}T12:00:00Z`) + 864e5).toISOString().slice(0, 10); }
+
+test("lesson: a lesson or word from a later unit names the story's own level, not A1", () => {
+  const { unitOfWeek } = lessonTypes;
+  const week = [...Array(60).keys()].find(w => unitOfWeek(w) === 2)!;
+  const story = (structuredClone(d0.story) as LessonStory);
+  story.level = "A2"; story.ref = "A2_2"; story.lessons = ["g_late"];
+  const w = { ...world, days: { s1e00: { week } }, lessons: { g_late: { ref: "A2_5" } } } as unknown as World;
+  const msgs = errors({ ...d0, story }, w).filter(p => p.rule === "ref").map(p => p.message);
+  assert.ok(msgs.some(m => /g_late is from A2_5, after week \d+'s A2_2/.test(m)), msgs.join(" | "));
+});
