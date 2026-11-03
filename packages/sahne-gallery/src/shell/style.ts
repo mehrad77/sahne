@@ -182,6 +182,11 @@ pre.code, .prose pre { font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, mon
 .prose th, .prose td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: top; }
 .prose th { background: var(--chip); }
 .prose img { max-width: 100%; height: auto; border-radius: 10px; }
+/* a markdown picture (a screenshot, a diagram) framed like a print on a mat, apart from the text */
+.prose img.pic { display: block; width: auto; max-width: 100%; max-height: 460px; margin: 14px auto; padding: 6px; background: var(--chip); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 1px 2px #0000000f, 0 8px 22px #0000001a; }
+.prose img.pic { cursor: zoom-in; }
+.pic-zoom { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 3vh 3vw; background: #000000c4; cursor: zoom-out; }
+.pic-zoom img { max-width: 94vw; max-height: 94vh; border-radius: 10px; background: var(--chip); box-shadow: 0 20px 60px #0008; }
 .prose blockquote { margin: 10px 0; padding: 2px 14px; border-left: 3px solid var(--accent); color: var(--mute); }
 .prose .live { margin: 10px 0 4px; }
 .prose pre.mermaid { background: none; border: 0; padding: 6px 0; text-align: center; overflow-x: auto; width: min(1100px, calc(100vw - 290px)); max-width: none; }

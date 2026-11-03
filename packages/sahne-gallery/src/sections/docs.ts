@@ -38,6 +38,21 @@ export async function render(host: HTMLElement, ctx: Ctx) {
     catch (e) { slot.append($("pre", "log", `This script did not load: ${(e as Error).message}`)); }
   }
 
+  // a picture opens full size over the page; a click or Escape closes it
+  for (const img of article.querySelectorAll<HTMLImageElement>("img.pic")) {
+    img.title = "Click to see it full size";
+    img.addEventListener("click", () => {
+      const over = $("div", "pic-zoom"), big = Object.assign($("img"), { src: img.src, alt: img.alt });
+      over.append(big);
+      const close = () => { over.remove(); removeEventListener("keydown", key); };
+      const key = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+      over.addEventListener("click", close);
+      addEventListener("keydown", key);
+      ctx.cleanup(close);
+      document.body.append(over);
+    });
+  }
+
   // a mermaid block becomes its diagram, in the page's colours; mermaid is loaded only for a doc that has one
   const diagrams = [...article.querySelectorAll<HTMLElement>("pre.mermaid")];
   if (diagrams.length) {

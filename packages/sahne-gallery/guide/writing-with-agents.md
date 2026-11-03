@@ -32,6 +32,12 @@ The tools cover the whole craft, about forty of them.
 
 Every call runs the same story check as a person's save, so an agent finds its own mistakes and fixes them in the next call. That's a big part of why the agents' work comes out right.
 
+The *Agents* page has the command to copy, and a log of every call an agent makes, as it makes it:
+
+![The Agents page's Connect tab: the command that connects Claude Code over HTTP, and the one that starts its own backstage over stdio, each with a copy button](../../../assets/backstage/agent-connect.jpg)
+
+![What they did: Claude Code's calls as they happen, reading the series overview, listing the episodes and reading two episodes, each with its time](../../../assets/backstage/agent-activity.jpg)
+
 ## The agent looks at what it made
 
 `look` is the tool that makes this feel like directing. The agent asks for a frame of its scene, say the line at step 12 forty percent of the way through its gesture. The open editor draws that frame on the real stage and sends it back as a picture. The agent sees Nima pointing at the wrong shelf, or a bubble covering a face, and fixes it.
@@ -50,6 +56,8 @@ Press ✦ and the assistant opens beside whatever you're working on. It knows th
 - **It takes your pictures**: paste a sketch or a photo of a real bakery into the chat.
 - **Quick asks sit where you work**: fill the missing translations, simplify this line, suggest staging, propose choice options, check this scene, draft the episode from its brief, or have a second reader review it with fresh eyes.
 
+![The assistant in the side panel: asked about Nima's line, it reads the step, looks up the kit's emotions and gestures (each call folded open with its time) and suggests a feeling and a gesture](../../../assets/backstage/agent-chat.jpg)
+
 ## Tasks: a team of agents on one goal
 
 A long ask, like "a week of episodes about the market, with a new stall keeper", becomes a **task**.
@@ -67,6 +75,8 @@ The task page is the fun part to watch. Each working step has a live line saying
 ## You have the last word, and it's one click
 
 What agents write arrives as a **proposal** on the block it changes. You see the diff word by word, read the way the script reads, with the stage playing it beside you. *Accept and save* takes it in one click. Proposals stack: an agent's next edit builds on its last, and accepting it merges cleanly with whatever you were typing.
+
+![Claude Code's proposal on an episode: the line's words before and after in Turkish, English and Persian, with Reject, Accept and Accept and save](../../../assets/backstage/needs-you.jpg)
 
 Or switch the Agents page to *they write, checked*, and agents write straight into the series while you review afterwards.
 

@@ -207,7 +207,7 @@ export function doc(slug) {
       return `<h${depth} id="${id}"${sec ? ` data-sec="${sec}"` : ""}>${html}</h${depth}>\n`;
     },
     link({ href: url, title, tokens }) { return `<a href="${escape(href(url))}"${title ? ` title="${escape(title)}"` : ""}>${this.parser.parseInline(tokens)}</a>`; },
-    image({ href: url, title, text }) { return `<img src="${escape(href(url, true))}" alt="${escape(text)}"${title ? ` title="${escape(title)}"` : ""} loading="lazy">`; },
+    image({ href: url, title, text }) { return `<img class="pic" src="${escape(href(url, true))}" alt="${escape(text)}"${title ? ` title="${escape(title)}"` : ""} loading="lazy">`; },
     code({ text, lang }) {
       if (lang === "mermaid") return `<pre class="mermaid">${escape(text)}</pre>\n`;
       if (lang === "sahne") return `<div class="sahne-live" data-script="${escape(text)}"></div><details class="src"><summary>The script</summary><pre><code>${escape(text)}</code></pre></details>\n`;
