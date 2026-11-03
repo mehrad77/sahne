@@ -14,7 +14,7 @@ de.match("Äpfel", "Apfel");                       // true
 de.matchLine("2 Brote bitte", ["Zwei Brezeln, bitte.", "Zwei Brote, bitte."]); // { matched: true, best: 1, heard, score }
 ```
 
-It depends on `sahne` for types and for the shared `lineMatcher`. Besides the plugin it exports the helpers it is built from: `lowerDe`, `isVowel`, `VOWELS`, `sayWord`, `sayNumber`, `sayNumeral`, `sayDigits`, `ordinal`, `tokens`, `syllables`, `phonemes`, `deixis`, the `TIMING` table and the `VISEME` map; for *say it aloud*, `normalise`, `sayWords`, `letters` and `allowance`; and for the story lints (`sahne-story`), `readNumber` ("einundzwanzig" → 21), `readClock` ("Halb drei" → 2:30) and `clockMinutes`.
+It depends on `sahne` for types and for the shared `lineMatcher`. Besides the plugin it exports the helpers it is built from: `lowerDe`, `isVowel`, `VOWELS`, `sayWord`, `sayNumber`, `sayNumeral`, `sayDigits`, `sayEuro`, `ordinal`, `tokens`, `syllables`, `phonemes`, `deixis`, the `TIMING` table and the `VISEME` map; for *say it aloud*, `normalise`, `sayWords`, `letters` and `allowance`; and for the story lints (`sahne-story`, `langs/de.ts`), `readNumber` ("einundzwanzig" → 21), `readClock` ("Halb drei" → 2:30) and `clockMinutes`.
 
 **Every language rule here was written without a native speaker and wants one's check**, as the Turkish names do: the timing table, the sound rules, the plural endings and the clock phrases below. They are heuristics. Where a rule is a guess, it is said so.
 
@@ -31,6 +31,8 @@ German spelling is nearly phonetic, so rules over the letters give the syllables
 | A dip to rest between two syllables with the same shape (Ba-na-ne), so the mouth does not freeze | 50, taken from the syllable |
 | Each extra consonant of a cluster at the start of a word or in a syllable's coda (Strand, Herbst) | 40 |
 | A diphthong's second shape (ei A→I, au A→U, eu and äu O→I) | at 55 % of the vowel |
+| The shortest a vowel gets when labials eat into its syllable | 100 |
+| Each letter of a hum or a shush (hmm, pst), within 300–600 | 120 |
 | Between words | 60 |
 | Comma, semicolon, colon, dash | 250 |
 | Full stop, ? and ! | 450 |
@@ -67,13 +69,6 @@ Compounds and derived words are other words and do not match: Brotkorb, Brötche
 
 `deixis(word, next?)` says whether a word points: `"dies"` for dieser, diese, dieses, diesem, diesen (here) and for an article followed by *hier* ("das hier"), `"jen"` for jener and its forms (there), `"da"` for an article followed by *da* or *dort* ("der da"), else null.
 
-## Tests
-
-```bash
-node --test test/*.test.ts         # here, or pnpm test
-pnpm sahne check                    # from the repo root: types, sizes and every Sahne package's tests
-```
-
 ## Say it aloud
 
 `matchLine(heard, expected, {names, tolerance})` decides whether a recogniser's transcript (or any of its n-best alternatives) is one of the card's lines. Both sides become spoken words with `normalise`: German lower case, numerals in words (*2* → *zwei*, *10:30* → *zehn Uhr dreißig*), no punctuation, apostrophes or fillers (*äh*, *ähm*, *öh*, *eh*, *hm*, *mhm*; *ach* and *oh* are words and stay), and a few recogniser spellings (*zwo* → *zwei*, *gibts* → *gibt es*, *dankeschön* → *danke schön*). Then the engine's word-level edit distance, weighted by letters:
@@ -105,3 +100,21 @@ A line matches when the cost is within its allowance: half a letter for three le
 | Dreiviertel drei | 2:45 |
 
 A bare number is no time (*Zwei Brezeln* is not 2:00). "Viertel drei" in the east means 2:15 and is read so too.
+
+## The story language
+
+`sahne-story` reads a German series through `langs/de.ts` (and `de-words.ts` for the check, with a loose verb-form resolver): words and pauses, `match`, the words that motivate each gesture (*hallo* waves, *danke* takes, *ja* nods; a short one such as *ja* or *nein* is marked to match only the whole word, so *ja* is not *Jahr*), numbers (`readNumber`), the check's dictionary forms, and four lints:
+
+- `deixis`: *dieser* (or *das Brot hier*) is near and takes `hold_up`, `touch` or `point` within reach; *jener* is far and takes `point_far`; *das Brot da / dort* points.
+- `var_yok`: *Es gibt X* needs the prop shown by then, *Es gibt kein X* hidden. It fires only where *gibt* stands next to *es* (*gibt* alone is also "gives"), and each clause after it (split at a comma or *aber*, *und*, *oder*, *sondern*) is negated, or not, on its own. A question (*Gibt es Brot?*) is no assertion.
+- `number`: *zwei Brote* → n = 2.
+- `time`: a clock time said aloud (`readClock`) matches the linked clock.
+
+There are no series hints. Every motive word and agreement wants a native speaker's check (`sahne-story/test/de.test.ts` runs the bakkal scene in German).
+
+## Tests
+
+```bash
+node --test test/*.test.ts         # here, or pnpm test
+pnpm sahne check                    # from the repo root: types, sizes and every Sahne package's tests
+```

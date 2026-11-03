@@ -1,4 +1,4 @@
-// What the story languages share (tr.ts, en.ts, de.ts): how near a thing is for a demonstrative, the gestures that point, and the
+// What the story languages share (tr.ts, en.ts, de.ts, fa.ts): how near a thing is for a demonstrative, the gestures that point, and the
 // clock lint, which reads the line's times in the language's own way (`readClock`) and holds them against the linked clock.
 
 import type { LineContext } from "../lang.ts";

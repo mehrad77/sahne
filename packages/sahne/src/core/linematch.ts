@@ -2,7 +2,7 @@
 // its text becomes spoken words (`normalise`), which letters are nearly the same (`near`), its
 // hesitations (`fillers`) and the spellings a recogniser may choose (`spellings`); this does the
 // rest: a word-level edit distance weighted by letters that forgives joins and splits, a slipped
-// letter, and a name, but not a different word. Turkish, English and German share it.
+// letter, and a name, but not a different word. Turkish, English, German and Persian share it.
 
 import type { LineMatch, MatchLineOptions } from "./lang.ts";
 

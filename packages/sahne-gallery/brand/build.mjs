@@ -34,7 +34,7 @@ const WIN = "M30 88V52C30 38 38 29 52 29C63 29 70 36 70 50V88Z";
 const FRAME_N = "M12 88V24H30V22C36 15 45 11 55 11C75 11 88 24 88 46V88H70V50C70 36 63 29 52 29C38 29 30 38 30 52V88Z";
 
 /** Each package's colour: `key` fills the mark's window and the tab, `ebru` is its marbling (the water first).
- * `sahne-fa` waits for the Persian plugin. A package not listed gets a colour from its name (`colours`). */
+ * A package not listed gets a colour from its name (`colours`). */
 export const PACKAGES = {
   sahne: { key: "#FBE6BC", name: "Perde", ebru: ["#F6E3BE", "#1C2246", "#2F8C88", "#C8463A", "#FBF3E2"] },
   "sahne-kit": { key: "#D8A440", name: "Pirinç", ebru: ["#F3E6CC", "#D8A440", "#8E6640", "#1C2246", "#FBF3E2"] },

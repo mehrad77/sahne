@@ -14,7 +14,7 @@ en.match("loaves", "loaf");                        // true
 en.matchLine("2 loaves please", ["Two loaves, please.", "Two rolls, please."]); // { matched: true, best: 0, heard, score }
 ```
 
-It depends on `sahne` for types and the shared line matcher. Besides the plugin it exports the helpers it is built from: `lowerEn`, `sayWord`, `tokens`, `syllables`, `phonemes`, `respell`, `forms`, `inflections`, `deixis`, `isNear`, the `TIMING` table and the `VISEME` map; for *say it aloud*, `normalise`, `sayWords`, `expand`, `letters` and `allowance`; and for the story lints (`sahne-story`, `langs/en.ts`), `sayNumber`, `sayNumeral`, `readNumber` ("twenty five" → 25), `readClock` ("quarter to ten" → 9:45) and `clockMinutes`.
+It depends on `sahne` for types and the shared line matcher. Besides the plugin it exports the helpers it is built from: `lowerEn`, `sayWord`, `tokens`, `syllables`, `phonemes`, `respell`, `forms`, `inflections`, `deixis`, `isNear`, the `TIMING` table and the `VISEME` map; for *say it aloud*, `normalise`, `sayWords`, `expand`, `letters` and `allowance`; and for the story lints (`sahne-story`, `langs/en.ts`), `sayNumber`, `sayNumeral`, `sayDigits`, `ordinal`, `readNumber` ("twenty five" → 25), `readClock` ("quarter to ten" → 9:45) and `clockMinutes`.
 
 ## Timing
 
@@ -29,6 +29,8 @@ English spelling is not phonetic, so the sounds come from grapheme rules and a s
 | A dip to rest between two syllables with the same shape, so the mouth does not freeze | 50, taken from the syllable |
 | Each extra consonant of a cluster at the start or end of a word (street, next) | 40 |
 | The shortest a vowel gets when labials eat into its syllable | 100 |
+| Where a gliding vowel moves to its second shape | at 55 % of the vowel |
+| Each letter of a hum or a shush (hmm, shh), within 300–600 | 120 |
 | Between words | 60 |
 | Comma, semicolon, colon, dash | 250 |
 | Full stop, ? and ! | 450 |
@@ -55,7 +57,7 @@ A line matches when the cost is within its allowance: half a letter for three le
 
 ## The story language
 
-`sahne-story` reads an English series through `langs/en.ts` (and `en-words.ts` for the check): words and pauses, `match`, the words that motivate each gesture (*hello* waves, *thanks* takes, *sorry* shrugs), numbers (`readNumber`), the check's dictionary forms (`inflections`, with the particles and numbers of English), and four lints: `deixis` (*this* is near and takes `hold_up`, `touch` or `point` within reach; *that* is far and takes `point_far`; *I think that bread…* points at nothing), `var_yok` (*There is / isn't X* about a linked prop needs it shown / hidden by then), `number` and `time`.
+`sahne-story` reads an English series through `langs/en.ts` (and `en-words.ts` for the check): words and pauses, `match`, the words that motivate each gesture (*hello* waves, *thanks* takes, *sorry* shrugs; a short one such as *no* or *hi* is marked to match only the whole word), numbers (`readNumber`), the check's dictionary forms (`inflections`, with the particles and numbers of English), and four lints: `deixis` (*this* is near and takes `hold_up`, `touch` or `point` within reach; *that* is far and takes `point_far`; *I think that bread…* points at nothing), `var_yok` (*There is / isn't X* about a linked prop needs it shown / hidden by then), `number` and `time`.
 
 ## Tests
 

@@ -16,7 +16,7 @@ packages/
   sahne-lesson/   the lesson plugin: spots, target words, glosses, the quiz, the syllabus checks → packages/sahne-lesson/README.md
   sahne-backstage/ the studio an app runs on its content root (:5181), and its MCP server → packages/sahne-backstage/README.md
   sahne-gallery/  the dev gallery and the checks (:5180)        → packages/sahne-gallery/README.md
-.github/workflows/ci.yml       pnpm sahne check on every push and pull request, and the scan
+.github/workflows/ci.yml       pnpm sahne check on every push and pull request, the scan, and the art job on a pull request that changes promoted drawings
 .github/workflows/deploy.yml   the gallery as the live demo, https://sahne.shab.boo (Cloudflare), deployed after ci passes on main; off until DEPLOY_ENABLED is set
 .github/workflows/release.yml  a GitHub release and npm publishing on a v* tag; off until RELEASE_ENABLED / PUBLISH_ENABLED are set
 assets/                        the README's poster and scene pictures, and brand/: the logo of every package (assets/README.md says how they were made)
@@ -33,6 +33,7 @@ assets/                        the README's poster and scene pictures, and brand
 | Stories, places, the content root | [packages/sahne-story/README.md](packages/sahne-story/README.md) |
 | The editor (backstage), its MCP server and assistant | [packages/sahne-backstage/README.md](packages/sahne-backstage/README.md), then the story README's Series and Languages sections |
 | A series in another language, or a language's lints | [packages/sahne-story/README.md](packages/sahne-story/README.md) (Languages, the story language) |
+| A language plugin itself (mouth timing, matching, numbers) | its package's README: [sahne-tr](packages/sahne-tr/README.md), [sahne-en](packages/sahne-en/README.md), [sahne-de](packages/sahne-de/README.md), [sahne-fa](packages/sahne-fa/README.md) |
 | A story plugin, or what a story teaches (spots, words, quiz) | [packages/sahne-story/README.md](packages/sahne-story/README.md) (Plugins), then [packages/sahne-lesson/README.md](packages/sahne-lesson/README.md) |
 | The gallery, screenshots, golden frames | [packages/sahne-gallery/README.md](packages/sahne-gallery/README.md) |
 | Package conventions, Kerim | [packages/README.md](packages/README.md) |
@@ -40,12 +41,12 @@ assets/                        the README's poster and scene pictures, and brand
 ## Workspace
 
 - This is one pnpm workspace over `packages/*`. Run `pnpm install` once at the root.
-- `pnpm check` (the same as `pnpm sahne check`, the gallery's `check` script) is the gate: types, sizes, bundle determinism, the story and extras checks, every package's Node tests and the golden frames. Run it after every change.
+- `pnpm check` (the same as `pnpm sahne check`, the gallery's `check` script) is the gate: types, the brand files, sizes, bundle determinism, the story, extras and language-shape checks, every package's Node tests and the golden frames. Run it after every change.
 - `pnpm sahne <script>` runs a gallery script (`pnpm sahne dev`, `pnpm sahne golden:update`).
 - Start the gallery with `preview_start sahne-gallery` (`.claude/launch.json`), or `pnpm dev`.
 - Start the editor with `preview_start sahne-backstage` (the samples, read-only), or `node packages/sahne-backstage/server/cli.ts --content <root> --write`. Agents reach it over MCP: `/mcp` on a running one (`claude mcp add --transport http sahne-backstage http://localhost:5181/mcp`), or on stdio with `node packages/sahne-backstage/server/cli.ts mcp --content <root> --write --backstage http://localhost:5181/` (without `--backstage`, proposals reach no editor). With no MCP set up, `node packages/sahne-backstage/server/call.ts <tool> '<json>' --content <root> --session kit` calls any of the same tools and saves their pictures as PNGs to Read: TS kit work (a generator you are editing) also renders through it, `kit_render` with `items` for a whole family on one sheet.
 - **The content root.** Every story, character and place is read through `packages/sahne-story/paths.ts`: from `$SAHNE_CONTENT` (an absolute folder) or, without it, from `packages/sahne-story/samples/`. Never build such a path yourself. Never point a path outside the repo: `packages/sahne-gallery/test/boundary.test.ts` fails on one.
-- The tests in `packages/sahne-story/test/kumru/` check Kumru's own content. They run only with `SAHNE_CONTENT` set to Kumru's `data/`. On the samples they are skipped, which is expected.
+- Tests that need data the samples lack (a `needs.json`, Kumru's airport) are skipped on the samples, which is expected. Tests of Kumru's own stories live in the Kumru repo.
 
 ## Shell and tools
 

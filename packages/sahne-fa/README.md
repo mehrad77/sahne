@@ -16,7 +16,7 @@ fa.match("نان‌هایم", "نان");                       // true
 fa.matchLine("۲ تا نون لطفا", ["دو تا نان، لطفاً.", "دو تا نان بدهید."]); // { matched: true, best: 0, heard, score }
 ```
 
-It depends on `sahne` for types and the shared line matcher. Besides the plugin it exports the helpers it is built from: `lowerFa`, `foldLetters`, `sayWord`, `tokens`, `ZWNJ`, `syllables`, `phonemes`, `respell`, `deixis`, `placeDeixis`, `isNear`, the `TIMING` table and the `VISEME` map; for *say it aloud*, `normalise`, `sayWords`, `letters` and `allowance`; and for the story lints (`sahne-story`, `langs/fa.ts`), `sayNumber`, `sayNumeral`, `readNumber` ("بیست و یک" → 21), `readClock` ("یه ربع به ده" → 9:45) and `clockMinutes`.
+It depends on `sahne` for types and the shared line matcher. Besides the plugin it exports the helpers it is built from: `lowerFa`, `foldLetters`, `sayWord`, `tokens`, `ZWNJ`, `syllables`, `phonemes`, `respell`, `isEnding`, `deixis`, `placeDeixis`, `isNear`, the `TIMING` table and the `VISEME` map; for *say it aloud*, `normalise`, `sayWords`, `letters` and `allowance`; and for the story lints (`sahne-story`, `langs/fa.ts`), `sayNumber`, `sayNumeral`, `sayDigits`, `ordinal`, `readNumber` ("بیست و یک" → 21), `readClock` ("یه ربع به ده" → 9:45) and `clockMinutes`.
 
 ## Writing
 
@@ -44,6 +44,7 @@ Persian writes its long vowels (ا آ و ی) and leaves the short ones out, so t
 | A dip to rest between two syllables with the same shape, so the mouth does not freeze | 50, taken from the syllable |
 | Each extra consonant of a cluster at the start or end of a syllable | 40 |
 | The shortest a vowel gets when labials eat into its syllable | 100 |
+| Each letter of a hum or a shush (هوم, هیس), within 300–600 | 120 |
 | Between words | 60 |
 | Comma, semicolon, colon, dash, `،` `؛` | 250 |
 | Full stop, `?` `!` `؟` | 450 |

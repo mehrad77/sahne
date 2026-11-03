@@ -1,7 +1,7 @@
 // The place lint ("a place with good details"): what can be checked of a place document
 // without looking at it. One rule per item of the standard:
 //
-//   valid    names in three languages, a district, a camera, times the stage has, a perch up high (there in
+//   valid    names in the series' languages, a district, a camera, times the stage has, a perch up high (there in
 //            every state, and inside the wide shot's height band), kit ids that exist, params each generator
 //            declares with values it takes (its `meta`), marks inside the place, door marks with their door
 //            and street side, a site, states that exist (one default per group)
