@@ -136,6 +136,7 @@ export const DOCS = [
   ["german", "sahne-de: German", "Packages", "packages/sahne-de/README.md"],
   ["persian", "sahne-fa: Persian", "Packages", "packages/sahne-fa/README.md"],
   ["gallery", "sahne-gallery: this site", "Packages", "packages/sahne-gallery/README.md"],
+  ["writing-with-agents", "Agentic story writing", "In depth", "packages/sahne-gallery/guide/agents.md"],
   ["design", "Design", "In depth", "packages/sahne/DESIGN.md"],
   ["style", "Style guide", "In depth", "packages/sahne-kit/STYLE.md"],
   ["drawing", "Drawing kit items", "In depth", "packages/sahne-kit/DRAWING.md"],
@@ -189,9 +190,10 @@ export function doc(slug) {
       return `<pre><code${lang ? ` class="language-${escape(lang)}"` : ""}>${escape(text)}</code></pre>\n`;
     },
   } });
-  // inline HTML in the docs (the README's centred poster, a package's brand block) has repo-relative src/srcset/href too
+  // inline HTML in the docs (the README's centred poster, a package's brand block) has repo-relative src/srcset/href too;
+  // a path into assets/ is already the site's (the image renderer made it so, or a guide's video names it)
   const html = md.parse(readFileSync(at(`../../${d.file}`), "utf8"))
-    .replace(/(<(?:img|a|source)\b[^>]*?\s(?:src|srcset|href)=")([^"#][^"]*)"/g, (m, pre, url) => /^[a-z]+:|^\/\/|^#/i.test(url) ? m : `${pre}${escape(href(url, !pre.startsWith("<a")))}"`);
+    .replace(/(<(?:img|a|source)\b[^>]*?\s(?:src|srcset|href)=")([^"#][^"]*)"/g, (m, pre, url) => /^[a-z]+:|^\/\/|^#|^assets\//i.test(url) ? m : `${pre}${escape(href(url, !pre.startsWith("<a")))}"`);
   return { ...d, html, toc, source: `${REPO_URL}/blob/main/${d.file}` };
 }
 

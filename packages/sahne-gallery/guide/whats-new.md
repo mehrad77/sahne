@@ -27,7 +27,7 @@ An illustrated dialogue scene usually takes a writer, an illustrator, an animato
 - **Any agent can join** over MCP, Claude Code among them. Every tool goes through the same checks, and its edits arrive as proposals.
 - **Tasks** carry the long work, such as "a new season with its cast, places and episodes". A task plans itself, then each step is done by its own agent. It goes on with the editor closed, and every write can be undone.
 
-[Get started with Backstage →](get-started.md#write-and-stage-episodes-in-backstage) · [The whole studio, page by page](../../sahne-backstage/README.md)
+[Get started with Backstage →](get-started.md#write-and-stage-episodes-in-backstage) · [How agents write stories](agents.md) · [The whole studio, page by page](../../sahne-backstage/README.md)
 
 ## Every language
 

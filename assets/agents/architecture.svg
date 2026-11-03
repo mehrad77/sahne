@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 560" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" role="img" aria-labelledby="t d">
+  <title id="t">How agents write stories in Sahne</title>
+  <desc id="d">Agents (the built-in assistant, Claude Code, any MCP client, and a task's planner and step agents) call Backstage's MCP server. Its tools read the series, edit episodes, look at the stage and draw kit items, all through the story check, into the content root. Proposals reach the person in the editor beside a live stage.</desc>
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#7A6E64"/></marker>
+  </defs>
+  <rect width="960" height="560" rx="18" fill="#F4EFE6"/>
+  <g font-size="12.5" fill="#2B2420">
+    <!-- agents column -->
+    <text x="40" y="44" font-size="12" font-weight="700" letter-spacing="1.5" fill="#7A6E64">AGENTS</text>
+    <g>
+      <rect x="40" y="60" width="230" height="64" rx="12" fill="#FFFDF8" stroke="#DDD3C4"/>
+      <text x="56" y="86" font-weight="700">✦ The assistant</text>
+      <text x="56" y="106" fill="#7A6E64">beside every page · LangGraph</text>
+      <rect x="40" y="136" width="230" height="64" rx="12" fill="#FFFDF8" stroke="#DDD3C4"/>
+      <text x="56" y="162" font-weight="700">Claude Code, Cursor…</text>
+      <text x="56" y="182" fill="#7A6E64">over MCP: HTTP or stdio</text>
+      <rect x="40" y="212" width="230" height="122" rx="12" fill="#FFFDF8" stroke="#DDD3C4"/>
+      <text x="56" y="238" font-weight="700">A task</text>
+      <text x="56" y="258" fill="#7A6E64">a planner, then one agent</text>
+      <text x="56" y="276" fill="#7A6E64">per step, side by side,</text>
+      <text x="56" y="294" fill="#7A6E64">checkpointed, journaled,</text>
+      <text x="56" y="312" fill="#7A6E64">undoable to the last byte</text>
+    </g>
+    <!-- mcp server -->
+    <rect x="330" y="60" width="280" height="274" rx="16" fill="#2F8C88"/>
+    <text x="350" y="90" font-size="16" font-weight="700" fill="#fff">Backstage's MCP server</text>
+    <g fill="#fff" font-size="13">
+      <text x="350" y="122">read · series, episodes, lines, guides</text>
+      <text x="350" y="148">write · steps, texts, staging, seasons,</text>
+      <text x="398" y="166">places, characters, looks</text>
+      <text x="350" y="192">see · look at the stage, as a picture</text>
+      <text x="350" y="218">draw · new kit items as data</text>
+      <text x="350" y="244">review · check, comment, approve</text>
+      <text x="350" y="270">point · show the person where</text>
+    </g>
+    <rect x="350" y="288" width="240" height="30" rx="8" fill="#ffffff22"/>
+    <text x="364" y="308" fill="#fff" font-weight="600">every call through the story check</text>
+    <!-- right: editor and content -->
+    <text x="690" y="44" font-size="12" font-weight="700" letter-spacing="1.5" fill="#7A6E64">THE PERSON</text>
+    <rect x="690" y="60" width="240" height="140" rx="12" fill="#FFFDF8" stroke="#DDD3C4"/>
+    <text x="706" y="86" font-weight="700">The editor</text>
+    <text x="706" y="106" fill="#7A6E64">a proposal on its block:</text>
+    <text x="706" y="124" fill="#7A6E64">the diff word by word,</text>
+    <text x="706" y="142" fill="#7A6E64">the stage playing it,</text>
+    <rect x="706" y="156" width="138" height="28" rx="14" fill="#2F8C88"/>
+    <text x="722" y="175" fill="#fff" font-weight="600">Accept and save</text>
+    <rect x="690" y="236" width="240" height="98" rx="12" fill="#FFFDF8" stroke="#DDD3C4"/>
+    <text x="706" y="262" font-weight="700">The content root</text>
+    <text x="706" y="282" fill="#7A6E64">series.json, seasons/, stories/,</text>
+    <text x="706" y="300" fill="#7A6E64">characters/, places/, kit/:</text>
+    <text x="706" y="318" fill="#7A6E64">plain JSON, in git</text>
+    <!-- arrows -->
+    <g stroke="#7A6E64" stroke-width="2" fill="none" marker-end="url(#a)">
+      <path d="M270 92H326"/><path d="M270 168H326"/><path d="M270 272H326"/>
+      <path d="M610 130H686"/>
+      <path d="M610 286H686"/>
+      <path d="M810 200V232"/>
+    </g>
+    <text x="616" y="122" font-size="11" fill="#7A6E64">proposals</text>
+    <text x="616" y="278" font-size="11" fill="#7A6E64">or straight in</text>
+    <!-- bottom: the stage -->
+    <rect x="40" y="380" width="880" height="140" rx="16" fill="#1C2246"/>
+    <text x="64" y="414" font-size="16" font-weight="700" fill="#FBE6BC">The stage plays whatever they write, as they write it</text>
+    <text x="64" y="442" fill="#F6E3BE">The director stages each line (gaze, gesture, shot), the kit draws it in cut paper,</text>
+    <text x="64" y="464" fill="#F6E3BE">a language plugin times the mouths. An agent can look at that frame, see what is wrong,</text>
+    <text x="64" y="486" fill="#F6E3BE">and fix it, the way a director watches a rehearsal.</text>
+    <path d="M810 334V376" stroke="#7A6E64" stroke-width="2" marker-end="url(#a)"/>
+  </g>
+</svg>
