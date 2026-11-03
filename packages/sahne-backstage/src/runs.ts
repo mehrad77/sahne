@@ -48,6 +48,28 @@ export async function loadRuns(): Promise<void> {
 }
 export const runsRead = () => read;
 
+/** A task's record in the content root's sidecar (server/runs/record.ts): what History and a task card read of a task this backstage's store does not have. */
+export interface TaskRecord {
+  id: string; goal: string; mode: string; by: string; status: Run["status"]; why?: string; createdAt: number; updatedAt: number; maxUsd: number; usd: number; estimateUsd?: number; brief: string;
+  steps: { id: string; kind: string; title: string; about?: string; status: StepStatus; summary?: string; decided?: string[]; needs?: string[]; owns?: { kind: Kind; id: string }[] }[];
+  made: Made[]; did: Did[];
+}
+/** The records of the tasks on this root, newest first: kept apart from `runs`, so a task run elsewhere never counts as working here. */
+export const records = signal<TaskRecord[]>([]);
+export async function loadRecords(): Promise<void> {
+  const r = await api.get<{ tasks: TaskRecord[] }>("tasks");
+  if (r.status === 200) records.value = r.tasks;
+}
+/** The records of tasks this backstage does not run (another port, another config, another person's): read-only. */
+export const elsewhere = (): TaskRecord[] => { const here = new Set(runs.value.map(r => r.id)); return records.value.filter(r => !here.has(r.id)); };
+/** The record of a task this backstage does not run (null when there is none). */
+export async function loadRecord(id: string): Promise<TaskRecord | null> {
+  const r = await api.get<{ task: TaskRecord }>(`tasks/${encodeURIComponent(id)}`);
+  if (r.status !== 200) return null;
+  records.value = [r.task, ...records.value.filter(x => x.id !== id)];
+  return r.task;
+}
+
 const keyOf = (run: string, step: string) => `${run}:${step}`;
 
 /** A step's log, read once (then the events grow it). */

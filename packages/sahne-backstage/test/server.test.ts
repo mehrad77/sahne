@@ -327,7 +327,8 @@ test("runs: started from a plan, held at the plan's gate, stopped; a bad plan or
   assert.equal(bad.status, 400);
   assert.match(bad.body.message, /the plan: step cast_x needs nope/);
   const { run } = (await call(rw.url, "POST", "runs", { goal: "g", plan })).body;
-  assert.deepEqual([run.id, run.status, run.gate, run.by], ["r1", "gate", "plan", "run:r1"]);
+  assert.match(run.id, /^r1-[a-z0-9]{3}$/, "the first task's number, and a short tail unique on the root");
+  assert.deepEqual([run.status, run.gate, run.by], ["gate", "plan", `run:${run.id}`]);
   assert.equal((await call(rw.url, "GET", `runs/${run.id}`)).body.run.steps[0].status, "waiting");
   assert.deepEqual((await call(rw.url, "GET", `runs/${run.id}/steps/cast_x/log`)).body, { events: [] });
   assert.equal((await call(rw.url, "POST", `runs/${run.id}`, { action: "stop" })).body.run.status, "stopped");

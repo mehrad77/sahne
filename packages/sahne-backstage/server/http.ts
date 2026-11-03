@@ -30,6 +30,7 @@ import { Store } from "./runs/store.ts";
 import { Runs, type Gates, type Plan } from "./runs/run.ts";
 import { DOCS } from "./guides.ts";
 import { forgetNote, readMemory, remember } from "./memory.ts";
+import { readRecord, readRecords } from "./runs/record.ts";
 
 const HERE = new URL("../", import.meta.url);
 const CLI_PATH = fileURLToPath(new URL("cli.ts", import.meta.url));
@@ -305,6 +306,13 @@ export async function serve(o: Options): Promise<Running> {
       if (!o.write) throw new Fail(403, "read-only: start backstage with --write");
       if (!forgetNote(a)) throw new Fail(404, `no note ${a}`);
       return json(res, 200, { notes: readMemory() });
+    }
+    // the tasks' records in the sidecar (runs/record.ts): what this root's tasks did, wherever they ran
+    if (route === "tasks" && m === "GET" && !b) {
+      if (!a) return json(res, 200, { tasks: readRecords() });
+      const t = readRecord(a);
+      if (!t) throw new Fail(404, `no record of a task ${a}`);
+      return json(res, 200, { task: t });
     }
     if (route === "usage" && m === "GET") return json(res, 200, usageSummary(readSettings().caps));
     if (route === "thumbs" && m === "GET") return json(res, 200, { stale: await staleThumbs(), command: "node packages/sahne-gallery/thumbs.mjs (in the Sahne repo, with SAHNE_CONTENT set)" });

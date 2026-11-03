@@ -8,13 +8,17 @@
 // journaled (journal.ts) so any of it can be undone, with no gates and no proposals, and, if the person says so, no
 // questions either. A run started from its goal alone plans itself first: a `plan` step reads the
 // series and proposes the plan (propose_plan), which the person sees at the plan gate. A run outlives a closed tab and a restart: the runs are in the store, and a
-// step that was running goes on from its last checkpoint.
+// step that was running goes on from its last checkpoint. Whenever a run changes, the backstage that runs it writes its
+// record to the content root's sidecar (record.ts), so the task travels with the series; a run's id is unique on the root
+// (its number after the highest recorded, and a short random tail, so two backstages, or two people's, do not share one).
 
 import { Command } from "@langchain/langgraph";
 import { HumanMessage } from "@langchain/core/messages";
 import type { Store } from "./store.ts";
 import { NodeSqliteSaver } from "./saver.ts";
 import { Journal, type Kept, type Undone, type Written } from "./journal.ts";
+import { highestRecorded, Records } from "./record.ts";
+import { randomBytes } from "node:crypto";
 import type { Events } from "../events.ts";
 import { listing, type Kind } from "../content.ts";
 import type { AgentEdits, McpOptions } from "../mcp.ts";
@@ -189,6 +193,7 @@ export class Runs {
   private readonly o: RunsOptions;
   private readonly saver: NodeSqliteSaver;
   readonly journal: Journal;
+  private readonly records = new Records();
   private list: Run[];
   private n: number;
   private readonly live = new Map<string, AbortController>();
@@ -292,7 +297,17 @@ export class Runs {
   all(): Run[] { if (!this.leads) this.load(); return this.list; }
   get(id: string): Run | undefined { return this.all().find(r => r.id === id); }
   private keep() { this.o.store.set("runs", { n: this.n, runs: this.list }); }
-  private changed(run: Run) { this.keep(); this.o.events.emit("run", { run }); }
+  private changed(run: Run) { this.keep(); this.recorded(run); this.o.events.emit("run", { run }); }
+  /** Its record in the sidecar (record.ts), when what it says changed. A record that cannot be written never stops the run. */
+  private recorded(run: Run) {
+    if (!this.o.write) return;
+    try { this.records.write(run, this.journal.made(run.id), this.journal.history(run.id)); } catch (e) { console.error(`the record of task ${run.id}: ${(e as Error).message}`); }
+  }
+  /** A new run's id: its number after any this store or the root's records have, and a short random tail (`r7-k3f`). */
+  private newId(): string {
+    this.n = Math.max(this.n, highestRecorded(), ...this.list.map(r => Number(/^r(\d+)/.exec(r.id)?.[1] ?? 0))) + 1;
+    return `r${this.n}-${(randomBytes(2).readUInt16BE() % 46656).toString(36).padStart(3, "0")}`;
+  }
   private settings() { return this.o.settings?.() ?? readSettings(); }
 
   /** Start a run: of a plan, or from its goal alone, a planning step first. */
@@ -302,7 +317,7 @@ export class Runs {
     const bad = planProblems(plan);
     if (bad.length) throw new Error(`the plan: ${bad.join("; ")}`);
     if (v.maxUsd !== undefined && !(Number.isFinite(v.maxUsd) && v.maxUsd >= 0)) throw new Error(`a budget is a number of dollars, not ${JSON.stringify(v.maxUsd)}`);
-    const s = this.settings(), id = `r${++this.n}`, mode = v.mode ?? s.runMode ?? "check";
+    const s = this.settings(), id = this.newId(), mode = v.mode ?? s.runMode ?? "check";
     // checking with the person shows the plan first; after that it stops only for a real choice (a new person or place is
     // not one: it can be undone), unless the gates say otherwise
     const gates: Gates = v.gates === false || mode === "auto" ? { plan: false, castAndPlaces: false } : { plan: v.gates?.plan ?? true, castAndPlaces: v.gates?.castAndPlaces ?? false };
@@ -572,7 +587,7 @@ export class Runs {
     let bs: Awaited<ReturnType<typeof backstage>> | null = null, failed: string | undefined;
     try {
       const st = this.settings(), model = this.modelOf(run, s);
-      bs = await backstage({ write: this.o.write, agentEdits: run.agentEdits, shareCards: this.o.shareCards, events: this.o.events, by: run.by, onCall: this.o.onCall, step: { id: s.id, owns: s.owns }, journal: (before, saved) => this.journal.record(run.id, s.id, before, saved) }, run.by);
+      bs = await backstage({ write: this.o.write, agentEdits: run.agentEdits, shareCards: this.o.shareCards, events: this.o.events, by: run.by, onCall: this.o.onCall, step: { id: s.id, owns: s.owns }, journal: (before, saved) => { this.journal.record(run.id, s.id, before, saved); this.recorded(run); } }, run.by);
       const mcp = bs.client;
       const system = `${systemPrompt({ agentEdits: run.agentEdits, writable: this.o.write, shareCards: this.o.shareCards, web: null, notes: readMemory() })}\n\nYou are one step of a task: a long piece of work split into steps, each done by its own agent with a fresh context. Do your step well and only your step; the person reviews the task's work by step.${run.asks === "never" ? " The person asked not to be asked: where something is a choice (a name, a wording), decide it yourself and say in your report what you chose, so they can change it later." : ""}${run.agentEdits === "direct" ? " Your edits are saved as you make them, each after the check, and the person can undo any of them." : ""}`;
       const graph = agentGraph({
@@ -587,7 +602,7 @@ export class Runs {
         after: (u: Usage) => {
           const e = record(model.id, model.model, u);
           s.usd += e.usd; run.usd += e.usd;
-          this.keep();
+          this.keep(); this.recorded(run);
           this.o.events.emit("usage", usageSummary(st.caps));
         },
         run: async c => {
@@ -607,7 +622,7 @@ export class Runs {
             s.summary = String(v.summary ?? "").slice(0, 2000);
             const decided = Array.isArray(v.decided) ? v.decided.filter((d): d is string => typeof d === "string" && !!d.trim()).map(d => d.trim().slice(0, 200)).slice(0, 8) : [];
             if (decided.length) s.decided = decided; else delete s.decided;
-            this.keep(); return { text: "Noted: your step is done.", isError: false, end: true }; }
+            this.keep(); this.recorded(run); return { text: "Noted: your step is done.", isError: false, end: true }; }
           return this.once(thread.configurable.thread_id, c, () => callTool(mcp, c));
         },
       }, this.saver);

@@ -5,7 +5,7 @@
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -94,10 +94,16 @@ test("steps run as sub-agents: two at once, the third after both with their repo
   assert.doesNotMatch(first, /Make Derya/);
   // the episode is set in the place the run proposed, with the character it proposed: all pending, by the run, tagged by step
   const ps = proposalsOf(events).all();
-  assert.deepEqual(ps.map(p => [p.doc, p.by, p.step]), [["derya", "run:r1", "cast_derya"], ["kutuphane", "run:r1", "place_library"], ["s1e05", "run:r1", "ep_books"]]);
+  assert.deepEqual(ps.map(p => [p.doc, p.by, p.step]), [["derya", run.by, "cast_derya"], ["kutuphane", run.by, "place_library"], ["s1e05", run.by, "ep_books"]]);
   assert.deepEqual(run.steps.map(s => s.summary), ["derya: a student who loves books", "kutuphane: a library, copied from bakkal", "s1e05 drafted"]);
   assert.ok(!existsSync(join(root, "stories", "s1e05.json")), "nothing is saved");
   assert.ok(r.log(run.id, "ep_books").some(e => e.event.type === "proposal"));
+  // its record in the sidecar says what it did, and nothing else (no log, no checkpoint, no step's brief)
+  const rec = JSON.parse(readFileSync(join(root, ".backstage", "tasks", `${run.id}.json`), "utf8"));
+  assert.deepEqual(Object.keys(rec).sort(), ["brief", "by", "createdAt", "did", "goal", "id", "made", "maxUsd", "mode", "status", "steps", "updatedAt", "usd"].concat(rec.estimateUsd !== undefined ? ["estimateUsd"] : []).sort());
+  assert.deepEqual([rec.id, rec.status, rec.goal, rec.by], [run.id, "done", "A week at the library", run.by]);
+  assert.deepEqual(rec.steps.map((s: { id: string; status: string; summary?: string }) => [s.id, s.status, s.summary]), run.steps.map(s => [s.id, "done", s.summary]));
+  assert.ok(rec.steps.every((s: object) => !("brief" in s) && !("told" in s) && !("proposals" in s)));
   assert.ok(run.usd > 0);
 });
 
@@ -702,4 +708,17 @@ test("a step stopped mid-turn whose writes are undone starts over when tried aga
   const last = seen.x.at(-1)!;
   assert.equal(last.filter(y => y.getType() === "ai").length, 0, "a fresh start: no turn of the old try");
   assert.ok(!last.some(y => /saved: add the character dilek11/.test(String(y.content))));
+});
+
+test("task ids: unique on the root, numbered after its records, though each backstage has a store of its own", () => {
+  const a = runs(scripted({})).r, b = runs(scripted({})).r;
+  const one = a.create({ goal: "one", plan: PLAN }), two = b.create({ goal: "two", plan: PLAN });
+  const n = (id: string) => Number(/^r(\d+)-[a-z0-9]{3}$/.exec(id)?.[1]);
+  assert.ok(n(one.id) > 0 && n(two.id) === n(one.id) + 1, `${one.id} then ${two.id}`);
+  for (const x of [one, two]) {
+    const rec = JSON.parse(readFileSync(join(root, ".backstage", "tasks", `${x.id}.json`), "utf8"));
+    assert.deepEqual([rec.status, rec.goal, rec.steps.length], ["gate", x.goal, PLAN.steps.length]);
+  }
+  a.act(one.id, { action: "stop" });
+  assert.equal(JSON.parse(readFileSync(join(root, ".backstage", "tasks", `${one.id}.json`), "utf8")).status, "stopped", "written again as it changes");
 });

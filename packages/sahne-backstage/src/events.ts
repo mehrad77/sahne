@@ -14,7 +14,7 @@ import * as H from "./model/history.ts";
 import { change, createDoc, drafts, go, keyOf, loadReview, loadWorld, openDoc, route, saveDocs, say, world } from "./store.ts";
 import { loadKitDocs } from "./kitdocs.ts";
 import { answerLook, type LookAsk } from "./look.ts";
-import { heardRun, loadRuns, runs } from "./runs.ts";
+import { heardRun, loadRecords, loadRuns, runs } from "./runs.ts";
 import { who } from "./model/who.ts";
 
 export interface ProposalEdit { kind: Kind; doc: string; next: unknown; base?: number; create?: boolean; paths?: Path[]; /** The document it was computed from (server/proposals.ts). */ from?: unknown }
@@ -93,7 +93,7 @@ export function connectEvents() {
   });
   source.addEventListener("usage", e => { usage.value = JSON.parse((e as MessageEvent).data) as Usage; });
   // runs (runs.ts): read once, then each change and each step's work as it comes
-  void loadRuns();
+  void loadRuns(); void loadRecords();
   source.addEventListener("run", e => heardRun(JSON.parse((e as MessageEvent).data)));
 }
 

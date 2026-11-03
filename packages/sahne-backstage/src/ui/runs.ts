@@ -3,12 +3,13 @@
 // (the plan to start, a question, a pause, the new people and places to look at); what it made as cards with pictures,
 // grouped into people, places and episodes, each to open and to undo (with what was built on it), or, for an older task
 // that proposed its work, to accept and save or turn down; and its steps, logs and reports folded under "Show the work".
+// A task this backstage's store does not have (it ran elsewhere) is shown from its record in the sidecar, read-only.
 
 import { html } from "htm/preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { textOf, type StoryPlace } from "sahne-story";
 import { route, say, world } from "../store.ts";
-import { act, actStep, loadLog, logs, runs, runsError, undo, type Did, type Run, type RunStep } from "../runs.ts";
+import { act, actStep, elsewhere, loadLog, loadRecord, loadRecords, logs, records, runs, runsError, undo, type Did, type Run, type RunStep, type TaskRecord } from "../runs.ts";
 import { acceptAndSave, neededFirst, proposals, reject, turnedDown, type Proposal } from "../events.ts";
 import { hrefOf, openProposal } from "./proposed.ts";
 import { Answer } from "./assistant.ts";
@@ -76,24 +77,61 @@ function stepsAfter(run: Run, id: string): RunStep[] {
   return [...out];
 }
 
-/** Runs: every run, newest first; or one run. */
+const short = (goal: string) => (goal.length > 140 ? `${goal.slice(0, 140)}…` : goal);
+
+/** Runs: every run, newest first, those that ran elsewhere from their records; or one run. */
 export function RunsTab() {
   const id = route.value[2];
+  useEffect(() => { if (!id) void loadRecords(); }, [id]);
   if (id) return html`<${RunView} id=${id} />`;
-  const list = [...runs.value].sort((a, b) => b.at - a.at);
+  const list = [...runs.value.map(r => ({ at: r.at, run: r as Run | null, rec: null as TaskRecord | null })), ...elsewhere().map(r => ({ at: r.createdAt, run: null, rec: r }))].sort((a, b) => b.at - a.at);
   if (!list.length && runsError.value) return html`<p class="note bad">The tasks could not be read: ${runsError.value}.</p>`;
   if (!list.length) return html`<p class="note">No task yet. Ask the assistant for a long task (a week of episodes, a new season with its people and places), and it offers one: a card you start.</p>`;
-  return html`<ol class="runs-list">${list.map(r => {
+  return html`<ol class="runs-list">${list.map(({ run: r, rec }) => {
+    if (!r) {
+      const x = rec!, work = x.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done").length;
+      return html`<li><a class="card run-card elsewhere" href=${`#/agents/tasks/${x.id}`}>
+        <span class="row"><b class="grow">${short(x.goal)}</b><${Chip}>ran elsewhere</${Chip}></span>
+        <span class="note">${RUN_WORD[x.status] ?? x.status} when last seen, ${ago(x.updatedAt)} · ${done} of ${work.length} done · ${usd(x.usd)}</span></a></li>`;
+    }
     const work = r.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done").length;
     return html`<li><a class="card run-card" href=${`#/agents/tasks/${r.id}`}>
-      <span class="row"><b class="grow">${r.goal.length > 140 ? `${r.goal.slice(0, 140)}…` : r.goal}</b><${Chip} live=${r.status === "running" || waitsForYou(r)} tone=${waitsForYou(r) ? "warn" : r.status === "done" ? "ok" : r.status === "paused" ? "bad" : ""}>${waitsForYou(r) ? "waits for you" : RUN_WORD[r.status]}</${Chip}></span>
+      <span class="row"><b class="grow">${short(r.goal)}</b><${Chip} live=${r.status === "running" || waitsForYou(r)} tone=${waitsForYou(r) ? "warn" : r.status === "done" ? "ok" : r.status === "paused" ? "bad" : ""}>${waitsForYou(r) ? "waits for you" : RUN_WORD[r.status]}</${Chip}></span>
       <span class="note">${auto(r) ? "Just doing it" : "Checking with you"} · ${done} of ${work.length} done · ${usd(r.usd)} · ${ago(r.at)}</span></a></li>`;
   })}</ol>`;
 }
 
+/**
+ * A task this backstage's store does not have, from its record in the sidecar: what it set out to do, its steps and
+ * reports, and what it made, read-only (only the backstage that runs it can undo, answer or go on).
+ */
+function RecordView(p: { id: string }) {
+  const [rec, setRec] = useState<TaskRecord | null | undefined>(() => records.value.find(r => r.id === p.id));
+  useEffect(() => { void loadRecord(p.id).then(setRec); }, [p.id]);
+  if (rec === undefined) return html`<p class="note">Reading task ${p.id}…</p>`;
+  if (!rec) return html`<p class="note">${runsError.value ? `The tasks could not be read: ${runsError.value}.` : `There is no task ${p.id} here, and no record of it in the series.`} <a href="#/agents/tasks">All tasks</a></p>`;
+  const work = rec.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done" || s.status === "undone" || s.status === "skipped").length;
+  const stepTitle = (id: string) => rec.steps.find(s => s.id === id)?.title ?? id;
+  return html`<div class="run run-record">
+    <p class="note"><a href="#/agents/tasks">All tasks</a></p>
+    <div class="run-head"><div class="grow"><h3 class="run-goal" title=${rec.goal}>${rec.goal}</h3>
+      <div class="run-progress"><span class="bar"><span style=${`width:${work.length ? (done / work.length) * 100 : 0}%`}></span></span>
+        <span class="note">${RUN_WORD[rec.status] ?? rec.status} when last seen · ${done} of ${work.length} · ${usd(rec.usd)}${rec.estimateUsd !== undefined ? ` of about ${usd(rec.estimateUsd)}` : ""} · ${rec.mode === "auto" ? "just doing it" : "checking with you"}</span></div></div></div>
+    <p class="note record-note"><${Icon} name="history" size=${14} /><span>This task ran in another backstage (another port, another person's, or before a restart on another config), so this one shows its record from the series (<code>.backstage/tasks/${rec.id}.json</code>), read-only. Last seen ${ago(rec.updatedAt)}, ${new Date(rec.updatedAt).toLocaleString()}${rec.why ? `; ${rec.why}` : ""}. To go on with it, undo or answer it, open the backstage that runs it.</span></p>
+    ${rec.made.length > 0 && html`<section aria-label="What it made"><h4>What it made</h4><ul class="record-made">${rec.made.map(m => html`<li><a href=${hrefOf(m.kind, m.id)}>${KIND_NAME[m.kind] ?? m.kind} <b>${m.id}</b></a> <span class="note">${m.created ? "made" : "changed"} by ${stepTitle(m.step)}</span></li>`)}</ul></section>`}
+    <details class="run-work" open><summary>Its ${rec.steps.length} steps and their reports</summary>
+      ${rec.brief && html`<details class="run-brief"><summary>The plan's brief</summary><${Markdown} text=${rec.brief} /></details>`}
+      <ol class="run-steps">${rec.steps.map(s => html`<li class="run-step"><div class="row"><b class="grow">${s.title}</b><${Chip} tone=${STEP_TONE[s.status] ?? ""}>${STEP_WORD[s.status] ?? s.status}</${Chip}></div>
+        ${s.about && html`<p class="note">${s.about}</p>`}
+        ${s.decided?.length ? html`<ul class="decided">${s.decided.map(d => html`<li>${d}</li>`)}</ul>` : ""}
+        ${s.summary && html`<details><summary>Its report</summary><${Markdown} text=${s.summary} /></details>`}</li>`)}</ol>
+    </details>
+  </div>`;
+}
+
 function RunView(p: { id: string }) {
   const run = runs.value.find(r => r.id === p.id);
-  if (!run) return html`<p class="note">${runsError.value ? `The tasks could not be read: ${runsError.value}.` : `There is no task ${p.id} in this backstage (a task stays with the backstage that ran it).`} <a href="#/agents/tasks">All tasks</a></p>`;
+  if (!run) return html`<${RecordView} id=${p.id} />`;
   // undone or skipped steps are over too: a done task's bar is full
   const work = run.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done" || s.status === "undone" || s.status === "skipped").length, doing = work.filter(s => s.status === "running").length;
   const share = (n: number) => `width:${work.length ? (n / work.length) * 100 : 0}%`;

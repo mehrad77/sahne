@@ -96,6 +96,10 @@ export const kitVariantIds = (root: URL = KIT_VARIANTS): { of: string; name: str
 export const REVIEW = new URL(".backstage/review.json", CONTENT);
 /** What the editor's assistant keeps between conversations (lasting decisions, preferences): beside the review notes, shared. */
 export const MEMORY = new URL(".backstage/memory.json", CONTENT);
+/** What each of backstage's tasks did, one `<id>.json` record each (ids `[a-z0-9-]`): what History shows of a task run elsewhere. */
+export const TASKS = new URL(".backstage/tasks/", CONTENT);
+/** One task record's file (the id checked by the caller). */
+export const taskFile = (id: string): URL => new URL(`${id}.json`, TASKS);
 
 /** The JSON schemas of stories, characters and places (stay in the package). */
 export const SCHEMA = new URL("schema/", HERE);
