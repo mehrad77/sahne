@@ -8,7 +8,7 @@ import { html } from "htm/preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { textOf, type StoryPlace } from "sahne-story";
 import { route, say, world } from "../store.ts";
-import { act, actStep, loadLog, logs, runs, undo, type Did, type Run, type RunStep } from "../runs.ts";
+import { act, actStep, loadLog, logs, runs, runsError, undo, type Did, type Run, type RunStep } from "../runs.ts";
 import { acceptAndSave, neededFirst, proposals, reject, turnedDown, type Proposal } from "../events.ts";
 import { hrefOf, openProposal } from "./proposed.ts";
 import { Answer } from "./assistant.ts";
@@ -81,6 +81,7 @@ export function RunsTab() {
   const id = route.value[2];
   if (id) return html`<${RunView} id=${id} />`;
   const list = [...runs.value].sort((a, b) => b.at - a.at);
+  if (!list.length && runsError.value) return html`<p class="note bad">The tasks could not be read: ${runsError.value}.</p>`;
   if (!list.length) return html`<p class="note">No task yet. Ask the assistant for a long task (a week of episodes, a new season with its people and places), and it offers one: a card you start.</p>`;
   return html`<ol class="runs-list">${list.map(r => {
     const work = r.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done").length;
@@ -92,7 +93,7 @@ export function RunsTab() {
 
 function RunView(p: { id: string }) {
   const run = runs.value.find(r => r.id === p.id);
-  if (!run) return html`<p class="note">There is no task ${p.id}. <a href="#/agents/tasks">All tasks</a></p>`;
+  if (!run) return html`<p class="note">${runsError.value ? `The tasks could not be read: ${runsError.value}.` : `There is no task ${p.id} in this backstage (a task stays with the backstage that ran it).`} <a href="#/agents/tasks">All tasks</a></p>`;
   // undone or skipped steps are over too: a done task's bar is full
   const work = run.steps.filter(s => s.kind !== "plan"), done = work.filter(s => s.status === "done" || s.status === "undone" || s.status === "skipped").length, doing = work.filter(s => s.status === "running").length;
   const share = (n: number) => `width:${work.length ? (n / work.length) * 100 : 0}%`;

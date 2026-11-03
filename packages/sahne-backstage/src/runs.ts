@@ -39,9 +39,12 @@ export const marks = computed(() => marksOf(runs.value));
 // the tab says so while a run waits for the person
 if (typeof document !== "undefined") { const base = document.title; effect(() => { document.title = waiting.value.length ? `● ${base}` : base; }); }
 
+/** Why the tasks could not be read (null once they were): the page says it instead of showing none. */
+export const runsError = signal<string | null>(null);
 export async function loadRuns(): Promise<void> {
   const r = await api.get<{ runs: Run[] }>("runs");
-  if (r.status === 200) { runs.value = r.runs; read = true; }
+  if (r.status === 200) { runs.value = r.runs; read = true; runsError.value = null; }
+  else runsError.value = r.status === 404 ? "this backstage is older than the page (it has no tasks): start it again" : (r as { message?: string }).message ?? `backstage answered ${r.status}`;
 }
 export const runsRead = () => read;
 
