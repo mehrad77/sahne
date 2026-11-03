@@ -20,7 +20,7 @@ a { color: var(--accent); }
 .side nav a.top { font-weight: 650; margin-top: 6px; }
 .side nav a.sub { padding-left: 18px; color: var(--mute); }
 .side nav a.sub small { opacity: .8; }
-.side nav a.sub:has(.icon) { display: flex; gap: 7px; align-items: flex-start; }
+.side nav a.sub:has(.icon) { display: flex; gap: 7px; align-items: flex-start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side nav a.sub .icon { width: 16px; height: 16px; flex: none; margin-top: 2px; border-radius: 3px; }
 .side nav .group { padding: 8px 8px 2px 18px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--mute); }
 .side nav a:hover { background: var(--chip); }
