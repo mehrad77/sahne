@@ -30,22 +30,34 @@ document.body.append(app);
 // ---- the sidebar ---------------------------------------------------------------------------------
 
 const items = new Map<string, NavItem[]>();
+// the why-and-how sections first; the workshop's pages folded under Explore, open while one of them shows
+const explore = $("details", "explore");
+explore.append($("summary", "", "Explore"));
 function drawNav() {
   nav.replaceChildren();
+  for (const el of [...explore.children].slice(1)) el.remove();
   for (const s of SECTIONS) {
-    nav.append(Object.assign($("a", "top", s.title), { href: `#/${s.id}`, title: s.about }));
+    const into = s.explore ? explore : nav;
+    into.append(Object.assign($("a", "top", s.title), { href: `#/${s.id}`, title: s.about }));
+    // a section's own list shows while the section does
+    const subs = Object.assign($("div", "subs"), { hidden: true });
+    subs.dataset.section = s.id;
     let group = "";
     for (const it of items.get(s.id) ?? []) {
-      if (it.group && it.group !== group) { group = it.group; nav.append($("div", "group", group)); }
+      if (it.group && it.group !== group) { group = it.group; subs.append($("div", "group", group)); }
       const a = Object.assign($("a", "sub", it.label), { href: it.hash });
       if (it.note) a.append(" ", $("small", "", it.note));
-      nav.append(a);
+      subs.append(a);
     }
+    into.append(subs);
   }
+  nav.append(explore);
   markCurrent();
 }
 function markCurrent() {
   const here = location.hash.split("?")[0] || "#/";
+  const section = here.slice(2).split("/")[0];
+  for (const d of nav.querySelectorAll<HTMLElement>(".subs")) d.hidden = d.dataset.section !== section;
   let best: HTMLAnchorElement | null = null;
   for (const a of nav.querySelectorAll<HTMLAnchorElement>("a")) {
     a.removeAttribute("aria-current");
@@ -53,24 +65,37 @@ function markCurrent() {
     if ((here === h || here.startsWith(h + "/")) && (!best || h.length > best.getAttribute("href")!.length)) best = a;
   }
   best?.setAttribute("aria-current", "page");
+  if (best && explore.contains(best)) explore.open = true;
 }
 for (const s of SECTIONS) if (s.nav) Promise.resolve(s.nav()).then(list => { items.set(s.id, list); drawNav(); }, e => console.warn(`nav ${s.id}: ${e.message}`));
 drawNav();
 
-// ---- the top bar: gallery-wide settings ------------------------------------------------------------
+// ---- the top bar: sound, and the gallery-wide settings in a menu ------------------------------------------------------------
 
 const crumbs = $("span", "crumbs");
-const menu = button("☰", () => app.classList.toggle("open"), undefined, "sections");
+// ☰ opens the sidebar over the page on a narrow window, and folds it away on a wide one (kept in this browser)
+const narrow = matchMedia("(max-width: 860px)");
+const folded = (() => { try { return localStorage.getItem("gallery:side") === "folded"; } catch { return false; } })();
+app.classList.toggle("folded", folded);
+const menu = button("☰", () => {
+  if (narrow.matches) { app.classList.toggle("open"); return; }
+  const on = app.classList.toggle("folded");
+  try { localStorage.setItem("gallery:side", on ? "folded" : "open"); } catch { /* kept for this visit only */ }
+}, undefined, "show or hide the sections");
 menu.className = "menu";
 const S = ctx.settings;
-top.append(
-  menu, crumbs,
+// sound is the one setting a newcomer wants at hand; the rest wait in a menu
+const more = $("details", "settings"), panel = $("div", "panel");
+more.append(Object.assign($("summary", "", "Settings"), { title: "Motion, captions, the stage's width, the theme" }), panel);
+panel.append(
   choice<Settings["motion"]>("motion", ["full", "calm", "still"], S.motion, m => ctx.setSettings({ motion: m })),
-  toggle("sound", S.sound, on => ctx.setSettings({ sound: on }), "sound on every stage (starts off: a browser wants a tap)"),
   toggle("captions", S.captions, on => ctx.setSettings({ captions: on }), "sound words as bubbles while sound is on"),
   choice<Settings["width"]>("width", ["fit", "390", "1100"], S.width, w => ctx.setSettings({ width: w }), { fit: "fit", "390": "390", "1100": "1100" }),
   choice<Settings["theme"]>("theme", ["auto", "light", "dark"], S.theme, t => ctx.setSettings({ theme: t })),
 );
+addEventListener("pointerdown", e => { if (more.open && !more.contains(e.target as Node)) more.open = false; });
+addEventListener("keydown", e => { if (e.key === "Escape") more.open = false; });
+top.append(menu, crumbs, toggle("sound", S.sound, on => ctx.setSettings({ sound: on }), "sound on every stage (starts off: a browser wants a tap)"), more);
 
 // the top bar's height, for a view's own sticky bars (it wraps on a narrow window)
 new ResizeObserver(() => document.documentElement.style.setProperty("--topbar-h", `${top.offsetHeight}px`)).observe(top);

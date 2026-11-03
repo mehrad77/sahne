@@ -20,7 +20,7 @@ await app.watch();
 // esbuild serves the folder on a port of its own; this server answers /data/* and passes the rest on.
 const { port: inner } = await app.serve({ servedir: dir, port: 0 });
 http.createServer(async (req, res) => {
-  const m = req.url.match(/^\/data\/([a-z]+|docs\/[a-z]+)\.json(?:\?|$)/);
+  const m = req.url.match(/^\/data\/([a-z]+|docs\/[a-z][a-z-]*)\.json(?:\?|$)/);
   if (m) {
     const make = m[1].startsWith("docs/") ? () => doc(m[1].slice(5)) ?? Promise.reject(new Error("no such doc")) : DATA[m[1]];
     if (!make) { res.writeHead(404).end(); return; }

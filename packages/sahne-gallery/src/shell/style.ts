@@ -22,17 +22,30 @@ a { color: var(--accent); }
 .side nav a.sub small { opacity: .8; }
 .side nav .group { padding: 8px 8px 2px 18px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--mute); }
 .side nav a:hover { background: var(--chip); }
+.side nav details.explore { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
+.side nav details.explore summary { cursor: pointer; padding: 3px 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--mute); font-weight: 650; }
+.side nav details.explore summary:hover { color: var(--ink); }
 .side nav a[aria-current="page"] { background: var(--accent); color: #fff; }
 .main { min-width: 0; }
 .topbar { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
 .topbar .crumbs { font-weight: 650; margin-right: auto; }
-.topbar .menu { display: none; }
+.topbar .menu { display: inline-block; }
+.app.folded { grid-template-columns: 0 1fr; }
+.app.folded .side { visibility: hidden; padding: 0; border: 0; }
+.topbar details.settings { position: relative; }
+.topbar details.settings summary { list-style: none; cursor: pointer; border: 1px solid var(--line); background: var(--chip); border-radius: 999px; padding: 3px 11px; }
+.topbar details.settings summary::-webkit-details-marker { display: none; }
+.topbar details.settings summary::before { content: "⚙ "; color: var(--mute); }
+.topbar details.settings[open] summary, .topbar details.settings summary:hover { border-color: var(--accent); }
+.topbar details.settings .panel { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; display: grid; gap: 4px; padding: 10px 12px; min-width: 260px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px #0003; }
+.topbar details.settings .panel > * { justify-self: start; margin: 0; }
 .view { max-width: 1180px; margin: 0 auto; padding: 16px 16px 60px; }
 @media (max-width: 860px) {
   .app { grid-template-columns: 1fr; }
   .side { position: fixed; z-index: 10; inset: 0 30% 0 0; transform: translateX(-102%); transition: transform .2s; height: 100vh; }
   .app.open .side { transform: none; box-shadow: 0 0 40px #0004; }
-  .topbar .menu { display: inline-block; }
+  .app.folded { grid-template-columns: 1fr; }
+  .app.folded .side { visibility: visible; padding: 12px 10px 24px; }
 }
 h1 { font-size: 20px; margin: 4px 0 6px; }
 h2 { font-size: 16px; margin: 22px 0 6px; }
@@ -102,6 +115,17 @@ table.t th { color: var(--mute); font-weight: 600; }
 .param input[type=range] { grid-column: 2; width: 100%; }
 .param small { grid-column: 2; color: var(--mute); font-size: 11.5px; line-height: 1.3; }
 /* the home page */
+.cards.why .card { margin: 0; } .cards.why p { margin: 6px 0 0; color: var(--mute); font-size: 13.5px; line-height: 1.5; }
+.how { list-style: none; padding: 0; margin: 6px 0 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; counter-reset: none; }
+.how li { position: relative; background: var(--chip); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px 12px 50px; display: grid; gap: 3px; }
+.how li .n { position: absolute; left: 12px; top: 12px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: #fff; font-weight: 700; }
+.how li small { color: var(--mute); font-size: 13px; line-height: 1.45; }
+@media (min-width: 900px) { .how li:not(:last-child)::after { content: "→"; position: absolute; right: -9px; top: 14px; color: var(--mute); background: var(--bg); padding: 0 1px; } }
+a.card.news { display: grid; gap: 4px; margin: 22px 0 6px; padding: 14px 16px; text-decoration: none; color: var(--ink); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, var(--chip)); }
+a.card.news small { text-transform: uppercase; letter-spacing: .06em; color: var(--accent); font-weight: 700; font-size: 11.5px; }
+a.card.news b { font-size: 17px; } a.card.news span { color: var(--mute); }
+a.card.news:hover { border-color: var(--ink); }
+.cards.packages code { font-size: 12px; color: var(--accent); }
 .cards.stats { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .hero { padding: 18px 0 6px; }
 .hero .wordmark { margin: 0; }

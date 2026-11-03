@@ -1,4 +1,4 @@
-// #/docs/<slug>: the repo's own markdown (data.mjs DOCS), rendered: the guide, the engine's README and
+// #/docs/<slug> (and #/new, #/get-started): the repo's own markdown (data.mjs DOCS), rendered: the guide, the engine's README and
 // DESIGN.md, the kit's style guide and lists, the story format, the conventions. A link between two docs
 // stays here, `?at=<anchor>` scrolls to a heading (`?at=s12` to DESIGN.md §12), and a `sahne` block plays.
 
@@ -9,7 +9,8 @@ import { doc } from "../shell/data.ts";
 import { live } from "../shell/live.ts";
 
 export async function render(host: HTMLElement, ctx: Ctx) {
-  const d = await doc(ctx.route.path[0] ?? "start");
+  // #/new and #/get-started are docs with a section of their own
+  const d = await doc(ctx.route.section === "docs" ? ctx.route.path[0] ?? "overview" : ctx.route.section);
   const head = $("div", "doc-head");
   const src = Object.assign($("a", "", "View on GitHub"), { href: d.source, target: "_blank", rel: "noopener" });
   head.append($("small", "", `${d.group} · ${d.file} · `), src);

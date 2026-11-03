@@ -1,6 +1,7 @@
 // The gallery's sections and what their sidebar lists. Each section's view is its own chunk, loaded
 // when it is first opened; the lists here are light (data files and the systems' registry), so the
-// sidebar can show everything at once.
+// sidebar can show everything at once. The first four answer why and how (the home, what's new, how to
+// start, the docs); the rest are the workshop's pages, folded under Explore (`explore`).
 
 import type { Ctx } from "./shell/ctx.ts";
 import { data } from "./shell/data.ts";
@@ -8,27 +9,30 @@ import { SYSTEMS } from "./systems/registry.ts";
 
 export interface NavItem { label: string; hash: string; group?: string; note?: string }
 export interface View { render(host: HTMLElement, ctx: Ctx): void | Promise<void> }
-export interface Section { id: string; title: string; about: string; nav?: () => NavItem[] | Promise<NavItem[]>; load: () => Promise<View> }
+export interface Section { id: string; title: string; about: string; nav?: () => NavItem[] | Promise<NavItem[]>; load: () => Promise<View>; /** Folded under Explore in the sidebar. */ explore?: boolean }
 
 export const SECTIONS: Section[] = [
-  { id: "", title: "Home", about: "What Sahne is, a scene playing, what it does", load: () => import("./sections/home.ts") },
+  { id: "", title: "Home", about: "What Sahne is, why it exists and how it works", load: () => import("./sections/home.ts") },
+  // these two are docs (guide/whats-new.md, guide/get-started.md) with a place of their own
+  { id: "new", title: "What's new", about: "Backstage, every language, story plugins and more kit", load: () => import("./sections/docs.ts") },
+  { id: "get-started", title: "Get started", about: "Write episodes, put a stage in an app, or draw for the kit", load: () => import("./sections/docs.ts") },
   {
-    id: "docs", title: "Docs", about: "The guide, the engine's design, the kit, the story format",
-    nav: async () => (await data("docs")).map(d => ({ label: d.title, hash: `#/docs/${d.slug}`, group: d.group })),
+    id: "docs", title: "Docs", about: "Every package, the engine's design, the kit, the story format",
+    nav: async () => (await data("docs")).filter(d => d.slug !== "new" && d.slug !== "get-started").map(d => ({ label: d.title, hash: `#/docs/${d.slug}`, group: d.group })),
     load: () => import("./sections/docs.ts"),
   },
   {
-    id: "systems", title: "Systems", about: "The engine, one live demo per system",
+    id: "systems", title: "Systems", about: "The engine, one live demo per system", explore: true,
     nav: () => SYSTEMS.map(s => ({ label: s.title, hash: `#/systems/${s.id}`, group: s.group })),
     load: () => import("./systems/view.ts"),
   },
   {
-    id: "kit", title: "Kit", about: "People, gestures, the set and props, sounds, Kerim",
+    id: "kit", title: "Kit", about: "People, gestures, the set and props, sounds, Kerim", explore: true,
     nav: () => KIT_NAV,
     load: () => import("./sections/kit.ts"),
   },
   {
-    id: "places", title: "Places", about: "Every story place: the board, each place scouted",
+    id: "places", title: "Places", about: "Every story place: the board, each place scouted", explore: true,
     nav: async () => {
       const places = await data("places");
       const { BENCH_DOCS } = await import("./places/common.ts");
@@ -37,16 +41,16 @@ export const SECTIONS: Section[] = [
     load: () => import("./sections/places.ts"),
   },
   {
-    id: "stories", title: "Stories", about: "The stories played through the adapter",
+    id: "stories", title: "Stories", about: "The stories played through the adapter", explore: true,
     nav: async () => (await data("drafts")).map(d => ({ label: d.id, hash: `#/stories/${d.id}`, note: d.fixture ? "test scene" : undefined })),
     load: () => import("./sections/stories.ts"),
   },
   {
-    id: "cast", title: "Cast", about: "The stories' characters: the roster and the extras, at every framing",
+    id: "cast", title: "Cast", about: "The stories' characters: the roster and the extras, at every framing", explore: true,
     nav: () => [{ label: "Roster", hash: "#/cast" }, { label: "Extras", hash: "#/cast/extras" }],
     load: () => import("./sections/cast.ts"),
   },
-  { id: "dev", title: "For maintainers", about: "Engine coverage and the changes to review", load: () => import("./sections/dev.ts") },
+  { id: "dev", title: "For maintainers", about: "Engine coverage and the changes to review", load: () => import("./sections/dev.ts"), explore: true },
 ];
 
 export const KIT_NAV: NavItem[] = [
