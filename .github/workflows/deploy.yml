@@ -2,7 +2,7 @@ name: deploy
 
 # The gallery as the live demo, https://sahne.shab.boo, on Cloudflare: once `ci` passes on main, the gallery is
 # built as a static site from the samples and deployed as a Worker's static assets (packages/sahne-gallery:
-# build.mjs, wrangler.jsonc; `pnpm sahne deploy` does the same by hand). Off until a maintainer sets the
+# build.mjs, wrangler.jsonc; `pnpm sahne run deploy` does the same by hand). Off until a maintainer sets the
 # repository variable DEPLOY_ENABLED = true and the secrets CLOUDFLARE_API_TOKEN (a token that can edit Workers)
 # and CLOUDFLARE_ACCOUNT_ID.
 
