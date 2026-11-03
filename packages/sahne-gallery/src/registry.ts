@@ -14,7 +14,11 @@ export interface Section { id: string; title: string; about: string; nav?: () =>
 export const SECTIONS: Section[] = [
   { id: "", title: "Home", about: "What Sahne is, why it exists and how it works", load: () => import("./sections/home.ts") },
   // these two are docs (guide/whats-new.md, guide/get-started.md) with a place of their own
-  { id: "new", title: "What's new", about: "Backstage, every language, story plugins and more kit", load: () => import("./sections/docs.ts") },
+  {
+    id: "new", title: "What's new", about: "Each release, newest first: Backstage in 0.2, the first stage in 0.1",
+    nav: () => RELEASES.map((r, i) => ({ label: i ? `Sahne ${r}` : `Sahne ${r} · latest`, hash: `#/new?at=sahne-${r.replace(".", "")}` })),
+    load: () => import("./sections/docs.ts"),
+  },
   { id: "get-started", title: "Get started", about: "Write episodes, put a stage in an app, or draw for the kit", load: () => import("./sections/docs.ts") },
   {
     id: "docs", title: "Docs", about: "Every package, the engine's design, the kit, the story format",
@@ -52,6 +56,9 @@ export const SECTIONS: Section[] = [
   },
   { id: "dev", title: "For maintainers", about: "Engine coverage and the changes to review", load: () => import("./sections/dev.ts"), explore: true },
 ];
+
+/** The releases guide/whats-new.md has a section for, newest first. */
+export const RELEASES = ["0.2", "0.1"];
 
 export const KIT_NAV: NavItem[] = [
   { label: "Set and props", hash: "#/kit/set" },

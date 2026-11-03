@@ -136,7 +136,7 @@ export const DOCS = [
   ["german", "sahne-de: German", "Packages", "packages/sahne-de/README.md"],
   ["persian", "sahne-fa: Persian", "Packages", "packages/sahne-fa/README.md"],
   ["gallery", "sahne-gallery: this site", "Packages", "packages/sahne-gallery/README.md"],
-  ["writing-with-agents", "Agentic story writing", "In depth", "packages/sahne-gallery/guide/agents.md"],
+  ["writing-with-agents", "Agentic story writing", "In depth", "packages/sahne-gallery/guide/writing-with-agents.md"],
   ["design", "Design", "In depth", "packages/sahne/DESIGN.md"],
   ["style", "Style guide", "In depth", "packages/sahne-kit/STYLE.md"],
   ["drawing", "Drawing kit items", "In depth", "packages/sahne-kit/DRAWING.md"],

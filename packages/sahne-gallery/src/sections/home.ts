@@ -9,6 +9,7 @@ import type { Ctx } from "../shell/ctx.ts";
 import { live } from "../shell/live.ts";
 import { FILM, FILM_EXTRAS, FILM_PLACES, FILM_TITLES } from "../film.ts";
 import { textOf } from "sahne-story";
+import sahne from "../../../sahne/package.json" with { type: "json" };
 
 const FEATURES: [string, string, string][] = [
   ["Cut-paper puppets", "People built from a kit of parts: faces that talk and blink, 39 gestures and 14 emotions, walks, carries and idle life, all posed by one rig.", "#/systems/actors"],
@@ -115,7 +116,7 @@ export async function render(host: HTMLElement, ctx: Ctx) {
   // ---- what's new ----
   const fresh = link("", "#/new");
   fresh.className = "card news";
-  fresh.append($("small", "", "What's new"), $("b", "", "Backstage: a studio for the whole series"), $("span", "", "Write, stage, translate and review episodes beside a live stage, with an assistant and agents you can watch and undo. And English, German and Persian, story plugins, and more kit."));
+  fresh.append($("small", "", `What's new in ${sahne.version.replace(/\.0$/, "")}`), $("b", "", "Backstage: a studio for the whole series"), $("span", "", "Write, stage, translate and review episodes beside a live stage, with an assistant and agents you can watch and undo. And English, German and Persian, story plugins, and more kit."));
   host.append(fresh);
 
   // ---- the packages ----
@@ -180,6 +181,6 @@ export async function render(host: HTMLElement, ctx: Ctx) {
   host.append($("h2", "", "In the gallery"), grid);
 
   const foot = $("p", "note");
-  foot.append("Code MIT, art CC BY 4.0, except Kerim, Kumru's mascot, whose art is all rights reserved. ", link("Contributing", "#/docs/contributing"), " · ", link("For maintainers", "#/dev"));
+  foot.append(link(`Sahne ${sahne.version}`, "#/new"), " · Code MIT, art CC BY 4.0, except Kerim, Kumru's mascot, whose art is all rights reserved. ", link("Contributing", "#/docs/contributing"), " · ", link("For maintainers", "#/dev"));
   host.append(foot);
 }
