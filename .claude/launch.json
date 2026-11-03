@@ -16,7 +16,7 @@
       "runtimeExecutable": "sh",
       "runtimeArgs": [
         "-c",
-        "cd packages/sahne-backstage && node server/cli.ts --port ${PORT:-5181}"
+        "cd packages/sahne-backstage && if [ -f ../../.env ]; then set -a; . ../../.env; set +a; fi && node server/cli.ts --write --port ${PORT:-5181}"
       ],
       "port": 5181,
       "autoPort": true
