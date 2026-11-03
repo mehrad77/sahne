@@ -22,6 +22,8 @@ jobs:
 
   check:
     runs-on: ubuntu-latest
+    # the gate takes about 4 minutes; a hung test fails at its own timeout (the check script's --test-timeout), and this stops the rest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
