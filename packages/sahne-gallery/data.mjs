@@ -5,6 +5,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:f
 import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Marked } from "marked";
+import hljs from "highlight.js/lib/common";
 import { execFileSync } from "node:child_process";
 import { CARDS, PLACES, STORIES_WORLD } from "../sahne-story/paths.ts";
 import { loadContentKit, loadNeeds } from "../sahne-story/load.ts";
@@ -156,6 +157,27 @@ const BY_FILE = new Map(DOCS.map(d => [d.file, d]));
 const anchor = text => text.toLowerCase().replace(/<[^>]+>/g, "").replace(/[^\p{L}\p{N}\s_-]/gu, "").trim().replace(/\s/g, "-");
 const escape = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/** A code block in colour (highlight.js, at build time, so the page loads no highlighter): by its language, or, with
+ * none named, the likeliest of the docs' own (a plain sketch or a table of names stays plain). */
+const LANGS = { jsonc: "json", sh: "bash", shell: "bash", zsh: "bash" };
+const GUESS = ["typescript", "javascript", "json", "bash", "yaml", "css", "xml"];
+function highlight(text, lang) {
+  const named = LANGS[lang] ?? lang;
+  if (named === "bash") return text.split("\n").map(shellLine).join("\n");
+  if (named && named !== "text" && hljs.getLanguage(named)) return hljs.highlight(text, { language: named, ignoreIllegals: true }).value;
+  if (named) return escape(text);
+  const guess = hljs.highlightAuto(text, GUESS);
+  return guess.relevance >= 6 ? guess.value : escape(text);
+}
+
+/** A shell line: highlight.js's colours, and the command itself and its --flags (which it leaves plain) in theirs. */
+function shellLine(line) {
+  if (/^\s*#/.test(line)) return hljs.highlight(line, { language: "bash" }).value;
+  const [, lead, cmd, rest] = /^(\s*(?:[A-Z_]+=\S*\s+)*)(\S*)(.*)$/.exec(line);
+  const out = hljs.highlight(rest, { language: "bash" }).value.replace(/(^|\s)(--?[a-z][\w-]*)/g, '$1<span class="hljs-attr">$2</span>');
+  return `${escape(lead)}${cmd ? `<span class="hljs-title">${escape(cmd)}</span>` : ""}${out}`;
+}
+
 /** One doc as HTML. Links: to another doc → `#/docs/<slug>?at=<anchor>`; to a heading of its own → `?at=`; to
  * any other repo file → GitHub (images → raw; the repo's assets/ is served beside the page). Headings carry GitHub's anchors, and a numbered one (`## 12.`,
  * `### 4.1`) also `data-sec`, so `?at=s12` finds DESIGN.md §12. A fenced block in the language `sahne` (a
@@ -189,7 +211,7 @@ export function doc(slug) {
     code({ text, lang }) {
       if (lang === "mermaid") return `<pre class="mermaid">${escape(text)}</pre>\n`;
       if (lang === "sahne") return `<div class="sahne-live" data-script="${escape(text)}"></div><details class="src"><summary>The script</summary><pre><code>${escape(text)}</code></pre></details>\n`;
-      return `<pre><code${lang ? ` class="language-${escape(lang)}"` : ""}>${escape(text)}</code></pre>\n`;
+      return `<pre><code class="hljs${lang ? ` language-${escape(lang)}` : ""}">${highlight(text, lang)}</code></pre>\n`;
     },
   } });
   // inline HTML in the docs (the README's centred poster, a package's brand block) has repo-relative src/srcset/href too;

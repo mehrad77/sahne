@@ -9,6 +9,8 @@ import type { Ctx } from "../shell/ctx.ts";
 import { live } from "../shell/live.ts";
 import { FILM, FILM_EXTRAS, FILM_PLACES, FILM_TITLES } from "../film.ts";
 import { textOf } from "sahne-story";
+import hljs from "highlight.js/lib/core";
+import typescript from "highlight.js/lib/languages/typescript";
 import sahne from "../../../sahne/package.json" with { type: "json" };
 
 const FEATURES: [string, string, string][] = [
@@ -147,7 +149,9 @@ export async function render(host: HTMLElement, ctx: Ctx) {
   // ---- quick start ----
   host.append($("h2", "", "In a few lines"));
   const pre = $("pre", "code");
-  pre.textContent = QUICK;
+  // in colour, as the docs' code is (highlight.js's classes, styled in style.ts)
+  if (!hljs.getLanguage("typescript")) hljs.registerLanguage("typescript", typescript);
+  pre.innerHTML = `<code class="hljs">${hljs.highlight(QUICK, { language: "typescript" }).value}</code>`;
   const more = $("p", "note");
   more.append("The whole walk-through, with a scene that plays: ", link("Your first scene", "#/docs/start"), ". The design, the formats and the budgets: ", link("DESIGN.md", "#/docs/design"), ".");
   host.append(pre, more);

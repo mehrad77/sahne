@@ -165,7 +165,19 @@ pre.code, .prose pre { font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, mon
 .prose h3 { font-size: 17px; margin: 20px 0 6px; }
 .prose h1, .prose h2, .prose h3, .prose h4 { scroll-margin-top: 56px; }
 .prose code { font: 0.88em ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--chip); border: 1px solid var(--line); border-radius: 5px; padding: 0 4px; }
-.prose pre code { border: 0; padding: 0; background: none; font-size: inherit; }
+.prose pre code, pre.code code { border: 0; padding: 0; background: none; font-size: inherit; }
+/* code in colour (highlight.js's classes, written by data.mjs), in the page's light and dark */
+:root { --hl-key: #A23E8C; --hl-str: #2F7A3A; --hl-num: #B5541D; --hl-com: #8C8176; --hl-fn: #2462A8; --hl-type: #1F7F7B; --hl-attr: #8A5A00; --hl-meta: #6B5CA5; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --hl-key: #E28AD0; --hl-str: #9BD08A; --hl-num: #F2A36B; --hl-com: #8F857B; --hl-fn: #82B4F0; --hl-type: #6FD0C8; --hl-attr: #E5C07B; --hl-meta: #B4A6F0; } }
+:root[data-theme="dark"] { --hl-key: #E28AD0; --hl-str: #9BD08A; --hl-num: #F2A36B; --hl-com: #8F857B; --hl-fn: #82B4F0; --hl-type: #6FD0C8; --hl-attr: #E5C07B; --hl-meta: #B4A6F0; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in.hljs-keyword, .hljs-literal { color: var(--hl-key); }
+.hljs-string, .hljs-regexp, .hljs-template-string, .hljs-symbol { color: var(--hl-str); }
+.hljs-number { color: var(--hl-num); }
+.hljs-comment, .hljs-quote { color: var(--hl-com); font-style: italic; }
+.hljs-title, .hljs-title.function_, .hljs-function .hljs-title { color: var(--hl-fn); }
+.hljs-type, .hljs-title.class_, .hljs-built_in { color: var(--hl-type); }
+.hljs-attr, .hljs-attribute, .hljs-property, .hljs-variable, .hljs-params { color: var(--hl-attr); }
+.hljs-meta, .hljs-subst, .hljs-tag, .hljs-name { color: var(--hl-meta); }
 .prose table { border-collapse: collapse; display: block; overflow-x: auto; margin: 10px 0; font-size: 13.5px; }
 .prose th, .prose td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; vertical-align: top; }
 .prose th { background: var(--chip); }
