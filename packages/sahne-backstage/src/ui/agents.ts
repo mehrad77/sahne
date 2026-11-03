@@ -131,7 +131,7 @@ function Tools(p: { v: AgentsView }) {
   const row = (t: Tool) => html`<li><code>${t.name}</code>${t.title ? html` <b>${t.title}</b>` : ""}${open ? html`<div class="note">${t.description}</div>` : ""}</li>`;
   return html`<div class="row"><span class="note grow">${read.length} to read, ${write.length} to edit, and the resources <code>sahne://format</code>, <code>sahne://languages</code>, <code>sahne://selection</code>.</span>
       <button class="small" onClick=${() => setOpen(!open)}>${open ? "Hide what each does" : "What each does"}</button></div>
-    <div class="tools"><div><h4>Read</h4><ul>${read.map(row)}</ul></div><div><h4>Edit</h4><ul>${write.map(row)}</ul></div></div>`;
+    <div class="tool-columns"><div><h4>Read</h4><ul>${read.map(row)}</ul></div><div><h4>Edit</h4><ul>${write.map(row)}</ul></div></div>`;
 }
 
 /** The Agents page: the assistant in full view, or the agents over MCP. */
