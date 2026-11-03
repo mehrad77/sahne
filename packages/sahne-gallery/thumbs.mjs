@@ -8,7 +8,7 @@
 //   node packages/sahne-gallery/thumbs.mjs --check    fail when a thumbnail is missing, stale or has no story (no browser)
 //
 // Written: thumbs/<id>.webp of the content root ($SAHNE_CONTENT, sahne-story/paths.ts) and thumbs.json, { <id>: the hash of what the picture is drawn from }: the story's
-// file, its opening place and its cast's documents, and this script. --check compares those hashes, never the pixels (a picture
+// opening scene, props, cast and looks (not its lines: a text fix keeps the picture), its opening place and its cast's documents, and this script. --check compares those hashes, never the pixels (a picture
 // differs a little between machines). A change to the stage or the kit draws differently without making a thumbnail stale:
 // run with --all then.
 //
@@ -36,7 +36,10 @@ function sourceHash(id) {
   const first = (s.steps ?? []).find((x) => x && typeof x === "object" && "scene" in x);
   const place = first?.scene ?? s.place;
   const h = createHash("sha256").update(readFileSync(new URL(import.meta.url)));
-  h.update(raw).update(read(new URL(`${place}.json`, PLACES)));
+  // only what the opening picture draws: its scene, where the story starts, its props, the cast and what they wear (a fix to a
+  // line's words keeps the picture)
+  h.update(JSON.stringify({ first, place: s.place, props: s.props, looks: s.looks, cast: s.cast, extras: s.extras }));
+  h.update(read(new URL(`${place}.json`, PLACES)));
   for (const c of [...(s.cast ?? []), ...(s.extras ?? [])].sort()) h.update(c).update(read(new URL(`${c}.json`, CHARACTERS)));
   return h.digest("hex").slice(0, 16);
 }

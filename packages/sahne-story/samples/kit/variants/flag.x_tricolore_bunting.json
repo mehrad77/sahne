@@ -1,0 +1,10 @@
+{
+  "of": "flag",
+  "name": "x_tricolore_bunting",
+  "params": {
+    "kind": "bunting",
+    "country": "fr",
+    "w": 420,
+    "sag": 30
+  }
+}

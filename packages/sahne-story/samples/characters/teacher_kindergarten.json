@@ -60,18 +60,24 @@
       }
     }
   },
-  "bio": "Stands at the side of the stage and keeps the row of children together.",
-  "bioFa": "کنارِ صحنه می‌ایستد و ردیفِ بچه‌ها را کنارِ هم نگه می‌دارد.",
+  "bio": {
+    "en": "Stands at the side of the stage and keeps the row of children together.",
+    "fa": "کنارِ صحنه می‌ایستد و ردیفِ بچه‌ها را کنارِ هم نگه می‌دارد."
+  },
   "color": "#8A8580",
   "id": "teacher_kindergarten",
   "kind": "extra",
   "level": "A1",
-  "name": "Öğretmen",
-  "nameFa": "معلم",
+  "name": {
+    "fa": "معلم",
+    "tr": "Öğretmen"
+  },
   "order": 108,
   "places": [
     "park_ferikoy"
   ],
-  "role": "The kindergarten teacher at the park show",
-  "roleFa": "معلمِ مهدکودک در جشنِ پارک"
+  "role": {
+    "en": "The kindergarten teacher at the park show",
+    "fa": "معلمِ مهدکودک در جشنِ پارک"
+  }
 }

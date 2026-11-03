@@ -50,20 +50,26 @@
     "skin": "skin_15",
     "v": 1
   },
-  "bio": "Walking somewhere; asked the way, he points.",
-  "bioFa": "دارد جایی می‌رود؛ وقتی راه را می‌پرسند، با دست نشان می‌دهد.",
+  "bio": {
+    "en": "Walking somewhere; asked the way, he points.",
+    "fa": "دارد جایی می‌رود؛ وقتی راه را می‌پرسند، با دست نشان می‌دهد."
+  },
   "color": "#8A8580",
   "id": "passerby_1",
   "kind": "extra",
   "level": "A1",
-  "name": "Yoldan geçen",
-  "nameFa": "رهگذر",
+  "name": {
+    "fa": "رهگذر",
+    "tr": "Yoldan geçen"
+  },
   "order": 119,
   "places": [
     "istiklal_street",
     "istiklal_taksim",
     "ferikoy"
   ],
-  "role": "A passer-by on İstiklal",
-  "roleFa": "رهگذری در استقلال"
+  "role": {
+    "en": "A passer-by on İstiklal",
+    "fa": "رهگذری در استقلال"
+  }
 }

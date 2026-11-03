@@ -8,7 +8,7 @@ import { $, bar, button, chip, choice, facts, frame, head, link, select, toggle 
 import { envBar, envFromQuery, env } from "../shell/env.ts";
 import type { Ctx } from "../shell/ctx.ts";
 import { thumb } from "../shell/thumbs.ts";
-import { pieceSvg } from "../piece-svg.ts";
+import { pieceSvg } from "sahne-kit/set-svg";
 import { generator, usage, asked, FEATURES } from "./catalog.ts";
 import { solo } from "./solo.ts";
 
@@ -46,6 +46,8 @@ export async function render(host: HTMLElement, ctx: Ctx, id: string) {
   const h = head(g.id, meta?.about ?? "(no meta: SET.md and the controls need one)");
   h.querySelector("h2")!.append(" ", chip(g.family), " ", chip(g.kind === "both" ? "piece and prop" : g.kind));
   title.append(link("← every piece", "#/kit/set"), h);
+  // an item promoted from a story is credited to its author (SET.md's Credits, CREDITS.json)
+  if (g.credit) title.append($("p", "note", `${g.credit.consent === "project" ? `The project's own art, drawn by its kit agents (${g.credit.contact}), ${g.credit.date}` : `Drawn by ${g.credit.by} (${g.credit.contact}), ${g.credit.date}`}${g.credit.story ? `, for ${g.credit.story}` : ""}. CC BY 4.0. A story's old id ${g.credit.from} still leads here.`));
   host.append(title);
 
   // ---- the stage ----

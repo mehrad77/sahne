@@ -1,0 +1,17 @@
+{
+  "name": "sahne-lesson",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "The lesson plugin of sahne-story: grammar spots, target words, glosses, the quiz, learner notes and the syllabus checks",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "sahne": "workspace:*",
+    "sahne-story": "workspace:*"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts"
+  }
+}

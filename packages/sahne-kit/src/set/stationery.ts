@@ -397,6 +397,15 @@ const noteUp = (g: G, i: number, L: number, c: string, words: boolean): Shape[] 
   return [S(o, c), ...lit(o, c, -3.4, 3.4, -L, 0, 0.12), D(rrect(-3, -L + 0.4, 6, L - 0.8, 0.2), WHITE, 0.12, 0.55), ...portrait(0, -L * 0.52, 2.3, 3, c), ...(words ? g.say(NOTE[i][0], -2.8, -L + 0.8, 5.6, 2.2, { b: true, s: 2, k: WHITE }) : [F(rrect(-2, -L + 1.2, 4, 1.2, 0.5), WHITE, 0.8)])];
 };
 const EDIM = [[12, 6.2], [12.7, 6.7], [13.3, 7.2], [14, 7.7], [14.7, 8.2], [15.3, 8.7]];
+/** Pound (polymer, a clear window and a foil strip, a faceless portrait) and franc notes (colour by value, a wave of lines round a disc), stylised and never traced, by value index `i`. */
+const GBP = ["#4FB3B8", "#E88B3A", "#7B4F9E", "#C8433A", "#C8433A", "#C8433A"], CHF = ["#F2C230", "#F2C230", "#D9433A", "#5BAA6A", "#4F86C6", "#A5683F"], GBP_DIM = [[12.5, 6.5], [13.2, 6.9], [13.9, 7.3], [14.6, 7.7]];
+const noteOther = (g: G, i: number, chf: boolean): Shape[] => {
+  const [w, h] = chf ? [12.3, 7] : GBP_DIM[Math.min(i, 3)], c = (chf ? CHF : GBP)[i], o = rrect(-w / 2, -h, w, h, 0.3), px = w / 2 - 3.2, n = NOTE[i][0];
+  const sh = [S(o, c), ...lit(o, c, -w / 2, w / 2, -h, 0, 0.1), D(rrect(-w / 2 + 0.4, -h + 0.4, w - 0.8, h - 0.8, 0.2), WHITE, 0.14, 0.6)];
+  if (chf) sh.push(F(ellipse(px - 0.4, -h / 2, 2.7), tone(c, "light"), 0.85), D(ellipse(px - 0.4, -h / 2, 2.1), WHITE, 0.14, 0.7), D(ellipse(px - 0.4, -h / 2, 1.4), WHITE, 0.12, 0.7), F(ellipse(px - 0.4, -h / 2, 0.7), WHITE, 0.8), ...[0, 1, 2].map(k => D(smooth([[-w / 2 + 0.6, -1.2 - k * 0.7], [-1.2, -1.9 - k * 0.7], [0.6, -1.2 - k * 0.7]], false, 1), WHITE, 0.14, 0.6)), F(rrect(w / 2 - 1.5, -h + 0.7, 0.9, 1.6, 0.3), "#E8F2F4", 0.85));
+  else sh.push(F(ellipse(px, -h / 2, 2.4, 2.9), tone(c, "light"), 0.9), ...portrait(px, -h / 2, 1.9, 2.5, c), F(rect(px - 3.5, -h, 0.8, h), "#D9B25A", 0.85), F(rrect(px - 2.5, -h + 0.7, 1, 1.9, 0.4), "#E8F2F4", 0.85), F(rect(-w / 2 + 0.7, -0.9, 5.6, 0.4), WHITE, 0.6));
+  return [...sh, ...g.say(n, -w / 2 + 0.7, -h + 0.8, 4.6, 2.8, { b: true, s: 3, k: WHITE, a: "left" }), ...g.say(chf ? "Fr." : "£", -w / 2 + 0.7, -h + 3.6, 2.2, 1.6, { b: true, s: 1.5, k: WHITE, a: "left" })];
+};
 
 const MONEY: Record<string, Kind> = {
   notes: { w: 16, h: 6.8, c: "#C8283A", pp: 12, e: 0.25, dx: 4, grip: [0, -1.4], d: g => lira(g, g.t.value) },
@@ -417,6 +426,7 @@ const MONEY: Record<string, Kind> = {
     R([[-0.5, -12.8], [0.5, -11.1]], STEEL, 0.12), S(ellipse(0, -11, 0.92), GOLD), D(ellipse(0, -11, 0.72), tone(GOLD, "deep"), 0.06, 0.7), F(ellipse(-0.07, -11, 0.4), tone(GOLD, "deep"), 0.7), F(ellipse(0.08, -11, 0.33), GOLD), F(star(0.3, -11, 5, 0.14, 0.06), tone(GOLD, "deep"), 0.9), crescent(0, -11, 0.92, GOLD), F(ellipse(-0.35, -11.4, 0.27, 0.14), WHITE, 0.45),
   ] },
   foreign: { w: 16, h: 8.7, c: "#4F80C8", pp: 12, e: 0.25, dx: 4, grip: [0, -1.4], d: g => {
+    if (g.t.currency === "pound" || g.t.currency === "franc") return noteOther(g, vi(g.t.value), g.t.currency === "franc");
     const i = vi(g.t.value), usd = g.t.currency === "dollar", [w, h] = usd ? [15.6, 6.6] : EDIM[i], c = usd ? "#8FB08A" : EURO[i], o = rrect(-w / 2, -h, w, h, 0.3), px = usd ? 0 : w / 2 - 3.4;
     const sh = [S(o, c), ...lit(o, c, -w / 2, w / 2, -h, 0, 0.1), D(rrect(-w / 2 + 0.4, -h + 0.4, w - 0.8, h - 0.8, 0.2), usd ? tone(c, "deep") : WHITE, 0.14, 0.6)];
     if (usd) sh.push(D(ellipse(0, -h / 2, 3, 2.7), tone(c, "deep"), 0.12, 0.6), ...portrait(0, -h / 2, 2.2, 2.4, "#E6EBD6"), F(ellipse(-w / 2 + 2.6, -h / 2, 1.1), "#4C7A55", 0.8), F(ellipse(w / 2 - 2.6, -h / 2, 1.1), "#2E5237", 0.8), ...g.say(NOTE[i][0], -w / 2 + 0.7, -h + 0.6, 2.6, 1.8, { b: true, s: 1.6, k: "#1F3F2A", a: "left" }), ...g.say(NOTE[i][0], w / 2 - 3.3, -2.4, 2.6, 1.8, { b: true, s: 1.6, k: "#1F3F2A", a: "right" }), ...g.say("$", -w / 2 + 3.4, -h + 0.6, 1.2, 1.8, { b: true, s: 1.4, k: "#1F3F2A" }));
@@ -426,8 +436,8 @@ const MONEY: Record<string, Kind> = {
 };
 
 props.money = gen("money", MONEY, { value: "20", currency: "euro" },
-  "Money: Turkish lira banknotes (5, 10, 20, 50, 100 or 200, each in its colour with a faceless portrait), a folded wad with a paper band, a fan of notes held in the hand, a çeyrek altın gold coin on a red ribbon, and foreign (euro or dollar) notes.",
-  { color: { type: "color", default: "#C8283A", about: "the wad's paper band or the çeyrek's ribbon (a palette id or a hex); notes keep the colour of their value" }, n: { type: "int", min: 1, max: 24, about: "how many (fan: the notes in the hand, default 5; notes overlap a little)" }, value: { type: "enum", values: ["5", "10", "20", "50", "100", "200"], default: "20", about: "the note's value (notes, wad, fan: the first; foreign)" }, currency: { type: "enum", values: ["euro", "dollar"], default: "euro", about: "foreign: euro or dollar notes" } },
+  "Money: Turkish lira banknotes (5, 10, 20, 50, 100 or 200, each in its colour with a faceless portrait), a folded wad with a paper band, a fan of notes held in the hand, a çeyrek altın gold coin on a red ribbon, and foreign (euro, dollar, pound or franc) notes.",
+  { color: { type: "color", default: "#C8283A", about: "the wad's paper band or the çeyrek's ribbon (a palette id or a hex); notes keep the colour of their value" }, n: { type: "int", min: 1, max: 24, about: "how many (fan: the notes in the hand, default 5; notes overlap a little)" }, value: { type: "enum", values: ["5", "10", "20", "50", "100", "200"], default: "20", about: "the note's value (notes, wad, fan: the first; foreign)" }, currency: { type: "enum", values: ["euro", "dollar", "pound", "franc"], default: "euro", about: "foreign: euro, dollar, pound or franc notes" } },
   ["a1-w-para", "a2-w-banknot", "a1-w-lira", "a2-w-ceyrek-altin", "a2-w-doviz", "a1-w-nakit"], ["money", "cash", "lira"], "how many (fan: the notes in the hand, default 5; notes: overlapping a little)");
 
 // ---- ticket ----------------------------------------------------------------------------------------------

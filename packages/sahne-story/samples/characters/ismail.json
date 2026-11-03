@@ -92,8 +92,10 @@
       }
     }
   },
-  "bio": "In his 50s, from Rize on the Black Sea; owns the bakkal round the corner from the TÖMER campus in Taksim. Generous, knows everyone's business, and gossips a little.",
-  "bioFa": "پنجاه و چند ساله، اهلِ ریزه در کرانهٔ دریای سیاه؛ صاحبِ بقالیِ سرِ کوچهٔ ساختمانِ تومر در تکسیم. دست‌ودل‌باز است، از کارِ همه خبر دارد و کمی هم غیبت می‌کند.",
+  "bio": {
+    "en": "In his 50s, from Rize on the Black Sea; owns the bakkal round the corner from the TÖMER campus in Taksim. Generous, knows everyone's business, and gossips a little.",
+    "fa": "پنجاه و چند ساله، اهلِ ریزه در کرانهٔ دریای سیاه؛ صاحبِ بقالیِ سرِ کوچهٔ ساختمانِ تومر در تکسیم. دست‌ودل‌باز است، از کارِ همه خبر دارد و کمی هم غیبت می‌کند."
+  },
   "catch": {
     "en": "Here you are! Fresh, fresh!",
     "fa": "بفرمایید، بفرمایید! تازهٔ تازه!",
@@ -113,14 +115,18 @@
     ],
     "tempo": 0.9
   },
-  "name": "İsmail",
-  "nameFa": "اسماعیل",
+  "name": {
+    "tr": "İsmail",
+    "fa": "اسماعیل"
+  },
   "order": 6,
   "places": [
     "bakkal"
   ],
-  "role": "Owner of the bakkal by the TÖMER campus",
-  "roleFa": "صاحبِ بقالیِ کنارِ ساختمانِ تومر",
+  "role": {
+    "en": "Owner of the bakkal by the TÖMER campus",
+    "fa": "صاحبِ بقالیِ کنارِ ساختمانِ تومر"
+  },
   "voice": {
     "pitch": 0.85,
     "rate": 0.95

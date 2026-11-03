@@ -6,6 +6,7 @@
 import { arcPoints, band, ellipse, luma, poly, rect, rrect, smooth, tone, type EmitSpec, type FlatSpec, type LightSpec, type Path, type PieceDef, type Rng, type Shape, type TextSpec, type Vec2 } from "sahne";
 import { S, P, L, num, str, holed, glowOnly, litByTurns, solidLine, type Pt } from "./draw.ts";
 import { SET } from "../palette.ts";
+import { COUNTRIES, countryOf, flagCloth, flagWidth, shifted } from "../flags.ts";
 
 // ---- Shared bits ------------------------------------------------------------------------------------
 
@@ -40,8 +41,9 @@ const SHUTTERS = ["#A9B0B5", "#9AA3A8", "#B4B9B5", "#8E979C"];
 const AWNINGS: [string, string][] = [["#C4302B", "#F4F1EA"], ["#2F8C88", "#F4F1EA"], ["#2F6B4A", "#F4F1EA"], ["#E0A83A", "#B3261E"], ["#2E3A59", "#F4F1EA"], ["#B3261E", "#B3261E"], ["#2F6B4A", "#2F6B4A"]];
 const GREENS = ["#4E7A48", "#5E8F52", "#3F6B3E", "#6E9E5C"];
 
-/** The Turkish flag, its hoist's top at (x, y), `w` wide, the fly rippling by `wave` cm. */
-function flag(x: number, y: number, w: number, wave = 0): Shape[] {
+/** The Turkish flag (or the `country`'s), its hoist's top at (x, y), `w` wide, the fly rippling by `wave` cm. */
+function flag(x: number, y: number, w: number, wave = 0, country = "tr"): Shape[] {
+  if (country !== "tr") { const h = Math.min(w / 1.5, w / flagWidth(1, country)); return shifted(flagCloth(h, wave / h, 0.8, country), x, y); }
   const h = w / 1.5, cy = y + h / 2;
   return [
     P([[x, y, 0], [x + w * 0.35, y - wave], [x + w * 0.7, y + wave * 0.6], [x + w, y + wave * 0.2, 0], [x + w, y + h + wave * 0.2, 0], [x + w * 0.7, y + h + wave * 0.6], [x + w * 0.35, y + h - wave], [x, y + h, 0]], "#E30A17"),
@@ -238,6 +240,90 @@ function wares(out: Shape[], lamps: Shape[], text: TextSpec[], kind: string, goo
   }
 }
 
+
+/** A baguette stand of `n` (leaning) at x, a croissant at (x, y), a round cheese (`w` wide) with a cut wedge, an ice-cream tub of scoops `c`. */
+const baguettes = (x: number, y: number, n = 5): Shape[] => [P([[x - 12, y, 0], [x + 12, y, 0], [x + 14, y - 22], [x - 14, y - 22]], "#8A6A4A"), ...span(0, n - 1, 1).flatMap(i => [L([[x - 9 + i * 4.6, y - 14], [x - 11 + i * 5.4, y - 62 - (i % 2) * 6]], "#C98A3A", 5, 1), L([[x - 9.4 + i * 4.8, y - 36], [x - 8.6 + i * 4.8, y - 31]], "#F0CF8E", 1, 0.9)])];
+const croissant = (x: number, y: number): Shape[] => [P([[x - 10, y, 0], [x - 8, y - 6], [x - 2, y - 9], [x + 3, y - 9], [x + 8, y - 6], [x + 10, y, 0], [x + 6, y - 2], [x + 3, y - 5], [x - 3, y - 5], [x - 6, y - 2]], "#D9962E"), L([[x - 5, y - 3], [x - 3, y - 8]], "#F0CF8E", 1, 0.8), L([[x, y - 5], [x, y - 9]], "#F0CF8E", 1, 0.8), L([[x + 5, y - 3], [x + 3, y - 8]], "#F0CF8E", 1, 0.8)];
+const cheese = (x: number, y: number, w: number, c = "#F2D27A"): Shape[] => [R(x - w / 2, y - w * 0.4, w, w * 0.4, c), R(x - w / 2, y - w * 0.4, w, 2, tone(c, "light"), pr(0.7)), R(x - w / 2, y - 3, w, 3, tone(c, "shade"), pr(0.6)), P([[x, y - w * 0.4, 0], [x + w / 2, y - w * 0.4, 0], [x + w / 2, y, 0], [x + w * 0.1, y, 0]], tone(c, "deep"), pr(0.5)), S(ellipse(x - w * 0.2, y - w * 0.22, 1.6), tone(c, "deep"), pr(0.6)), S(ellipse(x - w * 0.05, y - w * 0.12, 1.2), tone(c, "deep"), pr(0.6))];
+const tub = (x: number, y: number, c: string): Shape[] => [S(rrect(x - 11, y - 14, 22, 14, 2), "#E9E4DA"), S(smooth([[x - 12, y - 14, 0], [x - 9, y - 24], [x, y - 27], [x + 9, y - 24], [x + 12, y - 14, 0]], true, 1), c), S(ellipse(x - 3, y - 22, 3, 1.6), tone(c, "light"), pr(0.6)), R(x - 11, y - 8, 22, 1.5, tone(c, "deep"), pr(0.6))];
+
+/** What a shop window of one of the other cities' kinds holds, in x0…x1 between `top` and the sill `bot` (see `wares`). */
+function euWares(out: Shape[], lamps: Shape[], text: TextSpec[], kind: string, x0: number, x1: number, top: number, bot: number, r: Rng) {
+  const w = x1 - x0, mid = (x0 + x1) / 2, shelf = (n: number, wood: string, fill: (y: number, h: number) => void) => {
+    const gap = (bot - top - 16) / n;
+    for (let i = 0; i < n; i++) { const y = bot - 4 - i * gap; fill(y, gap - 10); out.push(R(x0, y, w, 4, wood), R(x0, y + 4, w, 2, INK, pr(0.25))); }
+  };
+  if (kind === "bookshop") return wares(out, lamps, text, "shop", "books", x0, x1, top, bot, r);
+  if (kind === "boulangerie") {
+    shelf(2, SET.wood, (y, h) => { if (h > 60 && y < bot - 60) for (let x = x0 + 16; x < x1 - 12; x += 26) out.push(...loaf(x, y)); else for (let x = x0 + 14; x < x1 - 12; x += 24) out.push(...croissant(x, y)); });
+    out.push(...baguettes(x0 + 26, bot - 4), ...baguettes(x1 - 28, bot - 4, 4), R(mid - 22, bot - 28, 44, 24, SET.wood_dark), ...[-12, 0, 12].map(dx => P([[mid + dx - 6, bot - 28, 0], [mid + dx + 6, bot - 28, 0], [mid + dx + 5, bot - 36], [mid + dx - 5, bot - 36]], "#C8863F")));
+  } else if (kind === "bistro") {
+    for (const f of [0.25, 0.75]) { const lx = x0 + w * f; out.push(L([[lx, top], [lx, top + 40]], INK, 0.8, 1), P([[lx - 4, top + 38, 0], [lx + 4, top + 38, 0], [lx + 14, top + 52, 0], [lx - 14, top + 52, 0]], "#C9A24A")); lamps.push(S(ellipse(lx, top + 52, 14, 2), "#FFE6A8", pr())); }
+    shelf(1, SET.wood, y => { for (let x = x0 + 20; x < x1 - 16; x += 20) out.push(S(ellipse(x, y - 8, 8, 8), "#F4F1EA"), S(ellipse(x, y - 8, 5, 5), "#E2D8C4", pr(0.8))); });
+    const cy = (top + bot) / 2 + 10;
+    out.push(L([[x0, cy], [x1, cy]], "#C9A24A", 2, 1), P([[x0 + 2, cy, 0], [x1 - 2, cy, 0], [x1 - 2, bot - 4, 0], [x0 + 2, bot - 4, 0]], "#F4F1EA", { opacity: 0.95 }), ...span(0, Math.floor(w / 14), 1).map(i => S(ellipse(x0 + 8 + i * 14, cy + 1, 7, 5), "#F4F1EA")), L([[x0 + 6, cy + 18], [x1 - 6, cy + 18]], "#D8CFBC", 0.8, 0.8));
+  } else if (kind === "pub") {
+    out.push(R(x0, top, w, bot - top, "#7A5A3C", pr(0.35)));
+    for (let x = x0; x < x1; x += 40) out.push(L([[x, top], [x, bot]], SET.wood_dark, 2.6, 0.9));
+    for (let y = top + 20; y < bot - 20; y += 36) for (let x = x0 + 20; x < x1; x += 40) out.push(L([[x - 20, y - 18], [x, y], [x + 20, y - 18]], "#E8D9A8", 0.8, 0.55), L([[x - 20, y + 18], [x, y], [x + 20, y + 18]], "#E8D9A8", 0.8, 0.55));
+    for (const sx of [x0 + 14, x1 - 14]) { out.push(R(sx - 1.5, top + 40, 3, 14, "#C9A24A"), S(rrect(sx - 7, top + 54, 14, 20, 3), "#F3E6C4")); lamps.push(S(rrect(sx - 6, top + 55, 12, 18, 3), "#FFE6A8", pr()), S(ellipse(sx, top + 64, 20, 18), "#FFD98A", pr(0.22))); }
+    out.push(R(x0, bot - 34, w, 34, SET.wood_dark), R(x0, bot - 36, w, 4, SET.wood), R(mid - 24, bot - 52, 12, 16, "#F4F1EA", pr(0.9)), R(mid + 10, bot - 56, 14, 20, "#C9A24A"));
+  } else if (kind === "fromagerie") {
+    shelf(3, SET.wood_light, y => { let x = x0 + 22; for (const c of ["#F2D27A", "#E8A94A", "#F6E8B8", "#D9843A"]) { if (x > x1 - 20) break; const ww = r.range(24, 32); out.push(...cheese(x, y, ww, c)); if (r.chance(0.6)) out.push(...cheese(x, y - ww * 0.4, ww * 0.8, c)); x += ww + 8; } });
+    out.push(...cheese(x1 - 30, bot - 4, 40), ...cheese(x1 - 74, bot - 4, 32, "#F6E8B8"));
+  } else if (kind === "tabac") {
+    const cols = Math.max(2, Math.floor(w / 24)), rows = 4, cw = 20, ch = 28;
+    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) { const cx = x0 + 6 + i * ((w - 12 - cw) / (cols - 1)), cy = top + 14 + j * (ch + 8), c = r.pick(CLOTH); out.push(R(cx, cy, cw, ch, "#F7F3EA"), R(cx + 1.5, cy + 1.5, cw - 3, ch * 0.55, c), R(cx + 1.5, cy + ch * 0.62, cw - 3, 2, INK, pr(0.55)), R(cx + 1.5, cy + ch * 0.76, cw * 0.6, 2, INK, pr(0.4))); }
+    out.push(R(x0, bot - 24, w, 24, SET.wood_dark), R(x0, bot - 26, w, 4, SET.wood), ...span(0, 4, 1).map(i => R(x0 + 10 + i * (w - 40) / 4, bot - 46, 22, 20, r.pick(CLOTH))));
+  } else if (kind === "konditorei") {
+    shelf(3, "#F4F1EA", y => { for (let x = x0 + 20; x < x1 - 18; x += r.range(34, 40)) out.push(...cake(x, y, r.range(26, 32), r.pick(CREAMS))); });
+    out.push(R(mid - 1.2, bot - 70, 2.4, 66, "#C9A24A"), S(ellipse(mid, bot - 4, 14, 3), "#C9A24A"), S(ellipse(mid, bot - 74, 24, 5), "#F4F1EA"), S(rrect(mid - 20, bot - 100, 40, 26, 6), "#4A2A22"), R(mid - 20, bot - 90, 40, 3, "#F4F1EA", pr(0.9)), S(ellipse(mid, bot - 100, 20, 4), "#5A3228"), ...[-8, 0, 8].map(dx => S(ellipse(mid + dx, bot - 103, 2.4), "#C8283A")));
+  } else if (kind === "gelateria") {
+    out.push(R(x0, bot - 56, w, 56, "#EFE6D6"), R(x0, bot - 58, w, 4, "#B8BEC4"), R(x0 + 4, bot - 50, w - 8, 3, "#9ED3C0", pr(0.8)));
+    const cs = ["#9CC255", "#E8506A", "#6B3E2E", "#F7E3A1", "#F2B8C6", "#F4F1EA", "#E8892B"];
+    for (let x = x0 + 18, i = 0; x < x1 - 14; x += 28, i++) out.push(...tub(x, bot - 58, cs[i % cs.length]));
+    for (const dx of [0, 14, 28]) out.push(P([[x1 - 40 + dx - 6, top + 70, 0], [x1 - 40 + dx + 6, top + 70, 0], [x1 - 40 + dx, top + 100, 0]], "#D9A05B"), S(ellipse(x1 - 40 + dx, top + 68, 7), ["#E8506A", "#9CC255", "#F7E3A1"][dx / 14]));
+    out.push(L([[x0 + 10, top + 14], [x1 - 10, top + 14]], SET.steel, 2, 1));
+    for (const x of span(0, 5, 1).map(i => x0 + 24 + i * (w - 48) / 5)) out.push(L([[x, top + 14], [x, top + 22]], SET.steel, 1, 1), P([[x - 5, top + 22, 0], [x + 5, top + 22, 0], [x + 8, top + 42, 0], [x - 8, top + 42, 0]], r.pick(CLOTH)));
+  } else if (kind === "kiosk") {
+    out.push(R(x0, top, w, bot - top, "#4A3A2E", pr(0.5)));
+    shelf(2, SET.wood, y => { for (let x = x0 + 14; x < x1 - 10; x += 16) { const c = r.pick(CLOTH); out.push(R(x - 6, y - 22, 12, 22, "#E9E4DA", pr(0.9)), R(x - 7, y - 26, 14, 5, c), S(ellipse(x, y - 11, 4.4), tone(c, "light"), pr(0.9))); } });
+    for (let i = 0; i < 4; i++) { const mx = x0 + 10 + i * ((w - 30) / 3), c = r.pick(CLOTH); out.push(R(mx, top + 8, 22, 30, "#F7F3EA"), R(mx + 2, top + 10, 18, 16, c), R(mx + 2, top + 29, 12, 2, INK, pr(0.5))); }
+    out.push(R(x0, bot - 20, w, 20, SET.wood_dark), R(x0, bot - 22, w, 4, SET.wood));
+  }
+}
+
+/** What stands on the pavement before one of the other cities' shops: a bistro's round table and rattan chairs with its board, a pub's hanging sign, a tabac's red diamond, a konditorei's pretzel, a gelateria's cone and board, a fromagerie's cheese crate, a baguette basket, a book trolley, a kiosk's card spinner. */
+function euYard(yard: Shape[], menu: TextSpec[], kind: string, left: boolean, x0: number, x1: number, dW: number, wx0: number, wx1: number, board: string, lang: string | undefined, table: boolean) {
+  const bx = left ? x1 - 40 : x0 + 40, tx = left ? x0 + dW + 74 : x1 - dW - 74, lg = lang ? { lang } : {}, hang = (hx: number, hy: number, art: Shape[]) => yard.push(R(hx - 30, hy - 6, 30, 3, IRON), L([[hx - 22, hy - 3], [hx - 22, hy + 6]], IRON, 0.8, 1), L([[hx - 6, hy - 3], [hx - 6, hy + 6]], IRON, 0.8, 1), ...art);
+  const hx = left ? x1 + 48 : x0 - 18;
+  const boardArt = () => { yard.push(L([[bx - 24, 0], [bx - 18, -96]], SET.wood_dark, 3, 1), L([[bx + 24, 0], [bx + 18, -96]], SET.wood_dark, 3, 1), S(rrect(bx - 27, -102, 54, 72, 2), SET.wood), R(bx - 23, -98, 46, 64, "#2F3B36")); if (board) menu.push({ text: board, x: bx - 20, y: -95, w: 40, h: 58, size: 7, font: "hand", color: "#F4F1EA", ...lg }); };
+  if (kind === "bistro") {
+    boardArt();
+    if (table) yard.push(S(ellipse(tx, -74, 30, 4), "#F4F1EA"), R(tx - 2, -72, 4, 70, "#3B3F45"), S(ellipse(tx, -2, 16, 3), "#3B3F45"), ...[-1, 1].flatMap(d => [S(ellipse(tx + d * 48, -26, 15, 4), "#D2A869"), S(ellipse(tx + d * 48, -58, 15, 17), "#7A4A2A"), S(ellipse(tx + d * 48, -58, 11.5, 13.5), "#D2A869"), L([[tx + d * 56, -26], [tx + d * 58, 0]], "#7A4A2A", 3, 1), L([[tx + d * 40, -26], [tx + d * 38, 0]], "#7A4A2A", 3, 1)]));
+  } else if (kind === "pub") {
+    boardArt();
+    hang(hx, -250, [L([[hx - 14, -247], [hx - 14, -238]], IRON, 0.8, 1), S(ellipse(hx - 14, -218, 22), "#2F4A3A"), S(ellipse(hx - 14, -218, 19), "#9C2B2B"), P([[hx - 24, -208, 0], [hx - 14, -236], [hx - 4, -208, 0]], "#E8C66A"), S(ellipse(hx - 14, -216, 5), "#6B3E2E")]);
+    for (const hb of [wx0 + 24, wx1 - 24]) yard.push(P([[hb - 12, -258, 0], [hb + 12, -258, 0], [hb + 8, -246], [hb - 8, -246]], "#6B4A35"), ...[-8, -2, 5, 10].map(d => S(ellipse(hb + d, -262 - Math.abs(d) * 0.3, 4.4), ["#D9343A", "#F2B705", "#E8506A", "#F4F1EA"][Math.abs(d) % 4])), ...[-9, 0, 9].map(d => S(ellipse(hb + d, -258, 4), "#4E7A48")));
+  } else if (kind === "tabac") {
+    hang(hx, -262, [L([[hx - 14, -259], [hx - 14, -252]], IRON, 0.8, 1), P([[hx - 14, -250, 0], [hx - 2, -230], [hx - 14, -210, 0], [hx - 26, -230]], "#C8283A"), L([[hx - 14, -244], [hx - 14, -216]], "#F4F1EA", 1.4, 0.8)]);
+  } else if (kind === "konditorei") {
+    hang(hx, -250, [L([[hx - 14, -247], [hx - 14, -240]], IRON, 0.8, 1), { path: smooth([[hx - 14, -238], [hx - 24, -232], [hx - 24, -222], [hx - 14, -216], [hx - 4, -222], [hx - 4, -232], [hx - 14, -238]], true, 1), stroke: { color: "#C98A3A", width: 5, cap: "round" } }, { path: smooth([[hx - 24, -222], [hx - 4, -232]], false), stroke: { color: "#C98A3A", width: 4, cap: "round" } }]);
+  } else if (kind === "gelateria") {
+    boardArt();
+    const cx = tx; yard.push(P([[cx - 14, -104, 0], [cx + 14, -104, 0], [cx, -34, 0]], "#D9A05B"), L([[cx - 8, -100], [cx + 2, -50]], "#B5814A", 0.8, 0.8), L([[cx + 8, -100], [cx - 2, -50]], "#B5814A", 0.8, 0.8), S(ellipse(cx, -112, 17), "#F2B8C6"), S(ellipse(cx, -134, 14), "#F7E3A1"), S(ellipse(cx - 4, -138, 4), "#FFFFFF", pr(0.5)), S(ellipse(cx, -150, 3), "#C8283A"));
+  } else if (kind === "fromagerie") {
+    for (let i = 0; i < 2; i++) yard.push(R(wx0 + 10 + i * 56, -34, 50, 34, SET.wood_light), R(wx0 + 10 + i * 56, -34, 50, 3, SET.wood), ...cheese(wx0 + 35 + i * 56, -34, 36, i ? "#F6E8B8" : "#F2D27A"));
+  } else if (kind === "boulangerie") {
+    yard.push(P([[wx0 + 6, 0, 0], [wx0 + 46, 0, 0], [wx0 + 42, -34], [wx0 + 10, -34]], "#8A6A4A"), ...span(0, 4, 1).map(i => L([[wx0 + 14 + i * 6, -30], [wx0 + 10 + i * 8, -76 - (i % 2) * 8]], "#C98A3A", 5, 1)));
+    boardArt();
+  } else if (kind === "bookshop") {
+    const bx0 = wx0 + 10; yard.push(R(bx0, -80, 70, 5, SET.wood), R(bx0 + 4, -80, 4, 80, SET.wood_dark), R(bx0 + 62, -80, 4, 80, SET.wood_dark), R(bx0, -42, 70, 4, SET.wood), ...span(0, 7, 1).map(i => R(bx0 + 4 + i * 7.6, -80 - 20 - (i % 3) * 3, 6.4, 20 + (i % 3) * 3, ["#C4553A", "#2F8C88", "#E0A83A", "#4F6E9E", "#7A3E6E"][i % 5])), ...span(0, 6, 1).map(i => R(bx0 + 4 + i * 8.6, -42 - 18, 7.4, 18, ["#2E3A59", "#C4553A", "#6F7A45", "#E0A83A", "#EE8AA0"][i % 5])));
+  } else if (kind === "kiosk") {
+    const cx = tx; yard.push(R(cx - 2, -110, 4, 110, "#3B3F45"), S(ellipse(cx, -2, 14, 3), "#3B3F45"), S(ellipse(cx, -112, 12, 3), "#3B3F45"), ...[-1, 1].flatMap(d => [R(cx + d * 12 - 9, -108, 18, 30, "#F7F3EA"), R(cx + d * 12 - 7, -106, 14, 17, d > 0 ? "#2F8C88" : "#E0A83A"), R(cx + d * 12 - 9, -66, 18, 26, "#F7F3EA"), R(cx + d * 12 - 7, -64, 14, 14, d > 0 ? "#C4553A" : "#4F6E9E")]));
+  }
+}
+
 /** A bakkal's stand of fruit and vegetable crates on the pavement, x0…x1, with blank price tags. */
 function crates(out: Shape[], x0: number, x1: number, r: Rng) {
   const fruit: [string, number][] = [["#E8892B", 3.4], ["#D9343A", 3.4], ["#9CC255", 3.2], ["#F2D13A", 3], ["#4E8A3A", 2.6], ["#C4302B", 3.2]];
@@ -316,7 +402,7 @@ const facade: PieceDef = { draw(p, r) {
   const shutters = cl(num(p.shutters, apt ? 0.3 : 0)), balconies = cl(num(p.balconies, apt ? 0.45 : 0)), boxes = cl(num(p.boxes, apt ? 0.15 : 0));
   const acs = cl(num(p.ac, apt ? 0.2 : school ? 0 : 0.15)), flags = cl(num(p.flags, apt ? 0.5 : 0)), age = cl(num(p.age, apt ? 0.3 : 0.1));
   const floorsIn = (v: unknown) => new Set(Array.isArray(v) ? v.filter((x): x is number => typeof x === "number") : []);
-  const litF = floorsIn(p.lit), ger = floorsIn(p.geraniums), litState = str(p.litState, ""), flagState = str(p.flagState, "flags");
+  const litF = floorsIn(p.lit), ger = floorsIn(p.geraniums), litState = str(p.litState, ""), flagState = str(p.flagState, "flags"), fc = countryOf(p.country);
   let laundry = Math.round(num(p.laundry, apt ? 1 : 0)), dishes = Math.round(num(p.dishes, apt ? 1 : 0));
   const db = Math.max(0, Math.min(bays - 1, Math.round(num(p.door, Math.floor(bays / 2))))), cb = p.cumba && floors > 0 ? db : -1, k1 = floors > 2 ? floors - 1 : floors;
   const bal = Array.from({ length: bays }, (_, i) => r() < balconies && i !== cb);
@@ -353,7 +439,7 @@ const facade: PieceDef = { draw(p, r) {
     else front.push(S(many(span(x0 + 5, x1 - 7, railKind ? 13 : 10.5).map(x => [x, top + 6, 2.2, 78])), IRON));
     if (railKind === 2) for (const x of span(x0 + 11.6, x1 - 12, 13)) front.push(ring(x, top + 16, 5.2, IRON, 1.5), ring(x, top + 72, 5.2, IRON, 1.5));
     front.push(R(x0 - 3, top, bwid + 6, 6, IRON), R(x0, y0 - 14, bwid, 4, IRON));
-    if (r() < flags) flagB.push(...flag(xm - 42, top + 3, 84, 3));
+    if (r() < flags) flagB.push(...flag(xm - 42, top + 3, 84, 3, fc));
     if (dishes > 0 && r() < 0.5) { dishes--; front.push(...dish(x1 - 22, top - 22)); }
   };
 
@@ -376,7 +462,7 @@ const facade: PieceDef = { draw(p, r) {
       if (u < acs) acUnit(up, x + ww / 2 - 34 + r.range(-12, 12), y + h + 24);
       else if (laundry > 0 && i !== cb && u < acs + 0.3) { laundry--; wash.push(...washing(x - 28, x + ww + 28, y + h + 30, r)); }
       else if (u < acs + 0.3 + age * 0.6) up.push(R(x + ww * r.range(0.2, 0.8), y + h + 14, 3.5, r.range(30, 80), INK, pr(0.09)));
-      if (r() < flags * 0.4) flagW.push(...flag(x + ww / 2 - 33, y + h + 12, 66, 2));
+      if (r() < flags * 0.4) flagW.push(...flag(x + ww / 2 - 33, y + h + 12, 66, 2, fc));
     }
   }
 
@@ -498,7 +584,7 @@ const facade: PieceDef = { draw(p, r) {
     gr.push(R(dx - ew / 2 - 70, top - 52, ew + 140, 22, "#E9E4DA"), R(dx - ew / 2 - 70, top - 30, ew + 140, 5, INK, pr(0.25)));
     const sc = school ? "#F4F1EA" : "#1F3F7A", sy = top - 116;
     gr.push(R(dx - sw / 2 - 4, sy - 4, sw + 8, 62, school ? "#B3261E" : "#E9E4DA"), R(dx - sw / 2, sy, sw, 54, sc));
-    if (!school) gr.push(...flag(dx - sw / 2 + 8, sy + 12, 46));
+    if (!school) gr.push(...flag(dx - sw / 2 + 8, sy + 12, 46, 0, fc));
     if (sign.trim()) text.push({ text: sign, x: dx - sw / 2 + (school ? 10 : 62), y: sy + 6, w: sw - (school ? 20 : 72), h: 42, size: 22, font: "print", color: school ? "#B3261E" : "#FFFFFF", weight: 700 });
     hinge = dx - ew / 2;
     leaf.push(R(dx - ew / 2, top + 52, ew / 2, eh - 52, "#4A5058"), R(dx - ew / 2 + 7, top + 60, ew / 2 - 14, eh - 96, GLASS), R(dx - 14, top + eh * 0.55, 4, 30, SET.steel), L([[dx - ew / 2 + 20, top + eh * 0.8], [dx - ew / 2 + 50, top + eh * 0.35]], "#FFFFFF", 4, 0.18));
@@ -506,7 +592,7 @@ const facade: PieceDef = { draw(p, r) {
     if (p.pole !== false) {
       const fx = -w / 2 + bw * 0.5, hp = school ? 760 : 900;
       pole.push({ group: { shapes: [R(fx - 22, -18, 44, 18, STONE), R(fx - 14, -30, 28, 14, tone(STONE, "light")), R(fx - 3.5, -hp, 7, hp - 30, "#C9CCCB"), R(fx - 3.5, -hp, 2, hp - 30, "#FFFFFF", pr(0.4)), S(ellipse(fx, -hp - 6, 7), "#C9A24A")], edge: 0.6 }, z: 150, ppcm: Math.min(2, 1900 / hp) });
-      pole.push({ group: { shapes: flag(0, 0, 150, 6), edge: 0.5 }, x: fx + 3.5, y: hp - 12, z: 150.5, ppcm: 2, pick: false, move: { sway: { rot: 0.035, dy: 1, ms: 2400 }, phase: r() } });
+      pole.push({ group: { shapes: flag(0, 0, 150, 6, fc), edge: 0.5 }, x: fx + 3.5, y: hp - 12, z: 150.5, ppcm: 2, pick: false, move: { sway: { rot: 0.035, dy: 1, ms: 2400 }, phase: r() } });
     }
   }
   if (typeof p.street === "string" && p.street.trim()) {
@@ -569,6 +655,7 @@ const facade: PieceDef = { draw(p, r) {
       litState: { type: "text", about: "the place state the lit floors light in" },
       flags: { type: "num", min: 0, max: 1, about: "share of balconies (and fewer windows) hung with a flag (0.5 apartment, else 0)" },
       flagState: { type: "text", default: "flags", about: "the place state the flags show in" },
+      country: { type: "enum", values: COUNTRIES, default: "tr", about: "whose flags hang on the balconies and the school's pole" },
     },
     states: ["flags"],
     terms: ["bina", "apartman", "okul"],
@@ -582,6 +669,17 @@ const SHOPS: Record<string, [string, string[], number]> = {
   bakkal: ["BAKKAL", ["#B3261E", "#2E3A59", "#2F6B4A"], 1], firin: ["FIRIN", ["#7A3B1E", "#2E3A59", "#C8863F"], 0.4], eczane: ["ECZANE", ["#F7F5F0"], 0],
   cafe: ["Berfin'in Kafesi", ["#2F8C88", "#3F5A6E", "#C4553A"], 1], pastane: ["PASTANE", ["#2F4A3A", "#6B2A33"], 1], emlak: ["EMLAK", ["#1F3F7A", "#2B2B2B"], 0],
   cicekci: ["ÇİÇEKÇİ", ["#4E7A48", "#F7F3EA"], 1], shop: ["BUTİK", ["#2B2B2B", "#7A3E6E", "#F7F3EA", "#2E3A59"], 0.5],
+};
+Object.assign(SHOPS, {
+  boulangerie: ["BOULANGERIE", ["#E8D9B8", "#2E4A6B", "#7A2E2E"], 1], bistro: ["BISTRO", ["#2F4A3A", "#6B1F2A", "#1F2E4A"], 1], pub: ["THE RED LION", ["#1F3B2D", "#3A1F1F", "#1E2A3A"], 0],
+  fromagerie: ["FROMAGERIE", ["#F3E3B0", "#6A8F4E", "#B5652A"], 0.7], pharmacy: ["PHARMACY", ["#F7F5F0"], 0], tabac: ["TABAC", ["#B3261E", "#1F3B2D", "#2E3A59"], 0.5],
+  konditorei: ["KONDITOREI", ["#5A2A33", "#2F4A3A", "#F4E9DA"], 1], gelateria: ["GELATERIA", ["#F2B8C6", "#9ED3C0", "#F7E3A1"], 1], bookshop: ["BOOKS", ["#2F3F5A", "#5A2E2E", "#2F4A3A"], 0.4], kiosk: ["KIOSK", ["#E0A83A", "#2F8C88", "#B3261E"], 0.6],
+} satisfies Record<string, [string, string[], number]>);
+/** The shops of the other cities: the language of their words, the wall behind the window, the board outside (its words), and what the sign's letters are in. */
+const EUSHOP: Record<string, { lang: string; back: string; menu?: string; ink?: string }> = {
+  boulangerie: { lang: "fr", back: "#D9C29A" }, bistro: { lang: "fr", back: "#8A6A50", menu: "Plat du jour\nSoupe\nTarte", ink: "#E8C66A" }, pub: { lang: "en", back: "#6B4A35", menu: "Roast of the day\nPie\nTea", ink: "#E8C66A" },
+  fromagerie: { lang: "fr", back: "#E6D7B0" }, pharmacy: { lang: "en", back: "#D5DDDA", ink: "#2E9E4A" }, tabac: { lang: "fr", back: "#B9A98E" },
+  konditorei: { lang: "de", back: "#E3CDBB", ink: "#E8C66A" }, gelateria: { lang: "it", back: "#F1E4D8", menu: "Gelato\nCoppa\nCono", ink: "#2B2420" }, bookshop: { lang: "en", back: "#8C7358" }, kiosk: { lang: "de", back: "#7A6A58" },
 };
 /** A shop's goods and the sign it has. */
 const WARES: Record<string, string> = { clothes: "BUTİK", shoes: "AYAKKABI", bags: "ÇANTA", books: "KİTAPÇI" };
@@ -603,14 +701,14 @@ const frontage: PieceDef = { draw(p, r) {
   for (let i = 0; i < n; i++) {
     const ox = (i - (n - 1) / 2) * (W + 6), goods = str(p.goods, r.pick(Object.keys(WARES)));
     const sign = typeof signs[i] === "string" ? signs[i] as string : i === 0 && typeof p.sign === "string" ? p.sign : kind === "shop" ? WARES[goods] ?? sign0 : i && kind === "cafe" ? "KAFE" : sign0;
-    const fc = hue(i === 0 ? p.color : undefined, {}, r.pick(fascias)), ink = luma(fc) > 0.6 ? (kind === "eczane" ? "#D2232A" : INK) : kind === "pastane" ? "#E8C66A" : "#FFFFFF";
+    const fc = hue(i === 0 ? p.color : undefined, {}, r.pick(fascias)), ink = EUSHOP[kind]?.ink && (kind === "pharmacy" || luma(fc) <= 0.6) ? EUSHOP[kind].ink! : luma(fc) > 0.6 ? (kind === "eczane" ? "#D2232A" : INK) : kind === "pastane" ? "#E8C66A" : "#FFFFFF", eu = EUSHOP[kind], lang = typeof p.lang === "string" && p.lang ? p.lang : eu?.lang;
     const pier = r.pick(["#CFC6B4", "#E6D9BF", "#B9B2A6", "#D9C7A8"]), fr = r.pick(["#3E4A52", "#5B6770", "#6E5A48", "#2F3B36"]), riser = r.pick(["#7A8A8C", "#8C6A54", "#3E4A52", "#B9B2A6"]);
     const left = p.door === "left" || (p.door !== "right" && r.chance(0.5)), awning = typeof p.awning === "boolean" ? p.awning : r() < awn, [aa, ab] = r.pick(AWNINGS), sc = r.pick(SHUTTERS);
     const x0 = -W / 2 + 18, x1 = W / 2 - 18, gt = -H0 + 33, dW = 92, dx = left ? x0 : x1 - dW, wx0 = left ? x0 + dW + 8 : x0, wx1 = left ? x1 : x1 - dW - 8, sill = -46;
     const main: Shape[] = [], text: TextSpec[] = [], glow: Shape[] = [], lf: Shape[] = [], yard: Shape[] = [], menu: TextSpec[] = [];
-    const back = kind === "eczane" ? "#D5DDDA" : kind === "pastane" ? "#E3CDBB" : kind === "cafe" ? "#8A6A50" : kind === "firin" ? "#C9B08E" : kind === "emlak" ? "#E6E1D6" : "#9C8B7A";
+    const back = eu ? eu.back : kind === "eczane" ? "#D5DDDA" : kind === "pastane" ? "#E3CDBB" : kind === "cafe" ? "#8A6A50" : kind === "firin" ? "#C9B08E" : kind === "emlak" ? "#E6E1D6" : "#9C8B7A";
     main.push(R(-W / 2, -H0 - 82, W, H0 + 82, pier), R(-W / 2 - 4, -H0 - 86, W + 8, 10, tone(pier, "light")), R(-W / 2, -H0 - 76, W, 3, INK, pr(0.15)), R(x0, -H0, x1 - x0, H0, back), R(x0, -H0, x1 - x0, 50, INK, pr(0.2)));
-    wares(main, glow, text, kind, goods, wx0 + 4, wx1 - 4, gt, sill, r);
+    if (eu && kind !== "pharmacy") euWares(main, glow, text, kind, wx0 + 4, wx1 - 4, gt, sill, r); else wares(main, glow, text, kind === "pharmacy" ? "eczane" : kind, goods, wx0 + 4, wx1 - 4, gt, sill, r);
     main.push(R(wx0 - 4, sill, wx1 - wx0 + 8, -sill, riser), R(wx0 + 6, sill + 8, wx1 - wx0 - 12, -sill - 16, tone(riser, "shade"), pr(0.5)), R(wx0 + 6, sill + 8, wx1 - wx0 - 12, 2, "#FFFFFF", pr(0.25)));
     main.push(R(wx0, gt, wx1 - wx0, sill - gt, "#CFE6EE", pr(0.12)), L([[wx0 + 20, sill - 20], [wx0 + 70, gt + 30]], "#FFFFFF", 5, 0.2), L([[wx0 + 50, sill - 12], [wx0 + 84, gt + 70]], "#FFFFFF", 2.5, 0.16));
     main.push(S(holed(rect(wx0 - 5, gt - 5, wx1 - wx0 + 10, sill - gt + 9), [rect(wx0 + 2, gt + 2, wx1 - wx0 - 4, sill - gt - 4)]), fr, { evenodd: true }));
@@ -618,26 +716,28 @@ const frontage: PieceDef = { draw(p, r) {
     main.push(R(x0 - 2, -H0 + 26, x1 - x0 + 4, 7, fr), R(dx, gt, dW, -gt, tone(back, "deep")));
     // the fascia and its sign
     main.push(R(x0 - 4, -H0 - 68, x1 - x0 + 8, 64, fc), R(x0 - 4, -H0 - 68, x1 - x0 + 8, 4, tone(fc, "light"), pr(0.7)), R(x0 - 4, -H0 - 8, x1 - x0 + 8, 4, tone(fc, "deep"), pr(0.6)));
-    if (sign.trim()) text.push({ text: sign, x: x0 + 8, y: -H0 - 62, w: x1 - x0 - 16, h: 52, size: 28, font: "print", color: ink, weight: 700 });
+    if (sign.trim()) text.push({ text: sign, x: x0 + 8, y: -H0 - 62, w: x1 - x0 - 16, h: 52, size: 28, font: "print", color: ink, weight: 700, ...(lang ? { lang } : {}) });
     // the door's leaf, glazed, with a blank card hanging inside
     const dh = -gt;
     lf.push(S(holed(rect(dx, gt, dW, dh), [rect(dx + 9, gt + 9, dW - 18, dh - 44)]), fr, { evenodd: true }), R(dx + 9, gt + 9, dW - 18, dh - 44, "#CFE6EE", pr(0.2)), R(left ? dx + dW - 17 : dx + 12, gt + dh * 0.45, 5, 32, SET.steel), L([[dx + 18, gt + dh * 0.7], [dx + 40, gt + dh * 0.3]], "#FFFFFF", 3, 0.25));
-    lf.push(L([[dx + dW / 2 - 9, gt + 26], [dx + dW / 2, gt + 15], [dx + dW / 2 + 9, gt + 26]], "#3B3B40", 0.8, 1), S(rrect(dx + dW / 2 - 14, gt + 26, 28, 15, 2), "#F7F3EA"), R(dx + dW / 2 - 11, gt + 29, 22, 9, kind === "eczane" ? "#3FA05A" : "#2F8C88", pr()));
+    lf.push(L([[dx + dW / 2 - 9, gt + 26], [dx + dW / 2, gt + 15], [dx + dW / 2 + 9, gt + 26]], "#3B3B40", 0.8, 1), S(rrect(dx + dW / 2 - 14, gt + 26, 28, 15, 2), "#F7F3EA"), R(dx + dW / 2 - 11, gt + 29, 22, 9, kind === "eczane" || kind === "pharmacy" ? "#3FA05A" : "#2F8C88", pr()));
     // inside lights up where the shutter is not down
     const cb = -H0 + 26 + (1 - open) * (H0 - 26), gy = Math.max(gt, cb), dy = Math.max(gt + 9, cb);
-    if (sill - gy > 4) glow.push(R(wx0, gy, wx1 - wx0, sill - gy, "#FFE2A6", pr(0.5)));
-    if (-35 - dy > 4) glow.push(R(dx + 9, dy, dW - 18, -35 - dy, "#FFE2A6", pr(0.5)));
+    // the older shops keep their flat half-lit pane; the European ones get a warm wash the wares still read through, a brighter pool low in the glass and a hot strip at the sill
+    if (sill - gy > 4) glow.push(...(eu ? [R(wx0, gy, wx1 - wx0, sill - gy, "#FFD98A", pr(0.36)), R(wx0, Math.max(gy, sill - 70), wx1 - wx0, Math.min(70, sill - gy), "#FFE9B0", pr(0.2)), R(wx0, Math.max(gy, sill - 12), wx1 - wx0, Math.min(12, sill - gy), "#FFF3CC", pr(0.55))] : [R(wx0, gy, wx1 - wx0, sill - gy, "#FFE2A6", pr(0.5))]));
+    if (-35 - dy > 4) glow.push(R(dx + 9, dy, dW - 18, -35 - dy, eu ? "#FFD98A" : "#FFE2A6", pr(eu ? 0.34 : 0.5)));
     if (kind === "firin") {
       const fx = left ? x1 - 26 : x0 + 26;
       main.push(R(fx - 8, -H0 - 300, 16, 220, "#4A4A4E"), R(fx - 8, -H0 - 300, 4, 220, "#FFFFFF", pr(0.2)), S(many([[fx - 10, -H0 - 160, 20, 5], [fx - 10, -H0 - 240, 20, 5]]), "#3B3B40"), P([[fx - 18, -H0 - 300, 0], [fx + 18, -H0 - 300, 0], [fx, -H0 - 318, 0]], "#3B3B40"));
       out.emitters.push({ kind: "smoke", x: ox + fx, y: H0 + 312, w: 10 });
-    } else if (kind === "eczane") {
+    } else if (kind === "eczane" || kind === "pharmacy") {
       const ex = left ? x0 + 30 : x1 - 30, ey = -H0 - 124, plus = (c: string, o: Partial<Shape> = {}) => [R(ex - 7, ey - 20, 14, 40, c, o), R(ex - 20, ey - 7, 40, 14, c, o)];
       main.push(R(ex - 30, ey - 30, 60, 60, "#F4F1EA"), R(ex - 30, ey + 26, 60, 4, INK, pr(0.15)), R(ex - 3, ey + 30, 6, 12, IRON), ...plus("#2E9E4A"));
       glow.push(...plus("#5CE07A", pr()), S(ellipse(ex, ey, 40), "#5CE07A", pr(0.2)));
     }
     // out on the pavement: crates, buckets, a menu board and a table
-    if (kind === "bakkal") crates(yard, wx0 + 4, Math.min(wx1 - 4, wx0 + 180), r);
+    if (eu) euYard(yard, menu, kind, left, x0, x1, dW, wx0, wx1, str(p.menu, eu.menu ?? ""), lang, p.table !== false);
+    else if (kind === "bakkal") crates(yard, wx0 + 4, Math.min(wx1 - 4, wx0 + 180), r);
     else if (kind === "cicekci") buckets(yard, wx0, wx1, r);
     else if (kind === "cafe") {
       const mx = left ? x1 - 40 : x0 + 40;
@@ -660,11 +760,13 @@ const frontage: PieceDef = { draw(p, r) {
 }, variants: {
   shop: { kind: "shop" }, firin: { kind: "firin" }, eczane: { kind: "eczane" }, cafe: { kind: "cafe" }, pastane: { kind: "pastane" },
   bakkal: { kind: "bakkal" }, cicekci: { kind: "cicekci" }, emlak: { kind: "emlak" },
+  boulangerie: { kind: "boulangerie" }, bistro: { kind: "bistro" }, pub: { kind: "pub" }, fromagerie: { kind: "fromagerie" }, pharmacy: { kind: "pharmacy" },
+  tabac: { kind: "tabac" }, konditorei: { kind: "konditorei" }, gelateria: { kind: "gelateria" }, bookshop: { kind: "bookshop" }, kiosk: { kind: "kiosk" },
 },
   meta: {
-    about: "A shopfront at street level: a bakkal, fırın, eczane, café, pastane, emlak, çiçekçi or a shop, its window, door and shutter.",
+    about: "A shopfront at street level: a bakkal, fırın, eczane, café, pastane, emlak, çiçekçi or a shop, or a boulangerie, bistro, pub, fromagerie, pharmacy, tabac, konditorei, gelateria, bookshop or kiosk (their signs in their own language), its window, door and shutter.",
     params: {
-      kind: { type: "enum", values: ["bakkal", "firin", "eczane", "cafe", "pastane", "emlak", "cicekci", "shop"], default: "bakkal" },
+      kind: { type: "enum", values: ["bakkal", "firin", "eczane", "cafe", "pastane", "emlak", "cicekci", "shop", "boulangerie", "bistro", "pub", "fromagerie", "pharmacy", "tabac", "konditorei", "gelateria", "bookshop", "kiosk"], default: "bakkal" },
       goods: { type: "enum", values: ["clothes", "shoes", "bags", "books"], about: "a shop's goods; seeded" },
       n: { type: "int", min: 1, max: 6, default: 1, about: "shopfronts side by side" },
       w: { type: "num", min: 0, default: 300, about: "opening width, cm" },
@@ -675,11 +777,12 @@ const frontage: PieceDef = { draw(p, r) {
       color: { type: "color", about: "the first fascia's colour; seeded" },
       door: { type: "enum", values: ["left", "right"], about: "the door's side; seeded" },
       awning: { type: "bool", about: "an awning; seeded by kind" },
-      menu: { type: "text", default: "Çay\nKahve\nTost", about: "a café's menu board" },
-      table: { type: "bool", default: true, about: "a café's table outside" },
+      menu: { type: "text", default: "Çay\nKahve\nTost", about: "a café's menu board (a bistro's, a pub's and a gelateria's have their own words)" },
+      lang: { type: "text", about: "the language tag of the sign (fr, de, it, en); the other cities' kinds have their own" },
+      table: { type: "bool", default: true, about: "a café's or bistro's table outside" },
     },
     terms: ["dükkan", "bakkal", "fırın", "eczane", "kafe", "pastane", "emlakçı", "çiçekçi"],
-    tags: ["shop", "food"],
+    tags: ["shop", "food", "city"],
   } };
 
 /**
@@ -726,6 +829,30 @@ const shutter: PieceDef = { draw(p, r) {
 
 // ---- Street furniture -------------------------------------------------------------------------------
 
+/** The lamp posts of an old city (`gas`: a fluted column on a stepped foot with a ladder bar and a square glass lantern under a pointed cap) and of a Dutch street (`dutch`: a slim steel pole curving over to a hanging bowl lamp). */
+function oldLamp(kind: string, p: Record<string, unknown>) {
+  const gas = kind === "gas", h = num(p.h, gas ? 360 : 520), c = hue(p.color, {}, gas ? "#2B332F" : "#3C4248"), gold = "#C9A24A";
+  const sh: Shape[] = [], glow: Shape[] = [], lights: LightSpec[] = [];
+  if (gas) {
+    const top = -h + 70;
+    sh.push(P([[-26, 0, 0], [26, 0, 0], [24, -10, 0], [16, -16, 0], [18, -26, 0], [12, -34, 0], [10, -70, 0], [-10, -70, 0], [-12, -34, 0], [-18, -26, 0], [-16, -16, 0], [-24, -10, 0]], c), R(-14, -80, 28, 10, c), R(-14, -80, 28, 2, gold, pr(0.8)));
+    sh.push(P([[-9, -80, 0], [9, -80, 0], [5, top, 0], [-5, top, 0]], c), L([[-3, -84], [-2, top + 6]], tone(c, "light"), 1.2, 0.5), L([[3, -84], [2, top + 6]], tone(c, "deep"), 1.2, 0.5), R(-9, -h * 0.5, 18, 6, c), R(-8, -h * 0.5, 16, 1.6, gold, pr(0.7)));
+    sh.push(R(-24, top + 20, 48, 4, c), R(-26, top + 18, 4, 8, c), R(24, top + 18, 4, 8, c), R(-8, top - 4, 16, 8, c));
+    const g = poly([[-11, top - 4], [11, top - 4], [14, top - 40], [-14, top - 40]]);
+    sh.push(P([[-14, top - 4, 0], [14, top - 4, 0], [18, top - 42, 0], [-18, top - 42, 0]], c), S(g, "#F3E6C4"), L([[0, top - 6], [0, top - 40]], c, 1.4, 1), P([[-20, top - 42, 0], [20, top - 42, 0], [6, top - 60], [-6, top - 60]], c), R(-20, top - 44, 40, 2.5, gold, pr(0.7)), L([[0, top - 60], [0, top - 72]], c, 2, 1), S(ellipse(0, top - 74, 3), gold));
+    glow.push(S(g, "#FFE6A8", pr()), S(ellipse(0, top - 22, 38, 34), "#FFD98A", pr(0.22)));
+    lights.push({ x: 0, y: -(top - 22), z: 20, color: "#FFD59A", radius: 4, intensity: 0.85, switch: false, at: ["dawn", "dusk", "night"] });
+  } else {
+    const hx = 66;
+    sh.push(R(-9, -10, 18, 10, c), R(-6, -h + 40, 12, h - 50, c), L([[-3, -14], [-3, -h + 50]], tone(c, "light"), 1.4, 0.5), R(-8, -h * 0.35, 16, 5, tone(c, "deep")));
+    sh.push({ path: smooth([[0, -h + 46], [0, -h + 12], [16, -h - 14], [hx * 0.6, -h - 22], [hx, -h - 8]], false), stroke: { color: c, width: 10, cap: "round" } }, R(hx - 3, -h - 12, 6, 12, c));
+    sh.push(P([[hx - 32, -h + 14, 0], [hx + 32, -h + 14, 0], [hx + 26, -h, 0], [hx + 12, -h - 12], [hx - 12, -h - 12], [hx - 26, -h]], tone(c, "deep")), R(hx - 32, -h + 12, 64, 3, c), L([[hx - 14, -h - 6], [hx + 4, -h - 9]], tone(c, "light"), 1.2, 0.5));
+    glow.push(S(ellipse(hx, -h + 16, 24, 3.5), "#FFF1C4", pr()), P([[hx - 24, -h + 18, 0], [hx + 24, -h + 18, 0], [hx + 52, -h * 0.5, 0], [hx - 52, -h * 0.5, 0]], "#FFE9AE", pr(0.1)));
+    lights.push({ x: hx, y: h - 14, z: 20, color: "#FFE3A8", radius: 5, intensity: 0.8, switch: false, at: ["dawn", "dusk", "night"] });
+  }
+  return { flats: [{ group: { shapes: sh, edge: 0.6 }, emissive: { shapes: glow, edge: 0 }, switch: false as const, glowAt: 0.05, ppcm: Math.min(2.4, 1900 / (h + 140)) }], lights };
+}
+
 /**
  * A cast-iron lamp post `h` cm tall in `color` (dark green or black by seed), `kind` `street` (the classic Istanbul post: a
  * fluted shaft on a flared foot, a ladder bar, a four-sided lantern on a scrolled neck) or `pier` (a double lamp: two lanterns
@@ -733,6 +860,7 @@ const shutter: PieceDef = { draw(p, r) {
  * The ladder bar, the arm and the lantern caps are perches.
  */
 const lampPost: PieceDef = { draw(p, r) {
+  if (p.kind === "gas" || p.kind === "dutch") return oldLamp(p.kind, p);
   const pier = str(p.kind, "street") === "pier", h = num(p.h, pier ? 400 : 430), c = hue(p.color, {}, pier ? "#2E3B35" : r.pick(["#2F4038", "#2A2C2E", "#2E3A4A"])), gold = "#C9A24A";
   const sh: Shape[] = [], glow: Shape[] = [], lights: LightSpec[] = [], top = -h + (pier ? 74 : 96);
   sh.push(P([[-22, 0, 0], [22, 0, 0], [18, -12, 0], [12, -22], [10, -64, 0], [-10, -64, 0], [-12, -22], [-18, -12, 0]], c), R(-24, -6, 48, 6, tone(c, "light")), R(-13, -72, 26, 9, c), R(-13, -72, 26, 2, gold, pr(0.8)));
@@ -757,12 +885,12 @@ const lampPost: PieceDef = { draw(p, r) {
     lantern(-ax, top - 2, 1.1); lantern(ax, top - 2, 1.1);
   }
   return { flats: [{ group: { shapes: sh, edge: 0.6 }, emissive: { shapes: glow, edge: 0 }, switch: false, glowAt: 0.05, ppcm: Math.min(2.4, 1900 / (h + 80)) }], lights };
-}, variants: { street: { kind: "street" }, pier: { kind: "pier" } },
+}, variants: { street: { kind: "street" }, pier: { kind: "pier" }, gas: { kind: "gas" }, dutch: { kind: "dutch" } },
   meta: {
-    about: "A cast-iron lamp post, the classic Istanbul street lamp or a pier's double lamp, glowing in the evening.",
+    about: "A lamp post glowing in the evening: the classic Istanbul street lamp, a pier's double lamp, an old city gas lamp or a Dutch hanging bowl lamp.",
     params: {
-      kind: { type: "enum", values: ["street", "pier"], default: "street" },
-      h: { type: "num", min: 0, about: "height, cm (430 street, 400 pier)" },
+      kind: { type: "enum", values: ["street", "pier", "gas", "dutch"], default: "street" },
+      h: { type: "num", min: 0, about: "height, cm (430 street, 400 pier, 360 gas, 520 dutch)" },
       color: { type: "color", about: "a hex; dark green or black by seed" },
     },
     terms: ["lamba"],

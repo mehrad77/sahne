@@ -1,3 +1,7 @@
+<!-- sahne:brand: written by packages/sahne-gallery/brand/build.mjs, edit that and run it -->
+<p><picture><source media="(prefers-color-scheme: dark)" srcset="../../assets/brand/sahne-tr-header-dark.svg"><img src="../../assets/brand/sahne-tr-header.svg" alt="sahne TR" height="64"></picture></p>
+<!-- /sahne:brand -->
+
 # sahne-tr
 
 The Turkish plugin of [Sahne](../sahne/README.md) ([DESIGN.md](../sahne/DESIGN.md) §4.1, §7, §9). Sahne knows no language: mouth timing and word matching come from a `LangPlugin`, and this is the Turkish one.
@@ -10,7 +14,7 @@ tr.match("ekmeği", "ekmek");                    // true
 tr.matchLine("2 ekmek lütfen", ["İki ekmek, lütfen.", "İki ekmek ver."]); // { matched: true, best: 0, heard, score }
 ```
 
-It depends on `sahne` for types only. Besides the plugin it exports the helpers it is built from: `lowerTr`, `isVowel`, `VOWELS`, `sayWord`, `sayNumber`, `sayNumeral`, `sayDigits`, `ordinal`, `tokens`, `syllables`, `phonemes`, `stems`, `deixis`, the `TIMING` table and the `VISEME` map; for *say it aloud*, `normalise`, `sayWords`, `letters` and `allowance`; and for the story lints (`sahne-story`), `readNumber` ("on beş" → 15), `readClock` ("Ona çeyrek var" → 9:45) and `clockMinutes`.
+It depends on `sahne` for types and the shared line matcher (`lineMatcher`). Besides the plugin it exports the helpers it is built from: `lowerTr`, `isVowel`, `VOWELS`, `sayWord`, `sayNumber`, `sayNumeral`, `sayDigits`, `ordinal`, `tokens`, `syllables`, `phonemes`, `stems`, `deixis`, the `TIMING` table and the `VISEME` map; for *say it aloud*, `normalise`, `sayWords`, `letters` and `allowance`; and for the story lints (`sahne-story`), `readNumber` ("on beş" → 15), `readClock` ("Ona çeyrek var" → 9:45) and `clockMinutes`.
 
 ## Timing
 
@@ -24,6 +28,8 @@ Turkish is written as it is said, so the spelling gives the syllables: one vowel
 | A dip to rest between two syllables with the same shape (ka-la-cak), so the mouth does not freeze | 50, taken from the syllable |
 | Each extra consonant of a cluster at the start or end of a word (tren, Türk) | 40 |
 | ğ lengthening the vowel before it (dağ, doğru) | 60 |
+| The shortest a vowel gets when labials eat into its syllable | 100 |
+| Each letter of a hum or a shush (hmm, şşt), within 300–600 | 120 |
 | Between words | 60 |
 | Comma, semicolon, colon, dash | 250 |
 | Full stop, ? and ! | 450 |
@@ -44,16 +50,9 @@ Keys are sorted, start at 0, never repeat a shape twice in a row, and end on `re
 
 Derived words are other words and do not match: ekmekçi, kitaplık, sütlü, çaydanlık, sucuk, Türkçe. Known misses: a homograph that is also an inflected form matches (ada is ad + a, kalem is kale + m); verbs are not supported; the plural of a compound token (çay bardakları for "çay bardağı") is missed. `deixis(word)` says whether a word is a form of bu, şu or o.
 
-## Tests
-
-```bash
-node --test test/*.test.ts         # here, or pnpm test
-pnpm sahne check                    # from the repo root: types, sizes and every Sahne package's tests
-```
-
 ## Say it aloud
 
-`matchLine(heard, expected, {names, tolerance})` decides whether a recogniser's transcript (or any of its n-best alternatives) is one of the card's lines. Both sides become spoken words with `normalise`: Turkish lower case, numerals in words (*2* → *iki*), no punctuation, apostrophes or fillers (*ıı*, *eee*, *hmm*; *şey* is a word and stays), and a few recogniser spellings (*buyurun* → *buyrun*). Then a word-level edit distance, weighted by letters:
+`matchLine(heard, expected, {names, tolerance})` decides whether a recogniser's transcript (or any of its n-best alternatives) is one of the card's lines. Both sides become spoken words with `normalise`: Turkish lower case, numerals in words (*2* → *iki*), no punctuation, apostrophes or fillers (*ıı*, *eee*, *hmm*; *şey* is a word and stays), and a few recogniser spellings (*buyurun* → *buyrun*). Then the engine's word-level edit distance (`lineMatcher`), weighted by letters:
 
 | Difference | Cost |
 |---|---|
@@ -64,4 +63,15 @@ pnpm sahne check                    # from the repo root: types, sizes and every
 | Two words heard as one, or one as two (*varmı*, *teşekkürederim*) | the letters that differ once joined |
 | A name in `names` | 0 against any one or two words; 1 if missing |
 
-A line matches when the cost is within its allowance: half a letter for three letters or fewer, then one letter, then about one in six (`tolerance` overrides the ratio). The closest line within its allowance wins, so a choice between *İki ekmek, lütfen.* and *İki ekmek ver.* picks the option that was said, and *Ekmek yok* never passes for *Ekmek var*. The plugin carries `locale: "tr-TR"` for the recogniser (`sahne/listen`).
+A line matches when the cost is within its allowance: half a letter for three letters or fewer, then one letter, then about one in six (`tolerance` overrides the ratio). The closest line within its allowance wins, so a choice between *İki ekmek, lütfen.* and *İki ekmek ver.* picks the option that was said, and *Ekmek yok* never passes for *Ekmek var*. At most 40 words are compared (the shared matcher's bound). The plugin carries `locale: "tr-TR"` for the recogniser (`sahne/listen`).
+
+## The story language
+
+`sahne-story` reads a Turkish series through `langs/tr.ts` (and `tr-words.ts` for the check, with its verb-form resolver): words and pauses, `match`, the words that motivate each gesture (*merhaba* waves, *teşekkür* takes, *evet* nods), numbers (`readNumber`), the check's dictionary forms, Kumru's series hints (the hometown token "Tahran", the stand-in naming no country or language, Kırlangıç glossed), and four lints: `deixis` (*bu* is near and takes `hold_up`, `touch` or `point` within reach; *o* is far and takes `point_far`; *şu* points), `var_yok` (*X var / yok* about a linked prop needs it shown / hidden by then), `number` and `time` (`readClock`).
+
+## Tests
+
+```bash
+node --test test/*.test.ts         # here, or pnpm test
+pnpm sahne check                    # from the repo root: types, sizes and every Sahne package's tests
+```

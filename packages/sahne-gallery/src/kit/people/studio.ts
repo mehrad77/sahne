@@ -7,7 +7,7 @@
 // #/systems/perf. Look, mood, backdrop and framings are in the URL.
 
 import { applyLook, type AvatarDoc, type Backdrop, type Framing, type Stage } from "sahne";
-import type { CharacterDoc } from "sahne-story";
+import { textOf, type CharacterDoc } from "sahne-story";
 import { $, bar, button, choice, css, slider } from "../../shell/dom.ts";
 import type { Ctx } from "../../shell/ctx.ts";
 
@@ -40,8 +40,9 @@ export async function studio(host: HTMLElement, ctx: Ctx) {
   const add = (id: string, name: string, doc: AvatarDoc) => { if (!seen.has(id)) { seen.add(id); looks.push({ id, name, doc }); } };
   const character = (id: string, c: CharacterDoc) => {
     if (!c.avatar) return;
-    add(id, c.name || id, c.avatar);
-    for (const [o, look] of Object.entries(c.outfits ?? {})) add(`${id}.${o}`, `${c.name || id} (${o})`, applyLook(c.avatar, look));
+    const name = textOf(c.name) || id;
+    add(id, name, c.avatar);
+    for (const [o, look] of Object.entries(c.outfits ?? {})) add(`${id}.${o}`, `${name} (${o})`, applyLook(c.avatar, look));
   };
   for (const c of cast) character(c.id, c);
   for (const x of extras) {

@@ -5,6 +5,7 @@
 
 import { ellipse, rect, rrect, smooth, tone, mix, type FlatMotion, type FlatSpec, type FlatWhen, type Rng, type Shape, type Vec2 } from "sahne";
 import { S, P, flip } from "./draw.ts";
+import { flagCloth, flagWidth, shifted } from "../flags.ts";
 import { CROWD_FABRIC, FABRIC, HAIR, SKIN } from "../palette.ts";
 
 export type Build = "adult" | "elder" | "child";
@@ -57,7 +58,11 @@ const limb = (pts: Vec2[], color: string, w: number): Shape => ({ path: smooth(p
 export interface Drawn { body: Shape[]; legs: [Shape[], Shape[]]; arm: [Shape[], Shape[]]; umbrella: Shape[]; flag: Shape[] }
 
 /** The Turkish flag on a little stick held at (`x`, `y`), the flag `w` cm wide at the top, flying right. */
-export function handFlag(x: number, y: number, w: number): Shape[] {
+export function handFlag(x: number, y: number, w: number, country = "tr"): Shape[] {
+  if (country !== "tr") {
+    const h = Math.min(w * 2 / 3, w / flagWidth(1, country)), top = y - h * 2.4;
+    return [{ path: smooth([[x, y + 2], [x, top]], false, 1), stroke: { color: "#8A6A48", width: 1.2, cap: "round" } }, ...shifted(flagCloth(h, 0, 0, country), x, top)];
+  }
   const h = w * 2 / 3, top = y - h * 2.4, cx = x + h * 0.5, cy = top + h / 2;
   // the flag law: the crescent's circles 0.5 h and 0.5625 h from the hoist, the star's centre at 0.82 h, a point towards the hoist
   const star: [number, number, number][] = Array.from({ length: 10 }, (_, i) => { const a = Math.PI + i * Math.PI / 5, rr = i % 2 ? h * 0.05 : h * 0.125; return [x + h * 0.82 + Math.cos(a) * rr, cy + Math.sin(a) * rr, 0]; });
@@ -73,7 +78,7 @@ export type Pose = "walk" | "stand" | "sit" | "sit_front";
  * A person in a pose, facing right (`sit_front`: facing us): `walk` gives two strides (contact and passing), `stand` and `sit`
  * one (in `legs[0]`, `arm[0]`). Colours are muted towards the haze by `mute` (0…1).
  */
-export function drawPerson(p: Person, pose: Pose, mute = 0.35, seat = 45): Drawn {
+export function drawPerson(p: Person, pose: Pose, mute = 0.35, seat = 45, flagCountry = "tr"): Drawn {
   if (pose === "sit_front") return seatedFront(p, mute, seat);
   const m = (c: string) => mix(c, "#A3ACB5", mute), H = p.h, child = p.build === "child";
   const skin = m(p.skin), hair = m(p.hair), top = m(p.top), bottom = m(p.bottom), shoes = m(p.shoes);
@@ -129,7 +134,7 @@ export function drawPerson(p: Person, pose: Pose, mute = 0.35, seat = 45): Drawn
   }
   if (p.flag) {
     const hand: Vec2 = [sx + H * 0.1, Y(child ? 0.95 : 0.9)];
-    flag.push(limb([[sx, sh + H * 0.03], [sx + H * 0.12, Y(0.8)], hand], tone(top, "shade"), lw * 0.7), S(ellipse(hand[0], hand[1], lw * 0.42), tone(skin, "shade")), ...handFlag(hand[0], hand[1], child ? 16 : 20));
+    flag.push(limb([[sx, sh + H * 0.03], [sx + H * 0.12, Y(0.8)], hand], tone(top, "shade"), lw * 0.7), S(ellipse(hand[0], hand[1], lw * 0.42), tone(skin, "shade")), ...handFlag(hand[0], hand[1], child ? 16 : 20, flagCountry));
   }
 
   // legs: the near one in the trousers' colour, the far one in shade; shoes; a stride or a stance
@@ -215,8 +220,8 @@ function seatedFront(p: Person, mute: number, seat: number): Drawn {
 }
 
 /** A person's flats: the body; the strides (legs behind the body, the near arm in front); the umbrella (in the rain) and the flag (in the flag state). */
-export function personFlats(p: Person, pose: Pose, o: { dir: number; at: [number, number]; mute: number; move?: FlatMotion; step?: number; when?: FlatWhen; flagState: string; seat?: number }): FlatSpec[] {
-  const d = drawPerson(p, pose, o.mute, o.seat), f = (sh: Shape[]) => flip(sh, o.dir);
+export function personFlats(p: Person, pose: Pose, o: { dir: number; at: [number, number]; mute: number; move?: FlatMotion; step?: number; when?: FlatWhen; flagState: string; flagCountry?: string; seat?: number }): FlatSpec[] {
+  const d = drawPerson(p, pose, o.mute, o.seat, o.flagCountry), f = (sh: Shape[]) => flip(sh, o.dir);
   const base = { x: o.at[0], z: o.at[1], ppcm: 1.2, pick: false as const, shadow: "none" as const, ...(o.when ? { when: o.when } : {}) };
   const mv = (extra: Partial<FlatMotion> = {}) => o.move || Object.keys(extra).length ? { move: { ...o.move, ...extra } as FlatMotion } : {};
   const both = (k: 0 | 1) => pose === "walk" && o.step ? { blink: { ms: o.step, on: 0.5, at: k * 0.5 } } : {};

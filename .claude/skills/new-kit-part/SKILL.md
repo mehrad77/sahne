@@ -28,9 +28,14 @@ The kit is art as code, held together by contracts the tests enforce. Missing on
 4. **Named looks** go in `variants`, and each variant is permanent too.
 5. **Regenerate:** `node packages/sahne-kit/set/build.ts` (SET.md and `src/set/families.gen.ts`); `--check` must pass.
 
+## A story's own item
+
+A set piece or prop a story needs and the kit lacks is a **drawing**: data in the story's content root (`kit/pieces/x_<id>.json`), made and looked at through backstage's MCP tools (`kit_search`, `kit_read` a neighbour, `draft_kit_item`, `save_kit_item`; from the shell `server/call.ts`), the format in `packages/sahne-kit/DRAWING.md`. No kit code changes. When a good one should be official, ask the person for their name, a contact and their consent (CC BY 4.0, their own work), then `promote_kit_item` or `node packages/sahne-kit/drawing/promote.ts` (DRAWING.md *Promoting*): it checks, writes `src/set/drawn/<family>/<id>.json` with the credit, makes the old `x_` id an alias and draws the review sheets. A family takes drawn items only when its file imports `./drawn/<family>.gen.ts` (see `bakery.ts`).
+
 ## Check it
 
-1. **Look at it** (use the `visual-check` skill): the part in `#/kit/people` (the studio: `?tab=studio`), the piece in `#/kit/set/<id>` with its params as controls, a family at once with `node packages/sahne-gallery/kit-sheet.ts --family <name> --out <dir>`, and in a real place if it belongs to one.
-2. **Sizes:** `node packages/sahne-gallery/size.mjs`; the budgets bind (README, DESIGN.md §12) and a bundle over budget fails the gate.
-3. **The gate:** `pnpm check`. A part that changes how existing people or places look changes golden frames: update them only on purpose and say so.
-4. **Docs follow the code** in the same commit: STYLE.md if you set a new rule, the generated CATALOGUE.md and SET.md always. Commit as `feat(kit): …`.
+1. **Render it after every edit**, from the shell: `node packages/sahne-backstage/server/call.ts kit_render '{"items":[{"id":"<id>"},{"id":"<neighbour>"}]}' --content <root> --session kit` prints the kit's own problems and a PNG path to Read (one sheet, a cell per item, each look by day and night, a 170 cm adult beside it). The session keeps the kit loaded and restarts itself when a generator's TypeScript changed, so you see your edit. A story's own drawing (`x_…`) uses `draft_kit_item` the same way (*DRAWING.md*).
+2. **Look at it in the gallery** (use the `visual-check` skill): the part in `#/kit/people` (the studio: `?tab=studio`), the piece in `#/kit/set/<id>` with its params as controls, a family at once with `node packages/sahne-gallery/kit-sheet.ts --family <name> --out <dir>`, and in a real place if it belongs to one.
+3. **Sizes:** `node packages/sahne-gallery/size.mjs`; the budgets bind (README, DESIGN.md §12) and a bundle over budget fails the gate.
+4. **The gate:** `pnpm check`. A part that changes how existing people or places look changes golden frames: update them only on purpose and say so.
+5. **Docs follow the code** in the same commit: STYLE.md if you set a new rule, the generated CATALOGUE.md and SET.md always. Commit as `feat(kit): …`.

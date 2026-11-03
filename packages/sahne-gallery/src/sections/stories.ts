@@ -9,12 +9,13 @@
 import { interact, propText, glossInto, browserVoice, placeSolids, type ActRun, type Stage } from "sahne";
 import { canListen, cannotListen, listenFor } from "sahne/listen";
 import { K_HEAD_VB, K_BUST, K_HEAD } from "sahne-kit/kerim/art";
+import { lesson } from "sahne-lesson";
 import { adaptStory, lintStory, storyPlayer, suggest, type StoryPlayer, type CharacterDoc, type CueInfo, type Picks, type StoryPlace, type StoryStage, type Turn } from "sahne-story";
 import { $, bar, button, css, frame, link, toggle } from "../shell/dom.ts";
 import type { Ctx } from "../shell/ctx.ts";
 import type { Draft } from "../shell/data.ts";
 import { glossLookup, speak, type SceneGloss } from "../gloss.ts";
-import { kerimPortrait, kerimOnTalk } from "../kerim.ts";
+import { kerimPortrait, kerimOnTalk } from "sahne-kit/kerim/portrait";
 import { replyCard, type Aloud } from "../card.ts";
 
 declare global { interface Window { storyDemo?: { stage: Stage; adapted: StoryStage; picks: Picks; next: number; heard: { cue: number; best: number; heard: string }[] } } }
@@ -64,14 +65,17 @@ export async function render(host: HTMLElement, ctx: Ctx) {
   play(host, ctx, draft, Object.fromEntries(docs.map(p => [p.id, p])) as unknown as Record<string, StoryPlace>, vocab);
 }
 
+/** The story plugins of the gallery's stories: the samples' series turns on the lesson plugin, and the bakkal test scene has a spot. */
+const PLUGINS = [lesson];
+
 function play(host: HTMLElement, ctx: Ctx, draft: Draft, PLACES: Record<string, StoryPlace>, vocab: [string, string, string][]) {
   const STORY = draft.story, CHARACTERS = draft.characters as Record<string, CharacterDoc>;
-  // the story's own glosses (`gl`: word → [fa, en]) over the A1 cards
-  const GL: Record<string, SceneGloss> = Object.fromEntries(Object.entries(STORY.gl ?? {}).map(([w, [fa, en]]) => [w, { en, fa }]));
+  // the story's own glosses (`gl`: word → { fa, en }) over the A1 cards
+  const GL: Record<string, SceneGloss> = Object.fromEntries(Object.entries(STORY.gl ?? {}).map(([w, g]) => [w, { en: g.en ?? "", fa: g.fa ?? "" }]));
   const GLOSS = { lookup: glossLookup(GL, {}, vocab), speak };
   let name = stored("story-name", "Nima"), translate = stored("story-translate", "1") === "1", aloudOn = stored("story-aloud", "1") === "1";
   /** Kumru's personalizeStr, in small: the name token becomes the learner's name. */
-  const personalise = (t: string, lang?: "tr" | "en" | "fa") => (name && name !== "Nima" ? t.replace(lang === "fa" ? /نیما/g : /Nima/g, name) : t);
+  const personalise = (t: string, lang?: string) => (name && name !== "Nima" ? t.replace(lang === "fa" ? /نیما/g : /Nima/g, name) : t);
 
   host.append(link("← every story", "#/stories"), $("h1", "", `${draft.id}${draft.fixture ? " · the bakkal test scene" : ""}`));
   const box = frame("16 / 10");
@@ -100,7 +104,7 @@ function play(host: HTMLElement, ctx: Ctx, draft: Draft, PLACES: Record<string, 
 
   /** A new adaptation (the learner's name is in it) and a player over it, at the opening scene. */
   function load() {
-    adapted = adaptStory(STORY, { places: PLACES, characters: CHARACTERS, personalise });
+    adapted = adaptStory(STORY, { places: PLACES, characters: CHARACTERS, personalise, plugins: PLUGINS });
     const p: StoryPlayer = storyPlayer(stage, adapted, {
       loadOptions: { narratorEl: kerim, onNarratorTalk: kerimOnTalk(kerim), narratorSound: "coo" },
       onCue: i => { if (player === p) addLog(i); },
@@ -154,7 +158,8 @@ function play(host: HTMLElement, ctx: Ctx, draft: Draft, PLACES: Record<string, 
       footer.append(card);
       return;
     }
-    if (f.kind === "busy" || f.kind === "devam") footer.append(primary("Devam ▸", () => player.devam()));
+    // a watch-only story runs on by itself: no Devam, only time (sahne-story src/play.ts)
+    if (f.kind === "busy" || f.kind === "devam") { if (!player.auto) footer.append(primary("Devam ▸", () => player.devam())); }
     else if (f.kind === "end") footer.append(primary("Baştan ↺", restart));
     else footer.append(cardFor(f.cue, f.turn));
   }
@@ -176,7 +181,7 @@ function play(host: HTMLElement, ctx: Ctx, draft: Draft, PLACES: Record<string, 
     }));
   }
   function showLints() {
-    const ps = lintStory(STORY, { places: PLACES, characters: CHARACTERS, kit: ctx.kit, solids: Object.fromEntries(Object.entries(PLACES).map(([id, p]) => [id, placeSolids(p, ctx.kit)])) }), ss = suggest(STORY, { places: PLACES, characters: CHARACTERS });
+    const ps = lintStory(STORY, { places: PLACES, characters: CHARACTERS, kit: ctx.kit, solids: Object.fromEntries(Object.entries(PLACES).map(([id, p]) => [id, placeSolids(p, ctx.kit)])), plugins: PLUGINS }), ss = suggest(STORY, { places: PLACES, characters: CHARACTERS, plugins: PLUGINS });
     lintsEl.replaceChildren();
     if (!ps.length) lintsEl.append($("li", "ok", "✓ no problems: deixis, var/yok, numbers, budget, via, silent, time, link, standin, mechanics, props, look, route"));
     for (const p of ps) lintsEl.append($("li", p.level, `${p.level} ${p.rule} @ step ${p.step}${p.option !== undefined ? `.${p.option}` : ""}: ${p.message}`));

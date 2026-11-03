@@ -8,7 +8,7 @@
 import { peopleSamples, flights, fleeAt, lookToward, reactShows, type Sample, type Flight } from "./anim/react.ts";
 import type { EmitSpec, Kit, KitPuppet, Item, FlatSpec, FlatMotion, FlatReact, LightSpec, PieceOut, Side, Bus } from "./core/kit.ts";
 import { placeSolids } from "./director/route.ts";
-import { withVariant, TIMETABLE } from "./core/kit.ts";
+import { withVariant, pieceOf, TIMETABLE } from "./core/kit.ts";
 import type { AvatarDoc, PieceRef, PlaceDoc, PuppetRef } from "./core/types.ts";
 import { clamp, apply, ease, project, type Vec2, type Vec3, type Affine, type Mat4 } from "./core/math.ts";
 import { hexToRgb } from "./core/color.ts";
@@ -30,7 +30,7 @@ import { moveAt } from "./anim/move.ts";
 import { cloneWorld, inState, propKey, whenWeight, type PropState, type Shot, type World } from "./script/world.ts";
 import { CAM_MS, emptyTrack, evaluate, type ActorFrame, type Frame, type Perf, type VoiceLine } from "./anim/timeline.ts";
 import { direct, directAll, glance, type DirectCtx } from "./director/direct.ts";
-import type { Pick } from "./interact/hit.ts";
+import { rayAt, rayFloor, type Pick } from "./interact/hit.ts";
 import { Overlay, type Bubble, type InsetOptions } from "./ui/overlay.ts";
 import type { GlossOptions } from "./ui/gloss.ts";
 import { AudioEngine, type AudioSessionType } from "./audio/engine.ts";
@@ -440,7 +440,7 @@ export class Stage {
     // `false` no overlay at all (a builder's preview, thumbnails); `"log"` the narrator's window and the sound words but no line
     // bubbles (the host shows the lines; setBubbles switches); `true` everything (theatre mode)
     this.lines = o.bubbles !== false && o.bubbles !== "log";
-    this.overlay = o.bubbles === false || !r ? null : new Overlay(el, { project: p => this.project(p), still: this.motion === "still" });
+    this.overlay = o.bubbles === false || !r ? null : new Overlay(el, { project: p => this.project(p), still: this.motion === "still", ...(this.lang.id !== "und" ? { lang: this.lang.id } : {}), ...(this.lang.dir ? { dir: this.lang.dir } : {}) });
     this.gloss = o.gloss ?? null;
     if (o.glosses && this.gloss) this.overlay?.setGloss(this.gloss);
     this.audio = new AudioEngine(this.kit, { volumes: o.volumes, sounds: o.sounds, session: o.audioSession });
@@ -967,7 +967,7 @@ export class Stage {
   private propLook(s: PropState, pl: string): boolean {
     const key = artKey(s), had = this.propArt.get(key);
     if (had) { if (had.at.has(pl)) return false; had.at.add(pl); return true; }
-    const def = this.kit.props[s.kit];
+    const def = pieceOf(this.kit, "props", s.kit);
     if (!def) { console.warn("sahne: no prop", s.kit); return false; }
     const out = def.draw(withVariant(def, { ...s.params, n: s.n, held: !!s.holder }), rng(s.of), this.kit);
     // each flat with words is followed by its words' own flat (DESIGN.md §6.8)
@@ -1892,6 +1892,15 @@ export class Stage {
     return x0 <= x1 ? [x0, y0, x1, y1] : null;
   }
 
+  /**
+   * The point of the floor (or of the level plane at `height`) under CSS pixel (x, y) inside the stage element,
+   * in the last frame's camera: where an editor drops a mark. Null off the floor (above the horizon).
+   */
+  floorAt(x: number, y: number, height = 0): Vec3 | null {
+    if (!this.cssW || !this.cssH) return null;
+    return rayFloor(rayAt(this.cam, this.aspect, x / this.cssW * 2 - 1, 1 - y / this.cssH * 2), height);
+  }
+
   /** A world point in CSS pixels inside the stage element. */
   project(p: Vec3): [number, number] | null {
     if (!this.vp) return null;
@@ -1971,7 +1980,7 @@ export function pieceSeed(place: { id: string; site?: string }, p: PieceRef): st
 /** A place's pieces drawn by their kit generators, each on its own seed; a piece the kit lacks is skipped with a warning. */
 export function drawPieces(place: { id: string; site?: string; pieces: PieceRef[] }, kit: Kit): { p: PieceRef; out: PieceOut }[] {
   return place.pieces.flatMap(p => {
-    const def = kit.set[p.kit];
+    const def = pieceOf(kit, "set", p.kit);
     if (!def) { console.warn("sahne: no set piece", p.kit); return []; }
     return [{ p, out: def.draw(withVariant(def, p), rng(pieceSeed(place, p)), kit) }];
   });

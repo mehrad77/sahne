@@ -5,6 +5,7 @@
 import { Path, ellipse, rect, rrect, poly, smooth, tone, mix, type FlatSpec, type LightSpec, type PieceDef, type PieceOut, type Rng, type Shape, type TextSpec, type Vec2 } from "sahne";
 import { S, P, L, num, str, holed, glowOnly, litByTurns, solidLine } from "./draw.ts";
 import { SET } from "../palette.ts";
+import { COUNTRIES, countryOf, flagCloth, flagWidth, shifted } from "../flags.ts";
 
 const IRON = "#2E3135", BRASS = "#C9A25A", STEEL = "#C3C9CE", GLASS = "#CFE6EE", WARM = "#FFD9A0", CONCRETE = "#B9B2A6", RUST = "#9A5530";
 const FACADES = ["#E9CF9E", "#F0DDBF", "#CFE0CF", "#E8B9A3", "#D9C7DA", "#F2E4C4", "#BFD3DC"];
@@ -568,8 +569,9 @@ const corridor: PieceDef = { draw(p, r) {
 
 // ---- Balconies ----------------------------------------------------------------------------------
 
-/** A Turkish flag hanging from its top edge at (0, 0) over a rail, `w` wide. */
-function flag(w: number): Shape[] {
+/** A flag (Turkey's unless `country`) hanging from its top edge at (0, 0) over a rail, `w` wide. */
+function flag(w: number, country = "tr"): Shape[] {
+  if (country !== "tr") { const h = Math.min(w * 2 / 3, w / flagWidth(1, country)); return shifted(flagCloth(h, 0, 0, country), -flagWidth(h, country) / 2, 1); }
   const h = w * 2 / 3, cy = h / 2, R = h / 4, star: Vec2[] = [];
   for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? R * 0.2 : R * 0.5; star.push([-w / 2 + h * 0.9 + Math.cos(a) * rr, cy + Math.sin(a) * rr]); }
   return [S(rect(-w / 2, 1, w, h), "#E30A17"), S(ellipse(-w / 2 + h * 0.5, cy, R, R), "#FFFFFF", { flat: true }), S(ellipse(-w / 2 + h * 0.5 + R * 0.25, cy, R * 0.8, R * 0.8), "#E30A17", { flat: true }),
@@ -578,7 +580,7 @@ function flag(w: number): Shape[] {
 
 /**
  * A balcony, `kind`: `facade` (a small balcony on a building front: the slab, an iron rail, pots, now and
- * then laundry, the balcony door behind it (`behind` false: none); a Turkish `flag` hung over the rail,
+ * then laundry, the balcony door behind it (`behind` false: none); a `flag` hung over the rail,
  * shown only in the place state `flagState` when one is given); `door` (a balcony door seen from inside:
  * a glazed double door `w` × `h` (150 × 225) whose two leaves swing in, curtains, the balcony rail and the street beyond);
  * `rail` (the rail from the balcony itself, `w` × `h` 300 × 100, a flat cap Kerim perches on at h + 4, pots,
@@ -634,7 +636,7 @@ const balcony: PieceDef = { draw(p, r) {
   }
   // a balcony on a façade
   const w = num(p.w, 160), n = held ? 1 : cl(Math.round(num(p.n, 1)), 1, 12), cols = Math.min(n, 3), gap = num(p.gap, w + 120);
-  const flagOn = !!p.flag, fs = str(p.flagState, "");
+  const flagOn = !!p.flag, fs = str(p.flagState, ""), fc = countryOf(p.country);
   const main: Shape[] = [], behind: Shape[] = [], flats: FlatSpec[] = [];
   for (let i = 0; i < n; i++) {
     const dx = ((i % cols) - (cols - 1) / 2) * gap, dy = -Math.floor(i / cols) * 300, b: Shape[] = [], m: Shape[] = [];
@@ -648,7 +650,7 @@ const balcony: PieceDef = { draw(p, r) {
     if (r.chance(0.3)) { m.push(L([[-w / 2 + 8, -150], [w / 2 - 8, -150]], "#5B6067", 0.8, 0.9)); for (let x = -w / 2 + 16; x < w / 2 - 30; x += r.range(26, 40)) m.push(S(rect(x, -150, r.range(16, 26), r.range(24, 50)), r.pick(["#F7F3EA", "#8DB8DA", "#E58FA0", "#E0A83A", "#9AA0A6"]))); }
     m.push(...railing(-w / 2 + 2, w / 2 - 2, 0, 95, ironC));
     behind.push(...sh(b, dx, dy)); main.push(...sh(m, dx, dy));
-    if (flagOn && !held) flats.push({ group: { shapes: flag(Math.min(80, w * 0.5)), edge: 0.4 }, x: dx + r.range(-w * 0.15, w * 0.15), y: 92 - dy, z: 3, ppcm: 2, move: { sway: { rot: 0.025, ms: r.range(2600, 3600) }, phase: r() }, ...(fs ? { when: { state: [fs] } } : {}) });
+    if (flagOn && !held) flats.push({ group: { shapes: flag(Math.min(80, w * 0.5), fc), edge: 0.4 }, x: dx + r.range(-w * 0.15, w * 0.15), y: 92 - dy, z: 3, ppcm: 2, move: { sway: { rot: 0.025, ms: r.range(2600, 3600) }, phase: r() }, ...(fs ? { when: { state: [fs] } } : {}) });
   }
   if (held) return { flats: [{ group: { shapes: main, edge: 0.6 }, ppcm: 1.4, id: "balcony" }] };
   return { flats: [...(behind.length ? [{ group: { shapes: behind, edge: 0.6 }, z: -12, ppcm: 1.4 }] : []), { group: { shapes: main, edge: 0.6 }, ppcm: Math.min(1.6, 1900 / (cols * gap)), id: "balcony", shadow: "drop" as const }, ...flats] };
@@ -663,7 +665,8 @@ const balcony: PieceDef = { draw(p, r) {
       n: { type: "int", min: 1, max: 12, default: 1, about: "facade balconies, in rows of three" },
       gap: { type: "num", about: "cm between facade balconies; default w + 120" },
       behind: { type: "bool", default: true, about: "the balcony door behind a facade balcony" },
-      flag: { type: "bool", about: "a Turkish flag over a facade balcony's rail" },
+      flag: { type: "bool", about: "a flag over a facade balcony's rail" },
+      country: { type: "enum", values: COUNTRIES, default: "tr", about: "whose flag it is" },
       flagState: { type: "text", about: "the place state the flag shows in; none: always" },
       view: { type: "bool", default: true, about: "the rail's city behind" },
     },

@@ -1,0 +1,92 @@
+{
+  "id": "apple_strudel",
+  "as": "prop",
+  "about": "A slice of apple strudel, flaky and dusted with sugar, a cut end showing the apple and raisins.",
+  "tags": [
+    "food",
+    "bakery",
+    "pastry",
+    "sweet"
+  ],
+  "terms": [],
+  "params": {},
+  "kinds": {
+    "main": {
+      "size": [
+        16,
+        5
+      ],
+      "ppcm": 14,
+      "grip": [
+        0,
+        -2.5
+      ],
+      "flats": [
+        {
+          "shapes": [
+            {
+              "d": "M-7.6 -1.2C-7.6 -3.4 -4 -4.6 0 -4.6C4 -4.6 7 -4 7.8 -2.4L7.2 -0.4C6.6 -0.1 5.6 0 4.6 0H-5.6C-6.8 0 -7.6 -0.4 -7.6 -1.2Z",
+              "fill": "#D69B45"
+            },
+            {
+              "d": "M5.6 -4.4C7.4 -4.2 8.2 -2.6 8 -1.6C7.8 -0.4 6.8 0.2 5.8 0C5 -1.6 5 -3 5.6 -4.4Z",
+              "fill": "#EBD9A0"
+            },
+            {
+              "d": "M5.9 -3.2C6.7 -3.2 7.2 -2.6 7.2 -2.2C7 -1.4 6.4 -1 5.9 -1.2Z",
+              "fill": "#B58A3C"
+            },
+            {
+              "d": "M6 -3.6C6.4 -3.6 6.6 -3.4 6.6 -3.4M6.1 -1.8h0.8",
+              "fill": "#A8662A",
+              "stroke": {
+                "color": "#A8662A",
+                "width": 0.35,
+                "cap": "round"
+              },
+              "flat": true
+            },
+            {
+              "d": "M-6 -3.2C-3 -4.2 1 -4.2 4.6 -3.8M-6.8 -1.9C-3 -2.8 1 -2.8 4.8 -2.4M-6.2 -0.7C-3 -1.4 1 -1.4 4.6 -1",
+              "fill": "#A8662A",
+              "stroke": {
+                "color": "#A8662A",
+                "width": 0.35,
+                "cap": "round"
+              },
+              "flat": true,
+              "opacity": 0.6
+            },
+            {
+              "d": "M-6.4 -3.4C-4 -4.6 0 -4.8 3.4 -4.3C0 -4.2 -3.4 -3.8 -6.4 -3.4Z",
+              "fill": "#FBF8F2",
+              "flat": true,
+              "opacity": 0.85
+            },
+            {
+              "d": "M-5 -3.6h0.5M-2.4 -4.2h0.5M0.4 -4.1h0.5M2.6 -3.8h0.5M-3.8 -2.6h0.5",
+              "fill": "#FFFFFF",
+              "stroke": {
+                "color": "#FFFFFF",
+                "width": 0.5,
+                "cap": "round"
+              },
+              "flat": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "repeat": {
+    "gap": 4
+  },
+  "credit": {
+    "by": "Sahne kit (drawn by its agents)",
+    "contact": "github:mehrad77",
+    "date": "2026-10-31",
+    "licence": "CC-BY-4.0",
+    "consent": "project",
+    "from": "x_apple_strudel"
+  }
+}

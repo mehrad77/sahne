@@ -167,7 +167,7 @@ const tea: PieceDef = { draw(p, r, kit) {
     const n = cnt(p, 1, 24), spoon = p.spoon !== false;
     ppcm = 8; edge = 0.25;
     const put = (k: number, step: number, y: number, dx = 0) => xs(k, step).forEach(x => { sh.push(...at(teaGlass(r, fill, spoon), x + dx, y)); vents.push([x + dx, y - 12.5, 2]); });
-    if (p.held) { put(Math.min(n, 3), 8, 0); m = LIFT; }
+    if (p.held) for (const x of xs(Math.min(n, 3), 8)) { sh.push(...at(glass(fill, spoon), x, 5)); vents.push([x, -6.5, 2]); } // the fingers close on the glass's waist, no saucer
     else if (n > 6) { const b = Math.floor(n / 2); put(b, 12.6, -2.8, b === n - b ? 6.3 : 0); put(n - b, 12.6, 0); }
     else put(n, 12.6, 0);
   }

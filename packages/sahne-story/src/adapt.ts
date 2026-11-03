@@ -6,19 +6,22 @@
 //   a stand-in line    → the reply card (a turn), then the line for nima; "…" with voice silent is the "…" card
 //   beat               → beat
 //   act                → act, whose result goes back like a choice; its reaction is a beat
-//   spot               → overlay, with Kerim's staging
+//   a plugin's step    → the cues its own adapt makes (src/plugin.ts): the lesson plugin's spot is an overlay
 //   choice             → the reply card with its options; the picked line, its reactions and the reply become cues
 //   looks              → the cast's starting clothes, the wardrobe, and `costume` on the scene, line or beat that changes them
 //
 // Translations (en, fa) never reach the stage: they stay in `info`, for the log and the card. The
 // host's personalising runs on every text that reaches the stage: lines, link keys, sound words,
-// prop labels and phone screens, an act's prompt, a spot's example and the display names.
+// prop labels and phone screens, an act's prompt and the display names (a plugin's step personalises its own).
 
 import type { ActCue, AvatarDoc, Cue, LoadOptions, PlaceDoc, PuppetRef, Script, Staging, VoiceSpec } from "sahne";
-import { lowerTr } from "sahne-tr";
-import { isAct, isBeat, isChoice, isLine, isScene, isSpot, NARRATOR, STANDIN, type CharacterDoc, type ChoiceOption, type Gate, type LineStep, type BeatStep, type Step, type StoryDoc, type Text3 } from "./types.ts";
+import { isAct, isBeat, isChoice, isLine, isScene, NARRATOR, STANDIN, type CharacterDoc, type ChoiceOption, type Gate, type LineStep, type BeatStep, type Step, type StoryDoc, type Text3 } from "./types.ts";
 import { storyProps } from "./props.ts";
+import { langFor, type StoryLang } from "./lang.ts";
+import { allLanguages, DEFAULT_LANGUAGES, textOf, type Languages, type LangText } from "./texts.ts";
 import { dressing } from "./looks.ts";
+import { pluginStepOf, type StoryPlugin } from "./plugin.ts";
+import { playOf, type PlayMode } from "./play.ts";
 
 export interface AdaptOptions {
   places: Record<string, PlaceDoc>;
@@ -27,46 +30,70 @@ export interface AdaptOptions {
   learner?: AvatarDoc | null;
   /**
    * The host's personalising (Kumru's `personalizeStr`): the name and hometown tokens become the
-   * learner's. It runs on the Turkish that reaches the stage and on the translations the host shows
+   * learner's. It runs on the main language that reaches the stage and on the translations the host shows
    * (the card, the log), with `lang` saying which: the tokens are written differently per language
    * (`Nima`, `نیما`; `Tahran`, `Tehran`, `تهران`).
    */
-  personalise?: (text: string, lang?: "tr" | "en" | "fa") => string;
+  personalise?: (text: string, lang?: string) => string;
+  /** The series' languages (`series.json`, src/texts.ts): the main one reaches the stage. Without them, Turkish with English and Persian. */
+  languages?: Languages;
+  /** The story language (src/lang.ts) that reads a link's word; the main language's by default. */
+  lang?: StoryLang;
   /** Flags set by earlier stories, for `if` / `unless` lines (Kumru's STORIES_SCHEMA.md §4.7). */
   flags?: Iterable<string>;
+  /** The series' story plugins (src/plugin.ts, `pluginsOf`): their steps become cues here. */
+  plugins?: readonly StoryPlugin[];
+  /** How the story plays (src/play.ts, `playOf(story, series)`); the story's own `play` without it. In `watch`, nothing waits
+   * for the viewer: the stand-in's lines are plain lines, a choice plays its first option, and an act plays only its reaction. */
+  play?: PlayMode;
 }
 
 /** What the learner picked: a choice's option index, or the target an act ended on. */
 export type Picks = Record<string, number | string>;
 
-/** One option of the reply card: the Turkish line and its translations. */
-export interface CardOption extends Text3 { ok?: boolean; tone?: string }
+/**
+ * A text the host shows, in every language of the series: `text` by language code, and `tr` (the main language's, by
+ * whatever code), `en` and `fa` as they were before series named their languages, kept for the hosts that read them.
+ */
+export interface Shown extends Text3 { text: LangText }
+
+/** One option of the reply card: the main-language line and its translations. */
+export interface CardOption extends Shown { ok?: boolean; tone?: string }
 
 /** A card shown before its cue plays. */
 export type Turn =
   | { kind: "say"; step: number; silent: boolean; options: [CardOption] }
   | { kind: "choice"; step: number; id: string; to?: string; options: CardOption[] }
-  | { kind: "act"; step: number; id: string; act: ActCue["act"]; prompt?: Text3; to?: string };
+  | { kind: "act"; step: number; id: string; act: ActCue["act"]; prompt?: Shown; to?: string };
 
 /** What the host needs to know about a cue: the story step it came from, the line with its translations, and the card before it. */
 export interface CueInfo {
   step: number;
-  kind: "scene" | "line" | "say" | "beat" | "act" | "react" | "spot" | "reply";
+  /** `spot` is the lesson plugin's grammar spot; another plugin's step names its own kind. */
+  kind: "scene" | "line" | "say" | "beat" | "act" | "react" | "spot" | "reply" | (string & {});
   who?: string;
+  /** The line in every language of the series, by code. */
+  text?: LangText;
+  /** The main language's line (by whatever code), then English and Persian: as before series named their languages. */
   tr?: string;
   en?: string;
   fa?: string;
   narr?: boolean;
-  note?: { en?: string; fa?: string };
+  /** A note for the learner, in the translations (from a plugin's `lineInfo`: the lesson plugin's). */
+  note?: LangText;
   turn?: Turn;
   /** The choice option a `say` or `reply` cue belongs to. */
   option?: number;
+  /** A `reply` cue's index in its option's `reply` list (gated replies that were skipped still count). */
+  reply?: number;
 }
 
 export interface Performance { script: Script; info: CueInfo[] }
 
 export interface StoryStage {
   story: StoryDoc;
+  /** How it plays: a watch-only story has no turns, and its player runs on by itself (src/player.ts). */
+  play: PlayMode;
   /** Every card of the story, in order (on the paths the default picks take). */
   turns: Turn[];
   /** What `Stage.load` needs besides the script: the cast's avatars, the places with the story's props, the other branches' cues. */
@@ -91,9 +118,13 @@ function deep<T>(v: T, p: (s: string) => string): T {
 
 export function adaptStory(story: StoryDoc, o: AdaptOptions): StoryStage {
   const P = o.personalise ?? ((s: string) => s);
-  const p = (s: string) => P(s, "tr");
-  const flags = new Set(o.flags ?? []);
-  const word = (k: string) => { const a = lowerTr(p(k)); return a !== k ? a : lowerTr(p(k[0].toUpperCase() + k.slice(1))); };
+  const langs = o.languages ?? DEFAULT_LANGUAGES, main = langs.main, every = allLanguages(langs);
+  const p = (s: string) => P(s, main);
+  /** A step's main-language text. */
+  const said = (t: object) => String((t as Record<string, unknown>)[main] ?? "");
+  const flags = new Set(o.flags ?? []), plugins = o.plugins ?? [], play = o.play ?? playOf(story), watch = play === "watch";
+  const lower = (o.lang ?? langFor(main)).lower;
+  const word = (k: string) => { const a = lower(p(k)); return a !== k ? a : lower(p(k[0].toUpperCase() + k.slice(1))); };
 
   /** The staging fields of a step, with the texts in them personalised. */
   function staging(s0: Staging): Staging {
@@ -104,7 +135,12 @@ export function adaptStory(story: StoryDoc, o: AdaptOptions): StoryStage {
     if (s.sfx) out.sfx = deep(s.sfx, p);
     return out as Staging;
   }
-  const t3 = (t: Text3): Text3 => ({ tr: p(t.tr), ...(t.en !== undefined ? { en: P(t.en, "en") } : {}), ...(t.fa !== undefined ? { fa: P(t.fa, "fa") } : {}) });
+  /** A step's texts as the host shows them (`Shown`), each personalised in its language. */
+  const t3 = (t: object): Shown => {
+    const r = t as Record<string, unknown>, text: LangText = {};
+    for (const l of every) if (typeof r[l] === "string") text[l] = P(r[l] as string, l);
+    return { tr: text[main] ?? "", ...(text.en !== undefined ? { en: text.en } : {}), ...(text.fa !== undefined ? { fa: text.fa } : {}), text };
+  };
   const card = (op: ChoiceOption): CardOption => ({ ...t3(op), ...(op.ok ? { ok: true } : {}), ...(op.tone ? { tone: op.tone } : {}) });
 
   const defaults: Picks = {};
@@ -122,41 +158,39 @@ export function adaptStory(story: StoryDoc, o: AdaptOptions): StoryStage {
       const st: Staging = { ...staging(l), ...(top ? worn(step) : {}) };
       const narr = "narr" in l && l.narr === true;
       if (narr && !st.to) st.to = "viewer";
-      push({ line: { who: l.who, text: p(l.tr), ...st } }, { step, kind, who: l.who, ...t3(l), ...(narr ? { narr } : {}), ...("note" in l && l.note ? { note: { ...(l.note.en !== undefined ? { en: P(l.note.en, "en") } : {}), ...(l.note.fa !== undefined ? { fa: P(l.note.fa, "fa") } : {}) } } : {}), ...extra });
+      push({ line: { who: l.who, text: p(said(l)), ...st } }, { step, kind, who: l.who, ...t3(l), ...(narr ? { narr } : {}), ...Object.assign({}, ...plugins.map(pl => pl.lineInfo?.(l, P) ?? {})), ...extra });
     };
     const beat = (b: BeatStep, step: number, kind: CueInfo["kind"], extra: Partial<CueInfo> = {}, top = false) =>
       push({ beat: { ...staging(b.beat), ...(top ? worn(step) : {}), ...(b.beat.who ? { who: b.beat.who } : {}), ...(b.beat.wait !== undefined ? { wait: b.beat.wait } : {}) } }, { step, kind, ...(b.beat.who ? { who: b.beat.who } : {}), ...extra });
 
     story.steps.forEach((s: Step, step) => {
       if (!passes(s, flags)) return;
-      if (isScene(s)) {
+      const own = pluginStepOf(s, plugins);
+      if (own) own.adapt(s, { step, main, play, p, said, shown: t3, staging: x => staging(x as Staging) as Record<string, unknown>, push });
+      else if (isScene(s)) {
         push({ scene: { place: s.scene, at: { ...(s.at ?? {}) }, ...(s.time ? { time: s.time } : {}), ...(s.weather ? { weather: s.weather } : {}), ...(s.state ? { state: s.state } : {}), ...(s.kerim ? { perch: s.kerim } : {}), ...(s.stop ? { stop: s.stop } : {}), ...worn(step) } }, { step, kind: "scene" });
       } else if (isLine(s)) {
-        if (s.who === STANDIN) {
+        if (s.who === STANDIN && !watch) {
           const silent = s.voice === "silent";
           line(s, step, "say", { turn: { kind: "say", step, silent, options: [t3(s)] } }, true);
         } else line(s, step, "line", {}, true);
       } else if (isBeat(s)) beat(s, step, "beat", {}, true);
-      else if (isSpot(s)) {
-        const { lesson, ex, show, tr } = s.spot;
-        push({ overlay: { kind: show ?? "spot", lesson, ex: p(ex), ...(tr ? { tr: p(tr) } : {}), who: NARRATOR, ...staging(s.spot) } },
-          { step, kind: "spot", who: NARRATOR, ...(tr ? { tr: p(tr) } : { tr: p(ex) }), ...(s.spot.en !== undefined ? { en: P(s.spot.en, "en") } : {}), ...(s.spot.fa !== undefined ? { fa: P(s.spot.fa, "fa") } : {}) });
-      } else if (isChoice(s)) {
+      else if (isChoice(s)) {
         const c = s.choice, k = Math.min(Math.max(0, Number(picks[c.id] ?? 0) | 0), c.options.length - 1), op = c.options[k];
         const turn: Turn = { kind: "choice", step, id: c.id, ...(c.to ? { to: c.to } : {}), options: c.options.map(card) };
-        line({ ...op, who: STANDIN }, step, "say", { turn, option: k });
-        for (const r of op.reply ?? []) {
-          if (!passes(r, flags)) continue;
-          if (isBeat(r)) beat(r, step, "reply", { option: k });
-          else line(r, step, "reply", { option: k });
-        }
+        line({ ...op, who: STANDIN }, step, watch ? "line" : "say", watch ? { option: k } : { turn, option: k });
+        (op.reply ?? []).forEach((r, j) => {
+          if (!passes(r, flags)) return;
+          if (isBeat(r)) beat(r, step, "reply", { option: k, reply: j });
+          else line(r, step, "reply", { option: k, reply: j });
+        });
       } else if (isAct(s)) {
         const a = s.act;
-        const cue = { kind: a.kind, targets: [...a.targets], ...(a.expect ? { expect: a.expect } : {}), ...(a.prompt ? { prompt: p(a.prompt.tr) } : {}),
+        const cue = { kind: a.kind, targets: [...a.targets], ...(a.expect ? { expect: a.expect } : {}), ...(a.prompt ? { prompt: p(said(a.prompt)) } : {}),
           // the learner's actor does it, the one who asked hints and shows; a drag moves `item`
           who: STANDIN, ...(a.to ? { by: a.to } : {}), ...(a.item ? { obj: a.item } : {}) } as ActCue["act"];
         const turn: Turn = { kind: "act", step, id: a.id, act: cue, ...(a.prompt ? { prompt: t3(a.prompt) } : {}), ...(a.to ? { to: a.to } : {}) };
-        push({ act: cue }, { step, kind: "act", ...(a.to ? { who: a.to } : {}), ...(a.prompt ? t3(a.prompt) : {}), turn });
+        if (!watch) push({ act: cue }, { step, kind: "act", ...(a.to ? { who: a.to } : {}), ...(a.prompt ? t3(a.prompt) : {}), turn });
         const got = picks[a.id] ?? a.expect;
         const react = !a.expect || got === a.expect ? a.react?.ok : a.react?.other;
         if (react && Object.keys(react).length) push({ beat: { react: { ...react } } }, { step, kind: "react" });
@@ -173,7 +207,7 @@ export function adaptStory(story: StoryDoc, o: AdaptOptions): StoryStage {
   for (const id of [...ids, NARRATOR]) {
     const ch = o.characters[id];
     if (ch) {
-      names[id] = p(story.names?.[id] ?? ch.name);
+      names[id] = p(story.names?.[id] ?? textOf(ch.name, main) ?? id);
       if (ch.voice && (ch.voice.rate !== undefined || ch.voice.pitch !== undefined)) voices[id] = { ...(ch.voice.rate !== undefined ? { rate: ch.voice.rate } : {}), ...(ch.voice.pitch !== undefined ? { pitch: ch.voice.pitch } : {}) } as VoiceSpec;
       if (ch.motion?.tempo !== undefined) tempo[id] = ch.motion.tempo;
       if (ch.terms?.length) terms[id] = [...ch.terms];
@@ -207,5 +241,5 @@ export function adaptStory(story: StoryDoc, o: AdaptOptions): StoryStage {
     for (const alt of alts) extra.push({ at, cues: perform({ ...defaults, [t.id]: alt }).script.cues.slice(at) });
   });
 
-  return { story, turns, defaults, perform, load: { cast, wardrobe: dressed.wardrobe, places, extra, narrator: NARRATOR, names, voices, tempo, terms } };
+  return { story, play, turns, defaults, perform, load: { cast, wardrobe: dressed.wardrobe, places, extra, narrator: NARRATOR, names, voices, tempo, terms } };
 }

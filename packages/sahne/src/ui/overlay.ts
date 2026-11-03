@@ -33,7 +33,7 @@ export interface Bubble {
   head?: [Vec3, Vec3, Vec3];
   /** "silent" draws the "…" of a line with no words; "whisper" a dashed, quieter bubble. */
   voice?: "normal" | "whisper" | "silent" | "mouthing";
-  /** Language of the text (its `lang` attribute). Default "tr". */
+  /** Language of the text (its `lang` attribute). Default the overlay's `lang`. */
   lang?: string;
   /** The speaker's display name, read by screen readers before the line ("İsmail: …"); not shown unless `remote`. */
   name?: string;
@@ -48,6 +48,9 @@ export interface OverlayOptions {
   still?: boolean;
   /** Accessible label of a sound word, in the app's language. Default `sound: <text>`. */
   soundLabel?: (text: string) => string;
+  /** The language and direction of the lines (the stage's `LangPlugin`). Default "tr", left to right. */
+  lang?: string;
+  dir?: "ltr" | "rtl";
 }
 
 export interface InsetOptions {
@@ -259,7 +262,7 @@ export class Overlay {
   private fillText(it: Item) {
     const b = it.b, silent = b.kind !== "sound" && b.voice === "silent", pop = popup(this.doc);
     if (pop.anchor && it.text.contains(pop.anchor)) pop.close();
-    glossInto(it.text, silent ? "…" : b.text, silent ? null : this.gloss, { text: b.text, who: b.who, lang: b.lang ?? "tr" });
+    glossInto(it.text, silent ? "…" : b.text, silent ? null : this.gloss, { text: b.text, who: b.who, lang: b.lang ?? this.o.lang ?? "tr" });
   }
 
   destroy() {
@@ -340,8 +343,9 @@ export class Overlay {
     }
     const shown = b.kind !== "sound" && voice === "silent" ? "…" : b.text;
     if (it.text.textContent !== shown || old?.lang !== b.lang) { this.fillText(it); resized = true; }
-    const lang = b.lang ?? "tr";
+    const lang = b.lang ?? this.o.lang ?? "tr", dir = b.lang ? "" : this.o.dir ?? "";
     if (it.text.lang !== lang) it.text.lang = lang;
+    if (it.text.dir !== dir) it.text.dir = dir;
     if (b.kind === "sound") it.root.setAttribute("aria-label", (this.o.soundLabel ?? (t => "sound: " + t))(b.text));
     if (it.sr) {
       // a remote speaker's name is shown, as a line above the text; otherwise it is only read

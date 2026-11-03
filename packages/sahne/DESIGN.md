@@ -2,7 +2,7 @@
 
 *Sahne* is Turkish for "stage". It is a reusable engine for illustrated, interactive dialogue scenes on the web: characters made of cut paper, in lit places with depth, a camera, sound, and things the learner can touch. [Kumru](https://github.com/mehrad77/kumru) uses it first, for the stories, the tutor talk and the avatar builder. Other apps can use it too.
 
-Status: **design v1, 2026-10-09; current as of 2026-10-10.** The engine build (B0–B5) is done (section 15). This replaces the SVG-rig proposal of 2026-10-08 (the Kumru repo's `docs/stories/STORIES_STAGE.md`, which now covers only how the stories use this engine). Items marked *proposed* can change during the build; items marked **Open** are undecided.
+Status: **design v1, 2026-10-09; current as of 2026-11-03.** The engine build (B0–B5) is done (section 15). This replaces the SVG-rig proposal of 2026-10-08 (the Kumru repo's `docs/stories/STORIES_STAGE.md`, which now covers only how the stories use this engine). Items marked *proposed* can change during the build; items marked **Open** are undecided.
 
 **Map** (read a section, not the file; the code side is in [README.md](README.md#where-things-are)):
 
@@ -50,20 +50,32 @@ Status: **design v1, 2026-10-09; current as of 2026-10-10.** The engine build (B
 - **Proportions.** Big heads, so faces read: adults about 1:3 head to body, elders the same with a slight stoop, children about 1:2.4, toddlers about 1:2.
 - **Faces carry the acting.** Large eyes with lids and moving pupils, brows with an inner and an outer point, a mouth that changes shape smoothly, small noses, cheeks that flush. The face is drawn fresh whenever it changes (section 6.4).
 - **Depth.** A place is a stack of paper flats at real depths: sky, far skyline, the room, set pieces, actors, props, a near edge. The camera's perspective gives true parallax. Distant layers soften slightly (depth of field).
-- **Light.** Each scene has a time of day: day, golden hour, dusk or night, plus overcast (and rain, planned). Light changes colour and strength, windows and lamps glow at night, and there is a rim light against a low sun. The art is never redrawn for the time of day.
+- **Light.** Each scene has a time of day: dawn, day, golden hour, dusk or night, plus overcast, and a weather over it (grey or rain, section 6.5). Light changes colour and strength, windows and lamps glow at night, and there is a rim light against a low sun. The art is never redrawn for the time of day.
 - **Theme.** The stage is a lit world, not UI, so it does not follow the app's light or dark theme. In the dark theme it is dimmed about 8%, and the UI around it changes.
 - **Text in the scene** (signs, labels, phone screens) is painted into the paper, in the app's fonts, so whatever stands in front covers it; an invisible HTML copy laid over it in perspective keeps it readable by screen readers (section 6.8). Sound words and speech are HTML bubbles.
 - **Style guide.** `packages/sahne-kit/STYLE.md` holds the palette, tones, edge and shadow sizes, line of action and proportions. The gallery is the visual reference.
 
 ## 4. Architecture
 
-```
-app (Kumru)                            sahne (engine)                                  sahne-kit (art)
- story steps ──adapter──▶ Script ─▶ fold() world state ─▶ Director ─▶ Timeline ─▶ Backend: paper | still | (toon3d later)
- avatar docs ───────────────────────▶ compose(avatar, kit) ─▶ Puppet ◀────────────── parts, palettes, poses, faces
- place docs  ───────────────────────▶ build(place, kit)    ─▶ Set    ◀────────────── set pieces, props, lights
- sound cues  ───────────────────────▶ Audio: synth | samples | voice ◀────────────── patches, motifs, CC0 samples
- UI ◀── events: inspect, act results ◀── Interaction: hit tests, requests
+```mermaid
+flowchart TB
+  app["<b>app</b> (Kumru)<br/>story steps · avatar docs<br/>place docs · sound cues"]
+  kit["<b>sahne-kit</b> (art)<br/>parts, palettes, poses, faces<br/>set pieces, props, lights<br/>patches, motifs, CC0 samples"]
+  subgraph engine["sahne (engine)"]
+    script["Script"] --> fold["fold(): world state"] --> director["Director"] --> timeline["Timeline"] --> backend["Backend: paper | still"]
+    puppet["Puppet<br/>compose(avatar, kit)"] --> backend
+    set["Set<br/>build(place, kit)"] --> backend
+    audio["Audio<br/>synth | samples | voice"]
+    interaction["Interaction<br/>hit tests, requests"]
+  end
+  app -- "story steps, by the adapter" --> script
+  app --> puppet & set & audio
+  kit --> puppet & set & audio
+  interaction -- "events: inspect, act results" --> ui["app UI"]
+  classDef app fill:#2F8C881F,stroke:#2F8C88
+  classDef kit fill:#D8A44026,stroke:#D8A440
+  class app,ui app
+  class kit kit
 ```
 
 ### 4.1 Packages
@@ -71,22 +83,25 @@ app (Kumru)                            sahne (engine)                           
 | Package | What it holds | Depends on |
 |---|---|---|
 | `packages/sahne` | The engine: formats (typed in TypeScript), world state, director, timeline, rig, backends, audio, interaction, the avatar model and a default builder UI | nothing |
-| `packages/sahne-kit` | The art: the body kit, parts, palettes, faces, poses and gestures, props, set pieces, sound patches, motifs, CC0 samples. A different app can ship a different kit in another style | `sahne` (types only) |
-| `packages/sahne-tr` | The Turkish plugin: mouth timing from spelling, token matching for word ↔ object links, normalising and matching speech for *say it aloud* (`normalise`, `matchLine`), and what the teaching lints read (*bu/şu/o*, numbers, clock times) | `sahne` (types only) |
-| `packages/sahne-story` | The story format's adapter (`adaptStory`: a story document becomes a script and its reply cards, the Kumru repo's `docs/stories/STORIES_STAGE.md` §3) and the story lints (`lintStory`, `suggest`, §4). Story-specific, so it lives beside the engine, not in it | `sahne` (types), `sahne-tr` |
-| `packages/sahne-gallery` | The dev site: every part, view, emotion, gesture, set, light and sound; the builder; a script player; a story played through the adapter; a performance readout | all of them |
+| `packages/sahne-kit` | The art: the body kit, parts, palettes, faces, poses and gestures, props, set pieces (in code, or drawn as data: `sahne-kit/drawing`), sound patches, motifs, CC0 samples. A different app can ship a different kit in another style | `sahne` |
+| `packages/sahne-tr` | The Turkish plugin: mouth timing from spelling, token matching for word ↔ object links, normalising and matching speech for *say it aloud* (`normalise`, `matchLine`), and what the teaching lints read (*bu/şu/o*, numbers, clock times) | `sahne` |
+| `packages/sahne-en`, `sahne-de`, `sahne-fa` | The English, German and Persian plugins, on the same contract (`LangPlugin`); Persian is written right to left | `sahne` |
+| `packages/sahne-story` | The story format's adapter (`adaptStory`: a story document becomes a script and its reply cards, the Kumru repo's `docs/stories/STORIES_STAGE.md` §3) and the story lints (`lintStory`, `suggest`, §4). Story-specific, so it lives beside the engine, not in it. A series turns on story plugins for parts not every story needs | `sahne`, the language plugins |
+| `packages/sahne-lesson` | The lesson plugin of the story format: grammar spots, target words, glosses, the quiz, learner notes and the syllabus checks, for a series that teaches a language | `sahne-story` |
+| `packages/sahne-backstage` | The editor an app runs on its content root: series, seasons and episodes played, fixed and staged in the browser, saved with the story check; a Node server beside a Preact page. Never ships | all but the gallery |
+| `packages/sahne-gallery` | The dev site: every part, view, emotion, gesture, set, light and sound; the builder; a script player; a story played through the adapter; a performance readout | all but backstage |
 
-All five are TypeScript with erasable syntax only, so Node 24 runs the tests directly (as the reader's tests do) and esbuild bundles them. The root pnpm workspace includes `packages/*` ([packages/README.md](../README.md)).
+All of them are TypeScript with erasable syntax only, so Node 24 runs the tests directly (as the reader's tests do) and esbuild bundles them. The root pnpm workspace includes `packages/*` ([packages/README.md](../README.md)).
 
 ### 4.2 Modules of the engine
 
 | Module | Holds | DOM? |
 |---|---|---|
-| `core` | Types (the formats, in `types.ts`), seeded random, maths, the kit and language-plugin contracts | no |
+| `core` | Types (the formats, in `types.ts`), seeded random, maths, the kit and language-plugin contracts, the line matcher the plugins share (`linematch.ts`, section 9) | no |
 | `script` | The script's cues and the world state after a cue | no |
-| `director` | Fills in default staging: gaze, framing, reactions, entrances; turns a cue into a timeline; `fold(script, i)` | no |
+| `director` | Fills in default staging: gaze, framing, reactions, entrances; turns a cue into a timeline; `fold(script, i)`; walks round solid lines (`route.ts`, section 7) | no |
 | `rig` | Skeletons, poses, two-bone IK, springs, the face model, lip-sync tracks | no |
-| `anim` | The clock, tweens and springs, pose layers, the timeline player (`seek`, `finish`) | no |
+| `anim` | The clock, tweens and springs, pose layers, the timeline player (`seek`, `finish`), a place's moving flats (`move.ts`) and the flats that react to people (`react.ts`, section 6.9) | no |
 | `render/paper` | The WebGL2 paper backend (section 6) | yes |
 | `render/still` | SVG output: portraits, story tiles, still frames for *Still* motion, and the fallback without WebGL2 | builds strings |
 | `audio` | The synthesizer and the sequencer (`dsp.ts`, `motif.ts`) and the speech clock (`clock.ts`), all pure; the Web Audio engine with its buses (`engine.ts`) and the voice providers (`voice.ts`). Kit recordings load through `AudioEngine.recording`; a voice provider of recorded lines loads its own clips | the engine and voices |
@@ -129,7 +144,7 @@ ui.setLang("en"); ui.setUnlocked(ids); ui.setTheme("dark"); ui.doc; ui.destroy()
 
 ## 5. Formats
 
-Every format is JSON, typed in TypeScript: avatar, place, kit and light types in `src/core/types.ts`, the script's cues in `src/script/types.ts`. The engine has no JSON schemas of its own: the schemas for the story, character and place documents, and the validator that uses them, are in `sahne-story` (`schema/`, `check/schema.ts`). Ids are permanent, as card ids are: a retired part, set piece or sound keeps its id and maps to a replacement through the kit's `aliases`.
+Every format is JSON, typed in TypeScript: avatar, place, kit and light types in `src/core/types.ts`, the script's cues in `src/script/types.ts`. The engine has no JSON schemas of its own: the schemas for the series, season, story, character and place documents and a content root's kit items (`kit-piece.json`, `kit-variant.json`: pieces drawn as data, `sahne-kit/DRAWING.md`), and the validator that uses them, are in `sahne-story` (`schema/`, `check/schema.ts`). Ids are permanent, as card ids are: a retired part, set piece or sound keeps its id and maps to a replacement through the kit's `aliases`.
 
 ### 5.1 Space
 
@@ -153,7 +168,7 @@ It describes one character: a learner's or a cast member's. It is the same docum
 ```
 
 - **Body:** `build` is `adult`, `elder`, `child` or `toddler`. `height` runs 0–1 inside the build's range. `shape` is `slim`, `average`, `broad` or `round`.
-- **Colours** are palette ids, never free hex, so every combination stays in the style. The first kit has 19 skin tones, 19 hair colours, 8 eye colours and 38 fabrics (`sahne-kit/src/palette.ts`; `sahne-kit/CATALOGUE.md` lists them), and some parts take a pattern (stripes, checks, dots, a print).
+- **Colours** are palette ids, never free hex, so every combination stays in the style. The first kit has 19 skin tones, 19 hair colours, 8 eye colours and 44 fabrics (`sahne-kit/src/palette.ts`; `sahne-kit/CATALOGUE.md` lists them), and some parts take a pattern (stripes, checks, dots, a print).
 - **Slots and rules.** Each part declares its slot and what it does to the others: `hides` (a headscarf hides the hair), `clips` (a cap keeps only the hair below its line), `replaces` (a dress replaces the top and bottom), `over` (a coat goes over the top). The builder offers only parts that fit, and `compose` enforces the same rules.
 - **Any part with any body.** There is no gender gate. Modest options are always there: headscarf styles, long sleeves, long skirts and dresses.
 - **Size:** at most 2 KB (`AVATAR_MAX_BYTES`; a host may only make it stricter). Kumru stores it as the `char` field; its Worker checks its shape, size, kit family and that it wears no cast part (Kumru's `shared/char.ts`), and `normalize` stays the boundary when it is drawn.
@@ -211,6 +226,8 @@ The type is `PlaceDoc` in `src/core/types.ts`. The example is cut from the bakka
 
 - A place is built from **set pieces**: parametric generators in the kit's set entry (`sahne-kit/set`, files in `sahne-kit/src/set/`). They come in **families** (`base`, `airport`, `metro`, `props`, …), each its own chunk: a host loads the families its story's places use (`loadSet(places)`, then `withSet(kit, loaded)` before `mountStage`); `sahne-kit/full` is the kit with every family, for the gallery, the tests and the lints. Every piece and prop, with the params it reads, its variants and the places using it, is in the generated `packages/sahne-kit/SET.md`. One generator draws every look of a thing through its params (a `chair` is a school chair, a folding one or a waiting row); its named looks are **variants** (`PieceDef.variants`), and a piece or prop picks one with `variant` (`{"kit": "chair", "variant": "folding", "n": 12}`), its own params overriding the variant's (`withVariant`). Each generator also describes itself in `PieceDef.meta` (`PieceMeta`): a line on what it draws, every param it reads with its type, values and default (`ParamSpec`), the place states it answers to and its usual card words. The engine never reads it; `SET.md` and the gallery's piece inspector are built from it, and the kit's tests hold every variant to it.
   - Families drawn for Kumru's A1 places: `street` (façades, shopfronts, lamp posts, trees), `interior` (doors that swing, the stairwell, balconies, the roof), `furniture`, `outdoor` (crowds, the sky, skylines, landmarks, the sea), `vehicles` and `metro` (the taxi's and the bus's cabin, the ferry, the tram, the platform), `food`, `paper` and `misc` (props). A vehicle's cabin has openings the view outside shows through: layers that scroll past on a running place (`life: "run"`).
+  - For Europe's towns: `transit` (buses, trains, cabs, boats), `houses` (town houses, a café terrace, a canal), `bakery` (what a bakery, café and deli sell) and `festival` (a Christmas market, a maypole, a carousel). `FAMILIES` in `sahne-kit/src/set/index.ts` lists all 29.
+  - **Drawn items.** A family can also hold pieces and props drawn as data and promoted from a story, credited to their author (`src/set/drawn/<family>/`, `sahne-kit/DRAWING.md`); a promoted item's old `x_` id is an alias of its new one.
 - A place file is small: about 2–5 KB. The art is in the kit.
 - **`site`** names the site a place is one space of: the metro's `metro_m11` and `metro_osmanbey` both have `site: "metro"`. A place that is a whole site has none. **`outdoor`** says the far band is sky, skyline or water. Each piece draws its random art from its own seed (`pieceSeed`): its `seed` if it has one (one building seen from several places), else the site (or place) with the piece's `id`, or with its kit and position. Adding, removing or reordering a piece never redraws the others, and a piece repeated in two places of one site looks the same.
 - **States** (`states`) are variations of one place: the class empty or full, the shutter down, bunting up. States in one `group` exclude each other (the class is `empty` or `full`); one without a group is a toggle (`flags`). `default` states are on when a scene starts here. A piece, mark or prop with `in: [states]` shows only while one of them is on (`placeState`, `inState` in `src/script/world.ts`). A scene's `state` turns states on beside the defaults; `env: "state:<s>"` turns one on (and the rest of its group off), `state:-<s>` off, both as a cut or, with `:fade`, a 0.4 s fade, or, with `:roll`, a 1.4 s one in which a flat with `reveal: "down"` (a roller shutter, `FlatSpec.reveal`) is not faded but drawn from its top edge down, and rolls up again when its state goes off. The same place keeps its states across scenes; a new place starts in its defaults. What another state shows leaves the explore list and the hit tests.
@@ -265,7 +282,7 @@ Some of these fields and cues are typed but not built yet; [README.md](README.md
 
 Emotions in the first kit *(proposed, 14)*: `neutral happy laugh sad surprised curious confused sorry annoyed shy tired nervous proud moved`. `nervous` is Nima's freeze; `moved` is touched to tears.
 
-Gestures in the first kit *(proposed, 40)*: the 31 of the 2026-10-08 draft (`point point_far hold_up touch look`, `wave welcome hand_heart nod cik shake_head shrug bow_head`, `me you count beckon stop think explain`, `give take eat drink write read phone type knit sit stand`), plus `clap hug photo shush shiver cheer knock sleep fly`, and `thumb_up` (the thumb's hand shape).
+Gestures in the first kit *(proposed, 40)*: the 31 of the 2026-10-08 draft (`point point_far hold_up touch look`, `wave welcome hand_heart nod cik shake_head shrug bow_head`, `me you count beckon stop think explain`, `give take eat drink write read phone type knit sit stand`), plus `clap hug photo shush shiver cheer knock sleep`, and `thumb_up` (the thumb's hand shape).
 
 ## 6. The paper backend
 
@@ -295,7 +312,7 @@ Gestures in the first kit *(proposed, 40)*: the 31 of the 2026-10-08 draft (`poi
 
 - Each piece is a quad on its bone.
 - **Arms and legs are strips skinned to two bones** (8 segments each), so elbows and knees bend smoothly. Sleeves and trouser legs are wider strips on the same bones.
-- **Hands** switch between shapes: open, relaxed, point, fist, hold, pinch, wave, thumb, and one to five fingers for counting.
+- **Hands** switch between shapes: open, relaxed, point, fist, hold, pinch, thumb, and one to five fingers for counting.
 - **Turning is a paper flip.**
   - The puppet's plane rotates about its vertical axis, and at 90° the front pieces give way to the back pieces.
   - A small turn of up to about ±30° shows the paper in perspective and stands in for a three-quarter view.
@@ -495,6 +512,7 @@ A flat may **react** to people (`FlatSpec.react`, `FlatReact`), and remember it.
 - **An act never blocks.** After two misses, the target is hinted with a gaze or a glow. After three, it is shown and the story goes on.
 - **Every act has an accessible alternative:** a list of buttons for keyboards and screen readers.
 - **Hit tests** cast a ray against piece quads and check a low-resolution alpha mask taken from the atlas, so taps on transparent corners pass through.
+- **Floor points.** `Stage.floorAt(x, y, height?)` casts the same ray against the level plane (`rayFloor`): the floor point under a CSS pixel, where an editor drops a mark (sahne-backstage). Marks themselves are not pickable.
 - **Each story week chooses its mechanics.** The engine never assumes one is on.
 
 **How it is built (B5).** The interaction layer is attached to a stage, not part of it, so the builder and the lists never load it: `interact(stage, { explore, list, focus, words })`, before `load`.
@@ -509,8 +527,9 @@ A flat may **react** to people (`FlatSpec.react`, `FlatReact`), and remember it.
 **Say it aloud** (built 2026-10-10):
 - `canListen()` is false without `SpeechRecognition` (or `webkitSpeechRecognition`), outside a secure context, offline (Chrome's recogniser is a server), and after the learner refused the microphone. The card hides its microphone then; `cannotListen()` says why.
 - `listenFor(expected, plugin, {signal, onInterim})` listens once in the plugin's `locale` (`tr-TR`) with interim results and five alternatives, stops early when the words so far already are a line, gives up after 6 s of silence or 12 s in all, and resolves `{matched, best, heard, score}` or an `error` (`no-speech`, `denied`, `network`, `aborted` …). It never rejects.
-- **The matching is the plugin's** (`matchLine` in `sahne-tr`): both sides become spoken words (Turkish lower case, numerals in words, no punctuation or fillers like *ıı* and *hmm*), then a word-level edit distance weighted by letters. It forgives a recogniser's joins and splits (*varmı*, *hoşgeldiniz*), a dot or cedilla (*mi* for *mı*), an extra word before the line, and the learner's name (any one or two words). The allowance scales with length: none in a word of three letters, one letter in a short phrase, about one in six beyond. A different word never passes: *İki ekmek ver* is not *İki ekmek, lütfen*. Every n-best alternative is tried; on a choice, the closest option within its allowance is the pick.
-- Size: 1.4 KB gzip for `sahne/listen`; the matcher adds about 2 KB to the plugin.
+- **The matching is the plugin's** (`matchLine`, built per language on `lineMatcher`; `sahne-tr` is the first): both sides become spoken words (Turkish lower case, numerals in words, no punctuation or fillers like *ıı* and *hmm*), then a word-level edit distance weighted by letters. It forgives a recogniser's joins and splits (*varmı*, *hoşgeldiniz*), a dot or cedilla (*mi* for *mı*), an extra word before the line, and the learner's name (any one or two words). The allowance scales with length: none in a word of three letters, one letter in a short phrase, about one in six beyond. A different word never passes: *İki ekmek ver* is not *İki ekmek, lütfen*. Every n-best alternative is tried; on a choice, the closest option within its allowance is the pick.
+- **The matcher is shared.** `lineMatcher({normalise, near, fillers, spellings, soft})` (`src/core/linematch.ts`, exported from `sahne`) is the language-blind part: the word-level edit distance, the joins and splits, names and the allowance. A plugin supplies `normalise(said): string[]` (its tokenising, lower case and numerals in words), `near` (letters that are nearly the same, each to the letter it folds to: Turkish `ı→i ş→s ç→c ğ→g ö→o ü→u`, German `ä→a ö→o ü→u ß→ss`, Persian the letters that sound alike `ص ث→س ط→ت ح→ه`…, English none), `soft` (letters barely said, Turkish `"ğ"`), `fillers` (a RegExp tested on one word) and `spellings` (a heard word to its usual form, possibly several words). It returns `{sayWords, normalise, letters, allowance, matchLine}`. A line of more than 40 words, heard or expected, is no match.
+- Size: 1.5 KB gzip for `sahne/listen`; the matcher adds about 2 KB to the plugin.
 
 ## 10. Avatars and the builder
 
@@ -562,12 +581,15 @@ Mid-range means a Galaxy A15/A25-class phone; low-end means Android Go with 2–
 | Item | Budget |
 |---|---|
 | Engine and Turkish plugin | ≤ 150 KB gzip (raised from 60 KB by the owner, 2026-10-10; 92.6 KB with B5's interaction and listening) |
+| Each other language plugin (`sahne-en`, `sahne-de`, `sahne-fa`), measured without the engine | ≤ 25 KB gzip (9.3, 5.7 and 7.4 KB) |
 | Kit code (parts, poses, patches, motifs) | ≤ 150 KB gzip (raised from 80 KB by the owner, 2026-10-10; batch 1 is 110 KB; 123 KB with the airport and metro sets, 106 KB once the set left it on 2026-10-13) |
-| A set family (`sahne-kit/set`), loaded when a story's places use it | ≤ 40 KB gzip each, measured without the kit code it shares; a family that outgrows it splits. The whole set is reported, not held |
+| A set family (`sahne-kit/set`), loaded when a story's places use it | ≤ 40 KB gzip each, measured without the kit code it shares; a family that outgrows it splits. The whole set is reported, not held. Drawings promoted into a family (`src/set/drawn/`) count in it, as code does; the interpreter they run through is the drawing row's |
 | Kerim's puppet (`sahne-kit/kerim`: her art, moods and gestures), loaded only by pages that cast her | ≤ 8 KB gzip |
 | The animal puppets (`sahne-kit/puppets`: Pisi and the gulls), loaded only by pages that cast them | ≤ 8 KB gzip (4.6 KB) |
+| The drawing interpreter (`sahne-kit/drawing`: pieces drawn as data), loaded by an app with content items, and by any family that takes drawn items | ≤ 8 KB gzip (3.1 KB) |
+| The lesson plugin (`sahne-lesson`), loaded by an app whose series teaches | ≤ 8 KB gzip (3.5 KB) |
 | What an app loads for its lists: `normalize` and `portrait` | ≤ 20 KB gzip (15 KB) |
-| What an app loads for its builder: `mountBuilder` with its stage | ≤ 100 KB gzip (80.3 KB; raised from 80 on 2026-10-13) |
+| What an app loads for its builder: `mountBuilder` with its stage | ≤ 100 KB gzip (93.3 KB; raised from 80 on 2026-10-13) |
 | All A1 places (28) | ≤ 100 KB gzip |
 | CC0 recordings | ≤ 1.2 MB in all, ≤ 80 KB each |
 | A portrait at list size (96 px), p90 of random characters | head ≤ 9 KB, bust ≤ 12 KB, whole figure ≤ 22 KB (kit batch 1: medians 7.6, 10.2 and 18.7 KB) |
@@ -595,13 +617,13 @@ The code budgets are measured by `node packages/sahne-gallery/size.mjs` (part of
 ## 14. Testing and review
 
 - **Node tests** cover the pure modules: `fold`, the director's defaults, the timeline, IK, springs, the schemas, `compose` and its slot rules, and the Turkish mouth timing.
-- **Golden frames** (`packages/sahne-gallery/golden.mjs`, baselines in `golden/<platform>/`: `darwin` for a Mac, `linux` for CI, as the two draw a few percent of pixels differently). Headless Chromium with software GL shoots fixed scenes of the gallery: five cues of s1e01 at their end pose and the bakkal's contact sheet. Each is compared pixel by pixel with its baseline: a pixel differs when a colour channel is off by more than 24, a scene fails above 0.4 % differing pixels, and a failure writes `golden/failed/` (the shot and a red diff). `pnpm sahne golden:update` rewrites this machine's baselines (`--only <name>` for some); the Linux ones are the CI artifact's shots (a missing baseline uploads its shot), or, when the artifact cannot be uploaded, shot in an x86_64 `node:24` container with `fonts-comic-neue` installed, as CI installs it (the signs' handwriting font; without it Linux falls back to whatever `cursive` maps to). Fonts and Chromium builds differ between machines, hence the tolerance; baselines are regenerated only on a deliberate look change. *Planned:* every part × view, emotion, gesture, light preset and place, as the run time allows (now about 15 s).
+- **Golden frames** (`packages/sahne-gallery/golden.mjs`, baselines in `golden/<platform>/`: `darwin` for a Mac, `linux` for CI, as the two draw a few percent of pixels differently). Headless Chromium with software GL shoots fixed scenes of the gallery: five cues of the sample story s1e00 at their end pose and the bakkal's contact sheet. Each is compared pixel by pixel with its baseline: a pixel differs when a colour channel is off by more than 24, a scene fails above 0.4 % differing pixels, and a failure writes `golden/failed/` (the shot and a red diff). `pnpm sahne golden:update` rewrites this machine's baselines (`--only <name>` for some); the Linux ones are the CI artifact's shots (a missing baseline uploads its shot), or, when the artifact cannot be uploaded, shot in an x86_64 `node:24` container with `fonts-comic-neue` installed, as CI installs it (the signs' handwriting font; without it Linux falls back to whatever `cursive` maps to). Fonts and Chromium builds differ between machines, hence the tolerance; baselines are regenerated only on a deliberate look change. *Planned:* every part × view, emotion, gesture, light preset and place, as the run time allows (now about 15 s).
 - **Determinism.** `determinism.mjs` bundles every package twice, in separate processes, minified or not with source maps, and fails unless the outputs are byte-identical.
 - **The art loop.**
   - The agent renders contact sheets in the Browser pane and checks them against `STYLE.md`: a distinct silhouette at 48 px, colours apart from others in the same scenes, faces readable at phone framing, the edge and shadow consistent.
   - The owner approves each set of parts once, not story by story.
 - **Performance.** The gallery has a readout (frame time, draw calls, texture memory, atlas build time) and a 6× CPU throttle run in Chrome.
-- **`pnpm sahne check`** runs the types, every package's Node tests (the kit manifest among them: every id unique, every part renders at every build and shape without errors) the bundle sizes against the budget (`size.mjs`), the determinism of the bundles, the story check and the golden frames. It runs in the root `pnpm check` and in CI (the `sahne` job).
+- **`pnpm sahne check`** runs the types, the brand files' `--check`, the bundle sizes against the budget (`size.mjs`), the determinism of the bundles, the story, extras and languages checks, every package's Node tests (the kit manifest among them: every id unique, every part renders at every build and shape without errors) and the golden frames. It runs in the root `pnpm check` and in CI (the `check` job).
 
 ## 15. Milestones
 

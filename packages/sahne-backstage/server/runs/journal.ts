@@ -1,0 +1,130 @@
+// What a run wrote, so it can be undone (Node only): every save a run's step made, in order, each document's file text
+// before it (none when the save created it) and a hash of the text it left. Undoing works document by document: from the
+// run's newest write of it back through the writes being undone, as long as the file still holds what the newest left; it
+// then gets the text from before the earliest of them (or goes, if the run created it). A document written after that (by
+// a person, or by a step that is not being undone) is kept and said, so a shared one (a season several steps added rows
+// to) comes back exactly as it was before the undone steps. A save by someone else between two of the run's writes (the
+// later write found a text the earlier did not leave) ends the walk there: the undo goes back to what they saved, and says
+// so. In the run store (store.ts).
+
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
+import { fileOf, forget, listing, usesOf, type Before, type Kind } from "../content.ts";
+import type { Store } from "./store.ts";
+import { writeAtomic } from "../../../sahne-story/json.ts";
+
+export interface Written { seq: number; run: string; step: string; kind: Kind; id: string; before: string | null; after: number; hash: string | null; at: number }
+/** A write undo kept, and why: its document changed after the run, or between the run's writes of it. */
+export type Kept = Written & { why: string };
+export interface Undone { kind: Kind; id: string; removed: boolean; mtime?: number }
+/** One write of a run, as a person reads it in its history. */
+export interface Did { step: string; kind: Kind; id: string; created: boolean; at: number }
+/** A document a run wrote, as a person sees it: who made it (its first step), whether the run created it, still there. */
+export interface Made { kind: Kind; id: string; step: string; created: boolean; steps: string[] }
+
+const hashOf = (text: string | null) => (text === null ? null : createHash("sha1").update(text).digest("hex"));
+const textAt = (u: URL) => (existsSync(u) ? readFileSync(u, "utf8") : null);
+
+export class Journal {
+  private readonly store: Store;
+  constructor(store: Store) {
+    this.store = store;
+    store.db.exec("CREATE TABLE IF NOT EXISTS journal (seq INTEGER PRIMARY KEY AUTOINCREMENT, run TEXT NOT NULL, step TEXT NOT NULL, kind TEXT NOT NULL, id TEXT NOT NULL, before TEXT, after REAL NOT NULL, at INTEGER NOT NULL)");
+    try { store.db.exec("ALTER TABLE journal ADD COLUMN hash TEXT"); } catch { /* there already */ }
+  }
+
+  /** A step's save: each document's text before it, and what it left (read back at once). */
+  record(run: string, step: string, before: Before[], saved: Record<string, number>): void {
+    const put = this.store.db.prepare("INSERT INTO journal (run, step, kind, id, before, after, hash, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+    for (const b of before) {
+      const mtime = saved[`${b.kind}:${b.id}`];
+      if (mtime !== undefined) put.run(run, step, b.kind, b.id, b.text, mtime, hashOf(textAt(fileOf(b.kind, b.id))), Date.now());
+    }
+  }
+
+  /** A document's text before a run first wrote it (null: the run created it), and now (null: gone): what it changed. */
+  before(run: string, kind: Kind, id: string): { before: string | null; now: string | null } | null {
+    const first = this.of(run).find(w => w.kind === kind && w.id === id);
+    return first ? { before: first.before, now: textAt(fileOf(kind, id)) } : null;
+  }
+
+  /** Every write of a run still in effect, oldest first. */
+  of(run: string): Written[] {
+    return this.store.db.prepare("SELECT seq, run, step, kind, id, before, after, hash, at FROM journal WHERE run = ? ORDER BY seq").all(run) as unknown as Written[];
+  }
+
+  /** The documents a run wrote (still undoable): the step that first wrote each, and whether the run created it. */
+  made(run: string): Made[] {
+    const out = new Map<string, Made>();
+    for (const w of this.of(run)) {
+      const k = `${w.kind}:${w.id}`, m = out.get(k);
+      if (!m) out.set(k, { kind: w.kind, id: w.id, step: w.step, created: w.before === null, steps: [w.step] });
+      else if (!m.steps.includes(w.step)) m.steps.push(w.step);
+    }
+    return [...out.values()];
+  }
+
+  /** What a run did, write by write, oldest first: which step wrote which document, whether it created it, and when. */
+  history(run: string): Did[] {
+    return this.of(run).map(w => ({ step: w.step, kind: w.kind, id: w.id, created: w.before === null, at: w.at }));
+  }
+
+  /**
+   * Take these writes back, document by document. What came back, and the writes kept: their document changed since, or
+   * it is one the run created that a document this undo leaves names (an episode that casts the character, a place that
+   * stands the drawn piece), which would break without it.
+   */
+  undo(run: string, which: Written[]): { undone: Undone[]; kept: Kept[] } {
+    const chosen = new Set(which.map(w => w.seq)), all = this.of(run), undone: Undone[] = [], kept: Kept[] = [];
+    forget();
+    // first each document's chain of writes to take back, then the ones that would go checked against what stays
+    const plans: { u: URL; chain: Written[] }[] = [];
+    for (const key of [...new Set(which.map(w => `${w.kind}:${w.id}`))]) {
+      const rows = all.filter(w => `${w.kind}:${w.id}` === key).reverse(), top = rows[0];
+      const u = fileOf(top.kind, top.id), now = textAt(u);
+      // the file must still be as the run's newest write left it (an older row has no hash: its mtime says)
+      const same = top.hash !== null ? hashOf(now) === top.hash : now !== null && Math.abs(statSync(u).mtimeMs - top.after) < 1;
+      const chain: Written[] = [];
+      let between = false;
+      if (same) for (const w of rows) {
+        if (!chosen.has(w.seq)) break;
+        // someone saved it between this write and the run's next one (the next found a text this one did not leave):
+        // what they saved is kept, so the undo goes back only to it
+        const next = chain.at(-1);
+        if (next && w.hash !== null && hashOf(next.before) !== w.hash) { between = true; break; }
+        chain.push(w);
+      }
+      const why = !same ? "it changed after the task" : between ? "someone saved it between the task's writes, and that is kept" : "a step not being undone wrote it after";
+      kept.push(...rows.filter(w => chosen.has(w.seq) && !chain.includes(w)).map(w => ({ ...w, why })));
+      if (chain.length) plans.push({ u, chain });
+    }
+    // a document that would go while one that stays names it stays too, and so on (a kept place keeps the piece it stands)
+    const keyOf = (w: Written) => `${w.kind}:${w.id}`, going = new Set(plans.map(p => keyOf(p.chain[0]))), held = new Map<string, string[]>();
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const { chain } of plans) {
+        const first = chain[chain.length - 1], k = keyOf(first);
+        if (!going.has(k) || first.before !== null) continue;
+        const users = usersOf(first.kind, first.id).filter(d => !going.has(d));
+        if (users.length) { going.delete(k); held.set(k, users); grew = true; }
+      }
+    }
+    for (const { u, chain } of plans) {
+      const first = chain[chain.length - 1], users = held.get(keyOf(first));
+      if (users) { kept.push(...chain.map(w => ({ ...w, why: `${users.map(d => d.split(":")[1]).join(", ")} ${users.length > 1 ? "use" : "uses"} it: take it out of ${users.length > 1 ? "them" : "it"} first` }))); continue; }
+      if (first.before === null) { rmSync(u); undone.push({ kind: first.kind, id: first.id, removed: true }); }
+      else undone.push({ kind: first.kind, id: first.id, removed: false, mtime: writeAtomic(u, first.before) });
+      const del = this.store.db.prepare("DELETE FROM journal WHERE seq = ?");
+      for (const w of chain) del.run(w.seq);
+    }
+    if (undone.length) forget();
+    return { undone, kept };
+  }
+}
+
+/** The documents (`kind:id`) that name a character, a place or a drawn piece, as a save would check them. */
+function usersOf(kind: Kind, id: string): string[] {
+  if (kind === "character" || kind === "place") return usesOf(kind, id).map(x => `story:${x.story}`);
+  if (kind === "kit_piece") return Object.entries(listing().places).filter(([, p]) => JSON.stringify(p).includes(JSON.stringify(id))).map(([pid]) => `place:${pid}`);
+  return [];
+}

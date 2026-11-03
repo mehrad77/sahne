@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sahne-story/kit-variant.json",
+  "title": "A named param set added to a generator of the kit (kit/variants/<of>.<name>.json): sahne-kit/DRAWING.md describes the format",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["of", "name", "params"],
+  "properties": {
+    "of": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "name": { "type": "string", "pattern": "^x_[a-z0-9_]+$", "maxLength": 48 },
+    "params": { "type": "object", "minProperties": 1 }
+  }
+}

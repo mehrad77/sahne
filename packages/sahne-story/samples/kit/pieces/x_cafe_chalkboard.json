@@ -1,0 +1,213 @@
+{
+  "id": "x_cafe_chalkboard",
+  "as": "prop",
+  "about": "A chalkboard menu in a wooden frame, on a standing easel or hung on a wall, its words in chalk.",
+  "tags": [
+    "cafe",
+    "food",
+    "sign"
+  ],
+  "terms": [],
+  "params": {
+    "color": {
+      "type": "color",
+      "default": "#2F3B35",
+      "about": "the slate"
+    },
+    "label": {
+      "type": "text",
+      "default": "Croissant 1,40\nBaguette 1,10\nCafé crème 2,50",
+      "about": "the lines under the heading, one a line"
+    },
+    "kind": {
+      "type": "enum",
+      "values": [
+        "easel",
+        "wall"
+      ],
+      "default": "easel",
+      "about": "on an easel, or hung on a wall"
+    },
+    "title": {
+      "type": "text",
+      "default": "Menu du jour",
+      "about": "the heading, over a chalk rule"
+    }
+  },
+  "kinds": {
+    "easel": {
+      "size": [
+        64,
+        110
+      ],
+      "ppcm": 8,
+      "grip": [
+        0,
+        -60
+      ],
+      "flats": [
+        {
+          "shapes": [
+            {
+              "d": "M-27 -36L-33 0H-28L-22 -36Z",
+              "fill": "#7A5232"
+            },
+            {
+              "d": "M27 -36L33 0H28L22 -36Z",
+              "fill": "#7A5232"
+            },
+            {
+              "d": "M-31 -14H31V-10H-31Z",
+              "fill": "#7A5232"
+            },
+            {
+              "d": "M-26 -106H26V-28H-26Z",
+              "fill": "#A8714A"
+            },
+            {
+              "d": "M-22 -102H22V-32H-22Z",
+              "fill": "$color"
+            },
+            {
+              "d": "M-26 -30H26V-26H-26Z",
+              "fill": {
+                "tone": "#A8714A",
+                "step": "deep"
+              }
+            },
+            {
+              "d": "M-17 -86H17M-13 -84.5H13",
+              "stroke": {
+                "color": "#F4F0E6",
+                "width": 0.7,
+                "cap": "round"
+              },
+              "flat": true,
+              "opacity": 0.85
+            },
+            {
+              "d": "M-5 -45H4L3 -38C2 -37 -4 -37 -5 -38ZM4 -43C7 -43 7 -39 3.5 -39M-2 -48C-3 -49.5 -1 -50 -2 -52M1 -48C0 -49.5 2 -50 1 -52",
+              "stroke": {
+                "color": "#F4F0E6",
+                "width": 0.5,
+                "cap": "round"
+              },
+              "flat": true,
+              "opacity": 0.7
+            }
+          ],
+          "text": [
+            {
+              "text": "$title",
+              "x": -19,
+              "y": -99,
+              "w": 38,
+              "h": 12,
+              "font": "hand",
+              "size": 5,
+              "color": "#F4F0E6",
+              "align": "center",
+              "lang": "fr"
+            },
+            {
+              "text": "$label",
+              "x": -19,
+              "y": -82,
+              "w": 38,
+              "h": 32,
+              "font": "hand",
+              "size": 4.2,
+              "color": "#F4F0E6",
+              "align": "center",
+              "lang": "fr"
+            }
+          ],
+          "glow": [],
+          "sway": null,
+          "shadow": "drop"
+        }
+      ]
+    },
+    "wall": {
+      "size": [
+        84,
+        72
+      ],
+      "ppcm": 8,
+      "grip": [
+        0,
+        -30
+      ],
+      "flats": [
+        {
+          "shapes": [
+            {
+              "d": "M-18 -58L0 -70L18 -58",
+              "stroke": {
+                "color": "#8C7A5A",
+                "width": 0.8,
+                "cap": "round"
+              }
+            },
+            {
+              "d": "M-42 0H42V-58H-42Z",
+              "fill": "#A8714A"
+            },
+            {
+              "d": "M-38 -4H38V-54H-38Z",
+              "fill": "$color"
+            },
+            {
+              "d": "M-26 -42H26M-20 -40.5H20",
+              "stroke": {
+                "color": "#F4F0E6",
+                "width": 0.7,
+                "cap": "round"
+              },
+              "flat": true,
+              "opacity": 0.85
+            }
+          ],
+          "text": [
+            {
+              "text": "$title",
+              "x": -34,
+              "y": -53,
+              "w": 68,
+              "h": 10,
+              "font": "hand",
+              "size": 5.2,
+              "color": "#F4F0E6",
+              "align": "center",
+              "lang": "fr"
+            },
+            {
+              "text": "$label",
+              "x": -34,
+              "y": -38,
+              "w": 68,
+              "h": 32,
+              "font": "hand",
+              "size": 5,
+              "color": "#F4F0E6",
+              "align": "center",
+              "lang": "fr"
+            }
+          ],
+          "glow": [],
+          "sway": null,
+          "shadow": "drop"
+        }
+      ]
+    }
+  },
+  "repeat": {
+    "gap": 6
+  },
+  "variants": {
+    "wall": {
+      "kind": "wall"
+    }
+  },
+  "solid": null
+}

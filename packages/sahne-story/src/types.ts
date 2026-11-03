@@ -2,6 +2,7 @@
 // Fields the stage never reads (quiz, summary, album …) are kept loose.
 
 import type { AvatarDoc, Look, PlaceDoc, PropRef, Staging } from "sahne";
+import type { Languages, LangText } from "./texts.ts";
 
 /** The staging a story writes: everything but `costume`, which the adapter derives from `looks`. */
 export type StoryStaging = Omit<Staging, "costume">;
@@ -11,7 +12,11 @@ export type LookRef = string | Look;
 /** Character id → change of clothes. Only on the story, a scene, a line or a beat (never inside a choice or an act). */
 export type Looks = Record<string, LookRef>;
 
-/** Turkish, English and Persian. Only `tr` ever reaches the stage. */
+/**
+ * A step's texts, by language code, flat beside its other keys (src/texts.ts): the series' main language and its
+ * translations. Only the main language ever reaches the stage. `tr`, `en` and `fa` are named for the roots written
+ * before series named their languages. Another language's key is read with `textIn(step, lang)`.
+ */
 export interface Text3 { tr: string; en?: string; fa?: string }
 
 /** `if` / `unless`: a callback to a flag an earlier story set (§4.7). */
@@ -23,8 +28,6 @@ export interface LineStep extends StoryStaging, Text3, Gate {
   /** Changes of clothes as the line starts (a coat coming off). */
   looks?: Looks;
   narr?: true;
-  note?: { en?: string; fa?: string };
-  mistake?: { fix: string };
   /** `frame: "past_inset"`: the scene it pictures. */
   of?: { story: string; step: number };
 }
@@ -46,10 +49,6 @@ export interface SceneStep extends Gate {
   looks?: Looks;
 }
 
-export interface SpotStep extends Gate {
-  spot: StoryStaging & { lesson: string; ex: string; en?: string; fa?: string; tr?: string; show?: string };
-}
-
 export interface ChoiceOption extends StoryStaging, Text3 {
   ok?: boolean;
   tone?: "polite" | "warm" | "formal" | "casual" | "blunt" | "rude";
@@ -60,7 +59,8 @@ export interface ChoiceOption extends StoryStaging, Text3 {
 }
 
 export interface ChoiceStep extends Gate {
-  choice: { id: string; kind?: "polite" | "meaning" | "action"; to?: string; options: ChoiceOption[] };
+  /** `kind`: polite or action in the core; a plugin may add its own (the lesson plugin's "meaning"). */
+  choice: { id: string; kind?: "polite" | "action" | (string & {}); to?: string; options: ChoiceOption[] };
 }
 
 export interface ActStep extends Gate {
@@ -88,27 +88,24 @@ export interface StoryProp { kit: string; at: PropAt | Record<string, PropAt>; n
 
 export type ReactValue =NonNullable<Staging["react"]>[string];
 
-export type Step = LineStep | BeatStep | SceneStep | SpotStep | ChoiceStep | ActStep;
+/** A step of the core format. A story plugin adds its own kinds (src/plugin.ts), read as plain objects. */
+export type Step = LineStep | BeatStep | SceneStep | ChoiceStep | ActStep;
 
 export interface Arc { id: string; tr: string; en?: string; fa?: string; mechanics: ("say" | "explore" | "act" | "aloud" | "unlocks")[] }
 
+/** A story document of the core format. A plugin's fields (the lesson plugin's `level`, `words`, `quiz` …) are read loosely, through the index signature. */
 export interface StoryDoc {
   id: string;
   releaseDate?: string;
   kind?: "episode" | "special";
-  level?: string;
   season?: number;
   arc?: Arc;
-  ref?: string;
-  title: string;
-  titleEn?: string;
-  titleFa?: string;
+  /** The title in every language of the series. */
+  title: LangText;
+  summary?: LangText;
   place: string;
   cast: string[];
   extras?: string[];
-  lessons?: string[];
-  words?: string[];
-  gl?: Record<string, [string, string]>;
   /** Story-only props, added to the places their `at` names (src/props.ts). */
   props?: Record<string, StoryProp>;
   /** What the cast wears from the start (§5.2). */
@@ -117,14 +114,56 @@ export interface StoryDoc {
   names?: Record<string, string>;
   steps: Step[];
   draft?: true;
+  /** How it plays (src/play.ts): `watch` on time alone, with no cards, choices or acts; the series' default without it. */
+  play?: "interactive" | "watch";
   [k: string]: unknown;
 }
+
+/** The series: the one story world of a content root (`series.json`, schema/series.json). Its episodes are the story documents. */
+export interface SeriesDoc {
+  v: 1;
+  id: string;
+  title: LangText;
+  summary?: LangText;
+  /** The main language and its translations (src/texts.ts); without it, Turkish with English and Persian. */
+  languages?: Languages;
+  /** The narrator's and the stand-in's character ids (the stage casts `NARRATOR` and `STANDIN`). */
+  narrator: string;
+  standin: string;
+  /** The story plugins the series turns on, by id (src/plugin.ts): `["lesson"]`. A host passes the plugins it has. */
+  plugins?: string[];
+  /** How its episodes play unless one says otherwise (src/play.ts): interactive without it. */
+  play?: "interactive" | "watch";
+}
+
+/** One release of an episode: its date, whether it is a weekday episode or a Saturday special, and its week. */
+export interface CalendarRow { date: string; kind: "episode" | "special"; week: number }
+
+/** A season of the series (`seasons/s<n>.json`, schema/season.json): its episodes are the stories `s<n>eNN`. No level. */
+export interface SeasonDoc {
+  v: 1;
+  id: string;
+  n: number;
+  title: LangText;
+  summary?: LangText;
+  /** The first release day of the season. */
+  launch?: string;
+  /** Each week's arc, by arc id (`s<n>wNN`): every story of the week carries the same `arc`. */
+  arcs?: Record<string, Omit<Arc, "id">>;
+  /** The release calendar, by story id: the source of truth for each story's `releaseDate` and `kind`. */
+  calendar?: Record<string, CalendarRow>;
+}
+
+/** The season a story id belongs to (`s12e03` → 12), or 0 for an id that is not one. */
+export const seasonOf = (id: string): number => Number(/^s([1-9][0-9]?)e[0-9]{2}$/.exec(id)?.[1] ?? 0);
 
 /** The character document (§5): what the stage reads of it. */
 export interface CharacterDoc {
   id: string;
-  name: string;
-  nameFa?: string;
+  /** The name in each language (the main language's is the one the stage shows). */
+  name: LangText;
+  role?: LangText;
+  bio?: LangText;
   kind: "narrator" | "standin" | "cast" | "extra";
   color?: string;
   avatar?: AvatarDoc;
@@ -142,7 +181,6 @@ export interface CharacterDoc {
 export const isLine = (s: Step): s is LineStep => "who" in s;
 export const isBeat = (s: Step): s is BeatStep => "beat" in s;
 export const isScene = (s: Step): s is SceneStep => "scene" in s;
-export const isSpot = (s: Step): s is SpotStep => "spot" in s;
 export const isChoice = (s: Step): s is ChoiceStep => "choice" in s;
 export const isAct = (s: Step): s is ActStep => "act" in s;
 
@@ -152,13 +190,13 @@ export const STANDIN = "nima";
 export const NARRATOR = "kerim";
 
 /**
- * A place document as Kumru keeps it (Kumru's STORIES_SCHEMA.md §6): a Sahne place with its name in three
- * languages and its district. `placeholder` marks a draft whose art stands in for the real thing: the
+ * A place document as Kumru keeps it (Kumru's STORIES_SCHEMA.md §6): a Sahne place with its name in each of the
+ * series' languages and its district. `placeholder` marks a draft whose art stands in for the real thing: the
  * place lints only warn on it.
  */
 export interface StoryPlace extends PlaceDoc {
-  /** Every place is named in all three languages (only `tr` reaches the stage). */
-  name: { tr: string; en: string; fa: string };
+  /** The place's name in each language of the series (only the main language's reaches the stage). */
+  name: LangText;
   district?: string;
   placeholder?: string;
   props?: Record<string, StoryPlaceProp>;

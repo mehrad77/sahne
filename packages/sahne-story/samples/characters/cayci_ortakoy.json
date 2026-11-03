@@ -59,18 +59,24 @@
       }
     }
   },
-  "bio": "Carries tea on a tray along the shore and calls 'Çay, çay!'",
-  "bioFa": "چای را در سینی کنارِ ساحل می‌چرخاند و صدا می‌زند «چای، چای!»",
+  "bio": {
+    "en": "Carries tea on a tray along the shore and calls 'Çay, çay!'",
+    "fa": "چای را در سینی کنارِ ساحل می‌چرخاند و صدا می‌زند «چای، چای!»"
+  },
   "color": "#8A8580",
   "id": "cayci_ortakoy",
   "kind": "extra",
   "level": "A1",
-  "name": "Çaycı",
-  "nameFa": "چای‌فروش",
+  "name": {
+    "fa": "چای‌فروش",
+    "tr": "Çaycı"
+  },
   "order": 102,
   "places": [
     "ortakoy"
   ],
-  "role": "The çaycı on the Ortaköy shore",
-  "roleFa": "چای‌فروشِ ساحلِ اورتاکوی"
+  "role": {
+    "en": "The çaycı on the Ortaköy shore",
+    "fa": "چای‌فروشِ ساحلِ اورتاکوی"
+  }
 }

@@ -9,7 +9,7 @@ import { K_HEAD_VB, K_BUST, K_HEAD } from "sahne-kit/kerim/art";
 import { $, bar, button, slider } from "../shell/dom.ts";
 import type { Ctx } from "../shell/ctx.ts";
 import { BAKKAL, ISMAIL, NIMA, VOICES } from "../bakkal.ts";
-import { kerimPortrait, kerimOnTalk } from "../kerim.ts";
+import { kerimPortrait, kerimOnTalk } from "sahne-kit/kerim/portrait";
 import { bench, BENCH_STREET, BENCH_SHORE } from "./bench.ts";
 
 const BUSES: Bus[] = ["voice", "fx", "ambience", "music"];

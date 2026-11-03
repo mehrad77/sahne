@@ -1,0 +1,121 @@
+{
+  "id": "x_bread_basket",
+  "as": "prop",
+  "about": "A wicker basket of baguettes, three standing out of it, for a baker's counter.",
+  "tags": [
+    "food",
+    "bakery",
+    "bread"
+  ],
+  "terms": [],
+  "params": {
+    "color": {
+      "type": "color",
+      "default": "#B98A4E",
+      "about": "the wicker"
+    }
+  },
+  "kinds": {
+    "main": {
+      "size": [
+        38,
+        44
+      ],
+      "ppcm": 10,
+      "grip": [
+        0,
+        -8
+      ],
+      "flats": [
+        {
+          "shapes": [
+            {
+              "d": "M-11 -15L-17 -36C-17.9 -38.9 -13.6 -40.2 -12.6 -37.4L-6 -15Z",
+              "fill": "#D69B45"
+            },
+            {
+              "d": "M-14.6 -33L-12.2 -32.2M-13.4 -28.4L-11 -27.6M-12.2 -23.8L-9.8 -23",
+              "stroke": {
+                "color": "#F2CE8A",
+                "width": 0.7,
+                "cap": "round"
+              },
+              "flat": true,
+              "opacity": 0.9
+            },
+            {
+              "d": "M-2.5 -15L-2 -41C-2 -43.6 2.4 -43.6 2.4 -41L2.5 -15Z",
+              "fill": "#D69B45"
+            },
+            {
+              "d": "M-0.8 -37L1.4 -37.6M-0.8 -32L1.4 -32.6M-0.6 -27L1.6 -27.6",
+              "stroke": {
+                "color": "#F2CE8A",
+                "width": 0.7,
+                "cap": "round"
+              },
+              "flat": true,
+              "opacity": 0.9
+            },
+            {
+              "d": "M6 -15L12.6 -37C13.4 -39.8 17.8 -38.6 16.8 -35.8L10 -15Z",
+              "fill": "#D69B45"
+            },
+            {
+              "d": "M12 -33L14.4 -33.8M10.6 -28.4L13 -29.2M9.4 -23.8L11.8 -24.6",
+              "stroke": {
+                "color": "#F2CE8A",
+                "width": 0.7,
+                "cap": "round"
+              },
+              "flat": true,
+              "opacity": 0.9
+            },
+            {
+              "d": "M-18 -16H18L14.5 0H-14.5Z",
+              "fill": "$color"
+            },
+            {
+              "d": "M-17 -12H17M-16 -8H16M-15 -4H15",
+              "stroke": {
+                "color": {
+                  "tone": "$color",
+                  "step": "shade"
+                },
+                "width": 0.8
+              },
+              "opacity": 0.9
+            },
+            {
+              "d": "M-12 -16L-11 0M-6 -16V0M0 -16V0M6 -16V0M12 -16L11 0",
+              "stroke": {
+                "color": {
+                  "tone": "$color",
+                  "step": "light"
+                },
+                "width": 0.8
+              },
+              "opacity": 0.8
+            },
+            {
+              "d": "M-19 -19H19V-15H-19Z",
+              "fill": {
+                "tone": "$color",
+                "step": "shade"
+              }
+            }
+          ],
+          "text": [],
+          "glow": [],
+          "sway": null,
+          "shadow": "drop"
+        }
+      ]
+    }
+  },
+  "repeat": {
+    "gap": 6
+  },
+  "variants": {},
+  "solid": null
+}

@@ -1,9 +1,9 @@
-// The story check's word resolver (check/words.ts): a token of a story's text resolves when it is a
+// The story check's word resolver (src/langs/tr-words.ts): a token of a story's text resolves when it is a
 // dictionary entry or a form of one, a number or a particle.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolver, words } from "../check/words.ts";
+import { resolver, words } from "../src/langs/tr-words.ts";
 
 test("an inflected form of an entry resolves; the entry does not resolve from its inflected forms", () => {
   const r = resolver(["fırın", "masa", "ev", "kitap"]);

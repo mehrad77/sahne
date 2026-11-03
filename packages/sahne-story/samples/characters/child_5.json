@@ -36,18 +36,24 @@
     "skin": "skin_04",
     "v": 1
   },
-  "bio": "One of the row of kindergarten children who sing on the park stage.",
-  "bioFa": "یکی از بچه‌های مهدکودک که در ردیفِ روی صحنه‌ی پارک آواز می‌خوانند.",
+  "bio": {
+    "en": "One of the row of kindergarten children who sing on the park stage.",
+    "fa": "یکی از بچه‌های مهدکودک که در ردیفِ روی صحنه‌ی پارک آواز می‌خوانند."
+  },
   "color": "#8A8580",
   "id": "child_5",
   "kind": "extra",
   "level": "A1",
-  "name": "Çocuk",
-  "nameFa": "بچه",
+  "name": {
+    "fa": "بچه",
+    "tr": "Çocuk"
+  },
   "order": 113,
   "places": [
     "park_ferikoy"
   ],
-  "role": "A kindergarten child at the park show",
-  "roleFa": "بچه‌ی مهدکودک در جشنِ پارک"
+  "role": {
+    "en": "A kindergarten child at the park show",
+    "fa": "بچه‌ی مهدکودک در جشنِ پارک"
+  }
 }

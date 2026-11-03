@@ -58,18 +58,24 @@
       }
     }
   },
-  "bio": "Calls 'Gel abla gel!' over his tomatoes.",
-  "bioFa": "پشتِ گوجه‌هایش صدا می‌زند «بیا خواهر، بیا!»",
+  "bio": {
+    "en": "Calls 'Gel abla gel!' over his tomatoes.",
+    "fa": "پشتِ گوجه‌هایش صدا می‌زند «بیا خواهر، بیا!»"
+  },
   "color": "#8A8580",
   "id": "stallholder_1",
   "kind": "extra",
   "level": "A1",
-  "name": "Pazarcı",
-  "nameFa": "فروشنده‌ی بازار",
+  "name": {
+    "fa": "فروشنده‌ی بازار",
+    "tr": "Pazarcı"
+  },
   "order": 117,
   "places": [
     "pazar_ferikoy"
   ],
-  "role": "A stallholder at the Feriköy Saturday market",
-  "roleFa": "فروشنده‌ای در بازارِ شنبه‌های فری‌کؤی"
+  "role": {
+    "en": "A stallholder at the Feriköy Saturday market",
+    "fa": "فروشنده‌ای در بازارِ شنبه‌های فری‌کؤی"
+  }
 }

@@ -26,6 +26,12 @@ The kit's art is code: the shapes, colours, poses and sounds it draws and plays.
 - the pictures made from them in this repository: the golden frames
   (packages/sahne-gallery/golden/), apart from what they show of the reserved
   works.
+- the drawings promoted into the kit from stories (packages/sahne-kit/src/set/drawn/).
+  Each was released by its author under CC BY 4.0, who said it is their own
+  work, not traced or copied; the author, a contact and the date are in the
+  drawing's "credit", in packages/sahne-kit/src/set/drawn/CREDITS.json and in
+  the Credits section of packages/sahne-kit/SET.md. Credit them where the
+  medium allows, beside "Sahne kit art by Mehrad Rousta".
 
 The build scripts and tests that sit beside the art (packages/sahne-kit/*/build.ts,
 packages/sahne-kit/test/) and the rest of the repository are code under the MIT

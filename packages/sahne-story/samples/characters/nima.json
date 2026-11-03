@@ -41,17 +41,23 @@
     "skin": "skin_04",
     "v": 1
   },
-  "bio": "New in Istanbul, learning Turkish.",
-  "bioFa": "تازه به استانبول آمده و ترکی یاد می‌گیرد.",
+  "bio": {
+    "en": "New in Istanbul, learning Turkish.",
+    "fa": "تازه به استانبول آمده و ترکی یاد می‌گیرد."
+  },
   "color": "#2F8C88",
   "id": "nima",
   "kind": "standin",
   "level": "A1",
-  "name": "Nima",
-  "nameFa": "نیما",
+  "name": {
+    "tr": "Nima",
+    "fa": "نیما"
+  },
   "order": 2,
-  "role": "The newcomer: the learner",
-  "roleFa": "تازه‌وارد: خودِ زبان‌آموز",
+  "role": {
+    "en": "The newcomer: the learner",
+    "fa": "تازه‌وارد: خودِ زبان‌آموز"
+  },
   "voice": {
     "pitch": 1.05,
     "rate": 1

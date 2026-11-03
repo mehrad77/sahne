@@ -8,24 +8,27 @@ import type { AvatarDoc, Cue, LineCue, PlaceDoc } from "sahne";
 import kit from "../../sahne-kit/src/full.ts";
 import { PLACES } from "../paths.ts";
 import { adaptStory, lintStory, suggest, type BeatStep, type CharacterDoc, type ChoiceStep, type ActStep, type LineStep, type Looks, type Problem, type SceneStep, type StoryDoc } from "../src/index.ts";
+// the bakkal scene and the samples use the lesson plugin (a grammar spot, the quiz): a test is a host, so it passes it in
+import { lesson } from "../../sahne-lesson/src/index.ts";
+const plugins = [lesson];
 
 const json = <T>(f: string): T => JSON.parse(readFileSync(new URL(`./fixtures/${f}`, import.meta.url), "utf8"));
 const STORY = json<StoryDoc>("bakkal.json");
 const places: Record<string, PlaceDoc> = { bakkal: JSON.parse(readFileSync(new URL("bakkal.json", PLACES), "utf8")) };
 const characters: Record<string, CharacterDoc> = Object.fromEntries(["ismail", "nima", "kerim"].map(id => [id, json<CharacterDoc>(`characters/${id}.json`)]));
 const story = (): StoryDoc => structuredClone(STORY);
-const kinds = (s: StoryDoc, picks = {}) => adaptStory(s, { places, characters }).perform(picks).info.map(i => i.kind);
+const kinds = (s: StoryDoc, picks = {}) => adaptStory(s, { places, characters, plugins }).perform(picks).info.map(i => i.kind);
 const lineOf = (c: unknown) => (c as LineCue).line;
 
 test("adapter: every step becomes its cue, in order", () => {
   assert.deepEqual(kinds(story()), ["scene", "line", "line", "say", "line", "act", "react", "line", "spot", "say", "reply", "line", "say", "line"]);
-  const { script } = adaptStory(story(), { places, characters }).perform();
+  const { script } = adaptStory(story(), { places, characters, plugins }).perform();
   assert.deepEqual(script.cues[0], { scene: { place: "bakkal", at: { ismail: "counter" }, time: "day", perch: "ledge" } });
   assert.equal(script.v, 1);
 });
 
 test("adapter: staging passes through unchanged, and Kerim narrates to the viewer", () => {
-  const { script } = adaptStory(story(), { places, characters }).perform();
+  const { script } = adaptStory(story(), { places, characters, plugins }).perform();
   const { who: _w, tr: _t, en: _e, fa: _f, ...staging } = STORY.steps[2] as LineStep;
   assert.deepEqual(lineOf(script.cues[2]), { who: "ismail", text: "Hoş geldiniz! Buyrun.", ...staging });
   assert.deepEqual(lineOf(script.cues[1]), { who: "kerim", text: "Nima bakkalda.", to: "viewer" });
@@ -33,7 +36,7 @@ test("adapter: staging passes through unchanged, and Kerim narrates to the viewe
 });
 
 test("adapter: translations never reach the stage", () => {
-  const { script, info } = adaptStory(story(), { places, characters }).perform({ ask: 1 });
+  const { script, info } = adaptStory(story(), { places, characters, plugins }).perform({ ask: 1 });
   const s = JSON.stringify(script);
   assert.ok(!/[؀-ۿ]/.test(s), "no Persian on the stage");
   for (const en of ["Welcome", "Two loaves", "Is there bread", "Slowly", "outline"]) assert.ok(!s.includes(en), en);
@@ -43,12 +46,12 @@ test("adapter: translations never reach the stage", () => {
 });
 
 test("adapter: every stand-in line is a card, even with one option; the '…' line is the silent card", () => {
-  const a = adaptStory(story(), { places, characters });
+  const a = adaptStory(story(), { places, characters, plugins });
   const { script, info } = a.perform();
   assert.deepEqual(a.turns.map(t => t.kind), ["say", "act", "choice", "say"]);
   const say = info[3].turn!;
   assert.equal(say.kind, "say");
-  assert.deepEqual(say.kind === "say" && say.options, [{ tr: "Ekmek var mı? Süt var mı?", en: "Is there bread? Is there milk?", fa: "نان هست؟ شیر هست؟" }]);
+  assert.deepEqual(say.kind === "say" && say.options, [{ tr: "Ekmek var mı? Süt var mı?", en: "Is there bread? Is there milk?", fa: "نان هست؟ شیر هست؟", text: { tr: "Ekmek var mı? Süt var mı?", en: "Is there bread? Is there milk?", fa: "نان هست؟ شیر هست؟" } }]);
   assert.equal(say.kind === "say" && say.silent, false);
   const dots = info[12].turn!;
   assert.ok(dots.kind === "say" && dots.silent);
@@ -56,7 +59,7 @@ test("adapter: every stand-in line is a card, even with one option; the '…' li
 });
 
 test("adapter: a choice is the same card with its options; the pick, its reactions and the reply become cues", () => {
-  const a = adaptStory(story(), { places, characters });
+  const a = adaptStory(story(), { places, characters, plugins });
   const polite = a.perform(), blunt = a.perform({ ask: 1 });
   const turn = polite.info[9].turn!;
   assert.ok(turn.kind === "choice");
@@ -74,7 +77,7 @@ test("adapter: a choice is the same card with its options; the pick, its reactio
 });
 
 test("adapter: an act is a cue whose result goes back like a choice; its reaction is a beat", () => {
-  const a = adaptStory(story(), { places, characters });
+  const a = adaptStory(story(), { places, characters, plugins });
   const ok = a.perform(), miss = a.perform({ which_bread: "obj:simit" });
   assert.deepEqual(ok.script.cues[5], { act: { kind: "tap", targets: ["obj:ekmek", "obj:simit"], expect: "obj:ekmek", prompt: "Hangi ekmek?", who: "nima", by: "ismail" } });
   assert.deepEqual(ok.script.cues[6], { beat: { react: { ismail: { do: "nod", emo: "happy" } } } });
@@ -85,7 +88,7 @@ test("adapter: an act is a cue whose result goes back like a choice; its reactio
 });
 
 test("adapter: the cast is the learner as Nima, the others from their documents; Kerim is the narrator inset", () => {
-  const plain = adaptStory(story(), { places, characters });
+  const plain = adaptStory(story(), { places, characters, plugins });
   assert.deepEqual(Object.keys(plain.load.cast).sort(), ["ismail", "nima"]);
   assert.deepEqual(plain.load.cast.nima, characters.nima.avatar);
   assert.equal(plain.load.narrator, "kerim");
@@ -93,23 +96,23 @@ test("adapter: the cast is the learner as Nima, the others from their documents;
   assert.deepEqual(plain.load.voices!.ismail, { rate: 1.05, pitch: 0.78 });
   assert.equal(plain.load.tempo!.ismail, 1.1);
   const learner = { ...characters.ismail.avatar!, skin: "skin_10" } as AvatarDoc;
-  assert.equal(adaptStory(story(), { places, characters, learner }).load.cast.nima, learner);
+  assert.equal(adaptStory(story(), { places, characters, plugins, learner }).load.cast.nima, learner);
 });
 
 test("adapter: a character with a puppet joins the cast as it, with its terms; Kerim without one stays the window", () => {
   const bird = { ...characters, kerim: { ...characters.kerim, puppet: "bird", terms: ["a1-w-kus"] } };
-  const a = adaptStory(story(), { places, characters: bird });
+  const a = adaptStory(story(), { places, plugins, characters: bird });
   assert.deepEqual(Object.keys(a.load.cast).sort(), ["ismail", "kerim", "nima"]);
   assert.deepEqual([a.load.cast.kerim, a.load.terms, a.load.narrator], [{ puppet: "bird" }, { kerim: ["a1-w-kus"] }, "kerim"]);
-  assert.deepEqual(adaptStory(story(), { places, characters }).load.terms, {});
+  assert.deepEqual(adaptStory(story(), { places, characters, plugins }).load.terms, {});
 });
 
 test("lint: Kerim on stage is at her perch, so ch:kerim has a place", () => {
   const s = story(), l = line(s, 4);
   Object.assign(l, { tr: "Bu kuş!", link: { "kuş": "ch:kerim" }, do: "point", at: "ch:kerim" });
   const bird = { ...characters, kerim: { ...characters.kerim, puppet: "bird" } };
-  assert.ok(lintStory(s, { places, characters: bird }).some(p => p.rule === "deixis" && /ch:kerim is 2\.\d m away/.test(p.message)), "bu at a bird on the ledge, 2 m off");
-  assert.ok(!lintStory(s, { places, characters }).some(p => p.rule === "deixis"), "only in her window: no distance to check");
+  assert.ok(lintStory(s, { places, plugins, characters: bird }).some(p => p.rule === "deixis" && /ch:kerim is 2\.\d m away/.test(p.message)), "bu at a bird on the ledge, 2 m off");
+  assert.ok(!lintStory(s, { places, characters, plugins }).some(p => p.rule === "deixis"), "only in her window: no distance to check");
 });
 
 test("adapter: personalising runs on every text that reaches the stage", () => {
@@ -119,7 +122,7 @@ test("adapter: personalising runs on every text that reaches the stage", () => {
   (s.steps[6] as { act: { prompt: { tr: string } } }).act.prompt.tr = "Nima, hangi ekmek?";
   (s.steps[8] as { spot: { ex: string } }).spot.ex = "Nima: süt yok.";
   const personalise = (t: string) => t.replace(/Nima/g, "Ali").replace(/Tahran/g, "Herat");
-  const a = adaptStory(s, { places, characters, personalise });
+  const a = adaptStory(s, { places, characters, plugins, personalise });
   const { script, info } = a.perform();
   const stage = JSON.stringify(script) + JSON.stringify(a.load.places);
   // ids stay ("nima" is the stand-in's id); no token is left in any text
@@ -142,7 +145,7 @@ test("adapter: personalising runs on every text that reaches the stage", () => {
 test("adapter: if / unless lines follow the flags of earlier stories", () => {
   const s = story();
   s.steps.splice(2, 0, { who: "ismail", if: "s1e00_x", tr: "Yine siz!" } as LineStep, { who: "ismail", unless: "s1e00_x", tr: "Merhaba!" } as LineStep);
-  const text = (flags: string[]) => lineOf(adaptStory(s, { places, characters, flags }).perform().script.cues[2]).text;
+  const text = (flags: string[]) => lineOf(adaptStory(s, { places, characters, plugins, flags }).perform().script.cues[2]).text;
   assert.equal(text([]), "Merhaba!");
   assert.equal(text(["s1e00_x"]), "Yine siz!");
 });
@@ -364,7 +367,7 @@ const lookStory = (): StoryDoc => {
 
 test("looks: default → story → scene → line, each kept until changed; a look changes only the slots it names", () => {
   const avatar = characters.ismail.avatar!;
-  const a = adaptStory(lookStory(), { places, characters: dressed() });
+  const a = adaptStory(lookStory(), { places, plugins, characters: dressed() });
   const w = a.load.wardrobe!.ismail;
   // the story's look dresses the cast document: the coat over his own clothes
   assert.equal(a.load.cast.ismail.outfit.outer!.id, "outer_coat_long");
@@ -382,20 +385,20 @@ test("looks: default → story → scene → line, each kept until changed; a lo
 });
 
 test("looks: no look leaves the cast document itself and an empty wardrobe; a beat changes clothes too", () => {
-  const c = dressed(), plain = adaptStory(story(), { places, characters: c });
+  const c = dressed(), plain = adaptStory(story(), { places, plugins, characters: c });
   assert.equal(plain.load.cast.ismail, c.ismail.avatar);
   assert.deepEqual(plain.load.wardrobe, {});
   assert.deepEqual(costumes(plain.perform().script.cues), []);
   const s = story();
   s.steps.push({ beat: { who: "ismail", do: "nod", looks: { ismail: "home" } } } as BeatStep);
-  const a = adaptStory(s, { places, characters: c });
+  const a = adaptStory(s, { places, plugins, characters: c });
   const cues = a.perform().script.cues;
   assert.deepEqual((cues.at(-1) as { beat: unknown }).beat, { do: "nod", costume: { ismail: "home" }, who: "ismail" });
   assert.equal(a.load.cast.ismail, c.ismail.avatar);
   // back to the avatar is the outfit "default" when the story's look dressed the cast
   const d = lookStory();
   line(d, 9).looks = { ismail: "default" };
-  const b = adaptStory(d, { places, characters: dressed() });
+  const b = adaptStory(d, { places, plugins, characters: dressed() });
   assert.deepEqual(costumes(b.perform().script.cues).at(-1), [11, { ismail: "default" }]);
   assert.deepEqual(b.load.wardrobe!.ismail.default, characters.ismail.avatar);
 });
@@ -404,8 +407,8 @@ test("looks: a gated line's look follows the flags", () => {
   const s = story();
   line(s, 4).looks = { ismail: "home" };
   line(s, 4).if = "s1e00_x";
-  assert.deepEqual(adaptStory(s, { places, characters: dressed() }).load.wardrobe, {});
-  assert.deepEqual(Object.keys(adaptStory(s, { places, characters: dressed(), flags: ["s1e00_x"] }).load.wardrobe!.ismail), ["home"]);
+  assert.deepEqual(adaptStory(s, { places, plugins, characters: dressed() }).load.wardrobe, {});
+  assert.deepEqual(Object.keys(adaptStory(s, { places, plugins, characters: dressed(), flags: ["s1e00_x"] }).load.wardrobe!.ismail), ["home"]);
 });
 
 test("looks: the learner keeps their own clothes: only a coat and a hat, never a hat over a head covering", () => {
@@ -415,11 +418,11 @@ test("looks: the learner keeps their own clothes: only a coat and a hat, never a
   s.looks = { nima: "out" };
   line(s, 3).looks = { nima: { wear: { eyes: "glasses_round" } } };
   // Nima's own document: the coat and the hat, the shirt stays
-  const own = adaptStory(s, { places, characters: c }).load;
+  const own = adaptStory(s, { places, plugins, characters: c }).load;
   assert.deepEqual([own.cast.nima.outfit.outer!.id, own.cast.nima.wear!.hat!.id, own.cast.nima.outfit.top!.id], ["outer_coat_long", "hat_beanie", "top_shirt"]);
   // a learner in a headscarf: the coat, no hat
   const learner = { ...structuredClone(characters.nima.avatar!), wear: { head: { id: "headscarf_wrap" } } } as AvatarDoc;
-  const a = adaptStory(s, { places, characters: c, learner });
+  const a = adaptStory(s, { places, plugins, characters: c, learner });
   assert.deepEqual([a.load.cast.nima.outfit.outer!.id, a.load.cast.nima.wear, a.load.cast.nima.outfit.top], ["outer_coat_long", { head: { id: "headscarf_wrap" } }, learner.outfit.top]);
   // glasses are not the learner's to change: no costume, no wardrobe
   assert.deepEqual(a.load.wardrobe, {});
@@ -427,14 +430,14 @@ test("looks: the learner keeps their own clothes: only a coat and a hat, never a
   // a bare hat: off over the headscarf, on without one
   const t = story();
   line(t, 3).looks = { nima: { wear: { hat: "hat_beanie" } } };
-  assert.deepEqual(adaptStory(t, { places, characters: c, learner }).load.wardrobe, {});
-  assert.equal(adaptStory(t, { places, characters: c }).load.wardrobe!.nima.look1.wear!.hat!.id, "hat_beanie");
+  assert.deepEqual(adaptStory(t, { places, plugins, characters: c, learner }).load.wardrobe, {});
+  assert.equal(adaptStory(t, { places, plugins, characters: c }).load.wardrobe!.nima.look1.wear!.hat!.id, "hat_beanie");
 });
 
 test("looks: every costume key of every branch is in the wardrobe", () => {
   const s = lookStory();
   (s.steps[10] as LineStep).looks = { nima: { outfit: { outer: "outer_coat_long" } } };
-  const a = adaptStory(s, { places, characters: dressed() });
+  const a = adaptStory(s, { places, plugins, characters: dressed() });
   const runs = [a.defaults, { ...a.defaults, ask: 1 }, { ...a.defaults, which_bread: "obj:simit" }];
   let n = 0;
   for (const picks of runs) for (const [, costume] of costumes(a.perform(picks).script.cues)) for (const [id, k] of Object.entries(costume)) {
@@ -445,12 +448,12 @@ test("looks: every costume key of every branch is in the wardrobe", () => {
   assert.equal(n, 15);
 });
 
-const lookLint = (s: StoryDoc, c = dressed()) => lintStory(s, { places, characters: c, kit }).filter(p => p.rule === "look");
+const lookLint = (s: StoryDoc, c = dressed()) => lintStory(s, { places, plugins, characters: c, kit }).filter(p => p.rule === "look");
 const said = (ps: Problem[]) => ps.map(p => `${p.level[0]}@${p.step}${p.option !== undefined ? "." + p.option : ""}${p.reply !== undefined ? "." + p.reply : ""}: ${p.message}`);
 
 test("lint look: the looks story is clean", () => {
   assert.deepEqual(lookLint(lookStory()), []);
-  assert.deepEqual(lintStory(lookStory(), { places, characters: dressed(), kit }), []);
+  assert.deepEqual(lintStory(lookStory(), { places, plugins, characters: dressed(), kit }), []);
 });
 
 test("lint look: who changes, into which outfit", () => {
@@ -506,7 +509,7 @@ test("lint look: the kit draws every part, in its slot, for the body's build; ou
     "e@4: ismail: wear.hat: hat_bonnet is not made for this body's build",
   ]);
   // without the kit, only what the story itself says
-  assert.deepEqual(lintStory(s, { places, characters: c }).filter(p => p.rule === "look").length, 1);
+  assert.deepEqual(lintStory(s, { places, plugins, characters: c }).filter(p => p.rule === "look").length, 1);
 });
 
 test("lint look: warnings for the learner's other slots and for a look that changes nothing", () => {

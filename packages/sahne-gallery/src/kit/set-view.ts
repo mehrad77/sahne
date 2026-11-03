@@ -4,7 +4,7 @@
 
 import { $, bar, chip, choice, select, toggle } from "../shell/dom.ts";
 import type { Ctx } from "../shell/ctx.ts";
-import { pieceSvg } from "../piece-svg.ts";
+import { pieceSvg } from "sahne-kit/set-svg";
 import { thumb, cancelThumbs, clearThumbs } from "../shell/thumbs.ts";
 import { generators, usage, asked, FEATURES, type Feature, type Gen } from "./catalog.ts";
 

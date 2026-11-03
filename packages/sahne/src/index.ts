@@ -5,8 +5,9 @@ export * from "./core/color.ts";
 export * from "./core/rng.ts";
 export type * from "./core/types.ts";
 export type * from "./core/kit.ts";
-export { withVariant, EMIT_KINDS, MOTION_KINDS, TIMETABLE } from "./core/kit.ts";
+export { withVariant, pieceOf, EMIT_KINDS, MOTION_KINDS, TIMETABLE } from "./core/kit.ts";
 export * from "./core/lang.ts";
+export * from "./core/linematch.ts";
 export * from "./art/path.ts";
 export * from "./art/shape.ts";
 export * from "./rig/skeleton.ts";
@@ -44,6 +45,6 @@ export { uiWords, fieldFraming, sectionFraming, WORDS as BUILDER_WORDS, type UiW
 export { glossInto, popup as glossPopup, type Gloss, type GlossContext, type GlossOptions } from "./ui/gloss.ts";
 export { interact, Interaction, INTERACT_WORDS, type InteractOptions, type InteractWords, type InspectEvent, type ActEvent, type ActResult, type ActRun } from "./interact/index.ts";
 export { startAct, tryAct, skipAct, targetOf, resolvedCue, nameOf, inspectOf, HINT_AT, SHOW_AT, type ActState, type Outcome, type SceneInfo } from "./interact/act.ts";
-export { rayAt, rayQuad, rayTri, rayZ, poolAlpha, maskHit, AlphaMasks, pickTop, partOf as bodyPartOf, isTarget, parseTarget, MASK_SCALE, type Pick, type Hit, type Ray } from "./interact/hit.ts";
+export { rayAt, rayFloor, rayQuad, rayTri, rayZ, poolAlpha, maskHit, AlphaMasks, pickTop, partOf as bodyPartOf, isTarget, parseTarget, MASK_SCALE, type Pick, type Hit, type Ray } from "./interact/hit.ts";
 export { heldKey, type ActHandler } from "./stage.ts";
 export { propText, flatMatrix, type PropText, type FlatAt } from "./ui/prop-text.ts";

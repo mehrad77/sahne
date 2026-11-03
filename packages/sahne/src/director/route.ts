@@ -5,7 +5,7 @@
 // exit through their own door mark. Pure: the director bakes the way into the walk, so seeking stays exact.
 
 import type { Vec3 } from "../core/math.ts";
-import { withVariant, type Kit, type PieceDef } from "../core/kit.ts";
+import { withVariant, pieceOf, type Kit, type PieceDef } from "../core/kit.ts";
 import type { PlaceDoc } from "../core/types.ts";
 
 /** A solid line in the floor plane, metres (`x`, `z`), as placed: `door` names the piece whose leaf it is (a gate, a door); `in` the place states it stands in. */
@@ -17,10 +17,10 @@ export const CLEAR = 0.25;
 const ROUND = CLEAR * 1.3;
 
 /** The solid lines of a place, from its pieces' generators (`PieceDef.solid`); a piece with `solid: false` has none. */
-export function placeSolids(place: PlaceDoc, kit: Pick<Kit, "set">): Solid[] {
+export function placeSolids(place: PlaceDoc, kit: Pick<Kit, "set" | "aliases">): Solid[] {
   const out: Solid[] = [];
   for (const p of place.pieces ?? []) {
-    const def: PieceDef | undefined = kit.set[p.kit];
+    const def: PieceDef | undefined = pieceOf(kit, "set", p.kit);
     if (!def?.solid || (p as { solid?: unknown }).solid === false || typeof p.x !== "number" || typeof p.z !== "number") continue;
     for (const s of def.solid(withVariant(def, p as Record<string, unknown>))) {
       out.push({

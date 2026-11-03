@@ -5,10 +5,11 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:f
 import { posix } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Marked } from "marked";
+import hljs from "highlight.js/lib/common";
 import { execFileSync } from "node:child_process";
 import { CARDS, PLACES, STORIES_WORLD } from "../sahne-story/paths.ts";
-import { loadNeeds } from "../sahne-story/load.ts";
-import { loadCast, loadDrafts, loadExtras } from "../sahne-story/check/world.ts";
+import { loadContentKit, loadNeeds } from "../sahne-story/load.ts";
+import { loadCast, loadDrafts, loadExtras, loadSeries } from "../sahne-story/check/world.ts";
 
 const at = p => new URL(p, import.meta.url);
 const json = p => JSON.parse(readFileSync(at(p), "utf8"));
@@ -97,6 +98,11 @@ function measure() {
 export const DATA = {
   places: () => readdirSync(PLACES).filter(f => f.endsWith(".json") && f !== "needs.json").sort().map(f => JSON.parse(readFileSync(new URL(f, PLACES), "utf8"))),
   needs: () => loadNeeds() ?? {},
+  // the content root's series.json (its languages: what the place lints ask a name in), null without one
+  series: () => loadSeries(),
+  // the content root's own kit items (kit/ of the root, sahne-story/load.ts `loadContentKit`): the good documents, checked against
+  // the whole kit one at a time as backstage checks them (checkPiece, a variant's params), so a bad one leaves out only itself; [] without kit/
+  kit: async () => loadContentKit({ kit: (await import("../sahne-kit/src/full.ts")).default }).docs,
   // the content root's cards for the place and story lints (sahne-story/load.ts): id → level, Turkish, English, retired;
   // null without cards (the card rules do not run); read only
   cards: async () => (await import(at(`../sahne-story/load.ts?${Date.now()}`).href)).loadCards(),
@@ -117,17 +123,27 @@ export const DATA = {
 /** The docs the gallery shows, in its sidebar's order: slug, title, group, and the file from the repo root. A
  * link between two of them stays in the gallery; a link to any other repo file goes to GitHub. */
 export const DOCS = [
-  ["start", "Your first scene", "Guide", "packages/sahne-gallery/guide/start.md"],
-  ["overview", "Overview", "Guide", "README.md"],
-  ["engine", "The engine", "Engine", "packages/sahne/README.md"],
-  ["design", "Design", "Engine", "packages/sahne/DESIGN.md"],
-  ["turkish", "The Turkish plugin", "Engine", "packages/sahne-tr/README.md"],
-  ["style", "Style guide", "Kit", "packages/sahne-kit/STYLE.md"],
-  ["catalogue", "Catalogue", "Kit", "packages/sahne-kit/CATALOGUE.md"],
-  ["set", "Set pieces", "Kit", "packages/sahne-kit/SET.md"],
-  ["sounds", "Sound sources", "Kit", "packages/sahne-kit/sounds/SOURCES.md"],
-  ["stories", "Stories and places", "Stories", "packages/sahne-story/README.md"],
-  ["gallery", "The gallery", "Project", "packages/sahne-gallery/README.md"],
+  ["get-started", "Get started", "Start here", "packages/sahne-gallery/guide/get-started.md"],
+  ["new", "What's new", "Start here", "packages/sahne-gallery/guide/whats-new.md"],
+  ["start", "Your first scene", "Start here", "packages/sahne-gallery/guide/start.md"],
+  ["overview", "Overview", "Start here", "README.md"],
+  ["engine", "sahne: the engine", "Packages", "packages/sahne/README.md"],
+  ["kit", "sahne-kit: the art", "Packages", "packages/sahne-kit/README.md"],
+  ["stories", "sahne-story: stories", "Packages", "packages/sahne-story/README.md"],
+  ["lesson", "sahne-lesson: lessons", "Packages", "packages/sahne-lesson/README.md"],
+  ["backstage", "sahne-backstage", "Packages", "packages/sahne-backstage/README.md"],
+  ["turkish", "sahne-tr: Turkish", "Packages", "packages/sahne-tr/README.md"],
+  ["english", "sahne-en: English", "Packages", "packages/sahne-en/README.md"],
+  ["german", "sahne-de: German", "Packages", "packages/sahne-de/README.md"],
+  ["persian", "sahne-fa: Persian", "Packages", "packages/sahne-fa/README.md"],
+  ["gallery", "sahne-gallery: this site", "Packages", "packages/sahne-gallery/README.md"],
+  ["writing-with-agents", "Agentic story writing", "In depth", "packages/sahne-gallery/guide/writing-with-agents.md"],
+  ["design", "Design", "In depth", "packages/sahne/DESIGN.md"],
+  ["style", "Style guide", "In depth", "packages/sahne-kit/STYLE.md"],
+  ["drawing", "Drawing kit items", "In depth", "packages/sahne-kit/DRAWING.md"],
+  ["catalogue", "Catalogue", "In depth", "packages/sahne-kit/CATALOGUE.md"],
+  ["set", "Set pieces", "In depth", "packages/sahne-kit/SET.md"],
+  ["sounds", "Sound sources", "In depth", "packages/sahne-kit/sounds/SOURCES.md"],
   ["packages", "Package conventions", "Project", "packages/README.md"],
   ["contributing", "Contributing", "Project", "CONTRIBUTING.md"],
   ["agents", "Rules for changes", "Project", "AGENTS.md"],
@@ -141,10 +157,32 @@ const BY_FILE = new Map(DOCS.map(d => [d.file, d]));
 const anchor = text => text.toLowerCase().replace(/<[^>]+>/g, "").replace(/[^\p{L}\p{N}\s_-]/gu, "").trim().replace(/\s/g, "-");
 const escape = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/** A code block in colour (highlight.js, at build time, so the page loads no highlighter): by its language, or, with
+ * none named, the likeliest of the docs' own (a plain sketch or a table of names stays plain). */
+const LANGS = { jsonc: "json", sh: "bash", shell: "bash", zsh: "bash" };
+const GUESS = ["typescript", "javascript", "json", "bash", "yaml", "css", "xml"];
+function highlight(text, lang) {
+  const named = LANGS[lang] ?? lang;
+  if (named === "bash") return text.split("\n").map(shellLine).join("\n");
+  if (named && named !== "text" && hljs.getLanguage(named)) return hljs.highlight(text, { language: named, ignoreIllegals: true }).value;
+  if (named) return escape(text);
+  const guess = hljs.highlightAuto(text, GUESS);
+  return guess.relevance >= 6 ? guess.value : escape(text);
+}
+
+/** A shell line: highlight.js's colours, and the command itself and its --flags (which it leaves plain) in theirs. */
+function shellLine(line) {
+  if (/^\s*#/.test(line)) return hljs.highlight(line, { language: "bash" }).value;
+  const [, lead, cmd, rest] = /^(\s*(?:[A-Z_]+=\S*\s+)*)(\S*)(.*)$/.exec(line);
+  const out = hljs.highlight(rest, { language: "bash" }).value.replace(/(^|\s)(--?[a-z][\w-]*)/g, '$1<span class="hljs-attr">$2</span>');
+  return `${escape(lead)}${cmd ? `<span class="hljs-title">${escape(cmd)}</span>` : ""}${out}`;
+}
+
 /** One doc as HTML. Links: to another doc → `#/docs/<slug>?at=<anchor>`; to a heading of its own → `?at=`; to
  * any other repo file → GitHub (images → raw; the repo's assets/ is served beside the page). Headings carry GitHub's anchors, and a numbered one (`## 12.`,
  * `### 4.1`) also `data-sec`, so `?at=s12` finds DESIGN.md §12. A fenced block in the language `sahne` (a
- * script, `{ v, cues }`) becomes a live stage in the gallery and stays plain JSON on GitHub. */
+ * script, `{ v, cues }`) becomes a live stage in the gallery and stays plain JSON on GitHub; a `mermaid` block is drawn
+ * as a diagram, here (docs.ts) as on GitHub. */
 export function doc(slug) {
   const d = DOCS.find(d => d.slug === slug);
   if (!d) return null;
@@ -169,15 +207,17 @@ export function doc(slug) {
       return `<h${depth} id="${id}"${sec ? ` data-sec="${sec}"` : ""}>${html}</h${depth}>\n`;
     },
     link({ href: url, title, tokens }) { return `<a href="${escape(href(url))}"${title ? ` title="${escape(title)}"` : ""}>${this.parser.parseInline(tokens)}</a>`; },
-    image({ href: url, title, text }) { return `<img src="${escape(href(url, true))}" alt="${escape(text)}"${title ? ` title="${escape(title)}"` : ""} loading="lazy">`; },
+    image({ href: url, title, text }) { return `<img class="pic" src="${escape(href(url, true))}" alt="${escape(text)}"${title ? ` title="${escape(title)}"` : ""} loading="lazy">`; },
     code({ text, lang }) {
+      if (lang === "mermaid") return `<pre class="mermaid">${escape(text)}</pre>\n`;
       if (lang === "sahne") return `<div class="sahne-live" data-script="${escape(text)}"></div><details class="src"><summary>The script</summary><pre><code>${escape(text)}</code></pre></details>\n`;
-      return `<pre><code${lang ? ` class="language-${escape(lang)}"` : ""}>${escape(text)}</code></pre>\n`;
+      return `<pre><code class="hljs${lang ? ` language-${escape(lang)}` : ""}">${highlight(text, lang)}</code></pre>\n`;
     },
   } });
-  // inline HTML in the docs (the README's centred poster) has repo-relative src/href too
+  // inline HTML in the docs (the README's centred poster, a package's brand block) has repo-relative src/srcset/href too;
+  // a path into assets/ is already the site's (the image renderer made it so, or a guide's video names it)
   const html = md.parse(readFileSync(at(`../../${d.file}`), "utf8"))
-    .replace(/(<(?:img|a)\b[^>]*?\s(?:src|href)=")([^"#][^"]*)"/g, (m, pre, url) => /^[a-z]+:|^\/\/|^#/i.test(url) ? m : `${pre}${escape(href(url, pre.startsWith("<img")))}"`);
+    .replace(/(<(?:img|a|source)\b[^>]*?\s(?:src|srcset|href)=")([^"#][^"]*)"/g, (m, pre, url) => /^[a-z]+:|^\/\/|^#|^assets\//i.test(url) ? m : `${pre}${escape(href(url, !pre.startsWith("<a")))}"`);
   return { ...d, html, toc, source: `${REPO_URL}/blob/main/${d.file}` };
 }
 

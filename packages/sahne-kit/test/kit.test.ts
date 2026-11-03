@@ -4,7 +4,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { compose, groupBounds, luma, rng, type AvatarDoc, type Build, type BodyShape, type Item, type PartCtx, type PartDef } from "sahne";
 import kit from "../src/full.ts";
-import { moveAt } from "../../sahne/src/anim/move.ts";
+import { checkPiece, kitDefs, problemLine } from "../src/check.ts";
 
 const BUILDS: Build[] = ["adult", "elder", "child", "toddler"];
 const SHAPES: BodyShape[] = ["slim", "average", "broad", "round"];
@@ -275,74 +275,14 @@ test("phone and phone_held share one drawing: the case, screen, status bar, bubb
 });
 
 // ---- every set piece and prop ------------------------------------------------
-// Each generator of kit.set and kit.props, with its defaults and three seeds (props also counted and
-// held): it draws finite flats that fit an atlas layer, its lights sit at finite places with a
-// radius, its motions loop sanely and rest where they start, its words lie inside its art, and a flat
-// that travels keeps its depth (the stage sorts flats by where they start).
-{
-  const SEEDS = ["a", "b", "c"];
-  const finiteBox = (b: number[]) => b.every(Number.isFinite) && b[2] > b[0] && b[3] > b[1];
-  const cases = [
-    ...Object.keys(kit.set).flatMap(id => SEEDS.map(s => ({ id, kind: "set", seed: s, p: {} as Record<string, unknown>, def: kit.set[id] }))),
-    ...Object.keys(kit.props).flatMap(id => [{}, { n: 3 }, { held: true }].flatMap(p => SEEDS.map(s => ({ id, kind: "prop", seed: s, p: p as Record<string, unknown>, def: kit.props[id] })))),
-  ];
-  const drawn = cases.map(c => ({ ...c, out: c.def.draw(c.p, rng(`${c.id}/${c.seed}`), kit) }));
-
-  test("every set piece and prop draws finite flats that fit the atlas", () => {
-    for (const { id, kind, out, p } of drawn) {
-      const tag = `${kind} ${id} ${JSON.stringify(p)}`;
-      assert.ok(out.flats.length > 0, `${tag}: no flats`);
-      for (const f of out.flats) {
-        assert.ok(finiteBox(groupBounds(f.group)) || f.emissive, `${tag}: a flat with no finite art`);
-        if (f.emissive) assert.ok(groupBounds(f.emissive).every(Number.isFinite), `${tag}: emissive art`);
-        for (const k of ["x", "y", "z", "ppcm", "lit", "yaw", "pitch"] as const) if (f[k] !== undefined) assert.ok(Number.isFinite(f[k]), `${tag}.${k}`);
-        // small things raster finely (a phone at 12 px/cm, for its screen); nothing outgrows an atlas layer (2048 px)
-        const ppcm = f.ppcm ?? 1.6;
-        assert.ok(ppcm > 0 && ppcm <= 16, `${tag}: ppcm ${ppcm}`);
-        // the glow is rasterised at its own ppcm (glowPpcm, at most the art's), else the flat's
-        if (f.glowPpcm !== undefined) assert.ok(f.glowPpcm > 0 && f.glowPpcm <= ppcm, `${tag}: glowPpcm ${f.glowPpcm}`);
-        for (const [g, k] of [[f.group, ppcm], [f.emissive, f.glowPpcm ?? ppcm]] as const) {
-          if (!g?.shapes.length) continue;
-          const [x0, y0, x1, y1] = groupBounds(g);
-          assert.ok((x1 - x0) * k <= 2040 && (y1 - y0) * k <= 2040, `${tag}: ${Math.round((x1 - x0) * k)} × ${Math.round((y1 - y0) * k)} px, more than an atlas layer`);
-        }
-      }
-      for (const l of out.lights ?? []) assert.ok([l.x, l.y, l.z, l.radius, l.intensity ?? 1].every(Number.isFinite) && l.radius > 0, `${tag}: a light`);
-    }
-  });
-
-  test("every moving flat loops sanely and rests where it starts", () => {
-    for (const { id, kind, out } of drawn) for (const f of out.flats) {
-      const m = f.move, tag = `${kind} ${id}`;
-      if (!m) continue;
-      if (m.phase !== undefined) assert.ok(m.phase >= 0 && m.phase < 1, `${tag}: phase ${m.phase}`);
-      if (m.path) {
-        assert.ok(m.path.pts.length >= 2 && m.path.pts.every(q => q.length === 3 && q.every(Number.isFinite)) && m.path.ms >= 500, `${tag}: path`);
-        // a path shown only in parts of its period (a passenger between stops) may be hidden at rest
-        const r0 = moveAt(m, 0);
-        if (!m.phase && (r0 || !m.path.show)) assert.deepEqual(r0!.at, m.path.pts[0].map(v => v / 100), `${tag}: rests at its first point`);
-      }
-      if (m.blink) assert.ok(m.blink.ms >= 334 && m.blink.on > 0 && m.blink.on < 1, `${tag}: blink at most three times a second`);
-      // a big flat sways gently; a small creature may swish its tail or peck (at most 0.3 rad under 60 cm)
-      const [bx0, by0, bx1, by1] = groupBounds(f.group), small = Math.max(bx1 - bx0, by1 - by0) <= 60;
-      if (m.sway) assert.ok(Math.abs(m.sway.rot ?? 0) <= (small ? 0.3 : 0.1) && Math.abs(m.sway.dy ?? 0) <= 5 && m.sway.ms >= 300, `${tag}: gentle sway`);
-      if (m.scroll) assert.ok(Number.isFinite(m.scroll.dx) && m.scroll.ms > 0, `${tag}: scroll`);
-      for (const t of [0, 1234, 9876, 123456]) { const at = moveAt(m, t); if (at) assert.ok([...at.at, at.dx, at.dy, at.rot].every(Number.isFinite), `${tag} at ${t}`); }
-    }
-  });
-
-  test("every word on a set piece or prop lies inside its art, in Turkish", () => {
-    for (const { id, kind, out, p } of drawn) {
-      // a blinking cell carries only a speck of art: its words lie inside its board's (the still flat with words)
-      const board = out.flats.find(g => g.text?.length && !g.move);
-      for (const f of out.flats) for (const t of f.text ?? []) {
-        const b = groupBounds(f.move?.blink && board ? board.group : f.group);
-        assert.ok(t.x >= b[0] - 0.5 && t.y >= b[1] - 0.5 && t.x + t.w <= b[2] + 0.5 && t.y + t.h <= b[3] + 0.5, `${kind} ${id} ${JSON.stringify(p)}: "${t.text}" outside its art`);
-        assert.ok(t.text.trim().length > 0 && (t.lang ?? "tr") === "tr", `${kind} ${id}: text`);
-      }
-    }
-  });
-}
+// Each generator of kit.set and kit.props, with its defaults and three seeds (props also counted and held),
+// through the kit's own checks (`src/check.ts`): finite flats that fit an atlas layer, lights with a radius,
+// motions that loop sanely and rest where they start, words inside their art with a language tag.
+test("every set piece and prop draws finite flats that fit the atlas, moves sanely and keeps its words inside its art", () => {
+  const problems: string[] = [];
+  for (const [def, as] of kitDefs(kit)) for (const p of checkPiece(def, as, kit)) if (p.level === "error" && ["flats", "motion", "text"].includes(p.rule)) problems.push(problemLine(p));
+  assert.equal(problems.length, 0, `\n${problems.join("\n")}\n`);
+});
 
 test("a prop keeps its steam and flames in a hand: a hot tea glass, a bunch of candles, a cake carried in lit", () => {
   const em = (id: string, p: Record<string, unknown>) => kit.props[id].draw(p, rng(id), kit).emitters ?? [];

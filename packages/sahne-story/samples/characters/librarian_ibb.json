@@ -71,18 +71,24 @@
       }
     }
   },
-  "bio": "Sits at the desk and asks for quiet with one finger.",
-  "bioFa": "پشتِ میز می‌نشیند و با یک انگشت می‌گوید ساکت.",
+  "bio": {
+    "en": "Sits at the desk and asks for quiet with one finger.",
+    "fa": "پشتِ میز می‌نشیند و با یک انگشت می‌گوید ساکت."
+  },
   "color": "#8A8580",
   "id": "librarian_ibb",
   "kind": "extra",
   "level": "A1",
-  "name": "Kütüphaneci",
-  "nameFa": "کتابدار",
+  "name": {
+    "fa": "کتابدار",
+    "tr": "Kütüphaneci"
+  },
   "order": 106,
   "places": [
     "library_ibb"
   ],
-  "role": "The librarian at the İBB city library",
-  "roleFa": "کتابدارِ کتابخانه‌ی شهرداری"
+  "role": {
+    "en": "The librarian at the İBB city library",
+    "fa": "کتابدارِ کتابخانه‌ی شهرداری"
+  }
 }
