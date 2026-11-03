@@ -159,7 +159,8 @@ const escape = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g,
 /** One doc as HTML. Links: to another doc → `#/docs/<slug>?at=<anchor>`; to a heading of its own → `?at=`; to
  * any other repo file → GitHub (images → raw; the repo's assets/ is served beside the page). Headings carry GitHub's anchors, and a numbered one (`## 12.`,
  * `### 4.1`) also `data-sec`, so `?at=s12` finds DESIGN.md §12. A fenced block in the language `sahne` (a
- * script, `{ v, cues }`) becomes a live stage in the gallery and stays plain JSON on GitHub. */
+ * script, `{ v, cues }`) becomes a live stage in the gallery and stays plain JSON on GitHub; a `mermaid` block is drawn
+ * as a diagram, here (docs.ts) as on GitHub. */
 export function doc(slug) {
   const d = DOCS.find(d => d.slug === slug);
   if (!d) return null;
@@ -186,6 +187,7 @@ export function doc(slug) {
     link({ href: url, title, tokens }) { return `<a href="${escape(href(url))}"${title ? ` title="${escape(title)}"` : ""}>${this.parser.parseInline(tokens)}</a>`; },
     image({ href: url, title, text }) { return `<img src="${escape(href(url, true))}" alt="${escape(text)}"${title ? ` title="${escape(title)}"` : ""} loading="lazy">`; },
     code({ text, lang }) {
+      if (lang === "mermaid") return `<pre class="mermaid">${escape(text)}</pre>\n`;
       if (lang === "sahne") return `<div class="sahne-live" data-script="${escape(text)}"></div><details class="src"><summary>The script</summary><pre><code>${escape(text)}</code></pre></details>\n`;
       return `<pre><code${lang ? ` class="language-${escape(lang)}"` : ""}>${escape(text)}</code></pre>\n`;
     },

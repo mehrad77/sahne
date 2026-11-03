@@ -57,13 +57,25 @@ Status: **design v1, 2026-10-09; current as of 2026-11-03.** The engine build (B
 
 ## 4. Architecture
 
-```
-app (Kumru)                            sahne (engine)                                  sahne-kit (art)
- story steps ──adapter──▶ Script ─▶ fold() world state ─▶ Director ─▶ Timeline ─▶ Backend: paper | still | (toon3d later)
- avatar docs ───────────────────────▶ compose(avatar, kit) ─▶ Puppet ◀────────────── parts, palettes, poses, faces
- place docs  ───────────────────────▶ build(place, kit)    ─▶ Set    ◀────────────── set pieces, props, lights
- sound cues  ───────────────────────▶ Audio: synth | samples | voice ◀────────────── patches, motifs, CC0 samples
- UI ◀── events: inspect, act results ◀── Interaction: hit tests, requests
+```mermaid
+flowchart TB
+  app["<b>app</b> (Kumru)<br/>story steps · avatar docs<br/>place docs · sound cues"]
+  kit["<b>sahne-kit</b> (art)<br/>parts, palettes, poses, faces<br/>set pieces, props, lights<br/>patches, motifs, CC0 samples"]
+  subgraph engine["sahne (engine)"]
+    script["Script"] --> fold["fold(): world state"] --> director["Director"] --> timeline["Timeline"] --> backend["Backend: paper | still"]
+    puppet["Puppet<br/>compose(avatar, kit)"] --> backend
+    set["Set<br/>build(place, kit)"] --> backend
+    audio["Audio<br/>synth | samples | voice"]
+    interaction["Interaction<br/>hit tests, requests"]
+  end
+  app -- "story steps, by the adapter" --> script
+  app --> puppet & set & audio
+  kit --> puppet & set & audio
+  interaction -- "events: inspect, act results" --> ui["app UI"]
+  classDef app fill:#2F8C881F,stroke:#2F8C88
+  classDef kit fill:#D8A44026,stroke:#D8A440
+  class app,ui app
+  class kit kit
 ```
 
 ### 4.1 Packages

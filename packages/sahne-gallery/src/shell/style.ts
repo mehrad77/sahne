@@ -172,5 +172,8 @@ pre.code, .prose pre { font: 12.5px/1.5 ui-monospace, SFMono-Regular, Menlo, mon
 .prose img { max-width: 100%; height: auto; border-radius: 10px; }
 .prose blockquote { margin: 10px 0; padding: 2px 14px; border-left: 3px solid var(--accent); color: var(--mute); }
 .prose .live { margin: 10px 0 4px; }
+.prose pre.mermaid { background: none; border: 0; padding: 6px 0; text-align: center; overflow-x: auto; width: min(1100px, calc(100vw - 290px)); max-width: none; }
+@media (max-width: 860px) { .prose pre.mermaid { width: auto; } }
+.prose pre.mermaid svg { max-width: 100%; height: auto; }
 .prose details.src summary { cursor: pointer; color: var(--mute); font-size: 13px; }
 `;
