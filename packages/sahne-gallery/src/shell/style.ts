@@ -22,7 +22,8 @@ a { color: var(--accent); }
 .side nav a.sub small { opacity: .8; }
 .side nav a.sub:has(.icon) { display: flex; gap: 7px; align-items: flex-start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .side nav a.sub .icon { width: 16px; height: 16px; flex: none; margin-top: 2px; border-radius: 3px; }
-.side nav .group { padding: 8px 8px 2px 18px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--mute); }
+.side nav .group { margin: 10px 8px 3px 10px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 10.5px; font-weight: 750; text-transform: uppercase; letter-spacing: .09em; color: var(--accent); }
+.side nav .subs > .group:first-child { border-top: 0; padding-top: 2px; margin-top: 4px; }
 .side nav a:hover { background: var(--chip); }
 .side nav details.explore { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 8px; }
 .side nav details.explore summary { cursor: pointer; padding: 3px 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--mute); font-weight: 650; }
