@@ -32,3 +32,7 @@ playwright-report/
 
 # Promotion output (sahne-kit/drawing/promote.ts: sheets, patch, pull request text)
 promote-out/
+
+# What backstage writes beside the samples when it is tried on them (preview_start sahne-backstage saves there):
+# conversations, task records, the assistant's memory and review notes. The samples are the project's, not a series'.
+packages/sahne-story/samples/.backstage/

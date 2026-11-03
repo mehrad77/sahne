@@ -25,7 +25,7 @@ Then open http://localhost:5181. The flags are:
 
 `cli.ts mcp` serves only the MCP server, on stdio (*Where it is served*). Any other command is refused.
 
-`preview_start sahne-backstage` (`.claude/launch.json`) starts it on the samples with `--write`, so it saves: a save changes the repo's own samples, to commit or put back. The assistant's key comes from the environment, or from a `.env` at the repo's root (git-ignored, `ANTHROPIC_API_KEY=…`), which the command reads first.
+`preview_start sahne-backstage` (`.claude/launch.json`) starts it on the samples with `--write`, so it saves: a save changes the repo's own samples, to commit or put back. What it keeps beside them (`.backstage/`: conversations, task records, memory, review notes) is git-ignored for the samples. The assistant's key comes from the environment, or from a `.env` at the repo's root (git-ignored, `ANTHROPIC_API_KEY=…`), which the command reads first.
 
 From an app (Kumru's `pnpm backstage`, `scripts/backstage.mjs`):
 
