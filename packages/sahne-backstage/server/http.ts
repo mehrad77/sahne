@@ -30,6 +30,7 @@ import { Store } from "./runs/store.ts";
 import { Runs, type Gates, type Plan } from "./runs/run.ts";
 import { DOCS } from "./guides.ts";
 import { forgetNote, readMemory, remember } from "./memory.ts";
+import { deleteChat, listChats, readChat, writeChat } from "./chats.ts";
 import { readRecord, readRecords } from "./runs/record.ts";
 
 const HERE = new URL("../", import.meta.url);
@@ -306,6 +307,19 @@ export async function serve(o: Options): Promise<Running> {
       if (!o.write) throw new Fail(403, "read-only: start backstage with --write");
       if (!forgetNote(a)) throw new Fail(404, `no note ${a}`);
       return json(res, 200, { notes: readMemory() });
+    }
+    // the assistant's conversations, in the content root's sidecar (chats.ts); a read-only backstage keeps none, and the
+    // editor keeps them in the browser then (`write` says which)
+    if (route === "chats") {
+      if (path.length > 2) throw new Fail(404, "not found");
+      if (!a && m === "GET") return json(res, 200, { chats: listChats(), write: o.write });
+      if (a && m === "GET") { const c = readChat(a); if (!c) throw new Fail(404, `no conversation ${a}`); return json(res, 200, { chat: c }); }
+      if (a && (m === "PUT" || m === "DELETE")) {
+        if (!o.write) throw new Fail(403, "read-only: start backstage with --write");
+        if (m === "PUT") return json(res, 200, { chat: writeChat(a, await body(req)) });
+        if (!deleteChat(a)) throw new Fail(404, `no conversation ${a}`);
+        return json(res, 200, { ok: true });
+      }
     }
     // the tasks' records in the sidecar (runs/record.ts): what this root's tasks did, wherever they ran
     if (route === "tasks" && m === "GET" && !b) {

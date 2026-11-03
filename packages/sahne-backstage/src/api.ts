@@ -49,4 +49,6 @@ export const api = {
   reload: () => call<{ ok: boolean }>("POST", "reload", {}),
   post: <T>(path: string, body: unknown) => call<T>("POST", path, body),
   get: <T>(path: string) => call<T>("GET", path),
+  put: <T>(path: string, body: unknown) => call<T>("PUT", path, body),
+  del: <T>(path: string) => call<T>("DELETE", path),
 };

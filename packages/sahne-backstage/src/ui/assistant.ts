@@ -8,10 +8,11 @@
 // An answer shows its work (chat/parts.ts): the model's thinking, folded once it moves on, and its tool calls grouped, in
 // plain words, each opening to what it was given and what came back. A live line says what it is doing; *Stop* ends it.
 //
-// Conversations are kept in this browser (localStorage, per series), never on the server: the last one opens again after
-// a reload, *New conversation* keeps the one before it, and *History* lists them to open again or delete (the newest 30).
-// What is kept is trimmed (the thinking shortened, the tools' results left out), and the oldest go when the browser's
-// storage is full.
+// Conversations are kept with the series, in the content root's sidecar (`.backstage/chats/`, server/chats.ts), when
+// backstage runs with --write; a read-only one keeps them in this browser (localStorage, per series, the newest 30), and
+// the browser's move to the series once it can. The last one opens again after a reload, *New conversation* keeps the one
+// before it, and *History* lists them with the tasks (live, or from their records), newest first, to open again or
+// delete. What is kept is trimmed (src/model/chats.ts: the thinking shortened, the tools' results left out, no pictures).
 
 import { html } from "htm/preact";
 import { signal } from "@preact/signals";
@@ -26,6 +27,8 @@ import { Markdown } from "./md.ts";
 import { loadSettings, settingsNow } from "./settings.ts";
 import { hrefOf } from "./proposed.ts";
 import { hostOf } from "../model/tools.ts";
+import { keptChat, KEEP_CHATS, toMove, type ChatSummary } from "../model/chats.ts";
+import { elsewhere, loadRecords, runs } from "../runs.ts";
 import { liveLine, scrollerOf, ThinkingBlock, tick, ToolGroup, useStickToBottom, type Thinking, type ToolPart } from "./chat/parts.ts";
 
 export type Part = { type: "start_run"; goal: string; started?: string } | { type: "text"; text: string } | Thinking | ToolPart | { type: "proposal"; id: string } | { type: "confirm"; estimateUsd: number; why: string } | { type: "error"; message: string } | { type: "done"; usd?: number } | { type: "stopped" } | AskPart | { type: "sources"; list: { url: string; title?: string }[] } | { type: "remembered"; id: string; text: string; undone?: boolean };
@@ -43,39 +46,57 @@ export const sideTab = signal<SideTab>(saved === "agents" || saved === "docs" ? 
 const turns = signal<Turn[]>([]);
 const busy = signal(false);
 
-// ---- the conversations kept in this browser ----------------------------------------------------------------------------
+// ---- the conversations: with the series (server/chats.ts), or in this browser on a read-only backstage ---------------------
 
 interface Chat { id: string; title: string; at: number; turns: Turn[] }
-const KEEP = 30;
+/** A conversation in History: its turns once they are read (a list from the server has none). */
+interface ChatItem { id: string; title: string; at: number; messages: number; turns?: Turn[] }
+/** The most kept in a browser (a read-only backstage keeps none). */
+const KEEP_LOCAL = 30;
 const storeKey = () => `backstage:chats:${world.value?.series?.id ?? "root"}`;
-const readChats = (): Chat[] => { try { return JSON.parse(localStorage.getItem(storeKey()) ?? "[]") as Chat[]; } catch { return []; } };
-/** The longest thinking kept with a conversation, and the most of one conversation kept. */
-const KEEP_THINKING = 2000, KEEP_CHAT = 200_000;
-/** A turn as it is kept: the thinking shortened, no tool's result (it can be long and is not needed to read it again). */
-const trimmed = (t: Turn): Turn => !t.parts ? t : { ...t, parts: t.parts.map(p => p.type === "thinking" ? { ...p, text: p.text.slice(0, KEEP_THINKING) } : p.type === "tool" ? { ...p, detail: undefined } : p) };
-const chatJson = (c: Chat) => { const turns = c.turns.map(trimmed); let j = JSON.stringify({ ...c, turns }); for (let n = 1; j.length > KEEP_CHAT && n < turns.length; n++) j = JSON.stringify({ ...c, turns: turns.slice(n) }); return j; };
-/** Write the conversations; when the browser's storage is full, the oldest go until they fit. */
-const writeChats = (cs: Chat[]) => {
-  const list = cs.slice(0, KEEP).map(chatJson);
+const readLocal = (k = storeKey()): Chat[] => { try { return JSON.parse(localStorage.getItem(k) ?? "[]") as Chat[]; } catch { return []; } };
+/** Write the conversations to this browser; when its storage is full, the oldest go until they fit. */
+const writeLocal = (cs: Chat[]) => {
+  const list = cs.slice(0, KEEP_LOCAL).map(c => JSON.stringify(keptChat(c)));
   for (let n = list.length; n > 0; n--) {
     try { localStorage.setItem(storeKey(), `[${list.slice(0, n).join(",")}]`); return; } catch { /* full: try with fewer */ }
   }
   // blocked: the conversation stays in this tab
 };
+const itemOf = (c: Chat): ChatItem => ({ id: c.id, title: c.title, at: c.at, messages: c.turns.filter(t => t.role === "user").length, turns: c.turns });
 /** The conversations kept, newest first, and the one open. */
-export const chats = signal<Chat[]>([]);
+export const chats = signal<ChatItem[]>([]);
+/** Where they are kept: with the series once the server said it writes them (`GET /api/chats`), else in this browser. */
+export const chatsKept = signal<"series" | "browser">("browser");
 const chatId = signal<string>("");
 const newId = () => `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 let loadedFor = "";
-/** Read the kept conversations once per series, and open the newest. */
+/** Read the kept conversations once per series, and open the newest: this browser's at once, then the series' from the server. */
 function loadChats() {
   const k = storeKey();
   if (loadedFor === k) return;
   loadedFor = k;
-  chats.value = readChats();
-  const last = chats.value[0];
-  chatId.value = last?.id ?? newId();
-  turns.value = last?.turns ?? [];
+  const local = readLocal(k);
+  chats.value = local.map(itemOf);
+  chatId.value = local[0]?.id ?? newId();
+  turns.value = local[0]?.turns ?? [];
+  void fromSeries(k, local);
+}
+/** The series' conversations, when this backstage writes them; this browser's move there once (then are cleared from it). */
+async function fromSeries(k: string, local: Chat[]) {
+  const r = await api.get<{ chats: ChatSummary[]; write: boolean }>("chats");
+  if (r.status !== 200 || !r.write || loadedFor !== k) return;
+  const move = toMove(local, r.chats);
+  let moved = 0;
+  for (const c of move) if ((await api.put(`chats/${c.id}`, keptChat(c))).status === 200) moved++;
+  if (moved === move.length) { try { localStorage.removeItem(k); } catch { /* blocked */ } }
+  const list = move.length ? await api.get<{ chats: ChatSummary[] }>("chats") : r;
+  if (loadedFor !== k || list.status !== 200) return;
+  chatsKept.value = "series";
+  // the one open keeps its turns, so opening it again does not count as a change
+  const open = chats.value.find(c => c.id === chatId.value);
+  chats.value = list.chats.map(s => ({ id: s.id, title: s.title, at: s.at, messages: s.messages, ...(s.id === open?.id ? { turns: open.turns } : {}) }));
+  if (!turns.value.length && chats.value[0]) await openChat(chats.value[0].id);
 }
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 /** Keep the open conversation (a moment after it changes, so a streaming answer is not written at every word). */
@@ -86,19 +107,37 @@ function keep() {
     if (!turns.value.length || chats.value.find(c => c.id === chatId.value)?.turns === turns.value) return;
     const first = turns.value.find(t => t.role === "user")?.content ?? "A conversation";
     const chat: Chat = { id: chatId.value, title: first.replace(/\s+/g, " ").slice(0, 80), at: Date.now(), turns: turns.value };
-    chats.value = [chat, ...chats.value.filter(c => c.id !== chat.id)].slice(0, KEEP);
-    writeChats(chats.value);
+    const series = chatsKept.value === "series";
+    chats.value = [itemOf(chat), ...chats.value.filter(c => c.id !== chat.id)].slice(0, series ? KEEP_CHATS : KEEP_LOCAL);
+    if (series) void api.put<{ message?: string }>(`chats/${chat.id}`, keptChat(chat)).then(r => { if (r.status !== 200) say(`the conversation was not kept: ${r.message ?? r.status}`, true); });
+    else writeLocal(chats.value.flatMap(c => (c.turns ? [{ id: c.id, title: c.title, at: c.at, turns: c.turns }] : [])));
   }, 400);
 }
 turns.subscribe(() => { if (loadedFor) keep(); });
 /** Start a new conversation (the one open stays in the history). */
 export function newChat() { loadChats(); chatId.value = newId(); turns.value = []; }
-function openChat(id: string) { const c = chats.value.find(x => x.id === id); if (c && !busy.value) { chatId.value = c.id; turns.value = c.turns; } }
-function forgetChat(id: string) {
+async function openChat(id: string) {
+  const c = chats.value.find(x => x.id === id);
+  if (!c || busy.value) return;
+  let got = c.turns;
+  if (!got) {
+    const r = await api.get<{ chat: Chat; message?: string }>(`chats/${id}`);
+    if (r.status !== 200) { say(r.message ?? "the conversation could not be read", true); return; }
+    got = r.chat.turns;
+    chats.value = chats.value.map(x => (x.id === id ? { ...x, turns: got } : x));
+  }
+  chatId.value = id; turns.value = got;
+}
+async function forgetChat(id: string) {
+  if (chatsKept.value === "series") {
+    const r = await api.del<{ message?: string }>(`chats/${id}`);
+    if (r.status !== 200 && r.status !== 404) { say(r.message ?? "the conversation was not deleted", true); return; }
+  }
   chats.value = chats.value.filter(c => c.id !== id);
-  writeChats(chats.value);
+  if (chatsKept.value === "browser") writeLocal(chats.value.flatMap(c => (c.turns ? [{ id: c.id, title: c.title, at: c.at, turns: c.turns }] : [])));
   if (chatId.value === id) newChat();
 }
+const TASK_WORD: Record<string, string> = { running: "working", gate: "waiting for you", paused: "paused", done: "done", stopped: "stopped" };
 const ago = (t: number) => { const m = Math.round((Date.now() - t) / 6e4); return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : new Date(t).toLocaleDateString(); };
 
 /** One-click asks, by the page open and what is selected on it: `block` needs a selected block of the script. */
@@ -472,6 +511,12 @@ export function AssistantChat() {
   const ai = typeof w.ai === "object" ? w.ai : null;
   const ctx = contextNow();
   const empty = !turns.value.length;
+  // History: the conversations and the tasks together, newest first (a task this backstage does not run, from its record)
+  const history = [
+    ...chats.value.map(c => ({ at: c.at, chat: c, task: null })),
+    ...runs.value.map(r => ({ at: r.at, chat: null, task: { id: r.id, goal: r.goal, status: TASK_WORD[r.status], elsewhere: false } })),
+    ...elsewhere().map(r => ({ at: r.createdAt, chat: null, task: { id: r.id, goal: r.goal, status: `last seen ${TASK_WORD[r.status] ?? r.status}`, elsewhere: true } })),
+  ].sort((a, b) => b.at - a.at);
   return html`
     ${!w.ai ? html`<p>The assistant is off. For Claude, stop backstage and start it again with <code>ANTHROPIC_API_KEY</code> set in its environment (the key never goes in a file). Or choose a local model (LM Studio, Ollama) in <a href="#/settings">Settings</a>.</p>` : html`
     <div class="chat">
@@ -498,12 +543,13 @@ export function AssistantChat() {
         </div>
       </div>
       <div class="meta"><button type="button" class="linkish" disabled=${busy.value || !turns.value.length} onClick=${() => { newChat(); setPast(false); }}><${Icon} name="plus" size=${14} /> New conversation</button>
-        <button type="button" class="linkish" aria-expanded=${past} disabled=${!chats.value.length} onClick=${() => setPast(!past)}><${Icon} name="history" size=${14} /> History${chats.value.length ? ` (${chats.value.length})` : ""}</button></div>
-      ${past && html`<div class="chat-history" role="list" aria-label="Past conversations">
-        <p class="note">Kept in this browser only, the newest ${KEEP}.</p>
-        ${chats.value.map(c => html`<div role="listitem" class=${`chat-past${c.id === chatId.value ? " on" : ""}`}>
-          <button type="button" class="open" disabled=${busy.value} onClick=${() => { openChat(c.id); setPast(false); }}><b>${c.title}</b><small>${ago(c.at)} · ${c.turns.filter(t => t.role === "user").length} message${c.turns.filter(t => t.role === "user").length === 1 ? "" : "s"}${c.id === chatId.value ? " · open now" : ""}</small></button>
-          <button type="button" class="iconbtn" title="Delete this conversation" aria-label=${`Delete “${c.title}”`} onClick=${() => forgetChat(c.id)}><${Icon} name="trash" size=${14} /></button></div>`)}
+        <button type="button" class="linkish" aria-expanded=${past} disabled=${!history.length} onClick=${() => { if (!past) void loadRecords(); setPast(!past); }}><${Icon} name="history" size=${14} /> History${history.length ? ` (${history.length})` : ""}</button></div>
+      ${past && html`<div class="chat-history" role="list" aria-label="Past conversations and tasks">
+        <p class="note">${chatsKept.value === "series" ? html`Kept with the series (<code>.backstage/</code>), with the tasks: everyone who works on it sees them. The newest ${KEEP_CHATS} conversations.` : html`This backstage is read-only, so conversations are kept in this browser only, the newest ${KEEP_LOCAL}. With <code>--write</code> they move to the series.`}</p>
+        ${history.map(h => h.chat ? html`<div role="listitem" class=${`chat-past${h.chat.id === chatId.value ? " on" : ""}`}>
+          <button type="button" class="open" disabled=${busy.value} onClick=${() => { void openChat(h.chat!.id); setPast(false); }}><span class="kind">Conversation</span><b>${h.chat.title}</b><small>${ago(h.at)} · ${h.chat.messages} message${h.chat.messages === 1 ? "" : "s"}${h.chat.id === chatId.value ? " · open now" : ""}</small></button>
+          <button type="button" class="iconbtn" title="Delete this conversation" aria-label=${`Delete “${h.chat.title}”`} onClick=${() => void forgetChat(h.chat!.id)}><${Icon} name="trash" size=${14} /></button></div>`
+          : html`<div role="listitem" class="chat-past"><a class="open" href=${`#/agents/tasks/${h.task!.id}`} onClick=${() => setPast(false)}><span class="kind">Task ${h.task!.id}${h.task!.elsewhere ? " · ran elsewhere" : ""}</span><b>${h.task!.goal}</b><small>${ago(h.at)} · ${h.task!.status}</small></a></div>`)}
       </div>`}
     </form>`}`;
 }
