@@ -1,3 +1,5 @@
+<a href="https://0rwx.com/"><img src=".github/ai-x.png" alt="AI:X: made by AI, curated by me" title="AI:X: made by AI, curated by me (0rwx.com)" width="44" align="right"></a>
+
 # Sahne
 
 <p align="center"><img src="assets/poster.jpg" alt="Sahne: a paper-theatre stage engine. Scene cards of a waterfront at golden hour, a night sky over the city, a story playing in a corner shop and a taxi ride, above a row of cut-paper characters." width="100%"></p>
