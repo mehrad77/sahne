@@ -4,9 +4,17 @@ Each release, newest first. The packages' `package.json` files carry the version
 
 ## Sahne 0.2
 
+### 0.2.2
+
+**Latest, 9 November 2026. A narrow almond eye.** [On GitHub](https://github.com/mehrad77/sahne/releases/tag/v0.2.2).
+
+- **The narrow almond eye** (`face.eyes: "narrow"`, *ince badem göz*), in [`sahne-kit`](../../sahne-kit/README.md). It is a long almond with its outer corner turned up and a lower, flatter lid with an inner fold, as many Central Asian faces have. Like every eye in the kit, it stays big and expressive, never a slit.
+  - It is open and a starter in the builder.
+  - It is never picked at random, so every crowd and seeded face looks as before.
+
 ### 0.2.1
 
-**Latest, 9 November 2026. Quizzes when a story wants one.** [On GitHub](https://github.com/mehrad77/sahne/releases/tag/v0.2.1).
+**9 November 2026. Quizzes when a story wants one.** [On GitHub](https://github.com/mehrad77/sahne/releases/tag/v0.2.1).
 
 - **The quiz is optional.** With the lesson plugin, an episode has no quiz, or one, two or three questions. A quiz of two or more still asks about the story and about a word (at least one `comp` and one `word` item). [`sahne-lesson`](../../sahne-lesson/README.md)
 - **Backstage removes a question.** Each question in the episode's quiz has a remove button, and the quiz block says it is optional.

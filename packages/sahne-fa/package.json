@@ -1,6 +1,6 @@
 {
   "name": "sahne-fa",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "description": "The Persian plugin of Sahne: mouth timing from spelling and word-to-token matching",
