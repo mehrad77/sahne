@@ -46,13 +46,16 @@ export const FACE_CHOICES: Record<"face.shape" | "face.eyes" | "face.eyeColor" |
       diamond: nm("Diamond", "elmas şeklinde yüz"), full: nm("Full", "dolgun yüz"),
     },
   },
-  // monolid, hooded and upturned are drawn as big and as expressive as the round eye (never a slit);
+  // monolid, hooded, upturned and narrow are drawn as big and as expressive as the round eye (never a slit);
   // 'çekik göz' is not a name or an alias here: in Turkish it is often pejorative about East Asian people
   "face.eyes": {
-    values: ["round", "almond", "sleepy", "dot", "small", "monolid", "hooded", "upturned"], default: "round", weights: { dot: 0.25, hooded: { adult: 1, elder: 2.5, child: 0.4, toddler: 0.2 } },
+    // narrow (a long almond, the outer corner a little up, as many Central Asian faces have) is never picked at random,
+    // so crowds and seeded looks stay as they were; a document or the builder chooses it
+    values: ["round", "almond", "sleepy", "dot", "small", "monolid", "hooded", "upturned", "narrow"], default: "round", weights: { dot: 0.25, hooded: { adult: 1, elder: 2.5, child: 0.4, toddler: 0.2 }, narrow: 0 },
     names: {
       round: nm("Round", "yuvarlak"), almond: nm("Almond", "badem"), sleepy: nm("Sleepy", "uykulu"), dot: nm("Dots", "nokta"),
       small: nm("Small", "küçük göz"), monolid: nm("Monolid", "tek kapaklı göz"), hooded: nm("Hooded", "düşük kapaklı göz"), upturned: nm("Upturned (cat)", "kedi gözü"),
+      narrow: nm("Narrow almond", "ince badem göz"),
     },
   },
   "face.eyeColor": { values: Object.keys(EYES), default: "eye_brown", weights: { eye_brown: 4, eye_dark: 4, eye_hazel: 2, eye_green: 1, eye_blue: 1.5, eye_grey: 0.6, eye_amber: 0.6, eye_light_blue: 0.6 } },
@@ -449,8 +452,8 @@ function drawEye(ctx: Ctx, s: KitFaceStyle, f: FaceParams, side: 1 | -1, kid: bo
     if (open > 0.3) { ctx.fillStyle = "#fff"; trace(ctx, ellipse(cx - 0.45 + f.pupil[0] * 0.5, cy - ry * 0.45, 0.42, 0.42)); ctx.fill(); }
     return;
   }
-  // the upturned eye is the whole eye turned 9° about its centre, the outer corner up; the lids act on top
-  const rot = kind === "upturned" ? -side * 9 * Math.PI / 180 : 0, co = Math.cos(rot), si = Math.sin(rot);
+  // the upturned eye is the whole eye turned 9° about its centre, the outer corner up (the narrow almond 6°); the lids act on top
+  const rot = kind === "upturned" ? -side * 9 * Math.PI / 180 : kind === "narrow" ? -side * 6 * Math.PI / 180 : 0, co = Math.cos(rot), si = Math.sin(rot);
   const R = (p: P): P => { const dx = p[0] - cx, dy = p[1] - cy, q: P = [cx + dx * co - dy * si, cy + dx * si + dy * co]; if (p.length === 3) q.push(p[2]); return q; };
   const sm = (pts: P[], closed: boolean) => smooth(rot ? pts.map(R) : pts, closed, 1);
   const el = (x: number, y: number, a: number, b: number) => rot ? ellipse(x, y, a, b).transform(rotateAbout(rot, cx, cy)) : ellipse(x, y, a, b);
@@ -462,6 +465,7 @@ function drawEye(ctx: Ctx, s: KitFaceStyle, f: FaceParams, side: 1 | -1, kid: bo
   else if (kind === "monolid") { rx *= 1.1; ry *= 0.76; }
   else if (kind === "hooded") { ry *= 0.9; }
   else if (kind === "upturned") { rx *= 1.05; ry *= 0.88; }
+  else if (kind === "narrow") { rx *= 1.22; ry *= 0.64; }
   const eye = el(cx, cy, rx, ry);
   // the eye socket: a thin deep rim, like a hole cut in the paper
   ctx.fillStyle = deep; ctx.globalAlpha = 0.55;
@@ -470,19 +474,19 @@ function drawEye(ctx: Ctx, s: KitFaceStyle, f: FaceParams, side: 1 | -1, kid: bo
   trace(ctx, eye); ctx.clip();
   ctx.fillStyle = "#FBF8F3"; ctx.fill();
   // the iris keeps its size on the narrower eyes (it is cut by the lids, as a real one is), so they stay big and readable
-  const ir = (kind === "monolid" ? Math.min(rx * 0.92, ry / 0.84) : kind === "upturned" || kind === "hooded" ? Math.min(rx, ry / 0.88) : Math.min(rx, ry)) * 0.8 * (0.92 + 0.08 * f.pupilSize);
+  const ir = (kind === "monolid" ? Math.min(rx * 0.92, ry / 0.84) : kind === "narrow" ? Math.min(rx * 0.78, ry / 0.7) : kind === "upturned" || kind === "hooded" ? Math.min(rx, ry / 0.88) : Math.min(rx, ry)) * 0.8 * (0.92 + 0.08 * f.pupilSize);
   const px = cx + f.pupil[0] * (rx - ir * 0.75), py = cy + f.pupil[1] * Math.max(0.3, ry - ir * 0.7) + ry * 0.06;
   ctx.fillStyle = s.eyeColor; trace(ctx, ellipse(px, py, ir, ir)); ctx.fill();
   ctx.fillStyle = "#16100E"; trace(ctx, ellipse(px, py, ir * 0.52 * f.pupilSize, ir * 0.52 * f.pupilSize)); ctx.fill();
   ctx.fillStyle = "#FFFFFF"; trace(ctx, ellipse(px - ir * 0.36, py - ir * 0.38, ir * 0.27, ir * 0.27)); ctx.fill();
   ctx.globalAlpha = 0.7; trace(ctx, ellipse(px + ir * 0.34, py + ir * 0.3, ir * 0.12, ir * 0.12)); ctx.fill(); ctx.globalAlpha = 1;
   // upper lid: closes from the top; tilt lowers the inner corner (+) or raises it (−)
-  const rest = kind === "sleepy" ? 0.22 : kind === "hooded" ? 0.14 : kind === "monolid" ? 0.05 : 0;
+  const rest = kind === "sleepy" ? 0.22 : kind === "hooded" ? 0.14 : kind === "monolid" ? 0.05 : kind === "narrow" ? 0.1 : 0;
   const lidY = cy - ry + (2 * ry) * (1 - Math.min(1, open) + rest * open);
   const innerX = cx - side * rx * 1.2, outerX = cx + side * rx * 1.2;
   const innerY = lidY + tilt * ry * 0.75, outerY = lidY - tilt * ry * 0.35;
-  // a monolid's lid is one smooth, flatter curve
-  const bulge = -ry * (kind === "monolid" ? 0.12 : 0.28) * Math.min(1, open);
+  // a monolid's lid is one smooth, flatter curve; the narrow almond's nearly so
+  const bulge = -ry * (kind === "monolid" ? 0.12 : kind === "narrow" ? 0.16 : 0.28) * Math.min(1, open);
   ctx.fillStyle = s.skin;
   trace(ctx, sm([[innerX, cy - ry * 3, 0], [outerX, cy - ry * 3, 0], [outerX, outerY, 0], [cx, (innerY + outerY) / 2 + bulge], [innerX, innerY, 0]], true)); ctx.fill();
   // lower lid: a smile's squint rises from below
@@ -490,7 +494,8 @@ function drawEye(ctx: Ctx, s: KitFaceStyle, f: FaceParams, side: 1 | -1, kid: bo
     const ly = cy + ry - 2 * ry * low * 0.62;
     trace(ctx, sm([[innerX, cy + ry * 3, 0], [outerX, cy + ry * 3, 0], [outerX, ly + ry * 0.2, 0], [cx, ly - ry * 0.18], [innerX, ly + ry * 0.2, 0]], true)); ctx.fill();
   }
-  const fold = kind === "monolid" && open > 0.12;
+  // the narrow almond has the monolid's inner fold too
+  const fold = (kind === "monolid" || kind === "narrow") && open > 0.12;
   const fx = cx - side * rx * 0.78, ftop = Math.max(innerY, cy - ry * 0.8);
   if (fold) {
     // the inner corner's fold: the lid comes down over the corner in a small wedge of skin
@@ -509,8 +514,9 @@ function drawEye(ctx: Ctx, s: KitFaceStyle, f: FaceParams, side: 1 | -1, kid: bo
   } else {
     const ly = Math.max(cy - ry, lidY), oy = Math.max(outerY, cy - ry * 0.45);
     trace(ctx, sm([[cx - side * rx * 0.98, Math.max(innerY, cy - ry * 0.6)], [cx, ly + bulge * 0.6], [cx + side * rx * 1.02, oy]], false)); ctx.stroke();
-    const flick = kind === "upturned" ? 0.48 : kind === "monolid" ? 0.2 : 0.33;
-    trace(ctx, sm([[cx + side * rx * 0.95, oy], [cx + side * rx * (0.95 + flick), oy - 0.9 - (kind === "upturned" ? 0.3 : 0)]], false)); ctx.stroke();
+    // the outer flick: the narrow almond's is long and low, drawing the eye out to its tail
+    const flick = kind === "upturned" ? 0.48 : kind === "monolid" ? 0.2 : kind === "narrow" ? 0.45 : 0.33;
+    trace(ctx, sm([[cx + side * rx * 0.95, oy], [cx + side * rx * (0.95 + flick), oy - (kind === "narrow" ? 0.55 : 0.9) - (kind === "upturned" ? 0.3 : 0)]], false)); ctx.stroke();
     if (kind === "hooded") {
       // the fold of skin that hangs over the lid, heavier towards the outer corner
       ctx.fillStyle = tone(s.skin, "shade"); ctx.globalAlpha = 0.45;
