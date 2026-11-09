@@ -2,7 +2,8 @@
 // plugin on (src/plugin.ts there). Errors: the ref and the lessons against the week's unit, the target words as cards of the
 // story's level and unit, a character above the story's level, how many target words and spots, a spot's lesson among the
 // story's and its example a line of it, the quiz, a mistake's fix used within three lines, and words that resolve to no card,
-// gloss or name. Warnings and info: the line counts by level, the 95% known-word ratio, and recycling across the season.
+// gloss or name. Warnings and info: the line counts by level (one-word reactions not counted), the 95% known-word ratio of
+// content words, "who says" quiz items, and across the season recycling and the spread of the quiz's right answers.
 // The rules that need the cards, the grammar, the syllabus or the calendar run only when the content root has them.
 
 import { isLine, type LineStep, type PluginCheckContext, type PluginSeasonContext, type StoryDoc } from "sahne-story";
@@ -16,8 +17,8 @@ interface LessonWorld {
   syllabus: { words: Record<string, { tr: string; unit: number }> } | null;
 }
 
-/** Lines per story (Kumru's STORIES_DESIGN.md §1, proposed): [min, max] by level and kind. */
-const LINES: Record<string, Record<string, [number, number]>> = { A1: { episode: [10, 14], special: [20, 28] }, A2: { episode: [14, 18], special: [26, 34] }, B1: { episode: [16, 22], special: [30, 40] } };
+/** Spoken lines per story (Kumru's STORIES_DESIGN.md §1): [min, max] by level and kind; a one-word reaction is not counted. */
+const LINES: Record<string, Record<string, [number, number]>> = { A1: { episode: [10, 18], special: [20, 30] }, A2: { episode: [14, 18], special: [26, 34] }, B1: { episode: [16, 22], special: [30, 40] } };
 const levelIndex = (l?: string) => (LEVELS as readonly string[]).indexOf(l ?? "A1");
 const addDays = (date: string, n: number) => new Date(Date.parse(`${date}T12:00:00Z`) + n * 864e5).toISOString().slice(0, 10);
 
@@ -51,13 +52,18 @@ export function checkLesson({ story, characters, world: w, lang, texts: all, nam
   if (nWords < wMin || nWords > wMax) add("counts", "error", `${nWords} target words; a${special ? " special" : "n episode"} has ${wMin}-${wMax}`);
   const spots = story.steps.filter(isSpot).length;
   if (special ? spots < 1 || spots > 2 : spots !== 1) add("counts", "error", `${spots} grammar spots; ${special ? "a special has 1-2" : "an episode has 1"}`);
-  const lines = story.steps.filter(isLine).length, size = LINES[level]?.[story.kind ?? "episode"];
-  if (size && (lines < size[0] || lines > size[1])) add("counts", "warning", `${lines} lines; ${level} ${story.kind ?? "episode"}s have ${size[0]}-${size[1]} (proposed)`);
+  // a one-word reaction (Aa!, Hmm…, Tamam, Evet!) is not a line here: it costs the reader nothing and makes turns natural
+  const said0 = (x: object) => String((x as Record<string, unknown>)[lang.id] ?? "");
+  const lines = story.steps.filter(st => isLine(st) && lang.checkWords(said0(st)).length > 1).length, size = LINES[level]?.[story.kind ?? "episode"];
+  if (size && (lines < size[0] || lines > size[1])) add("counts", "warning", `${lines} lines (one-word reactions not counted); ${level} ${story.kind ?? "episode"}s have ${size[0]}-${size[1]}`);
 
   // quiz
   const quiz = s.quiz ?? [];
-  // the quiz is optional: none, one, two or three items; two or more ask about the story and about a word
-  if (quiz.length >= 2 && (!quiz.some(q => q.kind === "comp") || !quiz.some(q => q.kind === "word"))) add("quiz", "error", "a quiz of two or more items needs at least one comp and one word item");
+  // the quiz is optional: none, one, two or three items. Two or more ask about the story; a word item is wanted too, but
+  // two comp items are fine when no target word works in a new frame
+  if (quiz.length >= 2 && !quiz.some(q => q.kind === "comp")) add("quiz", "error", "a quiz of two or more items needs at least one comp item");
+  // "“<quote>” Kim?" only matches a quote to its speaker: it needs no understanding of the story
+  quiz.forEach((q, k) => { const t = String(q.q?.[lang.id] ?? ""); if (/[“"][^”"]+[”"][^“"]*\bkim\b[^“"]*\?\s*$/i.test(t)) add("quiz", "warning", `quiz item ${k + 1} asks who says a quoted line; ask what the story needs instead`); });
   const haystack = all.map(t => norm(t.tr)).join(" | ");
   quiz.forEach((q, k) => {
     const quoted = [...(q.why ?? "").matchAll(/[“"]([^”"]+)[”"]/g)].map(m => m[1]);
@@ -88,14 +94,16 @@ export function checkLesson({ story, characters, world: w, lang, texts: all, nam
   }
   if (dictionary && unknown.size) add("text", "error", `${unknown.size} words resolve to no card, gloss or name: ${[...unknown].map(([x, n]) => (n > 1 ? `${x}×${n}` : x)).join(", ")}`);
 
-  // known-word ratio (a warning for now): names, numbers and particles count; glosses do not
+  // known-word ratio of content words (a warning for now): numbers and particles count as known; proper names, glossed
+  // words and sound words (hmm, aa, şşş, ku-kuu) are left out of the count, since a tap gives them and none is a word to learn
   if (day && dictionary) {
-    const known = resolver([...Object.values(world.cards ?? {}).filter(c => c.level === "A1" && unitOfRef(c.ref) > 0 && unitOfRef(c.ref) <= unit).map(c => c.tr), ...names, ...(world.syllabus ? Object.values(world.syllabus.words).filter(x => x.unit <= unit).map(x => x.tr) : [])]);
-    const toks = all.flatMap(t => words(t.tr));
+    const known = resolver([...Object.values(world.cards ?? {}).filter(c => c.level === "A1" && unitOfRef(c.ref) > 0 && unitOfRef(c.ref) <= unit).map(c => c.tr), ...(world.syllabus ? Object.values(world.syllabus.words).filter(x => x.unit <= unit).map(x => x.tr) : [])]);
+    const outside = resolver([...names, ...Object.keys(s.gl ?? {}), ...(lang.sounds ?? [])], { particles: false });
+    const toks = all.flatMap(t => words(t.tr)).filter(x => known(x) || !outside(x));
     const miss = new Map<string, number>();
     for (const x of toks) if (!known(x)) miss.set(x, (miss.get(x) ?? 0) + 1);
     const total = toks.length, missed = [...miss.values()].reduce((a, b) => a + b, 0), ratio = total ? 1 - missed / total : 1;
-    add("words", ratio < 0.95 ? "warning" : "info", `known words ${(ratio * 100).toFixed(1)}% of ${total} (95% wanted); not known: ${[...miss].map(([x, n]) => (n > 1 ? `${x}×${n}` : x)).join(", ")}`);
+    add("words", ratio < 0.95 ? "warning" : "info", `known words ${(ratio * 100).toFixed(1)}% of ${total} content words (95% wanted; names, glossed and sound words not counted); not known: ${[...miss].map(([x, n]) => (n > 1 ? `${x}×${n}` : x)).join(", ")}`);
   }
 }
 
@@ -108,6 +116,11 @@ export function checkLessonSeason({ world: w, stories, lang, texts, add }: Plugi
     const r = lang.resolver([c.tr], { particles: false });
     return texts(s).some(t => lang.checkWords(t.tr).some(r));
   };
+  // the quiz's right answers: a learner learns any position that is nearly always right (or never)
+  const at = [0, 0, 0, 0];
+  for (const story of stories) for (const q of lessonOf(story).quiz ?? []) if (q.options.length >= 3 && q.a >= 0 && q.a < 4) at[q.a]++;
+  const n = at.reduce((a, b) => a + b, 0), share = (k: number) => at[k] / n;
+  if (n >= 12 && [0, 1, 2].some(k => share(k) > 0.5 || share(k) < 0.15)) add("quiz", "warning", "season", `the quiz's right answers are skewed: first ${at[0]}, second ${at[1]}, third ${at[2]} of ${n}; vary the position`);
   for (const story of stories) {
     const date = story.releaseDate;
     if (!date) continue;

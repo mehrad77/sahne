@@ -36,7 +36,7 @@ export function noteOf(p: ProblemLike, c: NoteContext): Note {
     return { ...base, text: "Only the narrator speaks to the viewer.", fix: { label: "Make it a line", apply: s => set(s, [...path, "narr"], undefined) } };
   }
   if (p.rule === "counts" && (r = /^(\d+) target words; a(?:n)? ?(special|episode)? ?has (\d+)-(\d+)$/.exec(m))) return { ...base, text: `It teaches ${r[1]} target words; ${r[2] === "special" ? "a special" : "an episode"} needs ${r[3]}–${r[4]}.` };
-  if (p.rule === "quiz" && /needs at least one comp and one word/.test(m)) return { ...base, text: "The quiz needs a question about what happened and one about a word." };
+  if (p.rule === "quiz" && /needs at least one comp item/.test(m)) return { ...base, text: "The quiz needs a question about what happened." };
   if (p.rule === "quiz" && (r = /^quiz item (\d+): “(.+)” is not a line of the story$/.exec(m))) return { ...base, text: `Quiz question ${r[1]} quotes “${r[2]}”, which no line says.` };
   if (p.rule === "ref" && (r = /^spot example “(.*)” is not a line of the story$/.exec(m))) return { ...base, text: `The grammar spot points at “${r[1]}”, which no line says.` };
   if (p.rule === "text" && (r = /^(\d+) words resolve to no card, gloss or name: (.+)$/.exec(m))) {

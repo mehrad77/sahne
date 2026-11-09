@@ -7,7 +7,8 @@
 //   time      a clock time said aloud matches the linked clock
 //
 // and Kumru's series hints, which live here until a series can name its own: the hometown the host personalises
-// ("Tahran"), the stand-in never naming a country or a language, and Kırlangıç glossed.
+// ("Tahran"), the stand-in never claiming a country, nationality or language as their own (naming another
+// character's language is fine: "Farsça kelime!"), and Kırlangıç glossed.
 
 import type { ObjOp, Staging, Target } from "sahne";
 import { clockMinutes, deixis, lowerTr, match, readClock, readNumber, tokens } from "sahne-tr";
@@ -23,9 +24,9 @@ const ADVICE: Record<"bu" | "şu" | "o", string> = { bu: "hold_up", şu: "point"
 /** Words that motivate a gesture (prefixes of the lower-case word). Gestures not listed need none. */
 const MOTIVE: Record<string, string[]> = {
   count: [], // a number
-  give: ["buyr", "al", "ver", "işte"],
+  give: ["buyr", "buyur", "al", "ver", "işte"],
   take: ["al", "teşekkür", "sağ ol", "sağol"],
-  welcome: ["hoş", "buyr", "gel"],
+  welcome: ["hoş", "buyr", "buyur", "gel"],
   wave: ["merhaba", "selam", "hoşça", "güle", "görüşür", "bay", "günaydın", "iyi akşam", "iyi gece"],
   nod: ["evet", "tamam", "tabii", "olur", "peki", "doğru", "elbette", "anladım", "aynen"],
   shake_head: ["hayır", "yok", "değil", "olmaz"],
@@ -44,6 +45,20 @@ const MOTIVE: Record<string, string[]> = {
 
 const ascii = (s: string) => lowerTr(s).replace(/ı/g, "i").replace(/ş/g, "s").replace(/ç/g, "c").replace(/ğ/g, "g").replace(/ö/g, "o").replace(/ü/g, "u");
 const words = (text: string): LineWord[] => tokens(text).map(t => (t.kind === "word" ? { w: lowerTr(t.text).replace(/[’']/g, "'"), i: t.i } : { w: t.mark === "comma" ? "," : ".", i: t.i, pause: true, q: t.text === "?" }));
+
+/**
+ * A stand-in line that claims a country, nationality or language as the stand-in's own: Persian script, "İranlıyım",
+ * "Farsça konuşuyorum", "benim dilim". Naming another's ("Parvane Farsça konuşuyor", "Farsça kelime!") is not a claim.
+ */
+const B = "(?<![\\p{L}])", E = "(?![\\p{L}])";
+const CLAIM = [
+  /[\u0600-\u06FF]/u,
+  new RegExp(`${B}(?:İran|Fars|Afgan|Tacik)\\p{L}*?y?[ıiuü]m${E}`, "u"),
+  new RegExp(`${B}(?:Farsça|Arapça|Dari|Tacikçe)${E}[^.!?…]*?\\p{L}+(?:[ıiuü]yor|[ae]r|[ıiuü]r)[ıiuü]m${E}`, "u"),
+  new RegExp(`${B}(?:ana|benim) dilim${E}`, "iu"),
+  new RegExp(`${B}İran'?(?:da|dan|a)${E}[^.!?…]*?\\p{L}+[ıiuü]m${E}`, "u"),
+];
+export const standinClaims = (text: string): boolean => CLAIM.some(r => r.test(text));
 
 /** The learner's hometown in the stories' text, replaced by the host (s1e01: "Tahran"). */
 const HOMETOWN = "Tahran";
@@ -128,8 +143,9 @@ export const trLang: StoryLang = {
   checkWords,
   resolver,
   names: [HOMETOWN, `${HOMETOWN}lı`],
+  sounds: ["hmm", "hm", "aa", "a", "ay", "ah", "oh", "of", "uf", "vay", "şş", "şşş", "brr", "ha", "hı", "ku", "kuu", "tık", "pıt"],
   hints: (t, gl) => [
-    ...(t.standin && /İran|Farsça|[؀-ۿ]/.test(t.text) ? [`a stand-in line names a country or language: “${t.text}”`] : []),
+    ...(t.standin && standinClaims(t.text) ? [`a stand-in line claims a country, nationality or language: “${t.text}”`] : []),
     ...(/Kırlangıç/.test(t.text) && !gl["kırlangıç"] ? ["Kırlangıç is used but not glossed in gl"] : []),
   ],
   parenthetical: PARENTHETICAL,
