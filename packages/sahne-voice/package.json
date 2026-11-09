@@ -1,0 +1,23 @@
+{
+  "name": "sahne-voice",
+  "version": "0.2.3",
+  "private": true,
+  "type": "module",
+  "description": "The voice plugin of Sahne: each character's own voice, cast by a developer and generated ahead of time with a local speech model",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "sahne": "workspace:*"
+  },
+  "devDependencies": {
+    "sahne-story": "workspace:*",
+    "sahne-tr": "workspace:*",
+    "sahne-en": "workspace:*",
+    "sahne-de": "workspace:*",
+    "sahne-fa": "workspace:*"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts"
+  }
+}

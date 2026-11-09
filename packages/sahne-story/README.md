@@ -43,6 +43,7 @@ Every node reader (the story check, the place checker, the extras' generator, th
 | `needs.json` | what the stories' briefs ask of each place, keyed by site | no: without it the place lint's `needs` rule does not run |
 | `kit/pieces/<id>.json`, `kit/variants/<of>.<name>.json` | the root's own kit items, drawn as data (`sahne-kit/DRAWING.md`): a set piece or prop `x_<id>`, and named param sets (`x_<name>`) on generators the kit has; a drawing promoted into the kit (`sahne-kit/drawing/promote.ts`) leaves its `x_` id as an alias of its new one, which a story keeps using | no: without them the kit is the kit's own |
 | `thumbs/` | the story pictures, written by `sahne-gallery/thumbs.mjs` | no |
+| `voices/` | each character's recorded voice: the casting (`cast.json`), the chosen samples (`refs/`), the clips an app plays (`clips/<story>/`), and the developer's candidates and auditions (`.pool/`, `.audition/`, git-ignored); `sahne-voice/README.md` | no: without it every line is the device's voice |
 
 Story docs are separate from the data. The optional env var `SAHNE_STORY_DOCS` (an absolute folder) holds `STORIES_WORLD.md`: the stories' sites, as the tables of its §2. The gallery's places board (`/data/world.json`) and `test/needs.test.ts` read it. Without it, the board leaves the sites out and that test skips. Nothing in Sahne reads `STORIES_A1.md`; the calendar is the seasons' `calendar`, or `days.json`.
 

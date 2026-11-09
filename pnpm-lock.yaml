@@ -72,6 +72,9 @@ importers:
       sahne-tr:
         specifier: workspace:*
         version: link:../sahne-tr
+      sahne-voice:
+        specifier: workspace:*
+        version: link:../sahne-voice
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -120,6 +123,9 @@ importers:
       sahne-tr:
         specifier: workspace:*
         version: link:../sahne-tr
+      sahne-voice:
+        specifier: workspace:*
+        version: link:../sahne-voice
     devDependencies:
       '@fontsource/comic-neue':
         specifier: 5.3.0
@@ -194,6 +200,28 @@ importers:
       sahne:
         specifier: workspace:*
         version: link:../sahne
+
+  packages/sahne-voice:
+    dependencies:
+      sahne:
+        specifier: workspace:*
+        version: link:../sahne
+    devDependencies:
+      sahne-de:
+        specifier: workspace:*
+        version: link:../sahne-de
+      sahne-en:
+        specifier: workspace:*
+        version: link:../sahne-en
+      sahne-fa:
+        specifier: workspace:*
+        version: link:../sahne-fa
+      sahne-story:
+        specifier: workspace:*
+        version: link:../sahne-story
+      sahne-tr:
+        specifier: workspace:*
+        version: link:../sahne-tr
 
 packages:
 
