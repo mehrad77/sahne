@@ -237,7 +237,7 @@ A piece stands on its origin (the kit's floor point) when its art reaches it, el
 
   - **A parenthetical** (`src/model/parenthetical.ts`) is read phrase by phrase: a gesture of the kit (`waves`, `points at the apple`), a feeling (`happy`, `angry`), whom it is said to (`to İsmail`), where it points (`at the door`), a walk (`walks to counter`), a voice (`whispers`) or a shot (`close`). What it does not understand is named, never written.
   - Focusing a block selects it and the stage plays that moment; an option not picked is picked. The block playing is marked, and so are a changed block and one with problems.
-- **After the script:** what the series' plugins add. The lesson plugin adds the quiz (each question in every language, three options in the main language, the right one, the line its answer quotes) and the glosses (a word the cards do not have, its meaning in each translation).
+- **After the script:** what the series' plugins add. The lesson plugin adds the quiz (optional, none to three questions, each removable: each question in every language, three options in the main language, the right one, the line its answer quotes) and the glosses (a word the cards do not have, its meaning in each translation).
 - **The plugins' parts** (`src/ui/plugins/`): a series turns a story plugin on in `series.json` (sahne-story, *Plugins*), and backstage holds each plugin's two halves. The story half (`src/model/plugins.ts`, `STORY_PLUGINS`) adapts and checks. The editor half (`EditorPlugin`, `EDITOR_PLUGINS`) can add:
   - a row in the head (`Head`)
   - sections after the script (`Sections`)

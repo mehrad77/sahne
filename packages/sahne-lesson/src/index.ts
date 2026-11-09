@@ -43,9 +43,9 @@ export const lesson: StoryPlugin = {
         lessons: { type: "array", minItems: 1, maxItems: 3, uniqueItems: true, items: { type: "string", pattern: "^g_(a1|a2|b1)_[0-9]+_[a-z0-9_]+$" } },
         words: { type: "array", minItems: 5, maxItems: 12, uniqueItems: true, items: { type: "string", minLength: 1 } },
         gl: { type: "object", propertyNames: { pattern: "^[^A-ZİÇĞÖŞÜ]+$" }, additionalProperties: text },
-        quiz: { type: "array", minItems: 3, maxItems: 3, items: { type: "object", required: ["q", "options", "a", "why", "kind"], properties: { q: text, options: { type: "array", minItems: 3, maxItems: 3, items: { type: "string", minLength: 1 } }, a: { enum: [0, 1, 2] }, why: { type: "string", minLength: 1 }, kind: { enum: ["comp", "word"] } }, additionalProperties: false } },
+        quiz: { type: "array", maxItems: 3, items: { type: "object", required: ["q", "options", "a", "why", "kind"], properties: { q: text, options: { type: "array", minItems: 3, maxItems: 3, items: { type: "string", minLength: 1 } }, a: { enum: [0, 1, 2] }, why: { type: "string", minLength: 1 }, kind: { enum: ["comp", "word"] } }, additionalProperties: false } },
       },
-      required: ["level", "ref", "lessons", "words", "gl", "quiz"],
+      required: ["level", "ref", "lessons", "words", "gl"],
     },
     line: { mistake: { type: "object", required: ["fix"], properties: { fix: { type: "string", minLength: 1 } } }, note: { type: "object" } },
     choice: { kind: { enum: ["polite", "meaning", "action"] } },
@@ -62,5 +62,5 @@ export const lesson: StoryPlugin = {
     const n = (line as { note?: Record<string, string> }).note;
     return n ? { note: Object.fromEntries(Object.entries(n).map(([l, v]) => [l, personalise(v, l)])) } : {};
   },
-  prompt: "These are language-learning scenes. An episode teaches a few target words (card ids in `words`) and a grammar lesson (`lessons`), with one grammar spot ({ \"spot\": { \"lesson\", \"ex\" } }, Kerim explaining it on a line of the story) and a three-item quiz after it (`quiz/0` …, each answered by a line). Keep every line at the episode's level; gloss a word the learner cannot know in `gl`. A second reader also reports words above the level and quiz answers that do not hold.",
+  prompt: "These are language-learning scenes. An episode teaches a few target words (card ids in `words`) and a grammar lesson (`lessons`), with one grammar spot ({ \"spot\": { \"lesson\", \"ex\" } }, Kerim explaining it on a line of the story) and an optional quiz after it of up to three items (`quiz/0` …, each answered by a line; a story may have none). Keep every line at the episode's level; gloss a word the learner cannot know in `gl`. A second reader also reports words above the level and quiz answers that do not hold.",
 };
