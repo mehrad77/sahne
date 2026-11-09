@@ -7,6 +7,7 @@
 import json, sys, os, contextlib
 import torch, torchaudio as ta
 
+if os.environ.get("SAHNE_VOICE_THREADS"): torch.set_num_threads(int(os.environ["SAHNE_VOICE_THREADS"]))
 dev = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
 model = None
 ASR = os.environ.get("SAHNE_VOICE_ASR", "mlx-community/whisper-large-v3-turbo")
