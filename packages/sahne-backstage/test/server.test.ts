@@ -80,10 +80,10 @@ test("a save writes the edit and nothing else", async () => {
 test("an edit that brings an error is refused and writes nothing; one the file had does not block", async () => {
   const { body: { doc, mtime } } = await call(rw.url, "GET", "doc/story/s1e00");
   const before = readFileSync(file, "utf8");
-  delete doc.quiz;
+  delete doc.words;
   const r = await call(rw.url, "POST", "save", { edits: [{ kind: "story", id: "s1e00", doc, mtime }] });
   assert.equal(r.status, 422);
-  assert.ok(r.body.problems.some((p: { new?: boolean; level: string; message: string }) => p.new && p.level === "error" && /quiz/.test(p.message)));
+  assert.ok(r.body.problems.some((p: { new?: boolean; level: string; message: string }) => p.new && p.level === "error" && /words/.test(p.message)));
   assert.equal(readFileSync(file, "utf8"), before);
   const c = await call(rw.url, "POST", "check", { edits: [{ kind: "story", id: "s1e00", doc }] });
   assert.ok(c.body.problems.some((p: { new?: boolean }) => p.new));

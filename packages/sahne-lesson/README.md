@@ -18,12 +18,12 @@ The lesson plugin of [sahne-story](../sahne-story/README.md#plugins). A series t
 ## What it adds
 
 - **The step:** the spot. The core adapter skips a step it does not know, so the spot plays only with the plugin. The staging lints read its Kerim as a beat (`staging`).
-- **The story fields**, all of them required while the plugin is on:
+- **The story fields**, all of them but the quiz required while the plugin is on:
   - `level` (A1, A2, B1) and `ref` (the course unit, `A1_3`)
   - `lessons` (1–3 grammar lesson ids, `g_a1_2_var_yok`)
   - `words` (5–12 target words, as card ids)
   - `gl` (glosses: a lower-case word of the main language → its meaning in each translation)
-  - `quiz` (three items, each with a question, three options, the answer `a`, a `why` and a `kind`, `comp` or `word`)
+  - `quiz` (optional: none to three items, each with a question, three options, the answer `a`, a `why` and a `kind`, `comp` or `word`; a quiz of two or more has at least one of each kind)
 - **Line and choice fields:** a line's `note` and `mistake`; the choice kind `meaning`, beside the core's `polite` and `action`.
 - **The texts it needs:** each gloss in every translation, and each quiz question in every language.
 - **A line's note on its cue** (`info.note`, through `lineInfo`), personalised, for the host's log.

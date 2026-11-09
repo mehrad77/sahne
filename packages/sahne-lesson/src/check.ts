@@ -56,7 +56,8 @@ export function checkLesson({ story, characters, world: w, lang, texts: all, nam
 
   // quiz
   const quiz = s.quiz ?? [];
-  if (!quiz.some(q => q.kind === "comp") || !quiz.some(q => q.kind === "word")) add("quiz", "error", "the quiz needs at least one comp and one word item");
+  // the quiz is optional: none, one, two or three items; two or more ask about the story and about a word
+  if (quiz.length >= 2 && (!quiz.some(q => q.kind === "comp") || !quiz.some(q => q.kind === "word"))) add("quiz", "error", "a quiz of two or more items needs at least one comp and one word item");
   const haystack = all.map(t => norm(t.tr)).join(" | ");
   quiz.forEach((q, k) => {
     const quoted = [...(q.why ?? "").matchAll(/[“"]([^”"]+)[”"]/g)].map(m => m[1]);

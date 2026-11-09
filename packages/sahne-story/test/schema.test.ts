@@ -26,8 +26,8 @@ test("every place document is valid", () => {
 });
 
 test("a story with a break is refused, naming the path", () => {
-  const miss = S1(); delete miss.quiz;
-  assert.match(validateDoc("story", miss, [lesson])[0].message, /quiz/);
+  const miss = S1(); delete miss.words;
+  assert.match(validateDoc("story", miss, [lesson])[0].message, /words/);
   const kind = S1(); kind.kind = "movie";
   assert.ok(validateDoc("story", kind, [lesson]).some(p => p.path === "/kind"));
   const id = S1(); id.id = "x1";

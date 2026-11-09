@@ -38,15 +38,20 @@ test("lesson: a story with none of its parts passes the core check in a series w
   });
   const bare: World = { ...world, series: { ...world.series!, plugins: [] } };
   assert.deepEqual(errors(plain, bare, [lesson]).map(p => `${p.rule}: ${p.message}`), []);
-  // the same story in the lesson series misses what the plugin requires
-  assert.ok(errors(plain).some(p => /quiz/.test(p.message)));
+  // the same story in the lesson series misses what the plugin requires (the quiz is optional)
+  assert.ok(errors(plain).some(p => /words|lessons/.test(p.message)));
+  assert.ok(!errors(plain).some(p => /quiz/.test(p.message)));
 });
 
 test("lesson: the schema's lesson fields and step", () => {
   const s = structuredClone(d0.story) as LessonStory;
   assert.deepEqual(validateDoc("story", s, [lesson]), []);
   const noQuiz = structuredClone(s); delete noQuiz.quiz;
-  assert.match(validateDoc("story", noQuiz, [lesson])[0].message, /quiz/);
+  assert.deepEqual(validateDoc("story", noQuiz, [lesson]), [], "the quiz is optional");
+  const oneQ = structuredClone(s); oneQ.quiz = oneQ.quiz!.slice(0, 1);
+  assert.deepEqual(validateDoc("story", oneQ, [lesson]), [], "a quiz of one");
+  const fourQ = structuredClone(s); fourQ.quiz = [...fourQ.quiz!, fourQ.quiz![0]];
+  assert.ok(validateDoc("story", fourQ, [lesson]).some(p => p.path === "/quiz"), "at most three");
   const badA = structuredClone(s); badA.quiz![0].a = 3 as 0;
   assert.ok(validateDoc("story", badA, [lesson]).some(p => p.path === "/quiz/0/a"));
   const meaning = structuredClone(s) as StoryDoc;
@@ -61,6 +66,8 @@ test("lesson: each rule finds its break", () => {
   has(draft(s => { s.words = s.words!.slice(0, 4); }), "schema", /words/);
   has(draft(s => { s.quiz![0].why = "“Bu satır yok.”"; }), "quiz", /not a line/);
   has(draft(s => { s.quiz = s.quiz!.map(q => ({ ...q, kind: "comp" })); }), "quiz", /comp and one word/);
+  assert.ok(!rules(draft(s => { s.quiz = s.quiz!.slice(0, 1).map(q => ({ ...q, kind: "comp" })); })).some(r => /comp and one word/.test(r)), "one item may be either kind");
+  assert.ok(!rules(draft(s => { delete s.quiz; })).some(r => r.startsWith("quiz:")), "no quiz, no quiz rules");
   has(draft(s => { const sp = s.steps.find(isSpot)!; sp.spot.ex = "Hiç yok bu."; }), "ref", /spot example/);
   has(draft(s => { const sp = s.steps.find(isSpot)!; sp.spot.lesson = "g_a1_9_other"; }), "ref", /not in the story's lessons/);
   has(draft(s => { s.steps = s.steps.filter(st => !isSpot(st)); }), "counts", /0 grammar spots/);
