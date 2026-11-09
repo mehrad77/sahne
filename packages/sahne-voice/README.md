@@ -49,12 +49,13 @@ uv venv -p 3.11 ~/.cache/sahne-voice && uv pip install -p ~/.cache/sahne-voice/b
 $SAHNE_VOICE_PYTHON packages/sahne-voice/build/pool.py "$SAHNE_CONTENT/voices/.pool" tr_tr:dev:MALE:8 tr_tr:train:FEMALE:12 fa_ir:dev:MALE:5 children:3
 node packages/sahne-voice/build/voices.ts audition [--who a,b] [--n 5] [--force]
 node packages/sahne-voice/build/voices.ts choose --who farzad --ref fa_m02 --tempo 0.9 [--exaggeration 0.5] [--cfg 0.3] [--confirm]
-node packages/sahne-voice/build/voices.ts generate [--story s1e01,s1e02] [--who farzad]
+node packages/sahne-voice/build/voices.ts generate [--story s1e01,s1e02] [--who farzad] [--jobs 3]
 node packages/sahne-voice/build/voices.ts status
 node packages/sahne-voice/build/voices.ts --check
 ```
 
 - `pool.py` streams FLEURS. Each `lang:split:GENDER:n` asks for up to n distinct voices.
+- `generate` runs several workers side by side (`--jobs`, or `SAHNE_VOICE_JOBS`; by default a third of the cores, at most 4), each with its share of the CPU threads. The model is a step-by-step loop that leaves the GPU idle between steps, so this makes more clips a minute. Each worker holds its own model, about 2–4 GB, so keep to 3 on a 36 GB machine. The same line in the same voice in several stories is made once and copied.
 - `--check` fails when a confirmed voice has a missing or stale clip. An app's gate runs it.
 - Backstage runs `audition` and `generate` for the Voices page when it was started with `SAHNE_VOICE_PYTHON` set.
 

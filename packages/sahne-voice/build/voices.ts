@@ -2,7 +2,7 @@
 // SAHNE_CONTENT set to the content root and SAHNE_VOICE_PYTHON to a Python that has the worker's packages (build/worker.py):
 //
 //   node packages/sahne-voice/build/voices.ts audition [--who a,b] [--n 5]  each character's candidates reading their lines
-//   node packages/sahne-voice/build/voices.ts generate [--story a,b] [--who a,b]  the clips of the confirmed voices
+//   node packages/sahne-voice/build/voices.ts generate [--story a,b] [--who a,b] [--jobs n]  the clips of the confirmed voices, n workers side by side
 //   node packages/sahne-voice/build/voices.ts --check                          fails when a confirmed voice has a missing or stale clip
 //   node packages/sahne-voice/build/voices.ts status                           how many lines each voice has, made and doubted
 //
@@ -11,7 +11,9 @@
 // and kept only if the language plugin's matchLine accepts what was heard and its length is near the language's own
 // timing of the line; else it is made again with another seed, up to four times, and the best is kept and marked `doubt`.
 
-import { spawn, execFileSync, type ChildProcess } from "node:child_process";
+import { spawn, execFile, type ChildProcess } from "node:child_process";
+import { promisify } from "node:util";
+import { availableParallelism } from "node:os";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
@@ -63,14 +65,22 @@ export function linesOf(story: string): Line[] {
 
 // ---- the worker ----
 
+const TMP = join(tmpdir(), `sahne-voice-${process.pid}`);
+
 class Worker {
   private p: ChildProcess;
   private waiting = new Map<number, (r: Record<string, unknown>) => void>();
   private n = 0;
   readonly ready: Promise<void>;
-  constructor() {
+  /** This worker's scratch folder: workers run side by side, so each has its own. */
+  readonly dir: string;
+  /** `threads`: the CPU threads its model may use, so several workers share the cores instead of fighting over them. */
+  constructor(id = 0, threads = 0) {
     const py = process.env.SAHNE_VOICE_PYTHON ?? "python3";
-    this.p = spawn(py, [path(new URL("worker.py", import.meta.url))], { stdio: ["pipe", "pipe", "ignore"] });
+    this.dir = join(TMP, `w${id}`);
+    mkdirSync(this.dir, { recursive: true });
+    const env = threads ? { ...process.env, SAHNE_VOICE_THREADS: String(threads), OMP_NUM_THREADS: String(threads) } : process.env;
+    this.p = spawn(py, [path(new URL("worker.py", import.meta.url))], { stdio: ["pipe", "pipe", "ignore"], env });
     let ok: () => void;
     this.ready = new Promise(r => { ok = r; });
     createInterface({ input: this.p.stdout! }).on("line", l => {
@@ -92,15 +102,15 @@ class Worker {
 
 // ---- making one clip ----
 
-const TMP = join(tmpdir(), `sahne-voice-${process.pid}`);
-const ffmpeg = (...a: string[]) => execFileSync("ffmpeg", ["-loglevel", "error", "-y", ...a]);
-const lengthMs = (f: string) => Math.round(Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f]).toString()) * 1000);
+const run = promisify(execFile);
+const ffmpeg = (...a: string[]) => run("ffmpeg", ["-loglevel", "error", "-y", ...a]);
+const lengthMs = async (f: string) => Math.round(Number((await run("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f])).stdout) * 1000);
 const FEELING: Record<string, number> = { surprised: 0.15, laugh: 0.15, excited: 0.15, angry: 0.1, scared: 0.1, proud: 0.05, sad: -0.05, tired: -0.1 };
 
 /** Trim the silence, level the loudness, set the tempo, and encode (AAC, mono, 24 kHz). */
-function finish(wav: string, out: string, tempo: number) {
+async function finish(wav: string, out: string, tempo: number) {
   const t = Math.min(1.5, Math.max(0.6, tempo));
-  ffmpeg("-i", wav, "-af", `silenceremove=start_periods=1:start_threshold=-45dB,areverse,silenceremove=start_periods=1:start_threshold=-45dB,areverse,loudnorm=I=-18:TP=-1.5,atempo=${t}`,
+  await ffmpeg("-i", wav, "-af", `silenceremove=start_periods=1:start_threshold=-45dB,areverse,silenceremove=start_periods=1:start_threshold=-45dB,areverse,loudnorm=I=-18:TP=-1.5,atempo=${t}`,
     "-ar", "24000", "-ac", "1", "-c:a", "aac", "-b:a", "48k", out);
 }
 
@@ -117,16 +127,15 @@ function judge(text: string, heard: string, ms: number): { ok: boolean; doubt?: 
 
 /** One clip in a voice, checked; the best of up to four takes. */
 async function make(w: Worker, l: { who: string; text: string; emo?: string }, v: VoiceChoice, ref: string, out: string, takes = 4): Promise<{ ms: number; doubt?: string; heard: string }> {
-  mkdirSync(TMP, { recursive: true });
   let best: { score: number; ms: number; doubt?: string; heard: string; f: string } | null = null;
   const exaggeration = Math.min(1, Math.max(0.25, v.exaggeration + (FEELING[l.emo ?? ""] ?? 0)));
   for (let i = 0; i < takes; i++) {
-    const raw = join(TMP, `raw${i}.wav`), f = join(TMP, `take${i}.m4a`);
+    const raw = join(w.dir, `raw${i}.wav`), f = join(w.dir, `take${i}.m4a`);
     const r = await w.ask({ op: "say", text: spoken(l.text), lang: main, ref, exaggeration, cfg: v.cfg, seed: parseInt(hash(`${l.who}${l.text}${i}`).slice(0, 8), 16), out: raw });
     if (!r.ok) throw new Error(String(r.error));
-    finish(raw, f, v.tempo);
+    await finish(raw, f, v.tempo);
     const h = await w.ask({ op: "hear", path: f, lang: main });
-    const heard = String(h.heard ?? ""), ms = lengthMs(f), j = judge(l.text, heard, ms);
+    const heard = String(h.heard ?? ""), ms = await lengthMs(f), j = judge(l.text, heard, ms);
     if (!best || (j.ok ? 2 : 0) + j.score > (best.doubt ? 0 : 2) + best.score) best = { score: j.score, ms, doubt: j.doubt, heard, f };
     if (j.ok) break;
   }
@@ -229,27 +238,58 @@ function stale(story: string, c: VoiceCast, who?: string[]) {
   return { m, todo };
 }
 
-async function generate(o: { story?: string[]; who?: string[] }) {
-  const c = cast(), w = new Worker();
-  let made = 0, doubted = 0;
-  try {
-    for (const story of storyIds()) {
-      if (o.story && !o.story.includes(story)) continue;
-      const { m, todo } = stale(story, c, o.who);
-      m.unvoiced = Object.entries(c.characters).filter(([, ch]) => ch.unvoiced).map(([w]) => w).sort();
-      if (!m.unvoiced.length) delete m.unvoiced;
-      const dir = new URL(`${story}/`, VOICE_CLIPS);
-      mkdirSync(dir, { recursive: true });
-      for (const l of todo) {
-        const v = c.characters[l.who].voice!, f = clipFile(l.who, l.text);
+/** How many workers fit this machine: the model is a step-by-step loop that leaves the GPU idle between steps, so several
+ * side by side make more clips a minute; each takes a share of the cores. `SAHNE_VOICE_JOBS` or `--jobs` overrides it. */
+export const defaultJobs = () => Number(process.env.SAHNE_VOICE_JOBS) || Math.max(1, Math.min(4, Math.floor(availableParallelism() / 3)));
+
+async function generate(o: { story?: string[]; who?: string[]; jobs?: number }) {
+  const c = cast(), jobs = Math.max(1, o.jobs ?? defaultJobs());
+  const stories = storyIds().filter(s => !o.story || o.story.includes(s));
+  const unvoiced = Object.entries(c.characters).filter(([, ch]) => ch.unvoiced).map(([w]) => w).sort();
+  const manifests = new Map<string, Manifest>(), queue: { story: string; l: Line }[] = [];
+  for (const story of stories) {
+    const { m, todo } = stale(story, c, o.who);
+    if (unvoiced.length) m.unvoiced = unvoiced; else delete m.unvoiced;
+    manifests.set(story, m);
+    mkdirSync(new URL(`${story}/`, VOICE_CLIPS), { recursive: true });
+    for (const l of todo) queue.push({ story, l });
+  }
+  // the same line by the same voice in another story is one clip, copied: made once, by whichever worker reaches it first
+  const made = new Map<string, Promise<{ file: string; clip: Clip } | null>>();
+  let n = 0, doubted = 0, copied = 0;
+  const total = queue.length, t0 = Date.now();
+  console.log(`${total} lines to make, ${jobs} workers`);
+  const workers = Array.from({ length: Math.min(jobs, Math.max(1, total)) }, (_, i) => new Worker(i, Math.max(1, Math.floor(availableParallelism() / jobs))));
+  const one = async (w: Worker, { story, l }: { story: string; l: Line }) => {
+    const v = c.characters[l.who].voice!, f = clipFile(l.who, l.text), sig = sigOf(l, v), dir = new URL(`${story}/`, VOICE_CLIPS);
+    const key = `${l.who}\u0000${l.text}\u0000${sig}`;
+    let clip: Clip;
+    const first = made.get(key), done = first && await first;
+    if (done) {
+      copyFileSync(done.file, path(new URL(f, dir)));
+      clip = done.clip; copied++;
+    } else {
+      let ok!: (x: { file: string; clip: Clip } | null) => void;
+      made.set(key, new Promise(r => { ok = r; }));
+      try {
         const r = await make(w, l, v, refOf(l.who), path(new URL(f, dir)));
-        const clip: Clip = { f, ms: r.ms, sig: sigOf(l, v), ...(r.doubt ? { doubt: r.doubt } : {}) };
-        (m.lines[l.who] ??= {})[l.text] = clip;
-        writeJson(new URL("manifest.json", dir), m);
-        made++; if (r.doubt) doubted++;
-        console.log(`${story} ${l.who.padEnd(10)} ${r.doubt ? `doubt (${r.doubt})` : "ok"}  ${l.text}`);
-      }
+        clip = { f, ms: r.ms, sig, ...(r.doubt ? { doubt: r.doubt } : {}) };
+        ok({ file: path(new URL(f, dir)), clip });
+      } catch (e) { ok(null); throw e; }
+      if (clip.doubt) doubted++;
+    }
+    const m = manifests.get(story)!;
+    (m.lines[l.who] ??= {})[l.text] = clip;
+    writeJson(new URL("manifest.json", dir), m);
+    n++;
+    const eta = Math.round(((Date.now() - t0) / n) * (total - n) / 60000);
+    console.log(`[${n}/${total}, ~${eta} min left] ${story} ${l.who.padEnd(10)} ${done ? "copied" : clip.doubt ? `doubt (${clip.doubt})` : "ok"}  ${l.text}`);
+  };
+  try {
+    await Promise.all(workers.map(async w => { for (let job = queue.shift(); job; job = queue.shift()) await one(w, job); }));
+    for (const story of stories) {
       // drop what no line uses any more
+      const m = manifests.get(story)!, dir = new URL(`${story}/`, VOICE_CLIPS);
       const live = new Set(linesOf(story).map(l => `${l.who}\u0000${l.text}`));
       for (const [who, per] of Object.entries(m.lines)) for (const t of Object.keys(per)) if (!live.has(`${who}\u0000${t}`) || !c.characters[who]?.voice?.confirmed || c.characters[who]?.unvoiced) delete per[t];
       for (const [who, per] of Object.entries(m.lines)) if (!Object.keys(per).length) delete m.lines[who];
@@ -257,8 +297,8 @@ async function generate(o: { story?: string[]; who?: string[] }) {
       for (const f of readdirSync(dir)) if (f.endsWith(".m4a") && !used.has(f)) rmSync(new URL(f, dir));
       writeJson(new URL("manifest.json", dir), m);
     }
-  } finally { w.close(); rmSync(TMP, { recursive: true, force: true }); }
-  console.log(`${made} clips made, ${doubted} doubted (listen to them in backstage's Voices page)`);
+  } finally { workers.forEach(w => w.close()); rmSync(TMP, { recursive: true, force: true }); }
+  console.log(`${n} clips (${copied} copied from another story), ${doubted} doubted, in ${Math.round((Date.now() - t0) / 60000)} min (listen to the doubted ones in backstage's Voices page)`);
 }
 
 function check(): number {
@@ -292,12 +332,12 @@ function status() {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2), opt = (k: string) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args[i + 1] : undefined; };
   const list = (k: string) => opt(k)?.split(",");
-  const VALUED = ["--who", "--n", "--story", "--ref", "--tempo", "--exaggeration", "--cfg"];
+  const VALUED = ["--who", "--n", "--jobs", "--story", "--ref", "--tempo", "--exaggeration", "--cfg"];
   const cmd = args.find((a, i) => !a.startsWith("--") && !VALUED.includes(args[i - 1])) ?? (args.includes("--check") ? "check" : "status");
   if (cmd === "check") process.exit(check() ? 1 : 0);
   else if (cmd === "status") status();
   else if (cmd === "audition") await audition({ who: list("who"), n: Number(opt("n") ?? 5), force: args.includes("--force") });
-  else if (cmd === "generate") await generate({ story: list("story"), who: list("who") });
+  else if (cmd === "generate") await generate({ story: list("story"), who: list("who"), jobs: opt("jobs") ? Number(opt("jobs")) : undefined });
   else if (cmd === "choose") {
     const [who, ref] = [opt("who"), opt("ref")];
     if (!who || !ref) throw new Error("choose --who <id> --ref <pool id> [--tempo 0.9] [--exaggeration 0.5] [--cfg 0.3] [--confirm]");
