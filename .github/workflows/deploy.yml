@@ -2,9 +2,8 @@ name: deploy
 
 # The gallery as the live demo, https://sahne.shab.boo, on Cloudflare: once `ci` passes on main, the gallery is
 # built as a static site from the samples and deployed as a Worker's static assets (packages/sahne-gallery:
-# build.mjs, wrangler.jsonc; `pnpm sahne run deploy` does the same by hand). Off until a maintainer sets the
-# repository variable DEPLOY_ENABLED = true and the secrets CLOUDFLARE_API_TOKEN (a token that can edit Workers)
-# and CLOUDFLARE_ACCOUNT_ID.
+# build.mjs, wrangler.jsonc; `pnpm sahne run deploy` does the same by hand). It runs once the repository has the
+# secrets CLOUDFLARE_API_TOKEN (a token that can edit Workers) and CLOUDFLARE_ACCOUNT_ID; without them it does nothing.
 
 on:
   workflow_run:
@@ -21,8 +20,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # a job's `if` cannot read secrets, so this one says whether both are set
+  keys:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    outputs:
+      set: ${{ steps.keys.outputs.set }}
+    steps:
+      - id: keys
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$TOKEN" ] && [ -n "$ACCOUNT" ]; then echo "set=true" >> "$GITHUB_OUTPUT"; else echo "set=false" >> "$GITHUB_OUTPUT"; echo "::notice::No Cloudflare secrets: the site is not deployed"; fi
+
   deploy:
-    if: vars.DEPLOY_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
+    needs: keys
+    if: needs.keys.outputs.set == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -17,7 +17,7 @@ packages/
   sahne-backstage/ the studio an app runs on its content root (:5181), and its MCP server → packages/sahne-backstage/README.md
   sahne-gallery/  the dev gallery and the checks (:5180)        → packages/sahne-gallery/README.md
 .github/workflows/ci.yml       pnpm sahne check on every push and pull request, the scan, and the art job on a pull request that changes promoted drawings
-.github/workflows/deploy.yml   the gallery as the live demo, https://sahne.shab.boo (Cloudflare), deployed after ci passes on main; off until DEPLOY_ENABLED is set
+.github/workflows/deploy.yml   the gallery as the live demo, https://sahne.shab.boo (Cloudflare), deployed after ci passes on main; once the repository has the Cloudflare secrets (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID)
 .github/workflows/release.yml  a GitHub release and npm publishing on a v* tag; off until RELEASE_ENABLED / PUBLISH_ENABLED are set
 assets/                        the README's poster and scene pictures, and brand/: the logo of every package (assets/README.md says how they were made)
 .claude/skills/                visual-check, new-kit-part, new-place: the repo's own workflows for agents
