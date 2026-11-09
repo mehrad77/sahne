@@ -4,7 +4,18 @@ Each release, newest first. The packages' `package.json` files carry the version
 
 ## Sahne 0.2
 
-**Latest. Backstage: a studio for the whole series.** Also English, German and Persian, story plugins with lessons as the first, and more kit, drawn by more hands.
+### 0.2.1
+
+**Latest, 9 November 2026. Quizzes when a story wants one.** [On GitHub](https://github.com/mehrad77/sahne/releases/tag/v0.2.1).
+
+- **The quiz is optional.** With the lesson plugin, an episode has no quiz, or one, two or three questions. A quiz of two or more still asks about the story and about a word (at least one `comp` and one `word` item). [`sahne-lesson`](../../sahne-lesson/README.md)
+- **Backstage removes a question.** Each question in the episode's quiz has a remove button, and the quiz block says it is optional.
+- **The live demo deploys itself** after every green CI run on `main`, once the Cloudflare secrets are set. By hand it is `pnpm sahne run deploy`.
+- The README carries the AI:X badge.
+
+### 0.2.0
+
+**3 November 2026. Backstage: a studio for the whole series.** Also English, German and Persian, story plugins with lessons as the first, and more kit, drawn by more hands.
 
 <iframe src="https://www.youtube-nocookie.com/embed/HlKaonCS_YE?rel=0" title="Meet Sahne Backstage" loading="lazy" allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen style="display:block;width:100%;aspect-ratio:16/9;border:0;border-radius:12px"></iframe>
 
@@ -12,7 +23,7 @@ Each release, newest first. The packages' `package.json` files carry the version
 
 Until now, Sahne played what someone had written by hand in JSON. **Backstage** is where a series is now made: a studio in the browser for writers, directors and reviewers who don't program. AI can help at every step, and nothing reaches the learner until a person has approved it.
 
-### Why Backstage
+#### Why Backstage
 
 An illustrated dialogue scene usually takes a writer, an illustrator, an animator and an editor, and every change goes round all four again. That is why language apps show so few scenes, and why those scenes are rarely fixed or translated. In Sahne the script *is* the scene, so a scene can be changed as easily as its text. Backstage puts that power in the writer's hands:
 
@@ -20,7 +31,7 @@ An illustrated dialogue scene usually takes a writer, an illustrator, an animato
 - **Mistakes are cheap.** Every save passes the same checks as the project's own gate. Undo is always there, and so is the diff against the last commit.
 - **AI helps, people decide.** The assistant and outside agents propose, and you accept. Long work runs as a task you can watch, pause, steer and undo, down to *Back to before this task*.
 
-### How Backstage works
+#### How Backstage works
 
 - **A season is a board.** Weeks are rows and days are columns, with an episode on its release day. Drag a card to move its release, or click an empty day to start a new episode from three picks: where (a place, by its picture), who (the cast, by their portraits) and what it is about.
 - **An episode follows the stages of the work:** Brief, Script, Translate and Review, each with the one next step.
@@ -35,25 +46,25 @@ An illustrated dialogue scene usually takes a writer, an illustrator, an animato
 
 [Get started with Backstage →](get-started.md#write-and-stage-episodes-in-backstage) · [How agents write stories](writing-with-agents.md) · [The whole studio, page by page](../../sahne-backstage/README.md)
 
-### Every language
+#### Every language
 
 - **English, German and Persian** join Turkish as language plugins ([en](../../sahne-en/README.md), [de](../../sahne-de/README.md), [fa](../../sahne-fa/README.md)). Each times the mouths from the spelling, says numbers and times aloud, and hears an answer spoken back. Persian runs right to left. Their rules were written from the grammar and still want a native speaker's check.
 - **A series names its languages**: one main language, and the others as translations. Every title, name and line is kept in each of them, and a missing translation is caught by the check.
 - **Each story language has its own lints**, such as *this* versus *that* for near and far things, or a time in a line against the clock on the wall.
 
-### Stories that aren't lessons, and lessons as a plugin
+#### Stories that aren't lessons, and lessons as a plugin
 
 - **Story plugins** add their own steps, fields, checks and editor parts to a series that turns them on.
 - **Lessons are the first plugin**, [`sahne-lesson`](../../sahne-lesson/README.md): grammar spots, target words, glosses and the quiz. A series without it tells plain stories.
 - **Watch-only episodes** play on their own, with no turns for the viewer.
 
-### More kit, drawn by more hands
+#### More kit, drawn by more hands
 
 - **For stories across Europe:** a flag for every European country, boulangeries, bistros and pubs, trams, lamp posts, bistro chairs and pound and franc notes. There are also four new families: houses, transit, a bakery and a festival.
 - **Drawing as data.** A story can draw its own items in its content root. Agents draw them through backstage's tools and look at the result as a picture.
 - **Promotion with credit.** The best drawings move into the kit for everyone, with the artist's consent and credit ([Drawing kit items](../../sahne-kit/DRAWING.md)).
 
-### Also
+#### Also
 
 - Every package has a logo, from one generator.
 - 993 tests, and a review that confirmed and fixed 65 bugs before this release.
