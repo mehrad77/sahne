@@ -9,16 +9,17 @@ The voice plugin of Sahne: each character speaks in their own voice, the same in
 ## How it works
 
 1. **The pool.** The candidates are short read-speech samples from Google's [FLEURS](https://huggingface.co/datasets/google/fleurs) (CC BY 4.0: paid readers who agreed to it). Several languages are in it, so a character can speak Turkish with their own accent: a Persian sample gives Farzad a Persian accent. FLEURS has no speaker ids, so `build/pool.py` keeps only the voices Chatterbox's voice encoder tells apart (one speaker scores 0.85–0.95, two 0.6–0.75; the cut is 0.82). Children's candidates are young women's voices raised four semitones, since FLEURS has no children.
-2. **The brief.** `voices/cast.json` gives each speaking character a brief: gender (`neutral` for the learner's stand-in), age, and the language of their accent. It is the developer's, written once.
-3. **The audition.** `build/voices.ts audition` picks five candidates for each brief: the accent's own voices and two Turkish ones to compare, nearest the age's pitch. Each candidate reads two of the character's own lines.
-4. **The casting.** In backstage's Voices page (`#/voices`), the developer listens and picks a candidate. They set the tempo: the clips are slowed or quickened without changing their pitch, and the page shows the syllables per second. They set the feeling (calm, natural, lively), then confirm. A pick copies the candidate's sample to `voices/refs/<who>.wav`, with its credit in `voices/refs/CREDITS.json`.
-5. **Generating.** `build/voices.ts generate` reads every line of the confirmed voices with [Chatterbox Multilingual](https://github.com/resemble-ai/chatterbox) (Resemble AI, MIT), cloning the chosen sample.
+2. **Not voiced.** A character marked `unvoiced` in the casting is never recorded, and their lines stay silent: no clip and no fallback. The generator lists them in each story's manifest. Kumru's learner stand-in, Nima, is one: the lines are the learner's own to say, and the learner's character has no gender the series could cast for.
+3. **The brief.** `voices/cast.json` gives each speaking character a brief: gender (`neutral` for the learner's stand-in), age, and the language of their accent. It is the developer's, written once.
+4. **The audition.** `build/voices.ts audition` picks five candidates for each brief: the accent's own voices and two Turkish ones to compare, nearest the age's pitch. Each candidate reads two of the character's own lines.
+5. **The casting.** In backstage's Voices page (`#/voices`), the developer listens and picks a candidate. They set the tempo: the clips are slowed or quickened without changing their pitch, and the page shows the syllables per second. They set the feeling (calm, natural, lively), then confirm. A pick copies the candidate's sample to `voices/refs/<who>.wav`, with its credit in `voices/refs/CREDITS.json`.
+6. **Generating.** `build/voices.ts generate` reads every line of the confirmed voices with [Chatterbox Multilingual](https://github.com/resemble-ai/chatterbox) (Resemble AI, MIT), cloning the chosen sample.
    - Each line is said as the language plugin's `spoken()` gives it: numerals in words, no quote marks.
    - A surprised or laughing line gets a little more feeling.
    - Each clip is trimmed, levelled to −18 LUFS, set to the voice's tempo, and saved as 24 kHz mono AAC (`.m4a`, about 8 KB a line).
    - Whisper hears each clip back. A clip is kept only if the language plugin's `matchLine` accepts what was heard and its length is near the plugin's own timing of the line.
    - A clip that fails is made again with another seed, up to four takes. The best take is kept and marked `doubt`, and the Voices page lists it for listening.
-6. **Playing.** The app makes `clipVoice({ base, lang, fallback })`, a `VoiceProvider` for the stage (`sahne/DESIGN.md` §8.4), before the story starts.
+7. **Playing.** The app makes `clipVoice({ base, lang, fallback })`, a `VoiceProvider` for the stage (`sahne/DESIGN.md` §8.4), before the story starts.
    - It plays a line's clip into the voice bus. Its word marks are the language plugin's timing of the line, stretched to the clip.
    - A line with no clip goes to the fallback, the device's voice (`browserVoice()`). That covers a story not recorded yet, and a line that carries the learner's own name or hometown: the clips say the series' default, Nima and Tahran.
 
@@ -30,7 +31,7 @@ Every clip carries Resemble's inaudible Perth watermark.
 |---|---|---|
 | `voices/cast.json` | the briefs and the chosen voices (`VoiceCast`) | no, but tracked |
 | `voices/refs/<who>.wav`, `CREDITS.json` | each chosen voice's sample and where it comes from | no, but tracked |
-| `voices/clips/<story>/manifest.json`, `*.m4a` | the clips: who → the line as the stage speaks it → `{ f, ms, sig, doubt? }` | **yes** |
+| `voices/clips/<story>/manifest.json`, `*.m4a` | the clips: who → the line as the stage speaks it → `{ f, ms, sig, doubt? }`, and `unvoiced`, the characters whose lines stay silent | **yes** |
 | `voices/.pool/` | the candidates (`pool.json`, `<id>.wav`) | no: git-ignore it |
 | `voices/.audition/` | the auditions (`audition.json`, `<who>/*.m4a`) | no: git-ignore it |
 

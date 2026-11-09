@@ -35,7 +35,11 @@ export interface VoiceChoice {
 /** `voices/cast.json` in the content root. */
 export interface VoiceCast {
   model: string;
-  characters: Record<string, { brief: VoiceBrief; voice?: VoiceChoice }>;
+  /**
+   * `unvoiced`: a character whose lines are never recorded and stay silent, never the fallback voice: the learner's
+   * stand-in, whose lines are the learner's own to say, and whose look and so voice the series cannot know.
+   */
+  characters: Record<string, { brief: VoiceBrief; voice?: VoiceChoice; unvoiced?: boolean }>;
 }
 
 /** One line's clip in a story's manifest. */
@@ -51,7 +55,12 @@ export interface Clip {
 }
 
 /** `voices/clips/<story>/manifest.json`, beside the clips: who → the line as the stage speaks it → its clip. */
-export interface Manifest { story: string; lines: Record<string, Record<string, Clip>> }
+export interface Manifest {
+  story: string;
+  lines: Record<string, Record<string, Clip>>;
+  /** Characters whose lines stay silent (the cast's `unvoiced`): no clip, and no fallback either. */
+  unvoiced?: string[];
+}
 
 /** A short, stable hash (cyrb53) as 14 hex digits: clip file names and signatures, the same in Node and the browser. */
 export function hash(s: string): string {
@@ -89,10 +98,10 @@ export interface ClipVoice extends VoiceProvider {
  */
 export async function clipVoice(o: ClipVoiceOptions): Promise<ClipVoice> {
   const get = o.fetch ?? fetch;
-  let lines: Manifest["lines"] = {};
+  let lines: Manifest["lines"] = {}, unvoiced = new Set<string>();
   try {
     const r = await get(`${o.base}manifest.json`);
-    if (r.ok) lines = ((await r.json()) as Manifest).lines ?? {};
+    if (r.ok) { const m = (await r.json()) as Manifest; lines = m.lines ?? {}; unvoiced = new Set(m.unvoiced ?? []); }
   } catch { /* offline, or no clips for this story */ }
   const bytes = new Map<string, Promise<ArrayBuffer | null>>();
   const decoded = new Map<string, Promise<AudioBuffer | null>>();
@@ -116,6 +125,7 @@ export async function clipVoice(o: ClipVoiceOptions): Promise<ClipVoice> {
     count,
     available: lang => count > 0 || !!o.fallback?.available(lang),
     speak(text: string, so: SpeakOptions): Speaking | null {
+      if (so.who && unvoiced.has(so.who)) return null;
       const clip = so.who ? lines[so.who]?.[text] : undefined;
       const out = so.out;
       if (!clip || !out) return o.fallback?.available(so.lang) ? o.fallback.speak(text, so) : null;

@@ -175,7 +175,7 @@ async function audition(o: { who?: string[]; n: number; force: boolean }) {
   const w = new Worker();
   try {
     for (const [who, ch] of Object.entries(c.characters)) {
-      if (o.who && !o.who.includes(who)) continue;
+      if ((o.who && !o.who.includes(who)) || ch.unvoiced) continue;
       const samples = samplesOf(who, all), out = new URL(`${who}/`, dir);
       mkdirSync(out, { recursive: true });
       const entry: Audition = { who, brief: ch.brief, samples, candidates: [] };
@@ -221,7 +221,7 @@ function stale(story: string, c: VoiceCast, who?: string[]) {
   const m = readJson<Manifest>(new URL(`${story}/manifest.json`, VOICE_CLIPS), { story, lines: {} });
   const todo: Line[] = [];
   for (const l of linesOf(story)) {
-    const v = c.characters[l.who]?.voice;
+    const v = c.characters[l.who]?.unvoiced ? undefined : c.characters[l.who]?.voice;
     if (!v?.confirmed || (who && !who.includes(l.who))) continue;
     const have = m.lines[l.who]?.[l.text];
     if (!have || have.sig !== sigOf(l, v) || !existsSync(new URL(`${story}/${have.f}`, VOICE_CLIPS))) todo.push(l);
@@ -236,6 +236,8 @@ async function generate(o: { story?: string[]; who?: string[] }) {
     for (const story of storyIds()) {
       if (o.story && !o.story.includes(story)) continue;
       const { m, todo } = stale(story, c, o.who);
+      m.unvoiced = Object.entries(c.characters).filter(([, ch]) => ch.unvoiced).map(([w]) => w).sort();
+      if (!m.unvoiced.length) delete m.unvoiced;
       const dir = new URL(`${story}/`, VOICE_CLIPS);
       mkdirSync(dir, { recursive: true });
       for (const l of todo) {
@@ -249,7 +251,8 @@ async function generate(o: { story?: string[]; who?: string[] }) {
       }
       // drop what no line uses any more
       const live = new Set(linesOf(story).map(l => `${l.who}\u0000${l.text}`));
-      for (const [who, per] of Object.entries(m.lines)) for (const t of Object.keys(per)) if (!live.has(`${who}\u0000${t}`) || !c.characters[who]?.voice?.confirmed) delete per[t];
+      for (const [who, per] of Object.entries(m.lines)) for (const t of Object.keys(per)) if (!live.has(`${who}\u0000${t}`) || !c.characters[who]?.voice?.confirmed || c.characters[who]?.unvoiced) delete per[t];
+      for (const [who, per] of Object.entries(m.lines)) if (!Object.keys(per).length) delete m.lines[who];
       const used = new Set(Object.values(m.lines).flatMap(per => Object.values(per).map(x => x.f)));
       for (const f of readdirSync(dir)) if (f.endsWith(".m4a") && !used.has(f)) rmSync(new URL(f, dir));
       writeJson(new URL("manifest.json", dir), m);
@@ -281,6 +284,7 @@ function status() {
   }
   for (const [who, s] of Object.entries(per).sort((a, b) => b[1].lines - a[1].lines)) {
     const v = c.characters[who]?.voice;
+    if (c.characters[who]?.unvoiced) { console.log(`${who.padEnd(12)} ${String(s.lines).padStart(4)} lines  not voiced`); continue; }
     console.log(`${who.padEnd(12)} ${String(s.lines).padStart(4)} lines  ${String(s.made).padStart(4)} made  ${s.doubt ? `${s.doubt} doubted  ` : ""}${v ? `${v.ref}${v.confirmed ? "" : " (not confirmed)"}` : "no voice"}`);
   }
 }

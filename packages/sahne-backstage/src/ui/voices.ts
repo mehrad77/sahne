@@ -57,7 +57,7 @@ export function VoicesPage() {
 
   const w = world.value!;
   const who = Object.keys(s.cast.characters).sort((a, b) => (s.counts[b]?.lines ?? 0) - (s.counts[a]?.lines ?? 0));
-  const confirmed = who.filter(x => s.cast.characters[x].voice?.confirmed);
+  const confirmed = who.filter(x => s.cast.characters[x].voice?.confirmed || s.cast.characters[x].unvoiced);
   const running = !!s.job && !s.job.done;
   const start = (path: string, body: unknown) => api(path, body).then(load, e => setErr(String(e)));
 
@@ -67,7 +67,7 @@ export function VoicesPage() {
     ${!s.python && html`<p class="note bad">Backstage was started without SAHNE_VOICE_PYTHON, so it cannot run the speech model: auditions and generation are off. Picking and confirming still work.</p>`}
     ${err && html`<p class="note bad">${err}</p>`}
     <div class="row voices-bar">
-      <span class="chip ${confirmed.length === who.length ? "ok" : ""}">${confirmed.length} of ${who.length} voices confirmed</span>
+      <span class="chip ${confirmed.length === who.length ? "ok" : ""}">${confirmed.length} of ${who.length} characters settled (confirmed or not voiced)</span>
       <span class="grow"></span>
       <select value=${story} onChange=${(e: Event) => { const v = (e.target as HTMLSelectElement).value; setStory(v); void loadClips(v); }}>${s.stories.map(id => html`<option value=${id}>${id}</option>`)}</select>
       <button disabled=${running || !confirmed.length || !s.python} onClick=${() => start("/generate", { stories: [story] })}>Generate ${story}</button>
@@ -128,9 +128,10 @@ function Character(p: { id: string; name: string; pic: string; entry: VoiceCast[
           ${b.note && html`<span class="note">${b.note}</span>`}
         </div>
       </div>
-      <span class=${`chip ${v?.confirmed ? "ok" : v ? "warn" : ""}`}>${v?.confirmed ? `confirmed: ${v.ref}` : v ? `picked, not confirmed: ${v.ref}` : "no voice yet"}</span>
+      <label class="row small" title="Their lines stay silent: no clip, and not the device's voice either"><input type="checkbox" checked=${!!p.entry.unvoiced} onChange=${(e: Event) => api("/unvoiced", { who: p.id, on: (e.target as HTMLInputElement).checked }).then(p.onChange, p.onError)} /> Not voiced</label>
+      ${p.entry.unvoiced ? html`<span class="chip">not voiced</span>` : html`<span class=${`chip ${v?.confirmed ? "ok" : v ? "warn" : ""}`}>${v?.confirmed ? `confirmed: ${v.ref}` : v ? `picked, not confirmed: ${v.ref}` : "no voice yet"}</span>`}
     </div>
-    ${p.aud ? html`
+    ${p.entry.unvoiced ? html`<p class="note">Not voiced: their lines stay silent in the app.</p>` : p.aud ? html`
       <table class="voice-cands">
         <thead><tr><th></th><th>Voice</th><th>Its sample</th>${p.aud.samples.map(t => html`<th class="sample">“${t.replace(/^[“"]+|[”"]+$/g, "")}”</th>`)}<th title="Syllables per second at this tempo">syl/s</th></tr></thead>
         <tbody>${p.aud.candidates.map(c => html`<tr class=${pick === c.ref ? "on" : ""} onClick=${() => setPick(c.ref)}>
