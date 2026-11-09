@@ -238,9 +238,10 @@ function stale(story: string, c: VoiceCast, who?: string[]) {
   return { m, todo };
 }
 
-/** How many workers fit this machine: the model is a step-by-step loop that leaves the GPU idle between steps, so several
- * side by side make more clips a minute; each takes a share of the cores. `SAHNE_VOICE_JOBS` or `--jobs` overrides it. */
-export const defaultJobs = () => Number(process.env.SAHNE_VOICE_JOBS) || Math.max(1, Math.min(4, Math.floor(availableParallelism() / 3)));
+/** How many workers run side by side: two. The workers share one GPU, so a second one fills the gaps between the first one's
+ * steps (on an M3 Max: about 9 lines a minute against 6), but more only take turns and push the memory into compression
+ * (four made fewer lines than one). Each takes a share of the cores. `SAHNE_VOICE_JOBS` or `--jobs` overrides it. */
+export const defaultJobs = () => Number(process.env.SAHNE_VOICE_JOBS) || Math.min(2, availableParallelism());
 
 async function generate(o: { story?: string[]; who?: string[]; jobs?: number }) {
   const c = cast(), jobs = Math.max(1, o.jobs ?? defaultJobs());
