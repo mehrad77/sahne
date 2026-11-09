@@ -53,6 +53,17 @@ test("clipVoice hands a line with no clip to the fallback, and without one leave
   assert.equal(bare.speak("Başka.", { lang: "tr", who: "farzad", out }), null);
 });
 
+test("clipVoice leaves an unvoiced character's lines silent, never the fallback", async () => {
+  const said: string[] = [];
+  const fallback: VoiceProvider = { id: "f", available: () => true, speak: (t) => { said.push(t); return { cancel() {} }; }, cancel() {} };
+  const m: Manifest = { ...manifest, unvoiced: ["nima"] };
+  const f = (async (u: string) => (u.endsWith("manifest.json") ? { ok: true, json: async () => m } : { ok: true, arrayBuffer: async () => new ArrayBuffer(8) })) as unknown as typeof fetch;
+  const v = await clipVoice({ base: "/v/", lang: tr, fetch: f, fallback });
+  const { out } = fakeOut();
+  assert.equal(v.speak("Hoş bulduk!", { lang: "tr", who: "nima", out }), null);
+  assert.deepEqual(said, []);
+});
+
 test("clipVoice without a manifest is its fallback alone", async () => {
   const v = await clipVoice({ base: "/x/", lang: tr, fetch: (async () => ({ ok: false })) as unknown as typeof fetch });
   assert.equal(v.count, 0);

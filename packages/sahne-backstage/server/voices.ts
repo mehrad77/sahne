@@ -72,6 +72,13 @@ export async function voicesApi(method: string, a: string | undefined, b: string
     writeFileSync(VOICE_CAST, JSON.stringify(c, null, 1) + "\n");
     return { status: 200, body: { ok: true } };
   }
+  if (a === "unvoiced" && who) {
+    const c = castOf(), ch = c.characters[who];
+    if (!ch) return { status: 404, body: { message: `no character "${who}" in voices/cast.json` } };
+    if (q.on === true) ch.unvoiced = true; else delete ch.unvoiced;
+    writeFileSync(VOICE_CAST, JSON.stringify(c, null, 1) + "\n");
+    return { status: 200, body: { ok: true } };
+  }
   if (a === "choose" && who) {
     const v = q.voice as VoiceChoice;
     if (!v || typeof v.ref !== "string") return { status: 400, body: { message: "expected { who, voice: { ref, tempo, exaggeration, cfg, confirmed } }" } };
