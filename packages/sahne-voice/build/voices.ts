@@ -192,8 +192,10 @@ async function audition(o: { who?: string[]; n: number; force: boolean }) {
         }
         entry.candidates.push({ ref: p.id, lang: p.lang, gender: p.gender, f0: p.f0, source: p.source, clips });
       }
-      index[who] = entry;
-      writeJson(new URL("audition.json", dir), index);
+      // another run (backstage's Audition button) may have written since: merge into the file as it is now
+      const now = readJson<Record<string, Audition>>(new URL("audition.json", dir), {});
+      now[who] = index[who] = entry;
+      writeJson(new URL("audition.json", dir), now);
     }
   } finally { w.close(); rmSync(TMP, { recursive: true, force: true }); }
 }

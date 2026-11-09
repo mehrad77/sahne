@@ -132,7 +132,7 @@ function Character(p: { id: string; name: string; pic: string; entry: VoiceCast[
     </div>
     ${p.aud ? html`
       <table class="voice-cands">
-        <thead><tr><th></th><th>Voice</th><th>Its sample</th>${p.aud.samples.map(t => html`<th class="sample">“${t}”</th>`)}<th title="Syllables per second at this tempo">syl/s</th></tr></thead>
+        <thead><tr><th></th><th>Voice</th><th>Its sample</th>${p.aud.samples.map(t => html`<th class="sample">“${t.replace(/^[“"]+|[”"]+$/g, "")}”</th>`)}<th title="Syllables per second at this tempo">syl/s</th></tr></thead>
         <tbody>${p.aud.candidates.map(c => html`<tr class=${pick === c.ref ? "on" : ""} onClick=${() => setPick(c.ref)}>
           <td><input type="radio" name=${`pick-${p.id}`} checked=${pick === c.ref} /></td>
           <td><b>${c.ref}</b> <span class="note">${LANG[c.lang] ?? c.lang} · ${c.gender} · ${c.f0} Hz</span></td>
