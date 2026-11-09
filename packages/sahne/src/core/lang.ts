@@ -37,6 +37,11 @@ export interface LangPlugin {
   normalise?(said: string): string;
   /** Whether what the recogniser heard (one transcript, or its n-best alternatives) is one of the `expected` lines. */
   matchLine?(heard: string | string[], expected: string[], o?: MatchLineOptions): LineMatch;
+  /**
+   * A line as a voice should read it (`sahne-voice` sends it to a speech model): numerals in words, no quote marks, no leading
+   * pause; the punctuation that shapes the delivery stays. Without it the line goes as written.
+   */
+  spoken?(text: string): string;
 }
 
 export interface MatchLineOptions {
