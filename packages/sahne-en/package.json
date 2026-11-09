@@ -1,6 +1,6 @@
 {
   "name": "sahne-en",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "type": "module",
   "description": "The English plugin of Sahne: mouth timing from spelling and word-to-token matching",
