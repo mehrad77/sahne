@@ -15,7 +15,7 @@ export const SECTIONS: Section[] = [
   { id: "", title: "Home", about: "What Sahne is, why it exists and how it works", load: () => import("./sections/home.ts") },
   // these two are docs (guide/whats-new.md, guide/get-started.md) with a place of their own
   {
-    id: "new", title: "What's new", about: "Each release, newest first: Backstage in 0.2 (and the optional quiz in 0.2.1), the first stage in 0.1",
+    id: "new", title: "What's new", about: "Each release, newest first: Backstage in 0.2 (the optional quiz in 0.2.1, the narrow almond eye in 0.2.2), the first stage in 0.1",
     nav: () => RELEASES.map((r, i) => ({ label: i ? `Sahne ${r}` : `Sahne ${r} · latest`, hash: `#/new?at=sahne-${r.replace(".", "")}` })),
     load: () => import("./sections/docs.ts"),
   },

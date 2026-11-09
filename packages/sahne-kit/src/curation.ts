@@ -554,6 +554,7 @@ export const FEATURES: Record<string, Curated> = {
   "face.eyes:sleepy": { avail: "open", starter: true },
   "face.eyes:monolid": { avail: "open", starter: true },
   "face.eyes:hooded": { avail: "open", starter: true },
+  "face.eyes:narrow": { avail: "open", starter: true },
 };
 
 /** The fabrics of the starter set (every third, across the families); skin, hair and eye colours are always offered whole. */

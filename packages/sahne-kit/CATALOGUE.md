@@ -34,7 +34,7 @@ Every part, face value, colour and pattern of the first kit: the ones drawn, and
 | hold | 7 | 6 | 13 | 0 | 0 | 0 |
 | **all** | 155 | 278 | 367 | 64 | 2 | 0 |
 
-Face values: 66 drawn. Patterns: 8 drawn, 20 planned. Colours: 225 palette entries (with the unions). Deferred: 30.
+Face values: 67 drawn. Patterns: 8 drawn, 20 planned. Colours: 225 palette entries (with the unions). Deferred: 30.
 
 ## Parts
 
@@ -674,6 +674,7 @@ Planned: `pear` (Pear), `narrow` (Narrow), `soft_square` (Soft square).
 | `monolid` | Monolid | tek kapaklı göz | open · **starter** |
 | `hooded` | Hooded | düşük kapaklı göz | open · **starter** |
 | `upturned` | Upturned (cat) | kedi gözü | open |
+| `narrow` | Narrow almond | ince badem göz | open · **starter** |
 
 Planned: `large` (Large), `downturned` (Downturned), `deep_set` (Deep-set), `wide_set` (Wide-set).
 
