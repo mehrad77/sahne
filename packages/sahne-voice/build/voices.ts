@@ -2,6 +2,7 @@
 // SAHNE_CONTENT set to the content root and SAHNE_VOICE_PYTHON to a Python that has the worker's packages (build/worker.py):
 //
 //   node packages/sahne-voice/build/voices.ts audition [--who a,b] [--n 5]  each character's candidates reading their lines
+//   node packages/sahne-voice/build/voices.ts audition --who a --ref <pool id>  one more candidate for them (a sample of your own)
 //   node packages/sahne-voice/build/voices.ts generate [--story a,b] [--who a,b] [--jobs n]  the clips of the confirmed voices, n workers side by side
 //   node packages/sahne-voice/build/voices.ts --check                          fails when a confirmed voice has a missing or stale clip
 //   node packages/sahne-voice/build/voices.ts status                           how many lines each voice has, made and doubted
@@ -177,7 +178,7 @@ export function samplesOf(who: string, all: Line[]): string[] {
 
 interface Audition { who: string; brief: VoiceBrief; samples: string[]; candidates: { ref: string; lang: string; gender: string; f0: number; source: string; clips: { f: string; ms: number; doubt?: string; heard: string }[] }[] }
 
-async function audition(o: { who?: string[]; n: number; force: boolean }) {
+async function audition(o: { who?: string[]; n: number; force: boolean; ref?: string }) {
   const c = cast(), all = storyIds().flatMap(linesOf), voices = pool();
   if (!voices.length) throw new Error(`no candidate voices: build ${path(VOICE_POOL)}pool.json first (build/pool.py)`);
   const dir = VOICE_AUDITION, index = readJson<Record<string, Audition>>(new URL("audition.json", dir), {});
@@ -187,8 +188,11 @@ async function audition(o: { who?: string[]; n: number; force: boolean }) {
       if ((o.who && !o.who.includes(who)) || ch.unvoiced) continue;
       const samples = samplesOf(who, all), out = new URL(`${who}/`, dir);
       mkdirSync(out, { recursive: true });
-      const entry: Audition = { who, brief: ch.brief, samples, candidates: [] };
-      for (const p of candidates(ch.brief, voices, o.n)) {
+      // --ref: one more candidate (a sample of the developer's own) beside the ones already auditioned
+      const extra = o.ref ? voices.find(p => p.id === o.ref) : undefined;
+      if (o.ref && !extra) throw new Error(`no candidate "${o.ref}" in the pool`);
+      const entry: Audition = { who, brief: ch.brief, samples, candidates: extra ? (index[who]?.candidates ?? []).filter(x => x.ref !== extra.id) : [] };
+      for (const p of extra ? [extra] : candidates(ch.brief, voices, o.n)) {
         const v: VoiceChoice = { ref: p.id, exaggeration: 0.5, cfg: 0.3, tempo: 1, confirmed: false };
         const clips = [];
         for (const [i, text] of samples.entries()) {
@@ -337,7 +341,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const cmd = args.find((a, i) => !a.startsWith("--") && !VALUED.includes(args[i - 1])) ?? (args.includes("--check") ? "check" : "status");
   if (cmd === "check") process.exit(check() ? 1 : 0);
   else if (cmd === "status") status();
-  else if (cmd === "audition") await audition({ who: list("who"), n: Number(opt("n") ?? 5), force: args.includes("--force") });
+  else if (cmd === "audition") await audition({ who: list("who"), n: Number(opt("n") ?? 5), force: args.includes("--force"), ref: opt("ref") });
   else if (cmd === "generate") await generate({ story: list("story"), who: list("who"), jobs: opt("jobs") ? Number(opt("jobs")) : undefined });
   else if (cmd === "choose") {
     const [who, ref] = [opt("who"), opt("ref")];
