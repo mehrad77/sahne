@@ -128,19 +128,21 @@ function judge(text: string, heard: string, ms: number): { ok: boolean; doubt?: 
 
 /** One clip in a voice, checked; the best of up to four takes. */
 async function make(w: Worker, l: { who: string; text: string; emo?: string }, v: VoiceChoice, ref: string, out: string, takes = 4): Promise<{ ms: number; doubt?: string; heard: string }> {
-  let best: { score: number; ms: number; doubt?: string; heard: string; f: string } | null = null;
+  let best: { score: number; ms: number; doubt?: string; heard: string; f: string } | null = null, failed = "";
   const exaggeration = Math.min(1, Math.max(0.25, v.exaggeration + (FEELING[l.emo ?? ""] ?? 0)));
   for (let i = 0; i < takes; i++) {
     const raw = join(w.dir, `raw${i}.wav`), f = join(w.dir, `take${i}.m4a`);
     const r = await w.ask({ op: "say", text: spoken(l.text), lang: main, ref, exaggeration, cfg: v.cfg, seed: parseInt(hash(`${l.who}${l.text}${i}`).slice(0, 8), 16), out: raw });
-    if (!r.ok) throw new Error(String(r.error));
+    // the model can fail on a take (an empty sampling step): another seed usually works
+    if (!r.ok) { failed = String(r.error); continue; }
     await finish(raw, f, v.tempo);
     const h = await w.ask({ op: "hear", path: f, lang: main });
     const heard = String(h.heard ?? ""), ms = await lengthMs(f), j = judge(l.text, heard, ms);
     if (!best || (j.ok ? 2 : 0) + j.score > (best.doubt ? 0 : 2) + best.score) best = { score: j.score, ms, doubt: j.doubt, heard, f };
     if (j.ok) break;
   }
-  copyFileSync(best!.f, out);
+  if (!best) throw new Error(`every take failed: ${failed}`);
+  copyFileSync(best.f, out);
   return { ms: best!.ms, doubt: best!.doubt, heard: best!.heard };
 }
 
@@ -262,6 +264,7 @@ async function generate(o: { story?: string[]; who?: string[]; jobs?: number }) 
   // the same line by the same voice in another story is one clip, copied: made once, by whichever worker reaches it first
   const made = new Map<string, Promise<{ file: string; clip: Clip } | null>>();
   let n = 0, doubted = 0, copied = 0;
+  const failures: string[] = [];
   const total = queue.length, t0 = Date.now();
   console.log(`${total} lines to make, ${jobs} workers`);
   const workers = Array.from({ length: Math.min(jobs, Math.max(1, total)) }, (_, i) => new Worker(i, Math.max(1, Math.floor(availableParallelism() / jobs))));
@@ -280,7 +283,12 @@ async function generate(o: { story?: string[]; who?: string[]; jobs?: number }) 
         const r = await make(w, l, v, refOf(l.who), path(new URL(f, dir)));
         clip = { f, ms: r.ms, sig, ...(r.doubt ? { doubt: r.doubt } : {}) };
         ok({ file: path(new URL(f, dir)), clip });
-      } catch (e) { ok(null); throw e; }
+      } catch (e) {
+        // one line the model cannot say must not stop the season: it is left without a clip (the fallback says it) and listed
+        ok(null); n++; failures.push(`${story} ${l.who}: ${l.text} (${(e as Error).message})`);
+        console.log(`[${n}/${total}] ${story} ${l.who.padEnd(10)} FAILED  ${l.text}`);
+        return;
+      }
       if (clip.doubt) doubted++;
     }
     const m = manifests.get(story)!;
@@ -303,7 +311,8 @@ async function generate(o: { story?: string[]; who?: string[]; jobs?: number }) 
       writeJson(new URL("manifest.json", dir), m);
     }
   } finally { workers.forEach(w => w.close()); rmSync(TMP, { recursive: true, force: true }); }
-  console.log(`${n} clips (${copied} copied from another story), ${doubted} doubted, in ${Math.round((Date.now() - t0) / 60000)} min (listen to the doubted ones in backstage's Voices page)`);
+  if (failures.length) console.log(`${failures.length} line(s) failed every take and have no clip:\n  ${failures.join("\n  ")}`);
+  console.log(`${n - failures.length} clips (${copied} copied from another story), ${doubted} doubted, in ${Math.round((Date.now() - t0) / 60000)} min (listen to the doubted ones in backstage's Voices page)`);
 }
 
 function check(): number {
