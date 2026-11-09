@@ -22,15 +22,17 @@ function Head(p: EpisodeProps) {
     ${(l.lessons ?? []).map(id => html`<span class="chip ok">${id}</span>`)}</div>`;
 }
 
-/** The quiz after the episode. */
+/** The quiz after the episode: optional, none to three questions. */
 function Quiz(p: EpisodeProps) {
   const langs = useLangs(), all = allLanguages(langs);
   const quiz = (lessonOf(p.story).quiz ?? []) as unknown as Record<string, any>[];
   const put = (i: number, path: (string | number)[], v: unknown, field?: string) => p.edit(s => set(s, ["quiz", i, ...path], v), field ?? `quiz.${i}.${path.join(".")}`);
   return html`<div class="section-block"><h3><${Icon} name="review" size=${16} /> The quiz after it</h3>
+    <p class="note">Optional: none to three questions. Two or more ask about the story and about a word.</p>
     ${quiz.map((q, i) => html`<div class="quiz-item">
       <div class="row"><b>Question ${i + 1}</b>
-        <select value=${q.kind} aria-label="Kind" onChange=${(e: Event) => put(i, ["kind"], (e.target as HTMLSelectElement).value)}><option value="comp">understanding</option><option value="word">a word</option></select></div>
+        <select value=${q.kind} aria-label="Kind" onChange=${(e: Event) => put(i, ["kind"], (e.target as HTMLSelectElement).value)}><option value="comp">understanding</option><option value="word">a word</option></select>
+        <button class="iconbtn" aria-label=${`Remove question ${i + 1}`} title="Remove this question" onClick=${() => p.edit(s => { const rest = quiz.filter((_, k) => k !== i); return set(s, ["quiz"], rest.length ? rest : undefined); })}><${Icon} name="trash" size=${15} /></button></div>
       <${Texts} label="Question" value=${q.q} onInput=${(l: string, v?: string) => put(i, ["q", l], v ?? "")} />
       ${(q.options ?? []).map((o: string, k: number) => html`<label class=${`option${q.a === k ? " right" : ""}`}>
         <input type="radio" name=${`quiz${i}`} checked=${q.a === k} onChange=${() => put(i, ["a"], k)} aria-label=${`Option ${k + 1} is right`} />
