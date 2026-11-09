@@ -32,6 +32,7 @@ const BUNDLES = [
   { name: "say it aloud (sahne/listen)", entries: ["sahne/src/listen/index.ts"] },
   { name: "story adapter and lints (sahne-story)", entries: ["sahne-story/src/index.ts"], external: ["sahne", "sahne-tr", "sahne-en", "sahne-de", "sahne-fa"] },
   { name: "lesson plugin (sahne-lesson)", entries: ["sahne-lesson/src/index.ts"], external: ["sahne", "sahne-story"], budget: 8 },
+  { name: "voice plugin (sahne-voice)", entries: ["sahne-voice/src/index.ts"], external: ["sahne"], budget: 4 },
 ];
 // the set kit (sahne-kit/set): each family is a chunk an app loads when its places need it, measured
 // without the engine and without the kit code it shares (palette, carry); the whole set is told, not held

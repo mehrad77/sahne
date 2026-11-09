@@ -92,6 +92,19 @@ export const kitPieceIds = (root: URL = KIT_PIECES): string[] => existsSync(root
 export const kitVariantIds = (root: URL = KIT_VARIANTS): { of: string; name: string }[] =>
   existsSync(root) ? readdirSync(root).filter(f => f.endsWith(".json") && f.slice(0, -5).includes(".")).map(f => f.slice(0, -5)).sort().map(id => ({ of: id.slice(0, id.lastIndexOf(".")), name: id.slice(id.lastIndexOf(".") + 1) })) : [];
 
+/** Each character's recorded voice (sahne-voice): the casting, the chosen samples, the clips, and the developer's own files. */
+export const VOICES = new URL("voices/", CONTENT);
+/** The casting: each character's brief and chosen voice (sahne-voice's `VoiceCast`). */
+export const VOICE_CAST = new URL("cast.json", VOICES);
+/** The chosen voices' samples, `<who>.wav`, and where each one comes from (`CREDITS.json`). */
+export const VOICE_REFS = new URL("refs/", VOICES);
+/** The generated clips: `<story>/manifest.json` and its `.m4a` files, the folder an app serves. */
+export const VOICE_CLIPS = new URL("clips/", VOICES);
+/** The candidate samples to cast from (`pool.json`, `<id>.wav`): the developer's, not shipped (git-ignore it). */
+export const VOICE_POOL = new URL(".pool/", VOICES);
+/** The auditions: each candidate reading a character's lines (`audition.json`), the developer's, not shipped (git-ignore it). */
+export const VOICE_AUDITION = new URL(".audition/", VOICES);
+
 /** Editors' notes beside the content, never read by the app or the checks: sahne-backstage's review state. */
 export const REVIEW = new URL(".backstage/review.json", CONTENT);
 /** What the editor's assistant keeps between conversations (lasting decisions, preferences): beside the review notes, shared. */
