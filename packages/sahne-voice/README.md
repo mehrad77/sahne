@@ -48,6 +48,7 @@ uv venv -p 3.11 ~/.cache/sahne-voice && uv pip install -p ~/.cache/sahne-voice/b
 ```bash
 $SAHNE_VOICE_PYTHON packages/sahne-voice/build/pool.py "$SAHNE_CONTENT/voices/.pool" tr_tr:dev:MALE:8 tr_tr:train:FEMALE:12 fa_ir:dev:MALE:5 children:3
 node packages/sahne-voice/build/voices.ts audition [--who a,b] [--n 5] [--force]
+node packages/sahne-voice/build/voices.ts audition --who kirlangic --ref fa_own1   # one more candidate: a sample of your own, added to pool.json
 node packages/sahne-voice/build/voices.ts choose --who farzad --ref fa_m02 --tempo 0.9 [--exaggeration 0.5] [--cfg 0.3] [--confirm]
 node packages/sahne-voice/build/voices.ts generate [--story s1e01,s1e02] [--who farzad] [--jobs 2]
 node packages/sahne-voice/build/voices.ts status
