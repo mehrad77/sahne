@@ -29,7 +29,7 @@ import { canon, dress, forLearner, LEARNER_FIELDS, looksOf } from "./looks.ts";
 import { pluginStepOf } from "./plugin.ts";
 import { isAct, isBeat, isChoice, isLine, isScene, NARRATOR, STANDIN, type BeatStep, type CharacterDoc, type ChoiceOption, type LineStep, type LookRef, type StoryDoc } from "./types.ts";
 
-export type Rule = "deixis" | "var_yok" | "number" | "budget" | "via" | "silent" | "time" | "link" | "standin" | "mechanics" | "props" | "look" | "place" | "route";
+export type Rule = "deixis" | "var_yok" | "number" | "budget" | "via" | "silent" | "time" | "link" | "standin" | "mechanics" | "props" | "look" | "place" | "route" | "exit";
 
 export interface Problem {
   /** A core rule, or a plugin's own (src/plugin.ts). */
@@ -245,6 +245,9 @@ export function lintStory(story: StoryDoc, o: LintOptions): Problem[] {
   }
 
   function unit(u: Unit) {
+    // a speaker who leaves on their own line is off stage when the line plays, so it shows as a phone bubble (stage.ts);
+    // walking in on one's own line is fine: the actor is on stage as the line starts
+    if (u.who && (u.text ?? said(u.st)).trim()) for (const mv of [u.st.move ?? []].flat()) if (mv.who === u.who && mv.how === "exit") add(u, "exit", `${u.who} leaves on their own line, so it plays as an off-stage phone bubble: move the exit to the line after`, undefined, "warning");
     const before = clone(state);
     ways(u, state);
     apply(state, u.st, u.who);

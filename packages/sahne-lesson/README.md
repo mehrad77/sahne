@@ -39,14 +39,15 @@ These are errors:
 - a character above the story's level
 - 5–8 target words in an episode (10–12 in a special), and one spot (1–2 in a special)
 - a spot's lesson among the story's, and its example a line of the story
-- the quiz: a comp and a word item, and a line each `why` quotes that is not a line of the story
+- the quiz (0–3 items): with two or more, at least one comp item (a word item is wanted, but two comp items are fine when no target word works in a new frame); a line a `why` quotes that is not a line of the story
 - a `mistake.fix` used within the next three lines
 - words that resolve to no card, gloss or name
 
 These are warnings and info:
-- a quiz item whose `why` quotes no line
-- the line counts by level
-- the 95% known-word ratio
+- a quiz item whose `why` quotes no line, and one that only asks who says a quoted line
+- the season's right answers skewed to one position (any position above half or below 15% of 12 or more items)
+- the spoken line counts by level (A1: 10–18 in an episode, 20–30 in a special), not counting one-word reactions (Aa!, Hmm…, Tamam)
+- the 95% known-word ratio of content words: proper names, glossed words and the language's sound words (`sounds`: hmm, aa, şşş, ku-kuu) are left out of the count
 - recycling across the season: a story's target words come back in two of the next stories within 14 days, and what it reuses of the stories before
 
 The rules that need the cards, the grammar, the syllabus or the calendar run only when the content root has them.

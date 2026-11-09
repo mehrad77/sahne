@@ -184,14 +184,15 @@ Errors:
 - the root's own kit items (`kit`: a file `loadContentKit` leaves out)
 - the series and seasons (`checkSeries`, above), the characters (above), schema, ids
 - calendar: with a calendar (the season's, or `days.json`), release date, kind and arc against its row; always, no Sunday, no break week, specials on Saturdays and episodes Monday to Friday, no two stories on one date, and one week's arc the same in every story
-- cast limits: 4 speakers in an episode, 6 in a special (`CAST_ALLOW` holds s1e45's six); exactly one narrator and one stand-in
+- cast limits: 4 speakers in an episode, 6 in a special (`CAST_ALLOW` holds s1e45's six), counting those with three lines or more; anyone beyond the limit may say one short line (`SHORT_LINE`, 4 words); exactly one narrator and one stand-in
+- albums: each photo's `{story, step}` is a step of that story, with the character and the stand-in on stage there (`onStageAt`)
 - counts: the choices (1–2 in an episode, 2 in a special), and each choice id once (no choice count in a watch-only episode)
 - play: in a watch-only episode, no choice and no act; in a watch-only series, no arc mechanic that needs the viewer
 - flags: a flag a story sets is named `<story id>_<slug>`; each read flag set by the earlier story it names, once that story is written
 - missing places and characters
 - every `lintStory` error, and the `lintPlace` errors of each place a story visits
 
-Warnings and info: the story language's series hints (`text`), the acts from week 2, albums, the season's choice kinds.
+Warnings and info: the story language's series hints (`text`; Turkish: the stand-in never claims a country, nationality or language as their own, but may name another's), a speaker who leaves on their own line (`exit`: the line plays as a phone bubble), the acts from week 2, a character in three stories without an album, the season's choice kinds.
 
 The series' plugins add their own. The lesson plugin adds the units, the target words, the spots, the quiz, mistakes, unknown words, line counts, the known-word ratio and recycling ([its README](../sahne-lesson/README.md#the-checks)). The rules that need the cards, the grammar, the syllabus or the calendar run only when the content root has them (see the table above). `pnpm sahne check` and Kumru's `pnpm check` run the check, and `test/drafts.test.ts` finds every story in `stories/` of the content root on its own.
 

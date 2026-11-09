@@ -32,6 +32,8 @@ export interface CheckOptions {
 
 /** s1e45 has six speakers in an episode, the owner's choice (Kumru's STORIES_A1.md). */
 export const CAST_ALLOW = new Set(["s1e45"]);
+/** A line short enough to be said by someone outside the speaker cap ("Hayır!", "Ben de geliyorum!"). */
+export const SHORT_LINE = 4;
 /** Character ids of the series Kumru replaced: never used again (ids are permanent). */
 export const RETIRED_CHARACTERS = new Set("ada can dede deniz ela marti mert selin simit zeynep".split(" "));
 const BREAKS: [string, string][] = [["2026-11-02", "2026-11-07"], ["2027-01-04", "2027-01-09"]];
@@ -122,10 +124,22 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
 
   // cast
   const all = texts(s, langs.main);
-  const speakers = new Set(all.filter(t => t.kind !== "option" && t.who && !(t.who === NARRATOR && t.narr)).map(t => t.who!));
+  // the speaker cap counts the people who carry the story (three lines or more); anyone else may say one short line
+  // (Alex's "Hayır!"), and is then outside the cap and the cast list's limit too
+  const spoken = new Map<string, string[]>();
+  for (const t of all) if (t.kind !== "option" && t.kind !== "follow" && t.who && !(t.who === NARRATOR && t.narr)) spoken.set(t.who, [...(spoken.get(t.who) ?? []), t.tr]);
   const limit = s.kind === "special" || CAST_ALLOW.has(id) ? 6 : 4;
-  if (speakers.size > limit) add("cast", "error", `${speakers.size} speakers (${[...speakers].join(", ")}); the limit is ${limit}${CAST_ALLOW.has(id) ? "" : " for an episode"}`);
-  if ((s.cast ?? []).length > limit) add("cast", "error", `cast lists ${s.cast.length}; the limit is ${limit}`);
+  const major = [...spoken].filter(([, ls]) => ls.length >= 3).map(([w]) => w);
+  const minor = [...spoken].filter(([, ls]) => ls.length < 3);
+  const short = (ls: string[]) => ls.length === 1 && langOf(world).checkWords(ls[0]).length <= SHORT_LINE;
+  if (major.length > limit) add("cast", "error", `${major.length} speakers with three lines or more (${major.join(", ")}); the limit is ${limit}${CAST_ALLOW.has(id) ? "" : " for an episode"}`);
+  else if (spoken.size > limit) {
+    const room = limit - major.length;
+    const over = minor.filter(([, ls]) => !short(ls));
+    if (over.length > room) add("cast", "error", `${spoken.size} speakers (${[...spoken.keys()].join(", ")}); beyond the ${limit} who carry the story, each may say only one short line (${SHORT_LINE} words at most): ${over.map(([w, ls]) => `${w} has ${ls.length}`).join(", ")}`);
+  }
+  const once = minor.filter(([, ls]) => short(ls)).length;
+  if ((s.cast ?? []).length > limit + once) add("cast", "error", `cast lists ${s.cast.length}; the limit is ${limit}${once ? ` (and ${once} with one short line)` : ""}`);
   for (const t of all) if (t.kind !== "option" && t.who && !t.narr && t.who !== STANDIN && !s.cast.includes(t.who)) add("cast", "error", `${t.who} speaks but is not in cast`, t.step);
   for (const t of all) if (t.narr && t.who !== NARRATOR) add("cast", "error", `narr is only for ${NARRATOR}, not ${t.who}`, t.step);
   for (const c of s.cast ?? []) {
@@ -184,6 +198,24 @@ export function checkStory(d: Draft, world: World, o: CheckOptions = {}): CheckP
   return out;
 }
 
+/**
+ * Who is on stage at a top-level step: the last scene's people, plus anyone who moves in, speaks (not the narrator's
+ * narration) or acts in a beat since, minus anyone who leaves. Coarse on purpose (no reply or branch), for album photos.
+ */
+export function onStageAt(story: StoryDoc, step: number): Set<string> {
+  let from = 0;
+  for (let j = step; j >= 0; j--) if (isScene(story.steps[j])) { from = j; break; }
+  const first = story.steps[from] as { at?: unknown };
+  const on = new Set<string>(isScene(story.steps[from]) && first.at && typeof first.at === "object" ? Object.keys(first.at as object) : []);
+  for (const st of story.steps.slice(from, step + 1) as Record<string, unknown>[]) {
+    for (const mv of [(st.move as { who?: string; how?: string } | { who?: string; how?: string }[] | undefined) ?? []].flat()) if (mv.who) { if (mv.how === "exit") on.delete(mv.who); else on.add(mv.who); }
+    if (typeof st.who === "string" && !st.narr && !st.beat) on.add(st.who);
+    const beat = st.beat as { who?: string } | undefined;
+    if (beat && typeof beat.who === "string") on.add(beat.who);
+  }
+  return on;
+}
+
 /** Rules across stories: dates, arcs, flags, characters, albums, recycling. */
 export function checkSeason(world: World, drafts: Draft[] = world.drafts, o: CheckOptions = {}): CheckProblem[] {
   const out: CheckProblem[] = [];
@@ -223,6 +255,23 @@ export function checkSeason(world: World, drafts: Draft[] = world.drafts, o: Che
   // the album is Kerim's and shows the people the learner met: not the stand-in (the learner) or the narrator (Kumru's STORIES_SCHEMA.md §4.8)
   const NO_ALBUM = new Set(["extra", "standin", "narrator"]);
   for (const [c, n] of seen) if (n >= 3 && !docs.get(c)?.album && !world.extras?.[c] && !NO_ALBUM.has(docs.get(c)?.kind as string)) add("character", "warning", "season", `${c} is in ${n} stories but has no album entry`);
+  // each album photo is a frame of a story the character and the learner share: the step exists, and both are on stage.
+  // The album is shown after a season's last story, so its photos are checked once every story of the season's calendar
+  // is written (a root still being written, like the samples whose characters are Kumru's, is checked when it is done)
+  const byId = new Map([...world.drafts, ...drafts].map(d => [d.story.id, d.story] as const));
+  const rows = Object.values(world.days ?? {}) as { id: string }[];
+  const written = (season: number) => { const ids = rows.filter(r => seasonOf(r.id) === season).map(r => r.id); return ids.length > 0 && ids.every(x => byId.has(x)); };
+  for (const [c, doc] of docs) for (const [season, bands] of Object.entries((doc.album ?? {}) as Record<string, Record<string, { photo?: { story: string; step: number } }>>)) for (const [band, cap] of Object.entries(bands ?? {})) {
+    const p = cap?.photo;
+    if (!p) continue;
+    const st = byId.get(p.story);
+    const where = `${c}'s album (${season} ${band}): ${p.story} step ${p.step}`;
+    if (!st || !written(seasonOf(p.story))) continue;
+    if (!Number.isInteger(p.step) || p.step < 0 || p.step >= st.steps.length) { add("character", "error", p.story, `${where} is out of range (${st.steps.length} steps)`); continue; }
+    const on = onStageAt(st, p.step);
+    const missing = [c, STANDIN].filter(w => !on.has(w));
+    if (missing.length) add("character", "error", p.story, `${where} does not show ${missing.join(" and ")} on stage (on stage: ${[...on].join(", ") || "nobody"})`);
+  }
 
   // season-wide choice kinds
   const kinds: Record<string, number> = {};

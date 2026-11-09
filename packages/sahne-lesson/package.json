@@ -1,6 +1,6 @@
 {
   "name": "sahne-lesson",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "type": "module",
   "description": "The lesson plugin of sahne-story: grammar spots, target words, glosses, the quiz, learner notes and the syllabus checks",

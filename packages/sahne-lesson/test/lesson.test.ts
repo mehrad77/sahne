@@ -65,8 +65,9 @@ test("lesson: each rule finds its break", () => {
   const has = (d: Draft, rule: string, re: RegExp) => assert.ok(rules(d).some(r => r.startsWith(`${rule}:`) && re.test(r)), `${rule} ${re}: ${rules(d).join(" | ")}`);
   has(draft(s => { s.words = s.words!.slice(0, 4); }), "schema", /words/);
   has(draft(s => { s.quiz![0].why = "“Bu satır yok.”"; }), "quiz", /not a line/);
-  has(draft(s => { s.quiz = s.quiz!.map(q => ({ ...q, kind: "comp" })); }), "quiz", /comp and one word/);
-  assert.ok(!rules(draft(s => { s.quiz = s.quiz!.slice(0, 1).map(q => ({ ...q, kind: "comp" })); })).some(r => /comp and one word/.test(r)), "one item may be either kind");
+  has(draft(s => { s.quiz = s.quiz!.map(q => ({ ...q, kind: "word" })); }), "quiz", /at least one comp item/);
+  assert.ok(!rules(draft(s => { s.quiz = s.quiz!.map(q => ({ ...q, kind: "comp" })); })).some(r => /at least one comp item/.test(r)), "two comp items are fine when no word works in a new frame");
+  assert.ok(!rules(draft(s => { s.quiz = s.quiz!.slice(0, 1).map(q => ({ ...q, kind: "word" })); })).some(r => /at least one comp item/.test(r)), "one item may be either kind");
   assert.ok(!rules(draft(s => { delete s.quiz; })).some(r => r.startsWith("quiz:")), "no quiz, no quiz rules");
   has(draft(s => { const sp = s.steps.find(isSpot)!; sp.spot.ex = "Hiç yok bu."; }), "ref", /spot example/);
   has(draft(s => { const sp = s.steps.find(isSpot)!; sp.spot.lesson = "g_a1_9_other"; }), "ref", /not in the story's lessons/);

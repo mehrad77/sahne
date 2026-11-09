@@ -63,6 +63,8 @@ export interface StoryLang {
   resolver(entries: Iterable<string>, opts?: { particles?: boolean }): Resolver;
   /** Words a story may use that are no card: tokens the host personalises (Kumru's hometown). */
   names?: string[];
+  /** Sound words and interjections (hmm, aa, şşş, a bird's coo): no word to learn, so the known-word ratio leaves them out. */
+  sounds?: string[];
   /** A series' own text warnings, by line (Kumru's: the stand-in names no country or language). */
   hints?(t: { text: string; standin: boolean }, gl: Record<string, unknown>): string[];
   /** Words of a parenthetical that stage a line (`waves` → `{ do: "wave" }`), for an editor. */

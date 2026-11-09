@@ -4,9 +4,32 @@ Each release, newest first. The packages' `package.json` files carry the version
 
 ## Sahne 0.2
 
+### 0.2.3
+
+**Latest, 10 November 2026. Story checks that let dialogue breathe.** [On GitHub](https://github.com/mehrad77/sahne/releases/tag/v0.2.3).
+
+A review of Kumru's whole first season found rules that pushed writers toward stiff, crammed scenes. They are looser now, and there are new checks for what went wrong on screen.
+
+- **Room for natural turns** ([`sahne-lesson`](../../sahne-lesson/README.md)).
+  - An A1 episode has 10–18 spoken lines (a special 20–30).
+  - A one-word reaction (*Aa!*, *Hmm…*, *Tamam*) doesn't count as a line.
+- **One short line for anyone** ([`sahne-story`](../../sahne-story/README.md)). The speaker cap counts only those who carry the story, with three lines or more. Anyone else may say one short line.
+- **The known-word ratio counts content words.**
+  - Proper names, glossed words and sound words are left out.
+  - A story language names its sound words in the new `sounds`. For Turkish these are *hmm*, *aa*, *şşş*, *ku-kuu* and more.
+- **The quiz.**
+  - Two comprehension items are fine when no target word works in a new frame.
+  - A warning for a question that only asks who said a quoted line.
+  - A warning for a season whose right answers sit mostly in one position.
+- **Album photos are checked.** Once a season is written, each photo's step must exist and show the character with the stand-in on stage.
+- **No phone bubble by accident.** A speaker who leaves on their own line is off stage when it plays, and the line shows as a phone call. The lint now warns about it.
+- **Turkish.**
+  - *Buyurun* motivates a give, as *buyrun* did.
+  - The stand-in may name another character's language, but never claim one.
+
 ### 0.2.2
 
-**Latest, 9 November 2026. A narrow almond eye.** [On GitHub](https://github.com/mehrad77/sahne/releases/tag/v0.2.2).
+**9 November 2026. A narrow almond eye.** [On GitHub](https://github.com/mehrad77/sahne/releases/tag/v0.2.2).
 
 - **The narrow almond eye** (`face.eyes: "narrow"`, *ince badem göz*), in [`sahne-kit`](../../sahne-kit/README.md). It is a long almond with its outer corner turned up and a lower, flatter lid with an inner fold, as many Central Asian faces have. Like every eye in the kit, it stays big and expressive, never a slit.
   - It is open and a starter in the builder.
