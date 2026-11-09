@@ -7,6 +7,7 @@
 //   #/review                where every episode stands
 //   #/cast, #/character/<id> the cast, a character's look and words
 //   #/places, #/place/<id>   the places, a place's marks, props and set pieces
+//   #/voices                each character's recorded voice: candidates, a pick, the clips (sahne-voice)
 //   #/new/<season>[/<date>] a new episode (on that day)
 //   #/kit                   the kit: props, set pieces, gestures, emotions, sounds
 //   #/agents[/activity|/mcp] the assistant in full view; what agents did, what waits, how their edits land; how to connect one over MCP
@@ -16,6 +17,7 @@
 import { html } from "htm/preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import "@preact/signals";
+import { VoicesPage } from "./voices.ts";
 import { dirtyKeys, go, notice, route, world } from "../store.ts";
 import type { Command } from "../model/search.ts";
 import { Icon, MOD } from "./kit/index.ts";
@@ -41,7 +43,7 @@ import { KitPage } from "./kitpage.ts";
 import { waiting as runsWaiting, working } from "../runs.ts";
 
 /** The places to work, in the rail; after the gap, the ones about the work. */
-const RAIL: [string, string, string][] = [["board", "board", "Board"], ["cast", "cast", "Cast"], ["places", "places", "Places"], ["kit", "hand", "Kit"], ["review", "review", "Review"]];
+const RAIL: [string, string, string][] = [["board", "board", "Board"], ["cast", "cast", "Cast"], ["places", "places", "Places"], ["kit", "hand", "Kit"], ["voices", "sound", "Voices"], ["review", "review", "Review"]];
 const RAIL_END: [string, string, string][] = [["agents", "plug", "Agents"], ["docs", "book", "Docs"], ["settings", "settings", "Settings"]];
 
 export function App() {
@@ -104,6 +106,7 @@ function commandsOf(): Command[] {
     { id: "go-review", what: "Go", label: "Review: where every episode stands", run: () => go("review") },
     { id: "go-cast", what: "Go", label: "The cast", run: () => go("cast") },
     { id: "go-places", what: "Go", label: "The places", run: () => go("places") },
+    { id: "go-voices", what: "Go", label: "Voices: cast each character's recorded voice", keywords: "audio speech tts sound", run: () => go("voices") },
     { id: "go-kit", what: "Go", label: "The kit: props, gestures, emotions, sounds", run: () => go("kit") },
     { id: "theme", what: "Do", label: "Switch the theme (system, light, dark)", run: cycleTheme },
     { id: "assistant", what: "Do", label: "Open the assistant", run: () => toggleSide("assistant") },
@@ -129,6 +132,7 @@ function pageFor(page: string | undefined, id: string | undefined) {
     case "place": return html`<${PlacePage} key=${id} id=${id} />`;
     case "new": return html`<${NewEpisode} key=${route.value.join("/")} season=${id} date=${route.value[2]} />`;
     case "kit": return html`<${KitPage} />`;
+    case "voices": return html`<${VoicesPage} />`;
     case "settings": return html`<${SettingsPage} />`;
     case "agents": return html`<${AgentsPage} />`;
     case "docs": return html`<${DocsPage} guide=${id} at=${route.value[2]} />`;
