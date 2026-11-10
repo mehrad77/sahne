@@ -355,8 +355,10 @@ Gestures in the first kit *(proposed, 40)*: the 31 of the 2026-10-08 draft (`poi
   - `wide`, `two` (speaker and addressee), `single`, `close`;
   - `ots`: over the learner's shoulder when someone speaks to them, which puts the learner in the scene;
   - `obj`, a prop (with whoever performs, or the props alone when no one does: the bread on the counter); `follow`, an actor or Kerim in flight: a frame round the actor's live position, eased towards it every frame (cut in Still).
-- Shots frame actors where they are, perched high up included.
-- **Moves** ease in at most 450 ms, or cut. Under reduced motion they always cut.
+- Shots frame actors where they are, perched high up included: where they stand when the cue ends.
+- **The default shot shows everyone.** A line with no `cam` is a `two` (speaker and addressee) or a `single` only when they are everyone on stage, the narrator aside; with anyone else there it stays `wide`. A silent line (`…`) is a `close`, an entrance or exit `wide`. Closer shots are for the story to ask for with `cam`: the prop the line is about, a face whose feeling is the point, two people when nobody else matters.
+- **Walk first, then the shot.** While someone a shot frames (the speaker or addressee of a `two`, the actor of a closer shot) is still on the way (`enter`, `walk`, `run`, `hop`, a bird's `fly`), the camera holds the `wide`, which shows the walk and everyone, and moves to the shot as the last of them arrives. A shot kept from the cue before waits the same way. `follow` frames the live position, so it does not wait.
+- **Moves** ease in at most 450 ms, or cut; the move after a held wide starts from the wide. Under reduced motion they always cut, to the cue's last shot.
 - **Depth of field** is a mipmap bias by distance from the focus plane, which is cheap.
 - **Split frames and phone insets** are extra viewports of the same scene, or of a second place.
 - *Built:* the framings `wide`, `two`, `single`, `close`, `obj` and `follow`, the moves and the depth of field. `ots`, split frames and phone insets are planned ([README.md](README.md#status)).

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { speechFallback, matchFallback } from "../src/core/lang.ts";
 import { directAll, fold, sideOf, type DirectCtx } from "../src/director/direct.ts";
-import { evaluate } from "../src/anim/timeline.ts";
+import { CAM_MS, evaluate } from "../src/anim/timeline.ts";
 import type { GestureDef } from "../src/core/kit.ts";
 import type { PlaceDoc } from "../src/core/types.ts";
 import type { Cue } from "../src/script/types.ts";
@@ -149,6 +149,63 @@ test("a hand-over waits until the giver has walked over", () => {
   assert.ok(hand.t > walk.t1, `handed over at ${Math.round(hand.t)} after arriving at ${Math.round(walk.t1)}`);
   const turns = p.tracks.ismail.turns.map(t => t.t);
   assert.deepEqual(turns, [...turns].sort((a, b) => a - b), "turns stay in time order");
+});
+
+// ---- the camera waits for a walk, and the default shot keeps everyone in it (DESIGN.md §6.6) ----
+
+test("an actor framed on her own line holds the wide while she walks in, then eases to the shot", () => {
+  const p = directAll([CUES[0], { line: { who: "nima", text: "Merhaba!", to: "all", move: { who: "nima", to: "customer", how: "enter" }, cam: "single" } }], CAST, ctx)[1];
+  const walk = p.tracks.nima.walks[0];
+  assert.equal(p.before.shot.kind, "wide");
+  assert.deepEqual(p.cams.map(c => [c.t, c.shot.kind]), [[walk.t1, "single"]], "the wide it has stays, the single comes as she arrives");
+  assert.deepEqual(p.cams[0].shot.ids, ["nima"]);
+  for (const t of [0, walk.t0 + 200, (walk.t0 + walk.t1) / 2, walk.t1 - 1]) assert.equal(evaluate(p, t).shot.to.kind, "wide", `still wide at ${Math.round(t)} ms`);
+  assert.equal(evaluate(p, walk.t1 + CAM_MS / 2).shot.k < 1, true, "easing in after she is there");
+  assert.deepEqual([evaluate(p, p.dur).shot.to.kind, evaluate(p, p.dur).shot.k], ["single", 1], "and settled on her by the end (Still cuts to it)");
+  assert.ok(p.dur >= walk.t1 + CAM_MS, "the cue lasts until the move is done");
+});
+
+test("a walk inside the shot it already has still waits: the framing is where the walk ends", () => {
+  const ps = directAll([CUES[0],
+    { line: { who: "ismail", text: "Gel.", move: { who: "nima", to: "customer", how: "enter" } } },
+    { line: { who: "ismail", text: "Buyrun.", to: "nima", cam: "two" } },
+    { line: { who: "nima", text: "Tamam.", to: "ismail", move: { who: "nima", to: "door" }, cam: "two" } },
+  ], CAST, ctx), p = ps[3];
+  assert.equal(ps[2].after.shot.kind, "two");
+  const walk = p.tracks.nima.walks[0];
+  assert.deepEqual(p.cams.map(c => [c.t, c.shot.kind]), [[0, "wide"], [walk.t1, "two"]]);
+  // the addressee walking is framed too: the shot waits for her
+  const q = directAll([CUES[0], { line: { who: "ismail", text: "Gel.", move: { who: "nima", to: "customer", how: "enter" } } },
+    { line: { who: "ismail", text: "Buyrun.", to: "nima", move: { who: "nima", to: "door" }, cam: "two" } }], CAST, ctx)[2];
+  assert.deepEqual(q.cams.map(c => [c.t, c.shot.kind]), [[q.tracks.nima.walks[0].t1, "two"]], "already wide: no hold to push, the two once she is there");
+});
+
+test("a shot kept from the cue before waits for whoever it frames too", () => {
+  const ps = directAll([CUES[0], { line: { who: "ismail", text: "Gel.", move: { who: "nima", to: "customer", how: "enter" } } }, { line: { who: "ismail", text: "Buyrun.", to: "nima", cam: "two" } },
+    { beat: { move: { who: "nima", to: "door" } } }], CAST, ctx), p = ps[3];
+  assert.deepEqual(p.cams.map(c => [c.t, c.shot.kind]), [[0, "wide"], [p.tracks.nima.walks[0].t1, "two"]]);
+});
+
+test("someone not in the shot may walk: the shot does not wait for them", () => {
+  const ps = directAll([CUES[0], { line: { who: "ismail", text: "Gel.", move: { who: "nima", to: "customer", how: "enter" } } }, { line: { who: "ismail", text: "Buyrun.", to: "nima", cam: "two" } },
+    { line: { who: "ismail", text: "Bak.", move: { who: "nima", to: "door" }, cam: "close" } }], CAST, ctx);
+  assert.deepEqual(ps[3].cams.map(c => [c.t, c.shot.kind]), [[0, "close"]]);
+});
+
+test("the default shot frames the speaker and addressee only when they are everyone on stage", () => {
+  const three = { ...ctx, places: { shop: { ...SHOP, marks: { ...SHOP.marks, side: { x: 2.4, z: 0.3 } } } } };
+  const ps = directAll([
+    { scene: { place: "shop", at: { ismail: "counter", nima: "customer" } } },
+    { line: { who: "ismail", text: "Buyrun." } },
+    { scene: { place: "shop", at: { ismail: "counter", nima: "customer", ali: "side" } } },
+    { line: { who: "ismail", text: "Buyrun." } },
+    { line: { who: "ismail", text: "Buyrun.", cam: "two" } },
+    { line: { who: "nima", text: "…", voice: "silent" } },
+  ], [...CAST, "ali"], three);
+  assert.deepEqual([ps[1].after.shot.kind, ps[1].after.shot.ids], ["two", ["ismail", "nima"]], "the two of them alone: a two-shot");
+  assert.deepEqual([ps[3].cams.length, ps[3].after.shot.kind], [0, "wide"], "a third on stage: the wide stays");
+  assert.deepEqual(ps[4].after.shot.ids, ["ismail", "nima"], "`cam` still goes closer when asked");
+  assert.equal(ps[5].after.shot.kind, "close", "a silent card is still a close-up");
 });
 
 test("one actor's moves in a cue follow each other", () => {

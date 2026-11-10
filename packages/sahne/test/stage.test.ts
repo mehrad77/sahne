@@ -830,6 +830,34 @@ test("follow keeps the moving actor in frame and settles", () => onPage({}, asyn
   assert.equal((p.stage as unknown as { camBusy: boolean }).camBusy, false);
 }));
 
+test("a single on someone still walking holds the wide while she walks, then eases to her without a jump", () => onPage({}, async p => {
+  p.stage.load({ v: 1, cues: [
+    { scene: { place: "perch", at: { me: "here" } } },
+    { beat: { who: "me", do: "nod", cam: "close" } },
+    { line: { who: "me", text: "Merhaba!", move: { who: "me", to: "there" }, cam: "single" } },
+  ] }, { cast: { me: NIMA }, places: { perch: PERCH }, atlas: 1024 });
+  p.stage.show(1); p.frame();
+  const run = p.stage.play(2), [w, h] = p.stage.cssSize, H = actorOf(p.stage).puppet.body.H / 100;
+  const arrive = p.stage.perf!.cams.at(-1)!.t;
+  let prev = { ...p.stage.cam }, wasT = 0, jump = Infinity;
+  for (let i = 0; i < Math.ceil(run.dur / 16) + 30; i++) {
+    p.frame();
+    const f = p.stage.frame!, a = f.actors.me, q = p.stage.project([a.pos[0], a.pos[1] + H / 2, a.pos[2]])!;
+    if (f.t < arrive) assert.ok(q[0] > 0 && q[0] < w && q[1] > 0 && q[1] < h, `${Math.round(f.t)} ms: she is in view while she walks (${q.map(v => v.toFixed(0))})`);
+    // the second move starts from the wide it held, not from the shot before the cue
+    if (wasT < arrive && f.t >= arrive) jump = Math.hypot(...p.stage.cam.eye.map((v, k) => v - prev.eye[k]));
+    prev = { ...p.stage.cam }; wasT = f.t;
+  }
+  await run.done;
+  assert.ok(jump < 0.1, `the move to her starts where the wide was (${jump.toFixed(3)} m in its first frame)`);
+  assert.ok(Math.abs(p.stage.cam.target[0] - 1.5) < 0.05, `it ends on her where she stopped (${p.stage.cam.target[0].toFixed(3)})`);
+  // Still cuts straight to the shot
+  p.stage.setMotion("still");
+  p.stage.show(1); p.frame();
+  p.stage.play(2); p.frame();
+  assert.ok(Math.abs(p.stage.cam.target[0] - 1.5) < 0.05);
+}));
+
 test("setAvatar refuses a kit puppet", async () => onPage({ kit: BIRD_KIT }, async p => {
   p.stage.load({ v: 1, cues: [{ scene: { place: "perch", at: { me: "here", kerim: "ledge" } } }] }, { cast: { me: NIMA, kerim: { puppet: "tbird" } }, places: { perch: PERCH }, atlas: 1024 });
   const swaps = p.stage.stats.swaps;
