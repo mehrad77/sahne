@@ -78,7 +78,7 @@ export function VoicesPage() {
     ${s.job && html`<details class="voices-job" open=${running}><summary>${running ? "Working" : s.job.code === 0 ? "Done" : "Stopped"}: ${s.job.args.join(" ")}</summary><pre>${s.job.log.join("\n")}</pre></details>`}
     ${clips && html`<${StoryList} clips=${clips} />`}
     <div class="voices-list">
-      ${who.map(id => html`<${Character} key=${id} id=${id} name=${tx(w.characters[id]?.name) || id} pic=${portraitOf(w.characters[id], 72, "head")}
+      ${who.map(id => html`<${Character} key=${id} id=${id} usedBy=${(ref: string) => who.filter(x => x !== id && !s.cast.characters[x].unvoiced && s.cast.characters[x].voice?.ref === ref).map(x => tx(w.characters[x]?.name) || x)} name=${tx(w.characters[id]?.name) || id} pic=${portraitOf(w.characters[id], 72, "head")}
         entry=${s.cast.characters[id]} aud=${s.audition[id]} counts=${s.counts[id]} busy=${running} python=${s.python} onChange=${load} onError=${(e: unknown) => setErr(String(e))} />`)}
     </div>
   </div>`;
@@ -100,7 +100,7 @@ function StoryList({ clips }: { clips: StoryClips }) {
   </section>`;
 }
 
-function Character(p: { id: string; name: string; pic: string; entry: VoiceCast["characters"][string]; aud?: Aud; counts?: { lines: number; made: number; doubt: number }; busy: boolean; python: boolean; onChange: () => void; onError: (e: unknown) => void }) {
+function Character(p: { usedBy: (ref: string) => string[]; id: string; name: string; pic: string; entry: VoiceCast["characters"][string]; aud?: Aud; counts?: { lines: number; made: number; doubt: number }; busy: boolean; python: boolean; onChange: () => void; onError: (e: unknown) => void }) {
   const v = p.entry.voice;
   const [pick, setPick] = useState<string | undefined>(v?.ref);
   const [tempo, setTempo] = useState(v?.tempo ?? 0.9);
@@ -136,7 +136,7 @@ function Character(p: { id: string; name: string; pic: string; entry: VoiceCast[
         <thead><tr><th></th><th>Voice</th><th>Its sample</th>${p.aud.samples.map(t => html`<th class="sample">“${t.replace(/^[“"]+|[”"]+$/g, "")}”</th>`)}<th title="Syllables per second at this tempo">syl/s</th></tr></thead>
         <tbody>${p.aud.candidates.map(c => html`<tr class=${pick === c.ref ? "on" : ""} onClick=${() => setPick(c.ref)}>
           <td><input type="radio" name=${`pick-${p.id}`} checked=${pick === c.ref} /></td>
-          <td><b>${c.ref}</b> <span class="note">${LANG[c.lang] ?? c.lang} · ${c.gender} · ${c.f0} Hz</span></td>
+          <td><b>${c.ref}</b> <span class="note">${LANG[c.lang] ?? c.lang} · ${c.gender} · ${c.f0} Hz</span>${p.usedBy(c.ref).length ? html` <span class="chip warn" title="Another character already has this voice">also ${p.usedBy(c.ref).join(", ")}</span>` : ""}</td>
           <td><button class="mini" onClick=${(e: Event) => { e.stopPropagation(); play(`/voices/pool/${c.ref}.wav`); }} title=${c.source}>▶</button></td>
           ${c.clips.map(x => html`<td><button class="mini" onClick=${(e: Event) => { e.stopPropagation(); setPick(c.ref); play(`/voices/audition/${p.id}/${x.f}`, tempo); }} title=${x.doubt ? `Doubted: ${x.doubt}` : `Heard: ${x.heard}`}>▶</button>${x.doubt ? html`<span class="chip warn" title=${x.doubt}>?</span>` : ""}</td>`)}
           <td class="note">${rate(c)}</td>

@@ -79,4 +79,6 @@ test("candidates: an accented character hears their own language's voices and tw
   const kids = [...all, p("tr_f01", "tr", "female", 240), p("tr_c01", "tr", "child", 300)];
   assert.deepEqual(candidates({ gender: "male", age: "child" }, kids, 2).map(x => x.id), ["tr_c01", "tr_f01"]);
   assert.ok(!candidates({ gender: "female", age: "adult" }, kids, 9).some(x => x.gender === "child"));
+  // a voice another character has is not offered again
+  assert.ok(!candidates({ gender: "male", age: "adult", accent: "fa" }, all, 4, new Set(["fa_m01", "tr_m01"])).some(x => x.id === "fa_m01" || x.id === "tr_m01"));
 });

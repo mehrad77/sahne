@@ -51,6 +51,11 @@ for spec in sys.argv[2:]:
             cands.append((snr, b, y, f0))
             if len(cands) >= want * 40: break
     cands.sort(key=lambda c: -c[0])
+    # a voice added by hand (the developer's own sample) has no fingerprint yet: take it from its file
+    for p in pool:
+        if "emb" not in p:
+            y, _ = librosa.load(f"{out}/{p['id']}.wav", sr=16000)
+            p["emb"] = [round(float(x), 5) for x in ve.embeds_from_wavs([y], sample_rate=16000)[0]]
     kept, embs = 0, [np.array(p["emb"]) for p in pool]
     for snr, b, y, f0 in cands:
         e = ve.embeds_from_wavs([y], sample_rate=16000)[0]
