@@ -11,7 +11,7 @@ import { world } from "../store.ts";
 import { portraitOf } from "./galleries.ts";
 import { tx } from "./fields.ts";
 
-interface Cand { ref: string; lang: string; gender: string; f0: number; source: string; clips: { f: string; ms: number; doubt?: string; heard: string }[] }
+interface Cand { ref: string; lang: string; gender: string; f0: number; source: string; exaggeration?: number; cfg?: number; clips: { f: string; ms: number; doubt?: string; heard: string }[] }
 interface Aud { who: string; brief: VoiceBrief; samples: string[]; candidates: Cand[] }
 interface Job { args: string[]; done: boolean; code: number | null; started: number; log: string[] }
 interface State { cast: VoiceCast; audition: Record<string, Aud>; counts: Record<string, { lines: number; made: number; doubt: number }>; pool: number; stories: string[]; job: Job | null; python: boolean }
@@ -36,7 +36,7 @@ function play(url: string, tempo = 1) {
 
 /** Syllables of a Turkish (or any Latin-script) line: one per vowel. */
 const syllables = (t: string) => (t.match(/[aeıioöuüâîûy]/giu) ?? []).length;
-const LANG: Record<string, string> = { tr: "Turkish", fa: "Persian", ru: "Russian", uz: "Uzbek", ar: "Arabic", el: "Greek" };
+const LANG: Record<string, string> = { cb: "Chatterbox's own", tr: "Turkish", fa: "Persian", ru: "Russian", uz: "Uzbek", ar: "Arabic", el: "Greek" };
 
 export function VoicesPage() {
   const [s, setS] = useState<State | null>(null);
@@ -102,14 +102,21 @@ function StoryList({ clips }: { clips: StoryClips }) {
 
 function Character(p: { usedBy: (ref: string) => string[]; id: string; name: string; pic: string; entry: VoiceCast["characters"][string]; aud?: Aud; counts?: { lines: number; made: number; doubt: number }; busy: boolean; python: boolean; onChange: () => void; onError: (e: unknown) => void }) {
   const v = p.entry.voice;
-  const [pick, setPick] = useState<string | undefined>(v?.ref);
+  const [pick, setPick0] = useState<string | undefined>(v?.ref);
+  const [cfg, setCfg] = useState(v?.cfg ?? 0.3);
+  const setPick = (ref: string) => {
+    setPick0(ref);
+    const c = p.aud?.candidates.find(x => x.ref === ref);
+    if (c?.cfg !== undefined) setCfg(c.cfg);
+    if (c?.exaggeration !== undefined) setFeel(c.exaggeration);
+  };
   const [tempo, setTempo] = useState(v?.tempo ?? 0.9);
   const [feel, setFeel] = useState(v?.exaggeration ?? 0.5);
   const b = p.entry.brief;
-  const dirty = !v || v.ref !== pick || v.tempo !== tempo || v.exaggeration !== feel;
+  const dirty = !v || v.ref !== pick || v.tempo !== tempo || v.exaggeration !== feel || v.cfg !== cfg;
   const save = (confirmed: boolean) => {
     if (!pick) return;
-    const voice: VoiceChoice = { ref: pick, tempo, exaggeration: feel, cfg: v?.cfg ?? 0.3, confirmed };
+    const voice: VoiceChoice = { ref: pick, tempo, exaggeration: feel, cfg, confirmed };
     api("/choose", { who: p.id, voice }).then(p.onChange, p.onError);
   };
   const brief = (k: keyof VoiceBrief, val: string) => api("/brief", { who: p.id, brief: { ...b, [k]: val || undefined } }).then(p.onChange, p.onError);
@@ -136,7 +143,7 @@ function Character(p: { usedBy: (ref: string) => string[]; id: string; name: str
         <thead><tr><th></th><th>Voice</th><th>Its sample</th>${p.aud.samples.map(t => html`<th class="sample">“${t.replace(/^[“"]+|[”"]+$/g, "")}”</th>`)}<th title="Syllables per second at this tempo">syl/s</th></tr></thead>
         <tbody>${p.aud.candidates.map(c => html`<tr class=${pick === c.ref ? "on" : ""} onClick=${() => setPick(c.ref)}>
           <td><input type="radio" name=${`pick-${p.id}`} checked=${pick === c.ref} /></td>
-          <td><b>${c.ref}</b> <span class="note">${LANG[c.lang] ?? c.lang} · ${c.gender} · ${c.f0} Hz</span>${p.usedBy(c.ref).length ? html` <span class="chip warn" title="Another character already has this voice">also ${p.usedBy(c.ref).join(", ")}</span>` : ""}</td>
+          <td><b>${c.ref}</b> <span class="note">${LANG[c.lang] ?? c.lang}${c.cfg === 0 && c.lang !== "tr" ? ", accent off" : ""} · ${c.gender} · ${c.f0} Hz${(c.exaggeration ?? 0.5) > 0.6 ? " · lively" : ""}</span>${p.usedBy(c.ref).length ? html` <span class="chip warn" title="Another character already has this voice">also ${p.usedBy(c.ref).join(", ")}</span>` : ""}</td>
           <td><button class="mini" onClick=${(e: Event) => { e.stopPropagation(); play(`/voices/pool/${c.ref}.wav`); }} title=${c.source}>▶</button></td>
           ${c.clips.map(x => html`<td><button class="mini" onClick=${(e: Event) => { e.stopPropagation(); setPick(c.ref); play(`/voices/audition/${p.id}/${x.f}`, tempo); }} title=${x.doubt ? `Doubted: ${x.doubt}` : `Heard: ${x.heard}`}>▶</button>${x.doubt ? html`<span class="chip warn" title=${x.doubt}>?</span>` : ""}</td>`)}
           <td class="note">${rate(c)}</td>
@@ -145,7 +152,7 @@ function Character(p: { usedBy: (ref: string) => string[]; id: string; name: str
       <div class="row">
         <label class="row">Tempo <input type="range" min="0.7" max="1.1" step="0.05" value=${tempo} onInput=${(e: Event) => setTempo(Number((e.target as HTMLInputElement).value))} /> <b>${Math.round(tempo * 100)} %</b></label>
         <label class="row">Feeling <select value=${String(feel)} onChange=${(e: Event) => setFeel(Number((e.target as HTMLSelectElement).value))}>
-          ${[[0.35, "calm"], [0.5, "natural"], [0.7, "lively"]].map(([x, n]) => html`<option value=${String(x)}>${n}</option>`)}</select></label>
+          ${[[0.35, "calm"], [0.5, "natural"], [0.7, "lively"], [0.85, "very lively"]].map(([x, n]) => html`<option value=${String(x)}>${n}</option>`)}</select></label>
         <span class="grow"></span>
         <button disabled=${p.busy || !p.python} onClick=${() => api("/audition", { who: p.id, force: true }).then(p.onChange, p.onError)} title="Make the auditions again">Audition again</button>
         <button disabled=${!pick || (!dirty && !!v)} onClick=${() => save(false)}>Pick</button>
