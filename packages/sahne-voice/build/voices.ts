@@ -36,7 +36,34 @@ const writeJson = (u: URL, v: unknown) => writeFileSync(u, JSON.stringify(v, nul
 const main = (readJson<{ languages?: { main: string } }>(SERIES, {}).languages?.main) ?? "tr";
 const lang = LANGS[main];
 if (!lang) throw new Error(`sahne-voice: no language plugin for "${main}"`);
-const spoken = (t: string) => lang.spoken?.(t) ?? t;
+/**
+ * A line as the recording says it. The stand-in's name is the learner's own on screen (the app puts it in), so a clip never
+ * says "Nima": a name on its own between commas or at the end (*Günaydın, Nima!*) is left out, and a name inside the sentence
+ * becomes the pronoun in its case (Turkish: *Nima'nın* → *onun*, *Nima'ya* → *ona*, *Nima* → *o*).
+ */
+const NAME = "Nima", NARRATOR = "kerim";
+const CASES: [RegExp, string][] = [
+  [/'(n[ıi]n|[ıi]n)\b/, "onun"], [/'(y[ae]|[ae])\b/, "ona"], [/'(y[ıi]|[ıi])\b/, "onu"], [/'(d[ae]|t[ae])\b/, "onda"],
+  [/'(d[ae]n|t[ae]n)\b/, "ondan"], [/'(yl[ae]|l[ae])\b/, "onunla"], [/'(ın|in)\b/, "onun"],
+];
+export function withoutName(t: string, who?: string): string {
+  if (main !== "tr" || !t.includes(NAME)) return t;
+  const B = "(^|[!?.]\\s+|…\\s*)";                                                       // a sentence's start, or after "…"
+  let out = t
+    .replace(new RegExp(`${B}${NAME}[!?]+\\s*`, "g"), "$1")                              // "Nima! Kaç lira?" → "Kaç lira?"
+    // "Nima…": the narrator speaks of the learner ("O… yeni bir ev?"), anyone else speaks to them ("…bavulun yok mu?")
+    .replace(new RegExp(`${B}${NAME}…\\s*`, "g"), who === NARRATOR ? "$1O… " : "$1")
+    .replace(new RegExp(`,\\s*${NAME}(?=\\s*[!?.…,]|$)`, "g"), "")                        // "Günaydın, Nima!" → "Günaydın!"
+    .replace(new RegExp(`${B}${NAME}\\s*,\\s*(?![A-ZÇĞİÖŞÜ][a-zçğıöşü]+ ve )`, "g"), "$1"); // "Nima, bak!" → "bak!" (not a list: "Nima, Dilnoza ve Yusuf")
+  out = out.replace(new RegExp(`${NAME} için`, "g"), "onun için").replace(new RegExp(`${NAME}('[a-zçğıöşü]+)`, "g"), (_, suf: string) => {
+    for (const [re, pro] of CASES) if (re.test(suf)) return pro;
+    return "o";
+  }).replace(new RegExp(`\\b${NAME}\\b`, "g"), "o");
+  // a sentence that now starts with a small letter (not after "…", which goes on the same sentence)
+  out = out.replace(/(^|[!?.]\s+)([a-zçğıöşü])/g, (_, p: string, c: string) => p + c.toLocaleUpperCase("tr")).replace(/\s{2,}/g, " ").trim();
+  return out || t;
+}
+const spoken = (t: string, who?: string) => { const v = withoutName(t, who); return lang.spoken?.(v) ?? v; };
 
 // ---- the lines ----
 
@@ -69,36 +96,54 @@ export function linesOf(story: string): Line[] {
 const TMP = join(tmpdir(), `sahne-voice-${process.pid}`);
 
 class Worker {
-  private p: ChildProcess;
+  private p!: ChildProcess;
   private waiting = new Map<number, (r: Record<string, unknown>) => void>();
   private n = 0;
-  readonly ready: Promise<void>;
+  private closed = false;
+  ready!: Promise<void>;
   /** This worker's scratch folder: workers run side by side, so each has its own. */
   readonly dir: string;
+  private env: NodeJS.ProcessEnv;
   /** `threads`: the CPU threads its model may use, so several workers share the cores instead of fighting over them. */
   constructor(id = 0, threads = 0) {
-    const py = process.env.SAHNE_VOICE_PYTHON ?? "python3";
     this.dir = join(TMP, `w${id}`);
     mkdirSync(this.dir, { recursive: true });
-    const env = threads ? { ...process.env, SAHNE_VOICE_THREADS: String(threads), OMP_NUM_THREADS: String(threads) } : process.env;
-    this.p = spawn(py, [path(new URL("worker.py", import.meta.url))], { stdio: ["pipe", "pipe", "ignore"], env });
-    let ok: () => void;
-    this.ready = new Promise(r => { ok = r; });
-    createInterface({ input: this.p.stdout! }).on("line", l => {
+    this.env = threads ? { ...process.env, SAHNE_VOICE_THREADS: String(threads), OMP_NUM_THREADS: String(threads) } : process.env;
+    this.start();
+  }
+  /**
+   * The model's process. When it dies (the model runs out of memory over a long run), whatever it was asked fails, and the
+   * next question starts a fresh one: a retry on a process that is gone would wait for ever, and the run would hang.
+   */
+  private start() {
+    const py = process.env.SAHNE_VOICE_PYTHON ?? "python3";
+    const p = this.p = spawn(py, [path(new URL("worker.py", import.meta.url))], { stdio: ["pipe", "pipe", "ignore"], env: this.env });
+    let ok: () => void, fail: (e: Error) => void;
+    this.ready = new Promise((r, j) => { ok = r; fail = j; });
+    this.ready.catch(() => {});
+    createInterface({ input: p.stdout! }).on("line", l => {
       let m: Record<string, unknown>;
       try { m = JSON.parse(l); } catch { return; }
       if (m.ready) { ok(); return; }
       this.waiting.get(m.id as number)?.(m);
       this.waiting.delete(m.id as number);
     });
-    this.p.on("exit", c => { for (const w of this.waiting.values()) w({ ok: false, error: `the worker stopped (${c}): is SAHNE_VOICE_PYTHON a Python with chatterbox-tts?` }); });
+    p.stdin!.on("error", () => {});
+    p.on("exit", c => {
+      fail(new Error(`the worker stopped (${c}) before it was ready: is SAHNE_VOICE_PYTHON a Python with chatterbox-tts?`));
+      for (const w of this.waiting.values()) w({ ok: false, error: `the worker stopped (${c})` });
+      this.waiting.clear();
+      if (!this.closed) this.dead = true;
+    });
   }
+  private dead = false;
   async ask(q: Record<string, unknown>): Promise<Record<string, unknown>> {
+    if (this.dead) { this.dead = false; this.start(); }
     await this.ready;
     const id = ++this.n;
     return new Promise(r => { this.waiting.set(id, r); this.p.stdin!.write(JSON.stringify({ ...q, id }) + "\n"); });
   }
-  close() { this.p.stdin!.end(); }
+  close() { this.closed = true; this.p.stdin!.end(); }
 }
 
 // ---- making one clip ----
@@ -116,8 +161,8 @@ async function finish(wav: string, out: string, tempo: number) {
 }
 
 /** Whether a clip says the line: the language's say-it-aloud matching, and a length near its own timing of the line. */
-function judge(text: string, heard: string, ms: number): { ok: boolean; doubt?: string; score: number } {
-  const said = spoken(text);
+function judge(text: string, heard: string, ms: number, who?: string): { ok: boolean; doubt?: string; score: number } {
+  const said = spoken(text, who);
   const m = lang.matchLine?.(heard, [said], { names: [STANDIN === "nima" ? "Nima" : STANDIN] });
   const score = m ? m.score : lang.normalise?.(heard) === lang.normalise?.(said) ? 1 : 0;
   const expect = lang.speech(said).dur, ratio = expect ? ms / expect : 1;
@@ -132,12 +177,12 @@ async function make(w: Worker, l: { who: string; text: string; emo?: string }, v
   const exaggeration = Math.min(1, Math.max(0.25, v.exaggeration + (FEELING[l.emo ?? ""] ?? 0)));
   for (let i = 0; i < takes; i++) {
     const raw = join(w.dir, `raw${i}.wav`), f = join(w.dir, `take${i}.m4a`);
-    const r = await w.ask({ op: "say", text: spoken(l.text), lang: main, ref, exaggeration, cfg: v.cfg, seed: parseInt(hash(`${l.who}${l.text}${i}`).slice(0, 8), 16), out: raw });
+    const r = await w.ask({ op: "say", text: spoken(l.text, l.who), lang: main, ref, exaggeration, cfg: v.cfg, seed: parseInt(hash(`${l.who}${l.text}${i}`).slice(0, 8), 16), out: raw });
     // the model can fail on a take (an empty sampling step): another seed usually works
     if (!r.ok) { failed = String(r.error); continue; }
     await finish(raw, f, v.tempo);
     const h = await w.ask({ op: "hear", path: f, lang: main });
-    const heard = String(h.heard ?? ""), ms = await lengthMs(f), j = judge(l.text, heard, ms);
+    const heard = String(h.heard ?? ""), ms = await lengthMs(f), j = judge(l.text, heard, ms, l.who);
     if (!best || (j.ok ? 2 : 0) + j.score > (best.doubt ? 0 : 2) + best.score) best = { score: j.score, ms, doubt: j.doubt, heard, f };
     if (j.ok) break;
   }
@@ -154,7 +199,7 @@ const cast = (): VoiceCast => readJson<VoiceCast>(VOICE_CAST, { model: MODEL, ch
 /** The sample a confirmed voice is cloned from: the copy in refs/, made when it was picked. */
 const refOf = (who: string) => path(new URL(`${who}.wav`, VOICE_REFS));
 /** What a clip is made from: a change of any of these makes it stale. */
-const sigOf = (l: Line, v: VoiceChoice) => hash(JSON.stringify([MODEL, v.ref, v.exaggeration, v.cfg, v.tempo, spoken(l.text), l.emo ?? "", 2]));
+const sigOf = (l: Line, v: VoiceChoice) => hash(JSON.stringify([MODEL, v.ref, v.exaggeration, v.cfg, v.tempo, spoken(l.text, l.who), l.emo ?? "", 2]));
 
 /** The best candidates for a brief: the right gender and accent, nearest the age's pitch, and none another character already has. */
 export function candidates(b: VoiceBrief, pool: PoolVoice[], n: number, taken: Set<string> = new Set()): PoolVoice[] {
@@ -238,8 +283,13 @@ export function choose(who: string, v: VoiceChoice) {
 
 function stale(story: string, c: VoiceCast, who?: string[]) {
   const m = readJson<Manifest>(new URL(`${story}/manifest.json`, VOICE_CLIPS), { story, lines: {} });
-  const todo: Line[] = [];
+  const todo: Line[] = [], seen = new Set<string>();
   for (const l of linesOf(story)) {
+    // a speaker saying the same line twice in a story has one clip (the stage looks clips up by speaker and text): the first
+    // time decides its feeling and tempo, or the two would make each other stale for ever
+    const key = `${l.who}\u0000${l.text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     const v = c.characters[l.who]?.unvoiced ? undefined : c.characters[l.who]?.voice;
     if (!v?.confirmed || (who && !who.includes(l.who))) continue;
     const have = m.lines[l.who]?.[l.text];

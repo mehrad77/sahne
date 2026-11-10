@@ -29,6 +29,15 @@ export interface StillOptions {
    * one character are not the same crop.
    */
   framing: Framing;
+  /** `held`: only what the hands hold (a part of the `hold` field), framed around it, without the figure: a builder's thumbnail of the item itself. Throws when nothing is held. */
+  only?: "held";
+  /**
+   * A close-up of one part: the picture is cropped around the pieces drawn for `field` (the figure still drawn), or, when the
+   * figure wears nothing there, around `bones` (where it would sit: a "None" option); `always` frames the bones too, so every
+   * option of a field shares one crop (shorts and long trousers). At least about a head wide, so a ring
+   * shows its hand. Overrides `framing`.
+   */
+  focus?: { field: string; bones: string[]; always?: boolean };
   view?: ViewName;
   /** A pose to draw (a key pose for Still motion); the rest pose by default. */
   pose?: PoseState;
@@ -136,6 +145,22 @@ function frameBox(framing: Framing, b: BodyDims, world: Map<string, Affine>, ite
   return [u[0] - m, u[1] - m, u[2] + m, u[3] + m];
 }
 
+/** The crop of `StillOptions.focus`: the field's pieces, else its bones, squared, with a margin and a floor of about a head. */
+function focusBox(f: { field: string; bones: string[]; always?: boolean }, b: BodyDims, world: Map<string, Affine>, items: { it: Item; box: Box }[]): Box {
+  let u: Box | null = null;
+  for (const { it, box } of items) if (it.from === f.field) u = u ? [Math.min(u[0], box[0]), Math.min(u[1], box[1]), Math.max(u[2], box[2]), Math.max(u[3], box[3])] : box;
+  if (!u || f.always) for (const name of f.bones) {
+    const m = world.get(name);
+    if (!m) continue;
+    const [x, y] = apply(m, 0, 0), r = b.headW * 0.3;
+    u = u ? [Math.min(u[0], x - r), Math.min(u[1], y - r), Math.max(u[2], x + r), Math.max(u[3], y + r)] : [x - r, y - r, x + r, y + r];
+  }
+  if (!u) return frameBox("full", b, world, items);
+  const floor = b.headW * 0.9, cx = (u[0] + u[2]) / 2, cy = (u[1] + u[3]) / 2;
+  const w = Math.max(u[2] - u[0], floor) / 2, h = Math.max(u[3] - u[1], floor) / 2;
+  return square([cx - w, cy - h, cx + w, cy + h], 0.06);
+}
+
 /** A bone's transform as an attribute (nothing for the identity). */
 function transform(m: Affine, digits: number): string {
   const [a, b, c, d, e, f] = m;
@@ -200,8 +225,9 @@ export function renderSvg(puppet: Figure, kit: Kit, o: StillOptions): string {
     if (n && finite(n.box)) (raised.has(armSide(it)) ? later : nodes).push(n);
   }
   nodes.push(...later);
+  if (o.only === "held") nodes.splice(0, nodes.length, ...nodes.filter(n => n.it.hold));
 
-  const vb = frameBox(o.framing, b, world, nodes);
+  const vb = o.only === "held" ? frameBox("full", b, world, nodes) : o.focus ? focusBox(o.focus, b, world, nodes) : frameBox(o.framing, b, world, nodes);
   if (!finite(vb) || !(vb[2] > vb[0]) || !(vb[3] > vb[1])) throw new Error("sahne: nothing to draw");
 
   // a detail that would be about a pixel in a list (96 px) is left out (a glint, a stitch, a crease)

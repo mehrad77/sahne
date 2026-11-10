@@ -18,10 +18,10 @@
 // against a change to a listed part, the kit's odds or the randomiser itself: then --check fails, and
 // the extras are regenerated and looked at again (the gallery's #/cast/extras).
 
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createBuilder, normalize, type AvatarDoc, type OfferKind } from "sahne";
 import kit from "../../sahne-kit/src/full.ts";
-import { EXTRAS as DIR, repoPath } from "../paths.ts";
+import { EXTRAS as DIR, SERIES, repoPath } from "../paths.ts";
 
 /** The bubble colour of every extra: a neutral grey (they are silent; it never meets a speaker's). */
 const COLOR = "#8A8580";
@@ -214,11 +214,32 @@ export function avatarOf(s: Spec): AvatarDoc {
   return doc;
 }
 
+/** Whether the content root's series has Russian among its translations (`series.json` `languages`): then each extra gets its Russian. */
+const WITH_RU = existsSync(SERIES) && ((JSON.parse(readFileSync(SERIES, "utf8")) as { languages?: { translations?: string[] } }).languages?.translations ?? []).includes("ru");
+
+/** Each extra's Russian, by id (`child` and `passenger` for all of their numbered ones). */
+const RU: Record<string, { name: string; role: string; bio: string }> = {
+  baker_firin: { name: "Пекарь", role: "Пекарь в угловой пекарне в Ферикёе", bio: "Раздаёт горячие буханки, когда в четыре часа хлеб достают из печи." },
+  cayci_ortakoy: { name: "Чайщик", role: "Чайщик (çaycı) на берегу в Ортакёе", bio: "Носит чай на подносе вдоль берега и кричит «Çay, çay!»" },
+  cayci_vapur: { name: "Чайщик", role: "Чайщик (çaycı) на пароме", bio: "Обходит палубу с подносом стаканов чая." },
+  child: { name: "Ребёнок", role: "Ребёнок из детского сада на празднике в парке", bio: "Один из ряда детсадовских ребятишек, которые поют на сцене в парке." },
+  clerk_goc: { name: "Служащий", role: "Служащий за стеклом в миграционной службе", bio: "Проверяет бумаги, стучит пальцем по договору и качает головой; усталый, но не злодей." },
+  librarian_bu: { name: "Библиотекарь", role: "Библиотекарь в библиотеке университета Бейкент", bio: "Знает каждую полку и говорит шёпотом." },
+  librarian_ibb: { name: "Библиотекарь", role: "Библиотекарь в городской библиотеке İBB", bio: "Сидит за столом и одним пальцем просит тишины." },
+  passenger: { name: "Пассажир", role: "Пассажир в метро, автобусе или на пароме", bio: "Едет через весь город вместе со всеми; он же в толпе на улице." },
+  passerby_1: { name: "Прохожий", role: "Прохожий на Истикляль", bio: "Куда-то идёт; если спросить дорогу, покажет рукой." },
+  stallholder_1: { name: "Продавец", role: "Торговец на субботнем базаре в Ферикёе", bio: "Кричит «Gel abla gel!» над своими помидорами." },
+  stallholder_2: { name: "Продавец", role: "Торговец на субботнем базаре в Ферикёе", bio: "Продаёт деревенские яйца и зелень и всё взвешивает дважды." },
+  teacher_kindergarten: { name: "Учительница", role: "Учительница детского сада на празднике в парке", bio: "Стоит сбоку от сцены и следит, чтобы ряд детей не разбрёлся." },
+  usta: { name: "Мастер", role: "Мастер на все руки", bio: "Чинит в доме отопление и протечки, с ящиком инструментов в руках." },
+};
+
 /** The character document of one extra (Kumru's STORIES_SCHEMA.md §5, `kind: "extra"`). */
 export function extraDoc(s: Spec, order: number): Record<string, unknown> {
+  const ru = WITH_RU ? RU[s.id] ?? RU[s.id.replace(/_\d+$/, "")] : undefined;
   return {
     id: s.id, order, kind: "extra", level: "A1", color: COLOR,
-    name: { tr: s.name, fa: s.nameFa }, role: { en: s.role, fa: s.roleFa }, bio: { en: s.bio, fa: s.bioFa }, places: s.places, avatar: avatarOf(s),
+    name: { tr: s.name, fa: s.nameFa, ...(ru && { ru: ru.name }) }, role: { en: s.role, fa: s.roleFa, ...(ru && { ru: ru.role }) }, bio: { en: s.bio, fa: s.bioFa, ...(ru && { ru: ru.bio }) }, places: s.places, avatar: avatarOf(s),
   };
 }
 
