@@ -69,36 +69,54 @@ export function linesOf(story: string): Line[] {
 const TMP = join(tmpdir(), `sahne-voice-${process.pid}`);
 
 class Worker {
-  private p: ChildProcess;
+  private p!: ChildProcess;
   private waiting = new Map<number, (r: Record<string, unknown>) => void>();
   private n = 0;
-  readonly ready: Promise<void>;
+  private closed = false;
+  ready!: Promise<void>;
   /** This worker's scratch folder: workers run side by side, so each has its own. */
   readonly dir: string;
+  private env: NodeJS.ProcessEnv;
   /** `threads`: the CPU threads its model may use, so several workers share the cores instead of fighting over them. */
   constructor(id = 0, threads = 0) {
-    const py = process.env.SAHNE_VOICE_PYTHON ?? "python3";
     this.dir = join(TMP, `w${id}`);
     mkdirSync(this.dir, { recursive: true });
-    const env = threads ? { ...process.env, SAHNE_VOICE_THREADS: String(threads), OMP_NUM_THREADS: String(threads) } : process.env;
-    this.p = spawn(py, [path(new URL("worker.py", import.meta.url))], { stdio: ["pipe", "pipe", "ignore"], env });
-    let ok: () => void;
-    this.ready = new Promise(r => { ok = r; });
-    createInterface({ input: this.p.stdout! }).on("line", l => {
+    this.env = threads ? { ...process.env, SAHNE_VOICE_THREADS: String(threads), OMP_NUM_THREADS: String(threads) } : process.env;
+    this.start();
+  }
+  /**
+   * The model's process. When it dies (the model runs out of memory over a long run), whatever it was asked fails, and the
+   * next question starts a fresh one: a retry on a process that is gone would wait for ever, and the run would hang.
+   */
+  private start() {
+    const py = process.env.SAHNE_VOICE_PYTHON ?? "python3";
+    const p = this.p = spawn(py, [path(new URL("worker.py", import.meta.url))], { stdio: ["pipe", "pipe", "ignore"], env: this.env });
+    let ok: () => void, fail: (e: Error) => void;
+    this.ready = new Promise((r, j) => { ok = r; fail = j; });
+    this.ready.catch(() => {});
+    createInterface({ input: p.stdout! }).on("line", l => {
       let m: Record<string, unknown>;
       try { m = JSON.parse(l); } catch { return; }
       if (m.ready) { ok(); return; }
       this.waiting.get(m.id as number)?.(m);
       this.waiting.delete(m.id as number);
     });
-    this.p.on("exit", c => { for (const w of this.waiting.values()) w({ ok: false, error: `the worker stopped (${c}): is SAHNE_VOICE_PYTHON a Python with chatterbox-tts?` }); });
+    p.stdin!.on("error", () => {});
+    p.on("exit", c => {
+      fail(new Error(`the worker stopped (${c}) before it was ready: is SAHNE_VOICE_PYTHON a Python with chatterbox-tts?`));
+      for (const w of this.waiting.values()) w({ ok: false, error: `the worker stopped (${c})` });
+      this.waiting.clear();
+      if (!this.closed) this.dead = true;
+    });
   }
+  private dead = false;
   async ask(q: Record<string, unknown>): Promise<Record<string, unknown>> {
+    if (this.dead) { this.dead = false; this.start(); }
     await this.ready;
     const id = ++this.n;
     return new Promise(r => { this.waiting.set(id, r); this.p.stdin!.write(JSON.stringify({ ...q, id }) + "\n"); });
   }
-  close() { this.p.stdin!.end(); }
+  close() { this.closed = true; this.p.stdin!.end(); }
 }
 
 // ---- making one clip ----
