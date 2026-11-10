@@ -51,6 +51,10 @@ export interface BuilderUIOptions {
   backdrop?: Backdrop;
   /** The first tab (default `body`). */
   section?: string;
+  /** `false` leaves out the emotion strip under the preview (default true). */
+  moods?: boolean;
+  /** `false` leaves out the tabs: the host shows one section at a time with `setSection` (an app's own steps). Default true. */
+  tabs?: boolean;
   /** A seed for each press of the dice (default random). */
   seed?: () => number | string;
   onChange?(doc: AvatarDoc): void;
@@ -136,9 +140,9 @@ export function mountBuilder(host: HTMLElement, o: BuilderUIOptions): BuilderUI 
   const undoB = btn("undo"), redoB = btn("redo"), diceB = btn("dice"), resetB = btn("reset"), turnB = btn("turn", "sahne-bld-round sahne-bld-turn");
   const moodsEl = h("div", { cls: "sahne-bld-moods", role: "radiogroup" });
   const view = h("div", { cls: "sahne-bld-view" }, h("div", { cls: "sahne-bld-pic" }, stageHost, stillEl,
-    h("div", { cls: "sahne-bld-tools" }, h("div", {}, undoB, redoB), h("div", {}, diceB, resetB)), turnB), moodsEl);
-  const tabsEl = h("div", { cls: "sahne-bld-tabs", role: "tablist" });
-  const panel = h("div", { cls: "sahne-bld-panel", role: "tabpanel", id: `${uid}-panel`, tabindex: "0" });
+    h("div", { cls: "sahne-bld-tools" }, h("div", {}, undoB, redoB), h("div", {}, diceB, resetB)), turnB), o.moods === false ? null : moodsEl);
+  const tabsEl = h("div", { cls: "sahne-bld-tabs", role: "tablist", hidden: o.tabs === false });
+  const panel = h("div", { cls: "sahne-bld-panel", role: o.tabs === false ? "group" : "tabpanel", id: `${uid}-panel`, tabindex: "0" });
   const doneB = h("button", { type: "button", cls: "sahne-bld-btn sahne-bld-primary", "data-act": "done" });
   const cancelB = h("button", { type: "button", cls: "sahne-bld-btn", "data-act": "cancel" });
   const foot = h("div", { cls: "sahne-bld-foot" }, o.onCancel ? cancelB : null, o.onDone ? doneB : null);
