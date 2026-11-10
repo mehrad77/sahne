@@ -15,7 +15,7 @@ export const SECTIONS: Section[] = [
   { id: "", title: "Home", about: "What Sahne is, why it exists and how it works", load: () => import("./sections/home.ts") },
   // these two are docs (guide/whats-new.md, guide/get-started.md) with a place of their own
   {
-    id: "new", title: "What's new", about: "Each release, newest first: Backstage in 0.2 (the optional quiz in 0.2.1, the narrow almond eye in 0.2.2, story checks that let dialogue breathe in 0.2.3), the first stage in 0.1",
+    id: "new", title: "What's new", about: "Each release, newest first: each character's own recorded voice in 0.3, Backstage in 0.2 (the optional quiz in 0.2.1, the narrow almond eye in 0.2.2, story checks that let dialogue breathe in 0.2.3), the first stage in 0.1",
     nav: () => RELEASES.map((r, i) => ({ label: i ? `Sahne ${r}` : `Sahne ${r} · latest`, hash: `#/new?at=sahne-${r.replace(".", "")}` })),
     load: () => import("./sections/docs.ts"),
   },
@@ -58,7 +58,7 @@ export const SECTIONS: Section[] = [
 ];
 
 /** The releases guide/whats-new.md has a section for, newest first. */
-export const RELEASES = ["0.2", "0.1"];
+export const RELEASES = ["0.3", "0.2", "0.1"];
 
 export const KIT_NAV: NavItem[] = [
   { label: "Set and props", hash: "#/kit/set" },
