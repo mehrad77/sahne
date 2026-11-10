@@ -14,6 +14,7 @@ packages/
   sahne-fa/       the Persian plugin (right to left)            → packages/sahne-fa/README.md
   sahne-story/    the story format, its checks, the story plugins' seam, paths.ts, samples/ → packages/sahne-story/README.md
   sahne-lesson/   the lesson plugin: spots, target words, glosses, the quiz, the syllabus checks → packages/sahne-lesson/README.md
+  sahne-voice/    the voice plugin: each character's recorded voice, its casting, its generator → packages/sahne-voice/README.md
   sahne-backstage/ the studio an app runs on its content root (:5181), and its MCP server → packages/sahne-backstage/README.md
   sahne-gallery/  the dev gallery and the checks (:5180)        → packages/sahne-gallery/README.md
 .github/workflows/ci.yml       pnpm sahne check on every push and pull request, the scan, and the art job on a pull request that changes promoted drawings
@@ -35,6 +36,7 @@ assets/                        the README's poster and scene pictures, and brand
 | A series in another language, or a language's lints | [packages/sahne-story/README.md](packages/sahne-story/README.md) (Languages, the story language) |
 | A language plugin itself (mouth timing, matching, numbers) | its package's README: [sahne-tr](packages/sahne-tr/README.md), [sahne-en](packages/sahne-en/README.md), [sahne-de](packages/sahne-de/README.md), [sahne-fa](packages/sahne-fa/README.md) |
 | A story plugin, or what a story teaches (spots, words, quiz) | [packages/sahne-story/README.md](packages/sahne-story/README.md) (Plugins), then [packages/sahne-lesson/README.md](packages/sahne-lesson/README.md) |
+| Characters' recorded voices (casting, generating clips, playing them) | [packages/sahne-voice/README.md](packages/sahne-voice/README.md), then [DESIGN.md §8.4](packages/sahne/DESIGN.md) |
 | The gallery, screenshots, golden frames | [packages/sahne-gallery/README.md](packages/sahne-gallery/README.md) |
 | Package conventions, Kerim | [packages/README.md](packages/README.md) |
 

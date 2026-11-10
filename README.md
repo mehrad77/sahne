@@ -46,6 +46,7 @@ See every one of them move at [sahne.shab.boo](https://sahne.shab.boo) (or run `
 | [`sahne-fa`](packages/sahne-fa/) | The Persian plugin: the same for Persian (`fa-IR`, right to left), plus the Persian story lints in `sahne-story` |
 | [`sahne-story`](packages/sahne-story/) | The story format: the adapter (a story document becomes a script), the player, the story check and lints, the schemas, the story plugins' seam, and the samples |
 | [`sahne-lesson`](packages/sahne-lesson/) | The lesson plugin of the story format, for a series that teaches a language: grammar spots, target words, glosses, the quiz and the syllabus checks |
+| [`sahne-voice`](packages/sahne-voice/) | The voice plugin: each character's own voice, cast in backstage and generated ahead of time with a local speech model; an app plays the clips, the device's voice standing in for a line without one |
 | [`sahne-backstage`](packages/sahne-backstage/) | The studio: an app runs it on its content root to plan seasons on a board, write episodes as scripts beside a live stage, direct them, review them and save them, checked as `pnpm check` checks them; with an assistant and an MCP server for agents |
 | [`sahne-gallery`](packages/sahne-gallery/) | The dev gallery: a live demo of every engine system, the whole kit, every place and every story. It also runs the checks (sizes, determinism, golden frames) |
 
@@ -102,6 +103,7 @@ Pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the setup, 
 | The animal puppets (`sahne-kit/puppets`) | 8 KB |
 | Pieces drawn as data (`sahne-kit/drawing`) | 8 KB |
 | The lesson plugin (`sahne-lesson`) | 8 KB |
+| The voice plugin (`sahne-voice`) | 4 KB |
 | Portraits (`normalize`, `portrait`, `silhouette`) | 20 KB |
 | The builder with its stage | 100 KB |
 | All place documents together | 100 KB |

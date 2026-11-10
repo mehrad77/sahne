@@ -42,6 +42,7 @@ export const PACKAGES = {
   "sahne-fa": { key: "#1FA5A0", name: "Fîrûze", ebru: ["#E6F3F0", "#1FA5A0", "#0E6F73", "#D8A440", "#1C2246"] },
   "sahne-story": { key: "#9C5F7C", name: "Mürdüm", ebru: ["#F4E4EA", "#9C5F7C", "#5E3550", "#E0A13A", "#1C2246"] },
   "sahne-lesson": { key: "#3E7A5C", name: "Karatahta", ebru: ["#E2EFE6", "#3E7A5C", "#22473A", "#D8A440", "#1C2246"] },
+  "sahne-voice": { key: "#C2452D", name: "Kiremit", ebru: ["#F6E1DA", "#C2452D", "#7A2A1C", "#D8A440", "#1C2246"] },
   "sahne-backstage": { key: "#B98A5A", name: "Kraft", ebru: ["#E9D6B0", "#B98A5A", "#D8A440", "#8E6640", "#1C2246"] },
   "sahne-gallery": { key: "#5D72B4", name: "Gece mavisi", ebru: ["#DCE3F5", "#5D72B4", "#1C2246", "#D8A440", "#FBE6BC"] },
 };

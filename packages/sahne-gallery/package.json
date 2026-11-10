@@ -1,6 +1,6 @@
 {
   "name": "sahne-gallery",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Dev gallery for Sahne: the look, parts, faces, lights and cameras",
@@ -12,7 +12,7 @@
     "golden": "node golden.mjs",
     "golden:update": "node golden.mjs --update",
     "thumbs": "node thumbs.mjs",
-    "check": "tsc -p ../tsconfig.json && node brand/build.mjs --check && node size.mjs && node determinism.mjs && node ../sahne-story/stories.ts --check --quiet && node ../sahne-story/cast/extras.ts --check && node ../sahne-story/convert/languages.ts --check && node --test --test-timeout=120000 ../sahne/test/*.test.ts ../sahne-kit/test/*.test.ts ../sahne-tr/test/*.test.ts ../sahne-en/test/*.test.ts ../sahne-de/test/*.test.ts ../sahne-fa/test/*.test.ts ../sahne-story/test/*.test.ts ../sahne-lesson/test/*.test.ts ../sahne-backstage/test/*.test.ts test/*.test.ts && node golden.mjs"
+    "check": "tsc -p ../tsconfig.json && node brand/build.mjs --check && node size.mjs && node determinism.mjs && node ../sahne-story/stories.ts --check --quiet && node ../sahne-story/cast/extras.ts --check && node ../sahne-story/convert/languages.ts --check && node --test --test-timeout=120000 ../sahne/test/*.test.ts ../sahne-kit/test/*.test.ts ../sahne-tr/test/*.test.ts ../sahne-en/test/*.test.ts ../sahne-de/test/*.test.ts ../sahne-fa/test/*.test.ts ../sahne-story/test/*.test.ts ../sahne-lesson/test/*.test.ts ../sahne-voice/test/*.test.ts ../sahne-backstage/test/*.test.ts test/*.test.ts && node golden.mjs"
   },
   "dependencies": {
     "sahne": "workspace:*",
@@ -21,6 +21,7 @@
     "sahne-fa": "workspace:*",
     "sahne-kit": "workspace:*",
     "sahne-lesson": "workspace:*",
+    "sahne-voice": "workspace:*",
     "sahne-story": "workspace:*",
     "sahne-tr": "workspace:*"
   },

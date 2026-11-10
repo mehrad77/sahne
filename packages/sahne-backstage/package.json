@@ -1,6 +1,6 @@
 {
   "name": "sahne-backstage",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "A local, in-browser editor for a Sahne content root: its series, seasons and episodes, the cast and the places",
@@ -35,6 +35,7 @@
     "sahne-kit": "workspace:*",
     "sahne-lesson": "workspace:*",
     "sahne-story": "workspace:*",
+    "sahne-voice": "workspace:*",
     "sahne-tr": "workspace:*",
     "zod": "4.6.7"
   }

@@ -32,6 +32,7 @@ import { DOCS } from "./guides.ts";
 import { forgetNote, readMemory, remember } from "./memory.ts";
 import { deleteChat, listChats, readChat, writeChat } from "./chats.ts";
 import { readRecord, readRecords } from "./runs/record.ts";
+import { voiceFile, voicesApi } from "./voices.ts";
 
 const HERE = new URL("../", import.meta.url);
 const CLI_PATH = fileURLToPath(new URL("cli.ts", import.meta.url));
@@ -328,6 +329,7 @@ export async function serve(o: Options): Promise<Running> {
       if (!t) throw new Fail(404, `no record of a task ${a}`);
       return json(res, 200, { task: t });
     }
+    if (route === "voices") { const r = await voicesApi(m, a, b, () => body(req), writable()); return json(res, r.status, r.body); }
     if (route === "usage" && m === "GET") return json(res, 200, usageSummary(readSettings().caps));
     if (route === "thumbs" && m === "GET") return json(res, 200, { stale: await staleThumbs(), command: "node packages/sahne-gallery/thumbs.mjs (in the Sahne repo, with SAHNE_CONTENT set)" });
     throw new Fail(404, `no route ${m} /api/${path.join("/")}`);
@@ -364,6 +366,8 @@ export async function serve(o: Options): Promise<Running> {
       if (url.pathname.startsWith("/api/")) return await api(req, res, url.pathname.slice(5).split("/").map(decodeURIComponent));
       const f = files[url.pathname];
       if (f) { res.writeHead(200, { "content-type": f[1], "cache-control": "no-store" }).end(readFileSync(f[0])); return; }
+      const vf = voiceFile(url.pathname);
+      if (vf) { res.writeHead(200, { "content-type": vf.type, "cache-control": "no-store" }).end(readFileSync(vf.file)); return; }
       const s = /^\/sounds\/([a-z0-9_]+\.m4a)$/.exec(url.pathname);
       if (s) {
         const u = new URL(s[1], SOUNDS);

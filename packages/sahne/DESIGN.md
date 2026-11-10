@@ -489,7 +489,7 @@ A flat may **react** to people (`FlatSpec.react`, `FlatReact`), and remember it.
 
   So mouths, gestures and everything after the line stay on the words. A voice that gives no word marks only moves the end. A voice that never starts lets go of the clock after 2.5 s.
 - **Now:** the browser's speech (`browserVoice()`), with each character's `rate` and `pitch` and the cue's tempo, and word marks where the browser gives them. A whisper is quieter; `mouthing` and `silent` lines are not voiced.
-- **Next: neural voices** (the `sahne-voice` package, not in this repo yet). Each line's audio is generated at build time, inside a provider's free tier, uploaded to a public bucket and found by its speaker, text and rate; a provider of recordings plays it into `out` and reports word marks scaled from the language plugin's estimate. Marks only steer the clock: mouth shapes always come from the estimate. A character's `voice.neural` names its voice.
+- **Recorded voices** (`sahne-voice`). A developer casts a voice for each character in backstage's Voices page (candidate samples reading the character's own lines, a tempo, a confirmation); the generator (`sahne-voice/build/voices.ts`) then reads every line in that voice with a local speech model, checks each clip by hearing it back with the language plugin's `matchLine`, and writes each story's clips beside a manifest keyed by speaker and text. The app's `clipVoice` plays a line's clip into `out` and reports word marks scaled from the language plugin's estimate; a line with no clip (the learner's own name in it, a story not generated) goes to the fallback, `browserVoice()`. Marks only steer the clock: mouth shapes always come from the plugin's timing.
 
 ### 8.5 Captions
 

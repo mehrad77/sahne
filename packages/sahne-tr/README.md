@@ -14,7 +14,7 @@ tr.match("ekmeği", "ekmek");                    // true
 tr.matchLine("2 ekmek lütfen", ["İki ekmek, lütfen.", "İki ekmek ver."]); // { matched: true, best: 0, heard, score }
 ```
 
-It depends on `sahne` for types and the shared line matcher (`lineMatcher`). Besides the plugin it exports the helpers it is built from: `lowerTr`, `isVowel`, `VOWELS`, `sayWord`, `sayNumber`, `sayNumeral`, `sayDigits`, `ordinal`, `tokens`, `syllables`, `phonemes`, `stems`, `deixis`, the `TIMING` table and the `VISEME` map; for *say it aloud*, `normalise`, `sayWords`, `letters` and `allowance`; and for the story lints (`sahne-story`), `readNumber` ("on beş" → 15), `readClock` ("Ona çeyrek var" → 9:45) and `clockMinutes`.
+It depends on `sahne` for types and the shared line matcher (`lineMatcher`). Besides the plugin it exports the helpers it is built from: `lowerTr`, `isVowel`, `VOWELS`, `sayWord`, `sayNumber`, `sayNumeral`, `sayDigits`, `ordinal`, `tokens`, `syllables`, `phonemes`, `stems`, `deixis`, the `TIMING` table and the `VISEME` map; for *say it aloud*, `normalise`, `sayWords`, `letters` and `allowance`; for recorded voices (`sahne-voice`), `spoken` (a line as a voice reads it: numerals in words, no quote marks or leading pause, the punctuation kept), which is also the plugin's `spoken`; and for the story lints (`sahne-story`), `readNumber` ("on beş" → 15), `readClock` ("Ona çeyrek var" → 9:45) and `clockMinutes`.
 
 ## Timing
 

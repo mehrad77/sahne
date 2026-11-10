@@ -1,7 +1,7 @@
 // Voices (DESIGN.md §8.4). A provider speaks a line and reports when it starts, each word it
-// reaches and when it ends; the stage's clock follows those reports (audio/clock.ts). Now: the
-// browser's own speech, with each character's rate and pitch. Later: neural voices generated at
-// build time, which will report exact marks; a character's `neural` field is their id.
+// reaches and when it ends; the stage's clock follows those reports (audio/clock.ts). Here: the
+// browser's own speech, with each character's rate and pitch. Recorded voices, generated ahead of
+// time in each character's own voice, are the `sahne-voice` package's `clipVoice`.
 
 /** A character's voice (the story cast's `voice` field). */
 export interface VoiceSpec {
