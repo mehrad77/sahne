@@ -256,8 +256,13 @@ export function choose(who: string, v: VoiceChoice) {
 
 function stale(story: string, c: VoiceCast, who?: string[]) {
   const m = readJson<Manifest>(new URL(`${story}/manifest.json`, VOICE_CLIPS), { story, lines: {} });
-  const todo: Line[] = [];
+  const todo: Line[] = [], seen = new Set<string>();
   for (const l of linesOf(story)) {
+    // a speaker saying the same line twice in a story has one clip (the stage looks clips up by speaker and text): the first
+    // time decides its feeling and tempo, or the two would make each other stale for ever
+    const key = `${l.who}\u0000${l.text}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     const v = c.characters[l.who]?.unvoiced ? undefined : c.characters[l.who]?.voice;
     if (!v?.confirmed || (who && !who.includes(l.who))) continue;
     const have = m.lines[l.who]?.[l.text];
