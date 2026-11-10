@@ -16,6 +16,10 @@ import { renderSvg, finishSvg, detailOf } from "./render.ts";
 
 export interface PortraitOptions {
   framing?: Framing;
+  /** `held`: only what the hands hold, framed around it (`StillOptions.only`); a figure holding nothing gives an empty picture. */
+  only?: "held";
+  /** A close-up of one part (`StillOptions.focus`). */
+  focus?: { field: string; bones: string[]; always?: boolean };
   /** The longer side in px; left out, the SVG scales to its container. */
   size?: number;
   /** The size in px to choose the amount of detail for; by default `size`, or a list's 96 without one. A portrait that a stylesheet sizes but should look sharp large says `detail: 400`. */
@@ -102,10 +106,14 @@ export function portrait(doc: unknown, kit: Kit, o: PortraitOptions = {}): strin
   if (!nd) return silhouette(kit, o);
   const bg = svgPaint(o.background) ?? "", emotion = typeof o.emotion === "string" && Object.hasOwn(kit.face.emotions, o.emotion) ? o.emotion : "", view = o.view === "back" ? "back" : "front";
   // what `trusted` allowed is in the normalized document already: it is not a part of the key
-  const key = [kit.id, framing, emotion, view, bg, d.digits, d.rim, d.shadow, d.small, serialize(nd)].join("|");
+  const only = o.only === "held" ? "held" : undefined;
+  const focus = o.focus && typeof o.focus.field === "string" && Array.isArray(o.focus.bones) ? { field: o.focus.field, bones: o.focus.bones.map(String), always: o.focus.always === true } : undefined;
+  const key = [kit.id, framing, only ?? "", focus ? focus.field + ":" + focus.bones.join(",") + (focus.always ? "!" : "") : "", emotion, view, bg, d.digits, d.rim, d.shadow, d.small, serialize(nd)].join("|");
   return finishSvg(memo(key, () => {
     try {
-      return renderSvg(compose(nd, kit, { trusted }), kit, { framing, face: emotion, view, background: bg, ...d, idPrefix: "p" + tag(key) });
+      const fig = compose(nd, kit, { trusted });
+      if (only && !fig.views[view].some(it => it.hold)) return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"></svg>`;
+      return renderSvg(fig, kit, { framing, only, focus, face: emotion, view, background: bg, ...d, idPrefix: "p" + tag(key) });
     } catch (e) {
       fail(e);
       return plain(kit, framing, bg, d);

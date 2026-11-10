@@ -930,3 +930,27 @@ test("random characters stay near the size budgets", () => {
   }
   clearPortraits();
 });
+
+test("only what is held: the item alone, framed around it; nothing held, an empty picture", () => {
+  const plain = { v: 1, kit: "sahne-kit@1", body: { build: "adult", height: 0.5, shape: "average" }, skin: "skin_04", face: {}, hair: { style: "hair_short" }, outfit: { top: { id: "top_tee" }, bottom: { id: "bottom_jeans" }, shoes: { id: "shoes_sneakers" } } };
+  const box = (s: string) => s.match(/viewBox="([^"]+)"/)![1].split(" ").map(Number);
+  const whole = portrait({ ...plain, hold: { id: "book_held" } }, kit, { framing: "full" });
+  const book = portrait({ ...plain, hold: { id: "book_held" } }, kit, { framing: "full", only: "held" });
+  assert.ok(book.length > 500 && book.length < whole.length / 3, "the book, not the figure");
+  assert.ok(box(book)[3] < box(whole)[3] / 2, "framed around the book");
+  assert.notEqual(book, whole, "a key of its own");
+  assert.equal(box(portrait(plain, kit, { framing: "full", only: "held" })).join(" "), "0 0 1 1");
+});
+
+test("a close-up of one part: the crop follows the part's pieces, else its bones; the figure is still drawn", () => {
+  const plain = { v: 1, kit: "sahne-kit@1", body: { build: "adult", height: 0.5, shape: "average" }, skin: "skin_04", face: {}, hair: { style: "hair_short" }, outfit: { top: { id: "top_tee" }, bottom: { id: "bottom_jeans" }, shoes: { id: "shoes_sneakers" } } };
+  const box = (s: string) => s.match(/viewBox="([^"]+)"/)![1].split(" ").map(Number);
+  const focus = { field: "wear.waist", bones: ["hips"] };
+  const whole = box(portrait({ ...plain, wear: { waist: { id: "apron_shop" } } }, kit, { framing: "full" }));
+  const apron = box(portrait({ ...plain, wear: { waist: { id: "apron_shop" } } }, kit, { framing: "full", focus }));
+  const none = box(portrait(plain, kit, { framing: "full", focus }));
+  assert.ok(apron[3] < whole[3] * 0.6, "cropped to the apron");
+  assert.ok(none[3] < whole[3] * 0.4, "no apron: around the hips");
+  const it = compose(plain as AvatarDoc, kit).views.front;
+  assert.ok(it.some((x) => x.from === "outfit.top") && it.some((x) => x.from === undefined), "a piece names its field; the body names none");
+});

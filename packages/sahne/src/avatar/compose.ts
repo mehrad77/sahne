@@ -82,7 +82,10 @@ export function compose(avatar: AvatarDoc, kit: Kit, o: { trusted?: boolean } = 
     const cs = clipAt.get(u.part.slot) ?? [];
     const out = u.part.draw(ctxOf(u, cs));
     for (const c of cs) notes.push({ field: u.field, id: u.id, why: "clipped", by: c.by });
-    for (const v of ["front", "back"] as const) for (const it of out[v] ?? []) views[v].push(cs.length ? cut(it, cs.map(c => c[v])) : it);
+    for (const v of ["front", "back"] as const) for (const it0 of out[v] ?? []) {
+      const it = u.field === "body" ? it0 : { ...it0, from: u.field };
+      views[v].push(cs.length ? cut(it, cs.map(c => c[v])) : it);
+    }
     for (const [k, val] of Object.entries(out.alt ?? {})) if (!(k in rest) && typeof val === "string") rest[k] = val;
   }
   for (const v of ["front", "back"] as const) {
