@@ -156,8 +156,9 @@ const refOf = (who: string) => path(new URL(`${who}.wav`, VOICE_REFS));
 /** What a clip is made from: a change of any of these makes it stale. */
 const sigOf = (l: Line, v: VoiceChoice) => hash(JSON.stringify([MODEL, v.ref, v.exaggeration, v.cfg, v.tempo, spoken(l.text), l.emo ?? "", 2]));
 
-/** The best candidates for a brief: the right gender and accent, nearest the age's pitch. */
-export function candidates(b: VoiceBrief, all: PoolVoice[], n: number): PoolVoice[] {
+/** The best candidates for a brief: the right gender and accent, nearest the age's pitch, and none another character already has. */
+export function candidates(b: VoiceBrief, pool: PoolVoice[], n: number, taken: Set<string> = new Set()): PoolVoice[] {
+  const all = pool.filter(p => !taken.has(p.id));
   const pitch = b.age === "child" ? 300 : b.gender === "neutral" ? 165 : b.gender === "female" ? (b.age === "elder" ? 190 : 225) : (b.age === "elder" ? 105 : b.age === "young" ? 130 : 118);
   const fits = (p: PoolVoice) => b.age === "child" ? p.gender === "child" || p.gender === "female" : p.gender !== "child" && (b.gender === "neutral" || p.gender === b.gender);
   const near = (ps: PoolVoice[]) => ps.filter(fits).sort((x, y) => Math.abs(x.f0 - pitch) - Math.abs(y.f0 - pitch));
@@ -194,7 +195,9 @@ async function audition(o: { who?: string[]; n: number; force: boolean; ref?: st
       const extra = o.ref ? voices.find(p => p.id === o.ref) : undefined;
       if (o.ref && !extra) throw new Error(`no candidate "${o.ref}" in the pool`);
       const entry: Audition = { who, brief: ch.brief, samples, candidates: extra ? (index[who]?.candidates ?? []).filter(x => x.ref !== extra.id) : [] };
-      for (const p of extra ? [extra] : candidates(ch.brief, voices, o.n)) {
+      // the voices the other characters already have are not offered again
+      const taken = new Set(Object.entries(c.characters).filter(([w, x]) => w !== who && !x.unvoiced && x.voice).map(([, x]) => x.voice!.ref));
+      for (const p of extra ? [extra] : candidates(ch.brief, voices, o.n, taken)) {
         const v: VoiceChoice = { ref: p.id, exaggeration: 0.5, cfg: 0.3, tempo: 1, confirmed: false };
         const clips = [];
         for (const [i, text] of samples.entries()) {
