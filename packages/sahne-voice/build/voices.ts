@@ -179,9 +179,9 @@ export function samplesOf(who: string, all: Line[]): string[] {
   return [a?.text, b?.text].filter((t): t is string => !!t);
 }
 
-interface Audition { who: string; brief: VoiceBrief; samples: string[]; candidates: { ref: string; lang: string; gender: string; f0: number; source: string; clips: { f: string; ms: number; doubt?: string; heard: string }[] }[] }
+interface Audition { who: string; brief: VoiceBrief; samples: string[]; candidates: { ref: string; lang: string; gender: string; f0: number; source: string; exaggeration?: number; cfg?: number; clips: { f: string; ms: number; doubt?: string; heard: string }[] }[] }
 
-async function audition(o: { who?: string[]; n: number; force: boolean; ref?: string }) {
+async function audition(o: { who?: string[]; n: number; force: boolean; ref?: string[]; exaggeration?: number; cfg?: number }) {
   const c = cast(), all = storyIds().flatMap(linesOf), voices = pool();
   if (!voices.length) throw new Error(`no candidate voices: build ${path(VOICE_POOL)}pool.json first (build/pool.py)`);
   const dir = VOICE_AUDITION, index = readJson<Record<string, Audition>>(new URL("audition.json", dir), {});
@@ -192,13 +192,14 @@ async function audition(o: { who?: string[]; n: number; force: boolean; ref?: st
       const samples = samplesOf(who, all), out = new URL(`${who}/`, dir);
       mkdirSync(out, { recursive: true });
       // --ref: one more candidate (a sample of the developer's own) beside the ones already auditioned
-      const extra = o.ref ? voices.find(p => p.id === o.ref) : undefined;
-      if (o.ref && !extra) throw new Error(`no candidate "${o.ref}" in the pool`);
-      const entry: Audition = { who, brief: ch.brief, samples, candidates: extra ? (index[who]?.candidates ?? []).filter(x => x.ref !== extra.id) : [] };
+      // --ref a,b: these candidates (samples of the developer's own, or chosen ones) beside the ones already auditioned
+      const extra = o.ref?.map(r => voices.find(p => p.id === r) ?? (() => { throw new Error(`no candidate "${r}" in the pool`); })());
+      const entry: Audition = { who, brief: ch.brief, samples, candidates: extra ? (index[who]?.candidates ?? []).filter(x => !extra.some(e => e.id === x.ref)) : [] };
       // the voices the other characters already have are not offered again
       const taken = new Set(Object.entries(c.characters).filter(([w, x]) => w !== who && !x.unvoiced && x.voice).map(([, x]) => x.voice!.ref));
-      for (const p of extra ? [extra] : candidates(ch.brief, voices, o.n, taken)) {
-        const v: VoiceChoice = { ref: p.id, exaggeration: 0.5, cfg: 0.3, tempo: 1, confirmed: false };
+      for (const p of extra ?? candidates(ch.brief, voices, o.n, taken)) {
+        // --cfg 0 drops the sample's accent: a Persian reader speaks plain Turkish; --exaggeration 0.7 is livelier
+        const v: VoiceChoice = { ref: p.id, exaggeration: o.exaggeration ?? 0.5, cfg: o.cfg ?? 0.3, tempo: 1, confirmed: false };
         const clips = [];
         for (const [i, text] of samples.entries()) {
           const f = `${p.id}-${i}-${hash(text + v.cfg + v.exaggeration).slice(0, 6)}.m4a`, file = path(new URL(f, out));
@@ -208,7 +209,7 @@ async function audition(o: { who?: string[]; n: number; force: boolean; ref?: st
           clips.push({ f, ...r });
           console.log(`${who.padEnd(10)} ${p.id.padEnd(6)} ${r.doubt ? "doubt" : "ok   "} ${text}`);
         }
-        entry.candidates.push({ ref: p.id, lang: p.lang, gender: p.gender, f0: p.f0, source: p.source, clips });
+        entry.candidates.push({ ref: p.id, lang: p.lang, gender: p.gender, f0: p.f0, source: p.source, exaggeration: v.exaggeration, cfg: v.cfg, clips });
       }
       // another run (backstage's Audition button) may have written since: merge into the file as it is now
       const now = readJson<Record<string, Audition>>(new URL("audition.json", dir), {});
@@ -353,7 +354,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const cmd = args.find((a, i) => !a.startsWith("--") && !VALUED.includes(args[i - 1])) ?? (args.includes("--check") ? "check" : "status");
   if (cmd === "check") process.exit(check() ? 1 : 0);
   else if (cmd === "status") status();
-  else if (cmd === "audition") await audition({ who: list("who"), n: Number(opt("n") ?? 5), force: args.includes("--force"), ref: opt("ref") });
+  else if (cmd === "audition") await audition({ who: list("who"), n: Number(opt("n") ?? 5), force: args.includes("--force"), ref: list("ref"), exaggeration: opt("exaggeration") ? Number(opt("exaggeration")) : undefined, cfg: opt("cfg") ? Number(opt("cfg")) : undefined });
   else if (cmd === "generate") await generate({ story: list("story"), who: list("who"), jobs: opt("jobs") ? Number(opt("jobs")) : undefined });
   else if (cmd === "choose") {
     const [who, ref] = [opt("who"), opt("ref")];
