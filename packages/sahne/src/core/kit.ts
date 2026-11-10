@@ -47,6 +47,8 @@ export interface Item {
   alt?: { key: string; value: string; default?: boolean };
   /** A piece of a held part (`hold`) in this hand: the stage leaves it out while the script puts a prop in the same hand. */
   hold?: "l" | "r";
+  /** The avatar field whose part drew this piece (`wear.hands`), set by `compose`: a still picture can frame one part (`StillOptions.focus`). */
+  from?: string;
 }
 
 // ---- Gestures (DESIGN.md §7) -------------------------------------------------------------

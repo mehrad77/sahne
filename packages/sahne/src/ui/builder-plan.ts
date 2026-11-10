@@ -54,6 +54,19 @@ export function fieldFraming(field: string): Framing {
   return "full";
 }
 
+/**
+ * A thumbnail that shows a small part (or the bottom half, for trousers and skirts) close up (`StillOptions.focus`) instead of the whole figure: the part, and for "None" the
+ * bones it would sit on. Null for the fields `fieldFraming` frames well enough (and `hold`, whose item is drawn alone).
+ */
+export function fieldFocus(field: string): { field: string; bones: string[]; always?: boolean } | null {
+  const bones: Record<string, string[]> = {
+    "wear.waist": ["hips"], "wear.wrist": ["hand_l", "hand_r"], "wear.hands": ["hand_l", "hand_r"], "outfit.shoes": ["foot_l", "foot_r"],
+    "outfit.bottom": ["thigh_l", "thigh_r", "shin_l", "shin_r"],
+  };
+  // the legs frame every bottom, so shorts and long trousers share one crop
+  return Object.hasOwn(bones, field) ? { field, bones: bones[field], ...(field === "outfit.bottom" ? { always: true } : {}) } : null;
+}
+
 /** The preview's framing for a section: head for the face and hair, the whole figure for the body and clothes, a bust for extras. */
 export function sectionFraming(section: string): Framing {
   return section === "face" || section === "hair" ? "head" : section === "extras" ? "bust" : "full";

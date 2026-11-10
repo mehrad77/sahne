@@ -19,7 +19,7 @@ import { portrait } from "../render/still/portrait.ts";
 import type { Framing } from "../render/paper/camera.ts";
 import { mountStage, type Stage, type Motion, type Backdrop } from "../stage.ts";
 import { BUILDER_CSS } from "./builder-css.ts";
-import { uiWords, fill, fieldFraming, sectionFraming, emotionStrip, tapGestures, tagFilters, passes, colourSlots, withMark, roving, type UiWords } from "./builder-plan.ts";
+import { uiWords, fill, fieldFraming, fieldFocus, sectionFraming, emotionStrip, tapGestures, tagFilters, passes, colourSlots, withMark, roving, type UiWords } from "./builder-plan.ts";
 
 export interface BuilderUIOptions {
   kit: Kit;
@@ -169,7 +169,7 @@ export function mountBuilder(host: HTMLElement, o: BuilderUIOptions): BuilderUI 
     if (!el.isConnected) return;
     const d = make();
     if (!d) return;
-    const key = `${po?.framing}|${po?.emotion ?? ""}|${po?.view ?? ""}|${serialize(d as AvatarDoc)}`;
+    const key = `${po?.framing}|${po?.only ?? ""}|${po?.focus?.field ?? ""}|${po?.emotion ?? ""}|${po?.view ?? ""}|${serialize(d as AvatarDoc)}`;
     if (el.dataset.k === key) return;
     el.dataset.k = key;
     el.innerHTML = portrait(d, kit, { ...opts, ...po });
@@ -395,13 +395,17 @@ export function mountBuilder(host: HTMLElement, o: BuilderUIOptions): BuilderUI 
       if (what !== "opt" && what !== "pat") continue;
       const f = builder.field(field);
       if (!f) continue;
-      const fr = fieldFraming(field), detail = 96;
+      // what is held is drawn alone, framed around it: on the whole figure it would be a few pixels
+      const fr = fieldFraming(field), detail = 96, only = field === "hold" && what === "opt" ? "held" as const : undefined;
+      // a small part (a ring, an apron, shoes) close up, the figure around it
+      // a pattern on the part that takes it (the shoes, the trousers), not on the whole figure
+      const zoom = what === "pat" ? { ...fieldFocus(field), field, bones: fieldFocus(field)?.bones ?? [] } : fieldFocus(field) ?? undefined;
       for (const b of items) {
         const el = b.querySelector<HTMLElement>(".sahne-bld-thumb")!, v = b.dataset.v === "" ? null : b.dataset.v!;
         const make = what === "pat" ? () => withPattern(field, v)
           : f.kind === "multi" ? () => builder.preview(field, withMark(cur as string[], v!, f.max ?? 3)) ?? builder.preview(field, [v])
           : () => builder.preview(field, v) ?? lockedDoc(field, v);
-        thumbs.push([b, pic(el, make, { framing: fr, detail, idPrefix: `${uid}t` })]);
+        thumbs.push([b, pic(el, make, { framing: fr, only, focus: zoom, detail, idPrefix: `${uid}t` })]);
       }
     }
     // the pictures in view first (read after every write above, so layout runs once)
