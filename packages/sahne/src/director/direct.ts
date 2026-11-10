@@ -513,7 +513,7 @@ class Direction {
 
     // ---- camera
     // a narrator on stage stays out of the shot unless the line frames her
-    this.camera(st, narrator && !["follow", "single", "close"].includes(st.cam ?? "") ? undefined : who, addressee?.id, entering, silent, ops, isLine);
+    this.camera(st, narrator && !["follow", "single", "close"].includes(st.cam ?? "") ? undefined : who, addressee?.id, entering, silent, ops, isLine, arrive);
 
     this.end(tEnd + 250);
     if (st.wait) this.end(st.wait);
@@ -736,20 +736,42 @@ class Direction {
     if (by && by !== who) this.look(by, res, 200);
   }
 
-  camera(st: Staging, who: string | undefined, to: string | undefined, entering: boolean, silent: boolean, ops: ObjOp[], isLine: boolean) {
+  /**
+   * The cue's shot (DESIGN.md §6.6). Without `cam`, a line frames its speaker and addressee only
+   * when they are everyone on stage (the narrator aside); with anyone else there it stays wide.
+   * Framings are taken from where the actors stand when the cue ends, so while someone the shot
+   * frames is still on the way (an entrance, a walk), the camera holds the wide, which shows the
+   * walk and everyone, and moves to the shot as they arrive (a shot kept from the cue before too).
+   * `follow` is framed live and needs no wait.
+   */
+  camera(st: Staging, who: string | undefined, to: string | undefined, entering: boolean, silent: boolean, ops: ObjOp[], isLine: boolean, arrive: Record<string, number> = {}) {
     const w = this.w;
     let shot: Shot | null = null;
     const objs = ops.filter(o => ["hide", "show", "give", "take"].includes(o.op)).map(o => o.id).filter(id => w.props[id] && !w.props[id].holder);
-    if (st.cam === "wide" || (!st.cam && entering)) shot = { kind: "wide", ids: [], objs: [] };
+    const wide: Shot = { kind: "wide", ids: [], objs: [] };
+    if (st.cam === "wide" || (!st.cam && entering)) shot = wide;
     else if (st.cam) shot = { kind: st.cam, ids: [who, to].filter((x): x is string => !!x && !!w.actors[x]?.on), objs: st.at?.startsWith("obj:") ? [st.at.slice(4)] : objs };
     else if (who && w.actors[who]?.on && (isLine || objs.length)) {
       if (silent) shot = { kind: "close", ids: [who], objs: [] };
       else {
         const ids = [who, to].filter((x): x is string => !!x && !!w.actors[x]?.on);
-        shot = { kind: ids.length > 1 ? "two" : "single", ids, objs };
+        // anyone else on stage (the narrator aside) keeps the wide: every scene shows everyone in it
+        const others = Object.values(w.actors).some(a => a.on && a.id !== this.ctx.narrator && !ids.includes(a.id));
+        shot = others ? wide : { kind: ids.length > 1 ? "two" : "single", ids, objs };
       }
     }
-    if (shot && !sameShot(shot, w.shot)) {
+    // no new shot keeps the one there is, and it too waits for whoever it frames
+    shot ??= w.shot;
+    // walk first, then the shot: hold the wide until everyone it frames has arrived (a two-shot frames
+    // all its ids, the closer shots the first; stage.ts `framing`)
+    const framed = shot.kind === "follow" ? [] : shot.kind === "two" ? shot.ids : shot.ids.slice(0, 1);
+    const tArr = Math.max(-Infinity, ...framed.filter(id => arrive[id] !== undefined).map(id => arrive[id]));
+    if (tArr > 0) {
+      if (!sameShot(wide, w.shot)) this.perf.cams.push({ t: 0, shot: wide });
+      this.perf.cams.push({ t: tArr, shot });
+      w.shot = shot;
+      this.end(tArr + CAM_MS);
+    } else if (!sameShot(shot, w.shot)) {
       this.perf.cams.push({ t: 0, shot });
       w.shot = shot;
       this.end(CAM_MS);

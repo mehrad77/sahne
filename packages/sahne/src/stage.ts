@@ -1389,7 +1389,8 @@ export class Stage {
       this.camBusy = false;
       const toCam = this.shotCam(f.shot.to, f);
       if (this.motion === "still") this.cam = toCam;
-      else if (f.shot.k < 1) this.cam = blendCam(this.camFrom ?? this.shotCam(f.shot.from, f), toCam, f.shot.k);
+      // the first move starts from wherever the last cue left the camera; a later one (the wide held for a walk, then the shot) from the shot before it
+      else if (f.shot.k < 1) this.cam = blendCam((p.cams.length < 2 || f.t < p.cams[1].t ? this.camFrom : null) ?? this.shotCam(f.shot.from, f), toCam, f.shot.k);
       else if (this.camFrom && f.t < CAM_MS && p.cams.every(c => c.t === 0)) this.cam = blendCam(this.camFrom, toCam, ease.inOut(f.t / CAM_MS));
       else this.cam = toCam;
     }
