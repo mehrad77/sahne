@@ -36,7 +36,34 @@ const writeJson = (u: URL, v: unknown) => writeFileSync(u, JSON.stringify(v, nul
 const main = (readJson<{ languages?: { main: string } }>(SERIES, {}).languages?.main) ?? "tr";
 const lang = LANGS[main];
 if (!lang) throw new Error(`sahne-voice: no language plugin for "${main}"`);
-const spoken = (t: string) => lang.spoken?.(t) ?? t;
+/**
+ * A line as the recording says it. The stand-in's name is the learner's own on screen (the app puts it in), so a clip never
+ * says "Nima": a name on its own between commas or at the end (*Günaydın, Nima!*) is left out, and a name inside the sentence
+ * becomes the pronoun in its case (Turkish: *Nima'nın* → *onun*, *Nima'ya* → *ona*, *Nima* → *o*).
+ */
+const NAME = "Nima", NARRATOR = "kerim";
+const CASES: [RegExp, string][] = [
+  [/'(n[ıi]n|[ıi]n)\b/, "onun"], [/'(y[ae]|[ae])\b/, "ona"], [/'(y[ıi]|[ıi])\b/, "onu"], [/'(d[ae]|t[ae])\b/, "onda"],
+  [/'(d[ae]n|t[ae]n)\b/, "ondan"], [/'(yl[ae]|l[ae])\b/, "onunla"], [/'(ın|in)\b/, "onun"],
+];
+export function withoutName(t: string, who?: string): string {
+  if (main !== "tr" || !t.includes(NAME)) return t;
+  const B = "(^|[!?.]\\s+|…\\s*)";                                                       // a sentence's start, or after "…"
+  let out = t
+    .replace(new RegExp(`${B}${NAME}[!?]+\\s*`, "g"), "$1")                              // "Nima! Kaç lira?" → "Kaç lira?"
+    // "Nima…": the narrator speaks of the learner ("O… yeni bir ev?"), anyone else speaks to them ("…bavulun yok mu?")
+    .replace(new RegExp(`${B}${NAME}…\\s*`, "g"), who === NARRATOR ? "$1O… " : "$1")
+    .replace(new RegExp(`,\\s*${NAME}(?=\\s*[!?.…,]|$)`, "g"), "")                        // "Günaydın, Nima!" → "Günaydın!"
+    .replace(new RegExp(`${B}${NAME}\\s*,\\s*(?![A-ZÇĞİÖŞÜ][a-zçğıöşü]+ ve )`, "g"), "$1"); // "Nima, bak!" → "bak!" (not a list: "Nima, Dilnoza ve Yusuf")
+  out = out.replace(new RegExp(`${NAME} için`, "g"), "onun için").replace(new RegExp(`${NAME}('[a-zçğıöşü]+)`, "g"), (_, suf: string) => {
+    for (const [re, pro] of CASES) if (re.test(suf)) return pro;
+    return "o";
+  }).replace(new RegExp(`\\b${NAME}\\b`, "g"), "o");
+  // a sentence that now starts with a small letter (not after "…", which goes on the same sentence)
+  out = out.replace(/(^|[!?.]\s+)([a-zçğıöşü])/g, (_, p: string, c: string) => p + c.toLocaleUpperCase("tr")).replace(/\s{2,}/g, " ").trim();
+  return out || t;
+}
+const spoken = (t: string, who?: string) => { const v = withoutName(t, who); return lang.spoken?.(v) ?? v; };
 
 // ---- the lines ----
 
@@ -134,8 +161,8 @@ async function finish(wav: string, out: string, tempo: number) {
 }
 
 /** Whether a clip says the line: the language's say-it-aloud matching, and a length near its own timing of the line. */
-function judge(text: string, heard: string, ms: number): { ok: boolean; doubt?: string; score: number } {
-  const said = spoken(text);
+function judge(text: string, heard: string, ms: number, who?: string): { ok: boolean; doubt?: string; score: number } {
+  const said = spoken(text, who);
   const m = lang.matchLine?.(heard, [said], { names: [STANDIN === "nima" ? "Nima" : STANDIN] });
   const score = m ? m.score : lang.normalise?.(heard) === lang.normalise?.(said) ? 1 : 0;
   const expect = lang.speech(said).dur, ratio = expect ? ms / expect : 1;
@@ -150,12 +177,12 @@ async function make(w: Worker, l: { who: string; text: string; emo?: string }, v
   const exaggeration = Math.min(1, Math.max(0.25, v.exaggeration + (FEELING[l.emo ?? ""] ?? 0)));
   for (let i = 0; i < takes; i++) {
     const raw = join(w.dir, `raw${i}.wav`), f = join(w.dir, `take${i}.m4a`);
-    const r = await w.ask({ op: "say", text: spoken(l.text), lang: main, ref, exaggeration, cfg: v.cfg, seed: parseInt(hash(`${l.who}${l.text}${i}`).slice(0, 8), 16), out: raw });
+    const r = await w.ask({ op: "say", text: spoken(l.text, l.who), lang: main, ref, exaggeration, cfg: v.cfg, seed: parseInt(hash(`${l.who}${l.text}${i}`).slice(0, 8), 16), out: raw });
     // the model can fail on a take (an empty sampling step): another seed usually works
     if (!r.ok) { failed = String(r.error); continue; }
     await finish(raw, f, v.tempo);
     const h = await w.ask({ op: "hear", path: f, lang: main });
-    const heard = String(h.heard ?? ""), ms = await lengthMs(f), j = judge(l.text, heard, ms);
+    const heard = String(h.heard ?? ""), ms = await lengthMs(f), j = judge(l.text, heard, ms, l.who);
     if (!best || (j.ok ? 2 : 0) + j.score > (best.doubt ? 0 : 2) + best.score) best = { score: j.score, ms, doubt: j.doubt, heard, f };
     if (j.ok) break;
   }
@@ -172,7 +199,7 @@ const cast = (): VoiceCast => readJson<VoiceCast>(VOICE_CAST, { model: MODEL, ch
 /** The sample a confirmed voice is cloned from: the copy in refs/, made when it was picked. */
 const refOf = (who: string) => path(new URL(`${who}.wav`, VOICE_REFS));
 /** What a clip is made from: a change of any of these makes it stale. */
-const sigOf = (l: Line, v: VoiceChoice) => hash(JSON.stringify([MODEL, v.ref, v.exaggeration, v.cfg, v.tempo, spoken(l.text), l.emo ?? "", 2]));
+const sigOf = (l: Line, v: VoiceChoice) => hash(JSON.stringify([MODEL, v.ref, v.exaggeration, v.cfg, v.tempo, spoken(l.text, l.who), l.emo ?? "", 2]));
 
 /** The best candidates for a brief: the right gender and accent, nearest the age's pitch, and none another character already has. */
 export function candidates(b: VoiceBrief, pool: PoolVoice[], n: number, taken: Set<string> = new Set()): PoolVoice[] {

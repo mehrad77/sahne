@@ -21,7 +21,7 @@ The voice plugin of Sahne: each character speaks in their own voice, the same in
    - A clip that fails is made again with another seed, up to four takes. The best take is kept and marked `doubt`, and the Voices page lists it for listening.
 7. **Playing.** The app makes `clipVoice({ base, lang, fallback })`, a `VoiceProvider` for the stage (`sahne/DESIGN.md` §8.4), before the story starts.
    - It plays a line's clip into the voice bus. Its word marks are the language plugin's timing of the line, stretched to the clip.
-   - A line with no clip goes to the fallback, the device's voice (`browserVoice()`). That covers a story not recorded yet, and a line that carries the learner's own name or hometown: the clips say the series' default, Nima and Tahran.
+   - A line with no clip goes to the fallback, the device's voice (`browserVoice()`): a story not recorded yet. A line that names the stand-in has its clip too: the recording leaves the name out (*Günaydın, Nima!* says *Günaydın!*; inside a sentence the name becomes the pronoun: *Nima'nın saati* says *onun saati*), so it fits any learner's name, and `clipVoice({ personalise })` finds it under the line with the learner's name put in.
 
 Every clip carries Resemble's inaudible Perth watermark.
 

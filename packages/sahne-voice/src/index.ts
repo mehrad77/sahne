@@ -1,7 +1,7 @@
 // sahne-voice: each character's own voice, recorded ahead of time. A developer casts a voice for each character (backstage's
 // Voices page: candidate samples, a pick, a tempo), confirms it, and the generator (build/voices.ts) reads every line of every
 // story in that voice with a local speech model; an app plays the clips through `clipVoice`, a VoiceProvider for the stage
-// (sahne/src/audio/voice.ts). A line with no clip (a story not generated yet, a line with the learner's own name in it) goes to
+// (sahne/src/audio/voice.ts). A line with no clip (a story not generated yet) goes to
 // the fallback voice, the device's. The formats are below; the README says how to cast and generate.
 
 import type { LangPlugin, Speaking, SpeakOptions, VoiceProvider } from "sahne";
@@ -84,6 +84,11 @@ export interface ClipVoiceOptions {
   lang: LangPlugin;
   /** For lines with no clip: the device's voice (`browserVoice()`). Without one, those lines keep the stage's own timing. */
   fallback?: VoiceProvider;
+  /**
+   * How the app puts the learner's name into a line (Kumru's `personalizeStr`): the stage speaks the personalised line, and a
+   * clip is filed under the line as written, so each clip is found under both. The clip itself never says the name.
+   */
+  personalise?: (text: string) => string;
   fetch?: typeof fetch;
 }
 
@@ -118,6 +123,7 @@ export async function clipVoice(o: ClipVoiceOptions): Promise<ClipVoice> {
     return p;
   };
   const count = Object.values(lines).reduce((n, per) => n + Object.keys(per).length, 0);
+  if (o.personalise) for (const per of Object.values(lines)) for (const [t, c] of Object.entries(per)) { const p = o.personalise(t); if (p !== t && !per[p]) per[p] = c; }
   let current: (() => void) | null = null;
 
   return {
