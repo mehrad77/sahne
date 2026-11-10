@@ -2,11 +2,42 @@
 
 Each release, newest first. The packages' `package.json` files carry the version.
 
+## Sahne 0.3
+
+### 0.3.0
+
+**Latest, 10 November 2026. Every character in their own voice.** [On GitHub](https://github.com/mehrad77/sahne/releases/tag/v0.3.0).
+
+![Sahne 0.3: every character speaks in their own voice, the same in every episode. A story playing in the bakkal, İsmail Abi's line marked with his voice](../../../assets/releases/sahne-0.3.jpg)
+
+Until now every character spoke in the device's one Turkish voice, a little higher or slower for each. Now each has their own, the same in every episode. The voices are made once, on the developer's own machine, and the app only plays the recordings.
+
+- **A new package, [`sahne-voice`](../../sahne-voice/README.md).** It casts the voices, makes every line's recording, and plays them on the stage.
+  - The stage plays a line's recording and keeps its timing: mouths and gestures follow the words.
+  - A line with no recording falls back to the device's voice. That covers a story not recorded yet, or a line with the learner's own name in it.
+  - A character can be **not voiced**: their lines stay silent, with no fallback either. Kumru uses this for the learner's stand-in, whose lines are the learner's own to say.
+  - A recording is a few kB of AAC. An app fetches a story's recordings when the story opens, never all at once.
+- **Casting in Backstage**, on its new Voices page (`#/voices`).
+  - Each character has a brief: gender, age and accent.
+  - Candidates read two of the character's own lines. A candidate another character already has isn't offered.
+  - Set the tempo (the page shows syllables per second) and the feeling, then confirm. A sample of your own can be added as a candidate.
+- **The voices come from real readers.** The candidates are samples from Google's FLEURS (CC BY 4.0, paid readers who agreed to it), in six languages. A Persian sample gives a character a Persian accent; another setting drops the accent. Children's voices are raised from young women's.
+- **Every recording is checked.** A speech model on your machine (Chatterbox Multilingual, MIT) clones the chosen voice for each line. Whisper then hears the line back.
+  - A line is kept only when the language plugin accepts what was heard and the length is right.
+  - Otherwise it is made again, up to four times. The best take is kept and marked for a listen.
+  - `--check` lists any line whose recording is missing or out of date.
+- **Turkish.** [`sahne-tr`](../../sahne-tr/README.md) gives a line as a voice should read it (`spoken`): numbers in words, no quote marks.
+
+**Upgrading.**
+- Nothing changes until an app opts in. `browserVoice()` is still the stage's voice.
+- To use recorded voices, an app makes `clipVoice({ base, lang, fallback })` from `sahne-voice` before the story starts, and serves the content root's `voices/clips/`.
+- A language plugin may add `spoken(text)`. Without it, a line is read as written.
+
 ## Sahne 0.2
 
 ### 0.2.3
 
-**Latest, 10 November 2026. Story checks that let dialogue breathe.** [On GitHub](https://github.com/mehrad77/sahne/releases/tag/v0.2.3).
+**10 November 2026. Story checks that let dialogue breathe.** [On GitHub](https://github.com/mehrad77/sahne/releases/tag/v0.2.3).
 
 A review of Kumru's whole first season found rules that pushed writers toward stiff, crammed scenes. They are looser now, and there are new checks for what went wrong on screen.
 
