@@ -86,7 +86,7 @@ test("each rule catches its own break", () => {
   broken("explore", d => { d.props!.sut.terms = ["a1-w-taksi"]; });
   broken("light", d => { d.pieces = d.pieces.filter(p => p.kit !== "lamp"); });
   broken("sound", d => { d.motif = "opera"; });
-  broken("budget", d => { d.name.en = "x".repeat(6000); });
+  broken("budget", d => { d.props!.sut.terms = Array(500).fill("a1-w-sut"); });
 });
 
 test("crowds keep clear of the marks people stand on, and there are not too many of them (warnings)", () => {
@@ -244,4 +244,10 @@ test("a vehicle seen from inside (a cabin piece) fills the actors' and near band
   const msgs = lintPlace(car as StoryPlace, { kit, cards, needs }).map(p => `${p.rule}: ${p.message}`);
   assert.ok(msgs.some(m => /density: 3 pieces; a finished vehicle \(with a cabin\) has at least 6/.test(m)), msgs.join(" | "));
   assert.ok(msgs.some(m => /depth: .*missing backdrop$/.test(m)) && !msgs.some(m => /missing.*(actors|near)/.test(m)), msgs.join(" | "));
+});
+
+test("budget: the place's name, in however many languages, does not count", () => {
+  const d = good();
+  (d.name as Record<string, string>).ru = "x".repeat(6000);
+  assert.ok(!lint(d).some(p => p.rule === "budget"));
 });

@@ -14,7 +14,7 @@
 //   reach    people can walk to every mark they stand on from the first door mark (out through its own door too), round the solid lines (no mark stands in one)
 //   light    a place with dusk or night has a practical light and something lit
 //   sound    an ambience bed, a motif and a surface the kit has
-//   budget   at most 5 KB of JSON, and every flat of its pieces and props fits a layer of the atlas
+//   budget   at most 5 KB of JSON (the name left out), and every flat of its pieces and props fits a layer of the atlas
 //
 // A document with a `placeholder` (a draft whose art stands in) gets warnings only. The camera check
 // and the owner's review are the gallery's (#/places/<id>, shots.mjs --camera).
@@ -254,8 +254,8 @@ export function lintPlace(doc: StoryPlace, o: PlaceLintOptions): PlaceProblem[] 
   if (!doc.surface) add("sound", "no surface for the footsteps");
   else if (!SURFACES.has(doc.surface)) add("sound", `surface ${doc.surface} is not one of ${[...SURFACES].join(", ")}`);
 
-  // ---- budget
-  const bytes = JSON.stringify(doc).length;
+  // ---- budget: the stage's data; the name is left out, so a series can name its places in as many languages as it has
+  const bytes = JSON.stringify({ ...doc, name: undefined }).length;
   if (bytes > MAX_BYTES) add("budget", `${bytes} bytes of JSON; at most ${MAX_BYTES}`);
   // a flat larger than an atlas layer cannot be drawn at all, and the place would not load: as the stage draws it (DESIGN.md §6.2)
   const big = (what: string, f: FlatSpec) => {
